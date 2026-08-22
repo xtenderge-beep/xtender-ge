@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-slate-50 scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xtender.ge — Грузоперевозки, Грузчики и Вывоз Мусора в Тбилиси</title>
+
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <!-- Tailwind CSS Engine -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .mic-active {
+            animation: pulse-ring 1.2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="font-sans text-slate-800 bg-slate-50 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6">
+            <div class="flex items-center justify-between h-16 sm:h-20">
+                
+                <!-- Brand Logo -->
+                <a href="#" class="flex items-center gap-2">
+                    <span class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                        xtender<span class="text-emerald-600">.ge</span>
+                    </span>
+                </a>
+
+                <!-- 3 Categories Pills Header -->
+                <div class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600">
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1">🚚 Перевозки</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1">💪 Грузчики</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1">🧹 Вывоз мусора</span>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+                        <button onclick="setLanguage('ka')" id="lang-ka" class="px-2.5 py-1 rounded-lg hover:bg-white/50 transition">KA</button>
+                        <button onclick="setLanguage('ru')" id="lang-ru" class="px-2.5 py-1 rounded-lg bg-white shadow-sm text-slate-900 font-extrabold">RU</button>
+                        <button onclick="setLanguage('en')" id="lang-en" class="px-2.5 py-1 rounded-lg hover:bg-white/50 transition">EN</button>
+                    </div>
+
+                    <button onclick="openModal('driver-modal')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <i class="fa-solid fa-truck text-amber-400"></i>
+                        <span class="hidden sm:inline">Исполнителям</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow">
+        
+        <section class="bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white pt-10 pb-16 px-4">
+            <div class="max-w-3xl mx-auto text-center space-y-4">
+                
+                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold">
+                    <i class="fa-solid fa-bullhorn text-amber-400"></i>
+                    <span>Информационный сервис рассылки заказов по Тбилиси</span>
+                </div>
+
+                <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+                    Решите вашу задачу за <span class="text-emerald-400">несколько минут</span>
+                </h1>
+
+                <!-- 3 Categories Display -->
+                <div class="flex flex-wrap justify-center gap-2 pt-1 text-xs sm:text-sm font-bold text-slate-200">
+                    <span class="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center gap-1.5">
+                        🚚 <strong class="text-white">Машины</strong> (Газель / Транзит)
+                    </span>
+                    <span class="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center gap-1.5">
+                        💪 <strong class="text-white">Грузчики</strong>
+                    </span>
+                    <span class="px-3 py-1.5 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center gap-1.5">
+                        🧹 <strong class="text-white">Вывоз Строймусора</strong>
+                    </span>
+                </div>
+
+                <!-- 2 Options Visual Card -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 text-left max-w-2xl mx-auto text-xs">
+                    <div class="bg-slate-800/90 p-3.5 rounded-2xl border border-slate-700/70 space-y-1">
+                        <div class="font-extrabold text-amber-400 flex items-center gap-1.5">
+                            <span class="w-5 h-5 rounded-full bg-amber-400 text-slate-900 flex items-center justify-center font-black text-[10px]">1</span>
+                            <span>Заполнить СМС-Заявку</span>
+                        </div>
+                        <p class="text-slate-300 text-[11px] leading-snug">Мы сами разошлем задачу водителям и грузчикам. Когда найдете варианты — удалите заявку из системы.</p>
+                    </div>
+                    <div class="bg-slate-800/90 p-3.5 rounded-2xl border border-slate-700/70 space-y-1">
+                        <div class="font-extrabold text-emerald-400 flex items-center gap-1.5">
+                            <span class="w-5 h-5 rounded-full bg-emerald-400 text-slate-900 flex items-center justify-center font-black text-[10px]">2</span>
+                            <span>Позвонить напрямую</span>
+                        </div>
+                        <p class="text-slate-300 text-[11px] leading-snug">Выберите подходящую машину или бригаду из списка ниже и свяжитесь с ними самостоятельно.</p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="max-w-2xl mx-auto px-4 -mt-8 relative z-20 pb-8">
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-5 sm:p-7 space-y-5">
+                
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h2 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane text-emerald-600"></i>
+                        <span>СПОСОБ 1: Автоматическая СМС-Рассылка</span>
+                    </h2>
+                </div>
+
+                <!-- Single Input Task Box -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="main-task-input" class="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                            <span>Опишите вашу задачу в свободной форме:</span>
+                        </label>
+                        <button onclick="toggleVoiceInput()" id="mic-btn" type="button" class="text-[11px] font-bold text-slate-600 hover:text-emerald-600 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-emerald-50 border border-slate-200 transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-microphone text-emerald-500" id="mic-icon"></i>
+                            <span id="mic-label">Надиктовать</span>
+                        </button>
+                    </div>
+                    
+                    <textarea id="main-task-input" rows="3" 
+                        placeholder="Например: Нужен Форд Транзит и 2 грузчика, перевезти диван с Сабуртало или вывезти 20 мешков строймусора..." 
+                        class="w-full p-4 rounded-2xl border-2 border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 text-sm font-medium outline-none transition text-slate-800 resize-none shadow-inner bg-slate-50/50"></textarea>
+
+                    <!-- Fast Quick Templates across 3 categories -->
+                    <div class="mt-2.5 flex flex-wrap items-center gap-1.5 text-xs">
+                        <span class="text-slate-400 font-medium text-[11px]">Примеры:</span>
+                        <button onclick="setTaskTag('🚚 Нужен Форд Транзит или Газель для перевозки мебели')" class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-900 font-semibold hover:bg-amber-100 transition border border-amber-200/60 text-[11px]">🚚 Форд Транзит (Перевозка)</button>
+                        <button onclick="setTaskTag('💪 Нужно 2 грузчика на 2 часа для разгрузки')" class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 font-semibold hover:bg-emerald-100 transition border border-emerald-200/60 text-[11px]">💪 2 Грузчика</button>
+                        <button onclick="setTaskTag('🧹 Вывезти 30 мешков строительного мусора')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-semibold hover:bg-slate-200 transition text-[11px]">🧹 Вывоз строймусора</button>
+                    </div>
+                </div>
+
+                <!-- Phone Input & Order Buttons -->
+                <div class="space-y-3 pt-1">
+                    <div>
+                        <label for="client-phone-input" class="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                            <i class="fa-solid fa-phone text-emerald-600 mr-1"></i>Укажите ваш номер телефона для откликов:
+                        </label>
+                        <input type="tel" id="client-phone-input" placeholder="+995 5XX XX XX XX" value="+995 "
+                            class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-sm font-bold text-slate-900 bg-white">
+                    </div>
+
+                    <!-- Submit SMS Button -->
+                    <button onclick="launchSmsTender()" class="w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-comment-sms text-amber-300 text-lg"></i>
+                        <span>РАЗОСЛАТЬ СМС-ЗАЯВКУ ИСПОЛНИТЕЛЯМ</span>
+                    </button>
+                </div>
+
+                <!-- Price Benchmark Hint -->
+                <div class="text-[11px] font-semibold text-slate-600 flex flex-wrap items-center gap-1.5 bg-slate-50 border border-slate-200/80 p-2.5 rounded-xl">
+                    <span class="text-slate-800 font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i>
+                        Ориентир цен по Тбилиси:
+                    </span>
+                    <span class="text-slate-700">🚚 Машина — от <strong class="text-slate-900">50 GEL</strong></span>
+                    <span class="text-slate-300">•</span>
+                    <span class="text-slate-700">💪 Грузчик — от <strong class="text-slate-900">25 GEL/час</strong></span>
+                    <span class="text-slate-300">•</span>
+                    <span class="text-slate-700">🧹 Мусор — от <strong class="text-slate-900">60 GEL</strong></span>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="tender-live-section" class="hidden max-w-2xl mx-auto px-4 mb-8">
+            <div class="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-700 space-y-4">
+                
+                <div class="flex items-center justify-between text-xs border-b border-slate-800 pb-3">
+                    <span class="font-bold text-emerald-400 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+                        <span>ВАША ЗАЯВКА АКТИВНА И РАЗОСЛАНА</span>
+                    </span>
+                    <span class="text-slate-400 font-mono text-[11px]">ID #842</span>
+                </div>
+
+                <div class="space-y-1 text-xs">
+                    <p class="text-slate-100 font-bold text-sm" id="drivers-sms-status">
+                        <i class="fa-solid fa-paper-plane text-amber-400 mr-1.5 animate-bounce"></i> СМС отправлено зарегистрированным исполнителям Тбилиси.
+                    </p>
+                    <p class="text-slate-400 text-[11px]">Исполнители получат ваше описание и номер телефона. Они перезвонят вам напрямую.</p>
+                </div>
+
+                <!-- Critical Action: Delete / Close Request Button -->
+                <div class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div class="text-xs">
+                        <p class="font-bold text-amber-400">Нашли подходящий вариант или решили вопрос?</p>
+                        <p class="text-slate-400 text-[11px]">Удалите заявку из системы, чтобы больше не получать откликов.</p>
+                    </div>
+                    <button onclick="deleteActiveTender()" class="w-full sm:w-auto px-4 py-2.5 bg-red-600/90 hover:bg-red-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 shadow-md">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Удалить заявку из системы</span>
+                    </button>
+                </div>
+
+                <div id="bids-feed-container" class="pt-1">
+                    <!-- Dynamic feedback display -->
+                </div>
+            </div>
+        </section>
+
+        <section class="max-w-5xl mx-auto px-4 pb-20 space-y-6">
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 pb-4 gap-2">
+                <div>
+                    <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-address-book text-emerald-600"></i>
+                        <span>СПОСОБ 2: База Машин, Грузчиков и Вывоза Мусора</span>
+                    </h2>
+                    <p class="text-xs text-slate-500">Вы можете самостоятельно позвонить любому зарегистрированному исполнителю или написать в WhatsApp</p>
+                </div>
+            </div>
+
+            <!-- MASTERS & CARS UNIFIED GRID -->
+            <div id="masters-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Javascript populated cards -->
+            </div>
+
+        </section>
+
+    </main>
+
+    <div class="sm:hidden fixed bottom-3 left-3 right-3 z-40 bg-slate-900/95 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-slate-700/60 flex items-center justify-between">
+        <div class="pl-1">
+            <p class="text-[11px] font-bold text-white">Перевозки • Грузчики • Мусор</p>
+            <p class="text-[10px] text-amber-400 font-semibold">СМС-Рассылка или прямой звонок</p>
+        </div>
+        <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); setTimeout(() => document.getElementById('main-task-input').focus(), 300);" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-black text-xs rounded-xl shadow-md flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-paper-plane"></i>
+            <span>Подать заявку</span>
+        </button>
+    </div>
+
+    <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 text-xs">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+                <span class="text-base font-black text-white">xtender<span class="text-emerald-500">.ge</span></span>
+                <p class="text-slate-500 text-[11px]">Информационный сервис рассылки заказов по Тбилиси: Перевозки, Грузчики, Вывоз строймусора.</p>
+            </div>
+            <p class="text-slate-500 text-[11px]">© 2026 xtender.ge • Тбилиси, Грузия</p>
+        </div>
+    </footer>
+
+    <div id="driver-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
+            <button onclick="closeModal('driver-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold hover:bg-slate-200 transition">✕</button>
+
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mx-auto">
+                    <i class="fa-solid fa-truck-fast"></i>
+                </div>
+                <h3 class="text-base font-bold text-slate-900">Исполнителям и Водителям</h3>
+                <p class="text-xs text-slate-500">Получайте СМС с заказами клиентов по Тбилиси (Перевозки, Грузчики, Строймусор)</p>
+            </div>
+
+            <div class="bg-slate-900 text-white p-4 rounded-2xl space-y-2 text-xs">
+                <div class="flex justify-between items-center font-bold border-b border-slate-800 pb-2">
+                    <span class="text-amber-400">Подписка «SMS-Заказы»</span>
+                    <span class="text-emerald-400 text-sm">39 GEL / мес</span>
+                </div>
+                <p class="text-slate-300 text-[11px] leading-relaxed">Прямой номер телефона клиента в каждом СМС. Без комиссии с заказов.</p>
+            </div>
+
+            <div id="toast-message" class="hidden p-2.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl text-center">
+                Переход в WhatsApp техподдержки...
+            </div>
+
+            <button onclick="showDriverContact()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
+                📱 Подключить за 39 GEL / мес
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Database of registered vehicles and workers across the 3 core categories
+        const mastersData = [
+            {
+                id: 1,
+                name: "Давид К.",
+                type: "Ford Transit (Высокий кузов)",
+                categoryTag: "🚚 Машина для перевозок",
+                categoryColor: "bg-amber-100 text-amber-900 border-amber-200",
+                price: "от 60 GEL / рейс",
+                phone: "+995555987654",
+                desc: "Чистый крытый фургон. Перевозка мебели, коробок, бытовой техники."
+            },
+            {
+                id: 2,
+                name: "Георгий и Бригада",
+                type: "Бригада Грузчиков (2-4 чел)",
+                categoryTag: "💪 Грузчики",
+                categoryColor: "bg-emerald-100 text-emerald-900 border-emerald-200",
+                price: "от 30 GEL / час",
+                phone: "+995599123456",
+                desc: "Подъем и спуск мебели без лифта, разгрузка фур, переноска тяжестей."
+            },
+            {
+                id: 3,
+                name: "Отар М. (Вывоз мусора)",
+                type: "ЗИЛ / Самосвал / Мешки",
+                categoryTag: "🧹 Вывоз строймусора",
+                categoryColor: "bg-slate-100 text-slate-900 border-slate-300",
+                price: "от 70 GEL / рейс",
+                phone: "+995595111222",
+                desc: "Вынос строительного мусора в мешках, старой мебели и демонтированного лома."
+            },
+            {
+                id: 4,
+                name: "Ираклий",
+                type: "Mercedes Sprinter Max (4.2m)",
+                categoryTag: "🚚 Машина для перевозок",
+                categoryColor: "bg-amber-100 text-amber-900 border-amber-200",
+                price: "от 65 GEL / рейс",
+                phone: "+995598776554",
+                desc: "Длинная база, до 2.5 тонн. Крупные квартирные и офисные переезды."
+            },
+            {
+                id: 5,
+                name: "Торнике & Разнорабочие",
+                type: "Грузчики + Вынос мусора",
+                categoryTag: "🧹 Вывоз мусора & 💪 Грузчики",
+                categoryColor: "bg-emerald-100 text-emerald-900 border-emerald-200",
+                price: "от 35 GEL / чел",
+                phone: "+995574889900",
+                desc: "Быстрый сбор мусора в мешки, демонтаж и подъем стройматериалов."
+            },
+            {
+                id: 6,
+                name: "Сандро",
+                type: "Газель 4м с Гидробортом",
+                categoryTag: "🚚 Машина с лифтом",
+                categoryColor: "bg-amber-100 text-amber-900 border-amber-200",
+                price: "от 75 GEL / рейс",
+                phone: "+995599334455",
+                desc: "Гидролифт до 750кг. Идеально для тяжелого оборудования, сейфов, холодильников."
+            }
+        ];
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderCatalog(mastersData);
+        });
+
+        function renderCatalog(items) {
+            const grid = document.getElementById('masters-grid');
+            grid.innerHTML = items.map(m => `
+                <div class="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-3">
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${m.categoryColor}">
+                                ${m.categoryTag}
+                            </span>
+                            <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">В базе Тбилиси</span>
+                        </div>
+
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-sm">${m.name}</h3>
+                            <p class="text-xs font-semibold text-emerald-700">${m.type}</p>
+                        </div>
+
+                        <p class="text-xs text-slate-600 leading-snug">${m.desc}</p>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                        <span class="text-xs font-black text-slate-900">${m.price}</span>
+                        <div class="flex items-center gap-1.5">
+                            <a href="https://wa.me/${m.phone.replace('+', '')}" target="_blank" class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center text-sm transition border border-emerald-200/50" title="Написать в WhatsApp">
+                                <i class="fa-brands fa-whatsapp"></i>
+                            </a>
+                            <a href="tel:${m.phone}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 shadow-sm">
+                                <i class="fa-solid fa-phone text-[10px]"></i>
+                                <span>Позвонить</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setTaskTag(text) {
+            document.getElementById('main-task-input').value = text;
+        }
+
+        let isListening = false;
+        function toggleVoiceInput() {
+            const btn = document.getElementById('mic-btn');
+            const icon = document.getElementById('mic-icon');
+            const label = document.getElementById('mic-label');
+            const textarea = document.getElementById('main-task-input');
+
+            if (!isListening) {
+                isListening = true;
+                btn.classList.add('mic-active', 'bg-red-50', 'text-red-600', 'border-red-200');
+                icon.className = 'fa-solid fa-microphone text-red-500 animate-pulse';
+                label.innerText = 'Слушаю...';
+
+                setTimeout(() => {
+                    textarea.value = "Нужен Форд Транзит и 2 грузчика, перевезти шкаф и 10 коробок";
+                    isListening = false;
+                    btn.classList.remove('mic-active', 'bg-red-50', 'text-red-600', 'border-red-200');
+                    icon.className = 'fa-solid fa-microphone text-emerald-500';
+                    label.innerText = 'Надиктовать';
+                }, 2200);
+            }
+        }
+
+        function launchSmsTender() {
+            const task = document.getElementById('main-task-input').value.trim();
+            const phone = document.getElementById('client-phone-input').value.trim();
+
+            if (!task) {
+                showInAppToast("⚠️ Пожалуйста, опишите вашу задачу");
+                return;
+            }
+
+            if (phone.length < 9) {
+                showInAppToast("⚠️ Укажите ваш контактный номер телефона");
+                return;
+            }
+
+            const liveSection = document.getElementById('tender-live-section');
+            liveSection.classList.remove('hidden');
+            liveSection.scrollIntoView({ behavior: 'smooth' });
+
+            const container = document.getElementById('bids-feed-container');
+            container.innerHTML = `
+                <div class="p-3 bg-slate-800/80 border border-slate-700 rounded-xl text-xs text-slate-300 flex items-center gap-2 animate-pulse">
+                    <i class="fa-solid fa-spinner animate-spin text-amber-400"></i>
+                    <span>Идет отправка СМС по базе исполнителей... Ожидайте звонков от мастеров</span>
+                </div>
+            `;
+        }
+
+        function deleteActiveTender() {
+            const liveSection = document.getElementById('tender-live-section');
+            liveSection.classList.add('hidden');
+            
+            // Clear textarea
+            document.getElementById('main-task-input').value = '';
+            
+            showInAppToast("✅ Заявка успешно удалена из системы!");
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+            document.getElementById(id).classList.add('flex');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+            document.getElementById(id).classList.remove('flex');
+        }
+
+        function showDriverContact() {
+            const toast = document.getElementById('toast-message');
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                window.open('https://wa.me/995599000000?text=' + encodeURIComponent('Здравствуйте! Хочу подключить SMS-подписку для исполнителей за 39 GEL'), '_blank');
+                closeModal('driver-modal');
+                toast.classList.add('hidden');
+            }, 1000);
+        }
+
+        function showInAppToast(text) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-slate-700 flex items-center gap-2';
+            toast.innerHTML = `<span>${text}</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3200);
+        }
+
+        function setLanguage(lang) {
+            ['ka', 'ru', 'en'].forEach(l => {
+                const btn = document.getElementById(`lang-${l}`);
+                if (l === lang) {
+                    btn.className = "px-2.5 py-1 rounded-lg bg-white shadow-sm text-slate-900 font-extrabold";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-lg hover:bg-white/50 transition font-normal";
+                }
+            });
+        }
+    </script>
+</body>
+</html>

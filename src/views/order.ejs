@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('site_title_order') %></title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    .lang-btn.active { background: #fff; color: #0f172a; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="font-sans text-slate-800 bg-slate-50 min-h-screen antialiased">
+
+  <header class="bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-xl mx-auto px-4">
+      <div class="flex items-center justify-between h-16">
+        <a href="/" class="flex items-center gap-2">
+          <span class="text-xl font-black tracking-tight text-slate-900">xtender<span class="text-emerald-600">.ge</span></span>
+        </a>
+        <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+          <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+          <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+          <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto px-4 py-8">
+    <% if (!order) { %>
+      <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 text-center">
+        <h1 class="text-lg font-bold text-slate-900"><%= t('order_not_found') %></h1>
+      </div>
+    <% } else { %>
+      <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 space-y-5">
+
+        <div class="flex items-center justify-between">
+          <h1 class="text-lg font-extrabold text-slate-900"><%= t('order_hash') %><%= order.id %></h1>
+          <% if (order.status === 'closed') { %>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">
+              <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><%= t('status_closed') %>
+            </span>
+          <% } else { %>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><%= t('status_active') %>
+            </span>
+          <% } %>
+        </div>
+
+        <% if (order.district_name) { %>
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1"><%= t('label_district') %></div>
+            <div class="text-sm text-slate-800"><%= order.district_name %></div>
+          </div>
+        <% } %>
+
+        <div>
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1"><%= t('label_request') %></div>
+          <div class="text-sm text-slate-800 leading-relaxed"><%= order.description %></div>
+        </div>
+
+        <% if (files && files.length) { %>
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2"><%= t('label_photos') %></div>
+            <div class="flex flex-wrap gap-2">
+              <% files.forEach(function (f) { %>
+                <% if (f.mime_type.startsWith('image/')) { %>
+                  <a href="<%= f.file_path %>" target="_blank" rel="noopener">
+                    <img src="<%= f.file_path %>" alt="<%= f.original_name %>" class="w-20 h-20 object-cover rounded-xl border border-slate-200">
+                  </a>
+                <% } else { %>
+                  <a href="<%= f.file_path %>" target="_blank" rel="noopener" class="text-sm text-emerald-600 font-semibold underline"><%= f.original_name %></a>
+                <% } %>
+              <% }); %>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (order.status === 'closed') { %>
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-600 font-medium">
+            <%= t('order_closed_notice') %>
+          </div>
+        <% } else if (isOwner) { %>
+          <button id="closeBtn" class="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-lg shadow-red-600/20 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-trash-can"></i>
+            <span><%= t('btn_close_order') %></span>
+          </button>
+        <% } else { %>
+          <div class="flex gap-2.5">
+            <a id="callBtn" href="tel:<%= order.phone %>" class="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-phone"></i><span><%= t('btn_call') %></span>
+            </a>
+            <a id="whatsappBtn" href="https://wa.me/<%= order.phone.replace(/\D/g, '') %>" target="_blank" rel="noopener" class="flex-1 py-3.5 rounded-2xl bg-[#25d366] hover:brightness-95 text-white font-black text-sm shadow-lg transition flex items-center justify-center gap-2">
+              <i class="fa-brands fa-whatsapp"></i><span><%= t('btn_whatsapp') %></span>
+            </a>
+          </div>
+        <% } %>
+
+        <div id="msg" class="hidden p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold"></div>
+      </div>
+
+      <script>
+        const T = <%- JSON.stringify(clientStrings) %>;
+        const token = '<%= order.token %>';
+        const masterId = <%- masterId ? JSON.stringify(masterId) : 'null' %>;
+        const msg = document.getElementById('msg');
+
+        function logView() {
+          if (!masterId) return;
+          fetch('/api/orders/' + token + '/log-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ masterId }),
+            keepalive: true,
+          }).catch(() => {});
+        }
+
+        const callBtn = document.getElementById('callBtn');
+        const whatsappBtn = document.getElementById('whatsappBtn');
+        if (callBtn) callBtn.addEventListener('click', logView);
+        if (whatsappBtn) whatsappBtn.addEventListener('click', logView);
+
+        const closeBtn = document.getElementById('closeBtn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', async () => {
+            const res = await fetch('/api/orders/' + token + '/close', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+              window.location.reload();
+            } else {
+              msg.classList.remove('hidden');
+              msg.textContent = data.message || T.js_err_close_order;
+            }
+          });
+        }
+      </script>
+    <% } %>
+  </main>
+</body>
+</html>
