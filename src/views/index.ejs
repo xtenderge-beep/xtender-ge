@@ -34,7 +34,6 @@
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        #phoneStep, #otpStep { display: none; }
         .lang-btn.active { background: #fff; color: #0f172a; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
     </style>
 </head>
@@ -57,6 +56,11 @@
                 </div>
 
                 <div class="flex items-center gap-2 sm:gap-3">
+                    <a href="/my-orders" class="hidden sm:flex px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition items-center gap-1.5">
+                        <i class="fa-solid fa-list-check text-emerald-600"></i>
+                        <span><%= t('my_orders_nav') %></span>
+                    </a>
+
                     <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
                         <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
                         <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
@@ -77,35 +81,34 @@
         <section id="post-section" class="max-w-xl mx-auto px-4 pt-6 pb-6">
             <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden">
 
-                <div id="detailsStep" class="p-4 sm:p-5">
+                <div id="detailsStep">
                     <input type="hidden" id="description">
 
-                    <div class="flex gap-3">
-                        <div class="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shrink-0">
-                            <i class="fa-solid fa-user"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <textarea id="freeformInput" rows="3" placeholder="<%= t('freeform_placeholder') %>"
-                                class="w-full text-[15px] font-medium outline-none transition text-slate-800 resize-none placeholder:text-slate-400 placeholder:font-normal"></textarea>
+                    <div class="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-100 px-4 sm:px-5 py-2.5 sm:py-3 flex items-center justify-between">
+                        <span class="text-sm sm:text-base font-extrabold text-slate-900"><%= t('composer_headline') %></span>
+                        <button type="button" onclick="submitFreeform()" class="px-4 py-1.5 sm:px-5 sm:py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-black text-xs sm:text-sm shadow-sm shadow-emerald-600/25 transition flex items-center gap-1.5">
+                            <span><%= t('composer_publish') %></span>
+                            <i class="fa-solid fa-paper-plane text-[10px]"></i>
+                        </button>
+                    </div>
 
-                            <div class="flex flex-wrap gap-1.5 mt-2">
-                                <button type="button" onclick="toggleService('transport')" id="svcTransportBtn" class="service-chip px-3 py-1.5 rounded-full border text-xs font-bold text-slate-700 border-slate-200 transition">🚚 <%= t('wizard_type_transport_label') %></button>
-                                <button type="button" onclick="toggleService('movers')" id="svcMoversBtn" class="service-chip px-3 py-1.5 rounded-full border text-xs font-bold text-slate-700 border-slate-200 transition">💪 <%= t('wizard_type_movers_label') %></button>
-                                <button type="button" onclick="toggleService('junk')" id="svcJunkBtn" class="service-chip px-3 py-1.5 rounded-full border text-xs font-bold text-slate-700 border-slate-200 transition">🧹 <%= t('wizard_type_junk_label') %></button>
+                    <div class="p-4 sm:p-5">
+                        <div class="flex gap-3">
+                            <div class="w-11 h-11 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                                <i class="fa-solid fa-user"></i>
                             </div>
+                            <div class="flex-1 min-w-0">
+                                <textarea id="freeformInput" rows="4" placeholder="<%= t('freeform_placeholder') %>"
+                                    class="w-full text-[15px] font-medium outline-none transition text-slate-800 resize-none placeholder:text-slate-400 placeholder:font-normal"></textarea>
 
-                            <div id="attachmentsPreview" class="hidden mt-3 flex-wrap gap-2"></div>
+                                <div id="attachmentsPreview" class="hidden mt-3 flex-wrap gap-2"></div>
 
-                            <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-                                <label for="attachments" class="cursor-pointer w-9 h-9 rounded-full hover:bg-emerald-50 text-emerald-600 flex items-center justify-center text-base transition" title="<%= t('composer_photo_btn') %>">
-                                    <i class="fa-regular fa-image"></i>
-                                </label>
-                                <input type="file" id="attachments" multiple accept="image/*,application/pdf" class="hidden">
-
-                                <button type="button" onclick="submitFreeform()" class="px-5 py-2 rounded-full bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-black text-sm shadow-md shadow-emerald-600/25 transition flex items-center gap-1.5">
-                                    <span><%= t('composer_publish') %></span>
-                                    <i class="fa-solid fa-paper-plane text-xs"></i>
-                                </button>
+                                <div class="flex items-center mt-3 pt-3 border-t border-slate-100">
+                                    <label for="attachments" class="cursor-pointer w-9 h-9 rounded-full hover:bg-emerald-50 text-emerald-600 flex items-center justify-center text-base transition" title="<%= t('composer_photo_btn') %>">
+                                        <i class="fa-regular fa-image"></i>
+                                    </label>
+                                    <input type="file" id="attachments" multiple accept="image/*,application/pdf" class="hidden">
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -137,27 +140,6 @@
                 </div>
 
                 <div id="formMsg" class="hidden text-xs font-bold mx-4 sm:mx-5 mb-4 p-3 rounded-xl"></div>
-
-                <div class="rounded-2xl border border-slate-200 divide-y divide-slate-200 overflow-hidden bg-slate-50/60 mx-4 sm:mx-5 mb-4 sm:mb-5">
-                    <button type="button" onclick="toggleAccordion('accWhy')" class="w-full flex items-center justify-between px-4 py-2.5 text-left">
-                        <span class="text-xs font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
-                            <%= t('accordion_why_title') %>
-                        </span>
-                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform" id="accWhyIcon"></i>
-                    </button>
-                    <div id="accWhy" class="hidden px-4 pb-3 text-xs text-slate-600 leading-relaxed"><%= t('accordion_why_body') %></div>
-
-                    <button type="button" onclick="toggleAccordion('accHow')" class="w-full flex items-center justify-between px-4 py-2.5 text-left">
-                        <span class="text-xs font-bold text-slate-800 flex items-center gap-2">
-                            <i class="fa-solid fa-circle-question text-emerald-600"></i>
-                            <%= t('accordion_how_title') %>
-                        </span>
-                        <i class="fa-solid fa-chevron-down text-slate-400 text-xs transition-transform" id="accHowIcon"></i>
-                    </button>
-                    <div id="accHow" class="hidden px-4 pb-3 text-xs text-slate-600 leading-relaxed"><%= t('accordion_how_body') %></div>
-                </div>
-
             </div>
             <p class="mt-2 text-center text-[11px] text-slate-400"><%= t('composer_publish_hint') %></p>
         </section>
@@ -350,36 +332,11 @@
             formMsg.className = 'text-xs font-bold p-3 rounded-xl ' + (isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200');
         }
 
-        let selectedServices = { transport: false, movers: false, junk: false };
-
         function resetWizard() {
-            selectedServices = { transport: false, movers: false, junk: false };
-            document.querySelectorAll('.service-chip').forEach((btn) => {
-                btn.classList.remove('border-emerald-500', 'bg-emerald-50', 'text-emerald-700');
-                btn.classList.add('border-slate-200', 'text-slate-700');
-            });
             document.getElementById('freeformInput').value = '';
             document.getElementById('attachments').value = '';
             document.getElementById('attachmentsPreview').innerHTML = '';
             document.getElementById('attachmentsPreview').classList.add('hidden');
-        }
-
-        function toggleAccordion(id) {
-            const body = document.getElementById(id);
-            const icon = document.getElementById(id + 'Icon');
-            const isHidden = body.classList.contains('hidden');
-            body.classList.toggle('hidden');
-            if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : '';
-        }
-
-        function toggleService(name) {
-            selectedServices[name] = !selectedServices[name];
-            const btn = document.getElementById('svc' + name.charAt(0).toUpperCase() + name.slice(1) + 'Btn');
-            btn.classList.toggle('border-emerald-500', selectedServices[name]);
-            btn.classList.toggle('bg-emerald-50', selectedServices[name]);
-            btn.classList.toggle('text-emerald-700', selectedServices[name]);
-            btn.classList.toggle('border-slate-200', !selectedServices[name]);
-            btn.classList.toggle('text-slate-700', !selectedServices[name]);
         }
 
         const attachmentsInput = document.getElementById('attachments');
@@ -405,9 +362,6 @@
         function submitFreeform() {
             const text = document.getElementById('freeformInput').value.trim();
             if (!text) return showMsg(T.js_err_wizard_required, true);
-            if (!selectedServices.transport && !selectedServices.movers && !selectedServices.junk) {
-                return showMsg(T.js_err_services_required, true);
-            }
             showMsg('');
             descriptionInput.value = text;
             goToPhoneStep();
@@ -426,17 +380,21 @@
             detailsStep.classList.remove('hidden');
         }
 
+        let pendingOrderToken = null;
+
         async function sendOtp() {
             const phone = phoneInput.value.trim();
             if (!phone) return showMsg(T.js_err_empty_phone, true);
 
+            const description = descriptionInput.value.trim();
             const res = await fetch('/api/otp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone }),
+                body: JSON.stringify({ phone, description }),
             });
             const data = await res.json();
             if (data.success) {
+                pendingOrderToken = data.token;
                 showMsg(T.js_ok_code_sent, false);
                 phoneStep.classList.add('hidden');
                 otpStep.classList.remove('hidden');
@@ -460,16 +418,11 @@
                 return showMsg(data.message || T.js_err_wrong_code, true);
             }
 
-            const description = descriptionInput.value.trim();
             const formData = new FormData();
             formData.append('phone', phone);
-            formData.append('description', description);
+            formData.append('token', pendingOrderToken);
 
             Array.from(document.getElementById('attachments').files).forEach((file) => formData.append('files', file));
-
-            Object.keys(selectedServices).forEach((name) => {
-                if (selectedServices[name]) formData.append('targetCategories', name);
-            });
 
             res = await fetch('/api/orders', { method: 'POST', body: formData });
             data = await res.json();
@@ -494,6 +447,7 @@
             detailsStep.classList.remove('hidden');
             phoneInput.value = '';
             codeInput.value = '';
+            pendingOrderToken = null;
             showMsg('');
             resetWizard();
         }

@@ -19,7 +19,7 @@ async function checkRateLimit(phone) {
   return count <= RATE_LIMIT_MAX_REQUESTS;
 }
 
-async function sendCode(phone) {
+async function sendCode(phone, orderLink) {
   const allowed = await checkRateLimit(phone);
   if (!allowed) {
     return { success: false, reason: 'rate_limited' };
@@ -27,7 +27,12 @@ async function sendCode(phone) {
 
   const code = generateCode();
   await redis.set(`otp:${phone}`, code, 'EX', OTP_TTL_SECONDS);
-  await smsService.sendOtp(phone, code);
+
+  if (orderLink) {
+    await smsService.sendOrderNotification(phone, `Xtender: код ${code}, заявка: ${orderLink}`);
+  } else {
+    await smsService.sendOtp(phone, code);
+  }
 
   return { success: true };
 }

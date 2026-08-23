@@ -97,6 +97,7 @@ const dictionaries = {
     freeform_services_label: 'რომელი სერვისი გჭირდებათ?',
     photo_argument_generic: 'ფოტო ან ვიდეო დაეხმარება შემსრულებელს ზუსტი ფასის თქმაში — ასე ის ვერ გაზრდის ფასს ადგილზე.',
 
+    composer_headline: 'რა გჭირდებათ?',
     composer_publish: 'გამოქვეყნება',
     composer_publish_hint: 'შემსრულებლები დაგირეკავენ ფასის შეთავაზებით',
     composer_photo_btn: 'ფოტო',
@@ -138,8 +139,10 @@ const dictionaries = {
     otp_back: 'უკან',
 
     live_badge: 'თქვენი მოთხოვნა აქტიურია',
-    live_sms_status: 'შემსრულებლებმა მიიღეს თქვენი მოთხოვნა და ითვლიან ფასს.',
-    live_sms_hint: 'მალე დაგირეკავენ პირდაპირ და შემოგთავაზებენ ფასს. საუკეთესო ვარიანტს თავად აირჩევთ.',
+    live_sms_status: 'თქვენი მოთხოვნა მუშავდება — მალე გაეგზავნება შესაბამის შემსრულებლებს.',
+    live_sms_hint: 'ამის შემდეგ დაგირეკავენ პირდაპირ და შემოგთავაზებენ ფასს. საუკეთესო ვარიანტს თავად აირჩევთ.',
+    status_pending_review: 'მუშავდება',
+    order_pending_review_notice: 'ეს მოთხოვნა ჯერ მუშავდება — მალე გაეგზავნება შესაბამის შემსრულებლებს.',
     live_delete_title: 'იპოვეთ შესაფერისი ვარიანტი ან გადაწყვიტეთ საკითხი?',
     live_delete_hint: 'წაშალეთ განაცხადი სისტემიდან, რომ აღარ მიიღოთ ზარები.',
     live_delete_btn: 'განაცხადის წაშლა სისტემიდან',
@@ -175,7 +178,14 @@ const dictionaries = {
     label_request: 'შეკვეთა',
     label_photos: 'ფოტო',
     order_closed_notice: 'ეს შეკვეთა უკვე დახურულია დამკვეთის მიერ.',
+    order_closed_notice_late: 'ეს შეკვეთა უკვე დახურულია — შემსრულებელი უკვე მოიძებნა. შემდეგში სცადეთ სწრაფად უპასუხოთ, რომ არ გამოტოვოთ შეკვეთა.',
     btn_close_order: 'შეკვეთის დახურვა',
+
+    my_orders_nav: 'ჩემი განაცხადები',
+    my_orders_title: 'ჩემი განაცხადები',
+    my_orders_empty: 'თქვენ ჯერ არ გაქვთ განაცხადები.',
+    my_orders_views_label: 'ნახვები',
+    order_views_count: 'შემსრულებელმა ნახა',
 
     js_err_empty_description: 'გთხოვთ, აღწერეთ თქვენი ამოცანა',
     js_err_empty_phone: 'მიუთითეთ საკონტაქტო ტელეფონის ნომერი',
@@ -283,6 +293,7 @@ const dictionaries = {
     freeform_services_label: 'Какая услуга вам нужна?',
     photo_argument_generic: 'Фото или видео помогут исполнителю точно назвать цену — так он не сможет завысить её на месте.',
 
+    composer_headline: 'Что вы хотите сделать?',
     composer_publish: 'Опубликовать',
     composer_publish_hint: 'Исполнители перезвонят с предложением цены',
     composer_photo_btn: 'Фото',
@@ -324,8 +335,10 @@ const dictionaries = {
     otp_back: 'Назад',
 
     live_badge: 'Ваш запрос активен',
-    live_sms_status: 'Исполнители получили ваш запрос и считают цену.',
-    live_sms_hint: 'Скоро вам перезвонят напрямую и предложат цену. Вы сами выберете лучший вариант.',
+    live_sms_status: 'Ваша заявка обрабатывается — скоро уйдёт подходящим исполнителям.',
+    live_sms_hint: 'После этого вам перезвонят напрямую и предложат цену. Вы сами выберете лучший вариант.',
+    status_pending_review: 'Обрабатывается',
+    order_pending_review_notice: 'Эта заявка ещё обрабатывается — скоро уйдёт подходящим исполнителям.',
     live_delete_title: 'Нашли подходящий вариант или решили вопрос?',
     live_delete_hint: 'Удалите заявку из системы, чтобы больше не получать откликов.',
     live_delete_btn: 'Удалить заявку из системы',
@@ -361,7 +374,14 @@ const dictionaries = {
     label_request: 'Заявка',
     label_photos: 'Фото',
     order_closed_notice: 'Этот заказ уже закрыт заказчиком.',
+    order_closed_notice_late: 'Эта заявка уже закрыта — исполнитель уже найден. В следующий раз старайтесь отвечать быстрее, чтобы не упустить заказ.',
     btn_close_order: 'Закрыть заказ',
+
+    my_orders_nav: 'Мои заявки',
+    my_orders_title: 'Мои заявки',
+    my_orders_empty: 'У вас пока нет заявок.',
+    my_orders_views_label: 'просмотров',
+    order_views_count: 'Заявку посмотрели',
 
     js_err_empty_description: 'Пожалуйста, опишите вашу задачу',
     js_err_empty_phone: 'Укажите ваш контактный номер телефона',
@@ -469,6 +489,7 @@ const dictionaries = {
     freeform_services_label: 'Which service do you need?',
     photo_argument_generic: 'A photo or video helps the provider quote an exact price — so they can\'t raise it on-site.',
 
+    composer_headline: 'What do you need?',
     composer_publish: 'Publish',
     composer_publish_hint: 'Providers will call you back with a price',
     composer_photo_btn: 'Photo',
@@ -510,8 +531,10 @@ const dictionaries = {
     otp_back: 'Back',
 
     live_badge: 'Your request is active',
-    live_sms_status: 'Providers have received your request and are calculating a price.',
-    live_sms_hint: 'You\'ll be called back directly with a price soon. You pick the best option yourself.',
+    live_sms_status: 'Your request is being processed — it will be sent to matching providers shortly.',
+    live_sms_hint: 'After that you\'ll be called back directly with a price. You pick the best option yourself.',
+    status_pending_review: 'Processing',
+    order_pending_review_notice: 'This request is still being processed — it will be sent to matching providers shortly.',
     live_delete_title: 'Found a good match or solved it already?',
     live_delete_hint: 'Delete your request from the system to stop receiving calls.',
     live_delete_btn: 'Delete request from the system',
@@ -547,7 +570,14 @@ const dictionaries = {
     label_request: 'Request',
     label_photos: 'Photos',
     order_closed_notice: 'This order has already been closed by the customer.',
+    order_closed_notice_late: 'This request has already been closed — an executor was already found. Try to respond faster next time so you don\'t miss out.',
     btn_close_order: 'Close order',
+
+    my_orders_nav: 'My requests',
+    my_orders_title: 'My requests',
+    my_orders_empty: 'You have no requests yet.',
+    my_orders_views_label: 'views',
+    order_views_count: 'Viewed by',
 
     js_err_empty_description: 'Please describe your task',
     js_err_empty_phone: 'Enter your contact phone number',

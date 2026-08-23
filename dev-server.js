@@ -35,17 +35,31 @@ const TEMPLATES = [
 ];
 const NAMES = ['Давид', 'Гиорги', 'Нико', 'Леван', 'Заза', 'Тенгиз', 'Бека', 'Отар', 'Ираклий', 'Вахтанг', 'Сандро', 'Торнике'];
 
+const VEHICLE_SIZES = ['L', 'XL', 'XXL'];
+
 async function seedMasters() {
+  let transportIndex = 0;
   for (let i = 0; i < 50; i++) {
     const template = TEMPLATES[i % TEMPLATES.length];
     const vehicleType = template.vehicleTypes[i % template.vehicleTypes.length];
     const name = `${NAMES[i % NAMES.length]} ${i + 1}`;
     const phone = `+9955${(10000000 + i).toString()}`;
+
+    let vehicleSize = null;
+    let isFlatbed = false;
+    if (template.category === 'transport') {
+      vehicleSize = VEHICLE_SIZES[transportIndex % VEHICLE_SIZES.length];
+      isFlatbed = transportIndex % 4 === 0;
+      transportIndex++;
+    }
+
+    const isSubscribed = i % 7 !== 0;
+    const subscriptionUntil = i % 11 === 0 ? new Date(Date.now() - 24 * 60 * 60 * 1000) : null;
     await fakePool.query(
-      `INSERT INTO masters (name, phone, category, vehicle_type, price_text, description, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, true)
+      `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, is_flatbed, is_subscribed, subscription_until)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)
        ON CONFLICT (phone) DO NOTHING`,
-      [name, phone, template.category, vehicleType, template.price, template.desc]
+      [name, phone, template.category, vehicleType, vehicleSize, template.price, template.desc, isFlatbed, isSubscribed, subscriptionUntil]
     );
   }
   console.log('Seeded 50 demo masters');

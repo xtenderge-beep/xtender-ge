@@ -55,6 +55,10 @@
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-500 text-xs font-bold">
               <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><%= t('status_closed') %>
             </span>
+          <% } else if (order.status === 'pending_review') { %>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><%= t('status_pending_review') %>
+            </span>
           <% } else { %>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><%= t('status_active') %>
@@ -91,9 +95,21 @@
           </div>
         <% } %>
 
+        <% if (isOwner && funnel) { %>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-slate-500">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-eye text-emerald-600"></i><%= funnel.view %> <%= t('my_orders_views_label') %></span>
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-phone text-emerald-600"></i><%= funnel.call %></span>
+            <span class="flex items-center gap-1.5"><i class="fa-brands fa-whatsapp text-emerald-600"></i><%= funnel.whatsapp %></span>
+          </div>
+        <% } %>
+
         <% if (order.status === 'closed') { %>
           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-sm text-slate-600 font-medium">
-            <%= t('order_closed_notice') %>
+            <%= isOwner ? t('order_closed_notice') : t('order_closed_notice_late') %>
+          </div>
+        <% } else if ((order.status === 'pending_review' || order.status === 'unverified') && !isOwner) { %>
+          <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
+            <%= t('order_pending_review_notice') %>
           </div>
         <% } else if (isOwner) { %>
           <button id="closeBtn" class="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-lg shadow-red-600/20 transition flex items-center justify-center gap-2">
@@ -120,20 +136,22 @@
         const masterId = <%- masterId ? JSON.stringify(masterId) : 'null' %>;
         const msg = document.getElementById('msg');
 
-        function logView() {
+        function logEvent(eventType) {
           if (!masterId) return;
           fetch('/api/orders/' + token + '/log-view', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ masterId }),
+            body: JSON.stringify({ masterId, eventType }),
             keepalive: true,
           }).catch(() => {});
         }
 
+        if (masterId) logEvent('view');
+
         const callBtn = document.getElementById('callBtn');
         const whatsappBtn = document.getElementById('whatsappBtn');
-        if (callBtn) callBtn.addEventListener('click', logView);
-        if (whatsappBtn) whatsappBtn.addEventListener('click', logView);
+        if (callBtn) callBtn.addEventListener('click', () => logEvent('call'));
+        if (whatsappBtn) whatsappBtn.addEventListener('click', () => logEvent('whatsapp'));
 
         const closeBtn = document.getElementById('closeBtn');
         if (closeBtn) {

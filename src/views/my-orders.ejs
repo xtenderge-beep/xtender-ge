@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= t('my_orders_title') %></title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <style>
+    .lang-btn.active { background: #fff; color: #0f172a; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+  </style>
+</head>
+<body class="font-sans text-slate-800 bg-slate-50 min-h-screen antialiased">
+
+  <header class="bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <div class="max-w-xl mx-auto px-4">
+      <div class="flex items-center justify-between h-16">
+        <a href="/" class="flex items-center gap-2">
+          <span class="text-xl font-black tracking-tight text-slate-900">xtender<span class="text-emerald-600">.ge</span></span>
+        </a>
+        <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+          <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+          <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+          <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto px-4 py-8 space-y-4">
+    <h1 class="text-lg font-extrabold text-slate-900"><%= t('my_orders_title') %></h1>
+
+    <% if (!orders.length) { %>
+      <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 text-center text-sm text-slate-500 font-medium">
+        <%= t('my_orders_empty') %>
+      </div>
+    <% } else { %>
+      <div class="space-y-3">
+        <% orders.forEach(function (order) { %>
+          <a href="/order/<%= order.token %>" class="block bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm hover:shadow-md transition space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-sm font-bold text-slate-900"><%= t('order_hash') %><%= order.id %></span>
+              <% if (order.status === 'closed') { %>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[11px] font-bold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span><%= t('status_closed') %>
+                </span>
+              <% } else if (order.status === 'pending_review') { %>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><%= t('status_pending_review') %>
+                </span>
+              <% } else { %>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><%= t('status_active') %>
+                </span>
+              <% } %>
+            </div>
+            <p class="text-xs text-slate-600 leading-snug line-clamp-2"><%= order.description %></p>
+            <div class="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+              <i class="fa-solid fa-clock"></i>
+              <span><%= new Date(order.created_at).toLocaleDateString(lang) %></span>
+            </div>
+          </a>
+        <% }); %>
+      </div>
+    <% } %>
+  </main>
+</body>
+</html>

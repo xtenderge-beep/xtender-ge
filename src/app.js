@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
@@ -8,6 +9,8 @@ const apiRoutes = require('./routes/api.routes');
 const orderController = require('./controllers/order.controller');
 const masterService = require('./services/master.service');
 const { normalizeLang, translate, clientStrings } = require('./config/i18n');
+const asyncHandler = require('./middleware/asyncHandler');
+const pool = require('./config/db');
 
 const app = express();
 
@@ -38,12 +41,14 @@ app.get('/lang/:code', (req, res) => {
   res.redirect(back);
 });
 
-app.get('/', async (req, res) => {
+app.get('/', asyncHandler(async (req, res) => {
   const masters = await masterService.listMasters();
   res.render('index', { masters, clientStrings: clientStrings(req.lang) });
-});
+}));
 
-app.get('/order/:token', orderController.show);
+app.get('/order/:token', asyncHandler(orderController.show));
+app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
+app.get('/my-orders', asyncHandler(orderController.myOrders));
 
 app.use('/api', apiRoutes);
 
@@ -51,11 +56,28 @@ app.use((err, req, res, next) => {
   if (err && (err.name === 'MulterError' || err.message === 'Unsupported file type')) {
     return res.status(400).json({ success: false, message: err.message });
   }
-  next(err);
+  console.error('Unhandled request error:', err);
+  if (req.path.startsWith('/api')) {
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+  return res.status(500).send('Internal server error');
 });
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Xtender server running on port ${PORT}`);
-});
+async function runMigrations() {
+  const schema = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
+  await pool.query(schema);
+  console.log('Database schema is up to date');
+}
+
+runMigrations()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Xtender server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to run database migrations:', err);
+    process.exit(1);
+  });
