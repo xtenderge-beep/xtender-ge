@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="<%= lang %>" class="h-full bg-slate-50 scroll-smooth">
+<html lang="<%= lang %>" class="h-full bg-stone-50 scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,6 +17,7 @@
                 extend: {
                     fontFamily: {
                         sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'Noto Sans Georgian', 'ui-monospace', 'monospace'],
                     },
                     colors: {
                         brand: {
@@ -32,42 +33,50 @@
 
     <style>
         ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f5f9; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .lang-btn.active { background: #fff; color: #0f172a; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        ::-webkit-scrollbar-track { background: #f5f5f4; }
+        ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+        .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+        .dispatch-grid {
+            background-image: radial-gradient(circle, rgba(28,25,23,0.07) 1px, transparent 1px);
+            background-size: 22px 22px;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        .fade-in-up { animation: fadeInUp .45s cubic-bezier(0.16, 1, 0.3, 1) both; }
     </style>
 </head>
-<body class="font-sans text-slate-800 bg-slate-50 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+<body class="font-sans text-stone-800 bg-stone-50 dispatch-grid flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm">
+    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+        <div class="h-[3px] bg-emerald-600"></div>
         <div class="max-w-5xl mx-auto px-4 sm:px-6">
             <div class="flex items-center justify-between h-16 sm:h-20">
 
                 <a href="/" class="flex items-center gap-2">
-                    <span class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+                    <span class="text-2xl sm:text-3xl font-black tracking-tight text-stone-900">
                         xtender<span class="text-emerald-600">.ge</span>
                     </span>
                 </a>
 
-                <div class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600">
-                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1"><%= t('nav_transport') %></span>
-                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1"><%= t('nav_movers') %></span>
-                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 flex items-center gap-1"><%= t('nav_junk') %></span>
+                <div class="hidden xl:flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-wide text-stone-500">
+                    <span class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 flex items-center gap-1"><%= t('nav_transport') %></span>
+                    <span class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 flex items-center gap-1"><%= t('nav_movers') %></span>
+                    <span class="whitespace-nowrap px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 flex items-center gap-1"><%= t('nav_junk') %></span>
                 </div>
 
                 <div class="flex items-center gap-2 sm:gap-3">
-                    <a href="/my-orders" class="hidden sm:flex px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition items-center gap-1.5">
+                    <a href="/my-orders" class="hidden sm:flex whitespace-nowrap px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition items-center gap-1.5">
                         <i class="fa-solid fa-list-check text-emerald-600"></i>
                         <span><%= t('my_orders_nav') %></span>
                     </a>
 
-                    <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200">
+                    <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
                         <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
                         <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
                         <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
                     </div>
 
-                    <button onclick="openModal('driver-modal')" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <button onclick="openModal('driver-modal')" class="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                         <i class="fa-solid fa-truck text-amber-400"></i>
                         <span class="hidden sm:inline"><%= t('nav_drivers_btn') %></span>
                     </button>
@@ -78,77 +87,56 @@
 
     <main class="flex-grow">
 
-        <div class="max-w-6xl mx-auto px-4 pt-6 pb-28 sm:pb-16 flex flex-col lg:flex-row gap-6 items-start">
+        <div class="max-w-3xl mx-auto px-4 pt-6 pb-28 sm:pb-16">
 
-            <aside class="hidden lg:block lg:w-64 shrink-0 lg:sticky lg:top-24">
-                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-2 space-y-1">
-                    <button type="button" onclick="switchTab('details')" data-tab-btn="details"
-                        class="tab-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-bold transition bg-emerald-50 text-emerald-700">
-                        <i class="fa-solid fa-list-check w-4 text-center"></i>
-                        <span><%= t('sidebar_tab_details') %></span>
-                    </button>
-                    <button type="button" onclick="switchTab('specialists')" data-tab-btn="specialists"
-                        class="tab-btn w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl text-sm font-bold transition text-slate-600 hover:bg-slate-50">
-                        <span class="flex items-center gap-2.5">
-                            <i class="fa-solid fa-address-book w-4 text-center"></i>
-                            <span><%= t('sidebar_tab_specialists') %></span>
-                        </span>
-                        <span class="text-[11px] font-bold text-slate-400"><%= masters.length %></span>
-                    </button>
-                </div>
-            </aside>
-
-            <div class="flex-1 min-w-0 w-full">
-
-                <div id="tabPanel-details">
-                    <section id="post-section" class="max-w-xl mx-auto lg:max-w-none">
-                        <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden">
+                    <section id="post-section" class="fade-in-up">
+                        <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
                             <div id="detailsStep" class="p-5 sm:p-6">
                                 <input type="hidden" id="description">
 
-                                <h1 class="text-xl sm:text-2xl font-extrabold text-slate-900"><%= t('composer_headline') %></h1>
-                                <p class="text-sm text-slate-500 mt-1"><%= t('composer_subtitle') %></p>
+                                <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-stone-900"><%= t('composer_headline') %></h1>
+                                <p class="text-sm text-stone-500 mt-1"><%= t('composer_subtitle') %></p>
 
                                 <div class="mt-5">
                                     <textarea id="freeformInput" rows="6" placeholder="<%= t('freeform_placeholder') %>"
-                                        class="w-full text-[15px] font-medium outline-none transition text-slate-800 resize-none placeholder:text-slate-400 placeholder:font-normal bg-slate-50 border border-slate-200 rounded-2xl p-4 focus:border-emerald-500 focus:bg-white"></textarea>
+                                        class="w-full text-[15px] font-medium outline-none transition text-stone-800 resize-none placeholder:text-stone-400 placeholder:font-normal bg-stone-50 border border-stone-200 rounded-2xl p-4 focus:border-emerald-500 focus:bg-white"></textarea>
 
                                     <div id="attachmentsPreview" class="hidden mt-3 flex-wrap gap-2"></div>
 
-                                    <label for="attachments" class="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold cursor-pointer transition">
+                                    <label for="attachments" class="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-bold cursor-pointer transition">
                                         <i class="fa-regular fa-image text-emerald-600"></i>
                                         <span><%= t('composer_photo_btn') %></span>
                                     </label>
                                     <input type="file" id="attachments" multiple accept="image/*,application/pdf" class="hidden">
                                 </div>
 
-                                <button type="button" onclick="submitFreeform()" class="mt-6 w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                <button type="button" onclick="submitFreeform()" class="mt-6 w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <span><%= t('composer_publish') %></span>
                                     <i class="fa-solid fa-arrow-right text-xs"></i>
                                 </button>
                             </div>
 
                             <div id="phoneStep" class="p-5 sm:p-6 hidden">
-                                <label for="phone" class="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                                <label for="phone" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                                     <i class="fa-solid fa-phone text-emerald-600 mr-1"></i><%= t('form_phone_label') %>
                                 </label>
                                 <input type="tel" id="phone" placeholder="<%= t('form_phone_placeholder') %>"
-                                    class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-sm font-bold text-slate-900 bg-white">
-                                <button onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                    class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
+                                <button onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-shield-halved"></i>
                                     <span><%= t('otp_send') %></span>
                                 </button>
-                                <button onclick="goToDetailsStep()" class="mt-2 w-full py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition"><%= t('otp_back') %></button>
+                                <button onclick="goToDetailsStep()" class="mt-2 w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_back') %></button>
                             </div>
 
                             <div id="otpStep" class="p-5 sm:p-6 hidden">
-                                <label for="code" class="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+                                <label for="code" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                                     <i class="fa-solid fa-key text-emerald-600 mr-1"></i><%= t('otp_label') %>
                                 </label>
                                 <input type="text" id="code" maxlength="4" inputmode="numeric"
-                                    class="w-full px-4 py-3 rounded-xl border-2 border-slate-200 focus:border-emerald-500 outline-none text-lg font-black tracking-[0.3em] text-center text-slate-900 bg-white">
-                                <button onclick="verifyOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                    class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none font-mono text-lg font-black tracking-[0.3em] text-center text-stone-900 bg-white">
+                                <button onclick="verifyOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check"></i>
                                     <span><%= t('otp_verify') %></span>
                                 </button>
@@ -156,31 +144,34 @@
 
                             <div id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
                         </div>
-                        <p class="mt-2 text-center text-[11px] text-slate-400"><%= t('composer_publish_hint') %></p>
+                        <p class="mt-2 text-center text-[11px] text-stone-400"><%= t('composer_publish_hint') %></p>
                     </section>
 
-                    <section id="tender-live-section" class="hidden max-w-xl lg:max-w-none mx-auto mt-6">
-                        <div class="bg-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-slate-700 space-y-4">
+                    <section id="tender-live-section" class="hidden mt-6">
+                        <div class="bg-stone-900 text-white rounded-2xl p-5 sm:p-6 shadow-xl border border-stone-700 space-y-4">
 
-                            <div class="flex items-center justify-between text-xs border-b border-slate-800 pb-3">
+                            <div class="flex items-center justify-between text-xs border-b border-stone-800 pb-3">
                                 <span class="font-bold text-emerald-400 flex items-center gap-2">
-                                    <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+                                    <span class="relative flex h-2 w-2">
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
                                     <span><%= t('live_badge') %></span>
                                 </span>
-                                <span id="live-order-id" class="text-slate-400 font-mono text-[11px]"></span>
+                                <span id="live-order-id" class="text-stone-400 font-mono text-[11px]"></span>
                             </div>
 
                             <div class="space-y-1 text-xs">
-                                <p class="text-slate-100 font-bold text-sm">
+                                <p class="text-stone-100 font-bold text-sm">
                                     <i class="fa-solid fa-paper-plane text-amber-400 mr-1.5"></i> <%= t('live_sms_status') %>
                                 </p>
-                                <p class="text-slate-400 text-[11px]"><%= t('live_sms_hint') %></p>
+                                <p class="text-stone-400 text-[11px]"><%= t('live_sms_hint') %></p>
                             </div>
 
-                            <div class="bg-slate-800 p-3.5 rounded-2xl border border-slate-700 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div class="bg-stone-800 p-3.5 rounded-2xl border border-stone-700 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <div class="text-xs">
                                     <p class="font-bold text-amber-400"><%= t('live_delete_title') %></p>
-                                    <p class="text-slate-400 text-[11px]"><%= t('live_delete_hint') %></p>
+                                    <p class="text-stone-400 text-[11px]"><%= t('live_delete_hint') %></p>
                                 </div>
                                 <button onclick="closeActiveOrder()" class="w-full sm:w-auto px-4 py-2.5 bg-red-600/90 hover:bg-red-600 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 shadow-md">
                                     <i class="fa-solid fa-trash-can"></i>
@@ -190,42 +181,61 @@
 
                         </div>
                     </section>
-                </div>
 
-                <div id="tabPanel-specialists" class="hidden space-y-8">
+                    <section id="masters-section" class="mt-10 space-y-5">
 
-                    <div class="border-b border-slate-200 pb-4">
-                        <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
-                            <i class="fa-solid fa-address-book text-emerald-600"></i>
-                            <span><%= t('catalog_title') %></span>
-                        </h2>
-                        <p class="text-xs text-slate-500 mt-1"><%= t('catalog_hint') %></p>
-                    </div>
+                        <div class="border-b border-stone-200 pb-4">
+                            <h2 class="text-xl font-extrabold text-stone-900 flex items-center gap-2">
+                                <i class="fa-solid fa-address-book text-emerald-600"></i>
+                                <span><%= t('catalog_title') %></span>
+                            </h2>
+                            <p class="text-xs text-stone-500 mt-1"><%= t('catalog_hint') %></p>
+                        </div>
 
-                    <%
-                      const groups = [
-                        { key: 'transport', anchor: 'group-transport', label: t('catalog_group_transport'), icon: '🚚', color: 'bg-amber-100 text-amber-900 border-amber-200' },
-                        { key: 'movers', anchor: 'group-movers', label: t('catalog_group_movers'), icon: '💪', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
-                        { key: 'junk', anchor: 'group-junk', label: t('catalog_group_junk'), icon: '🧹', color: 'bg-slate-100 text-slate-900 border-slate-300' },
-                      ];
-                    %>
+                        <%
+                          const groups = [
+                            { key: 'transport', anchor: 'group-transport', label: t('catalog_group_transport'), icon: '🚚', color: 'bg-amber-100 text-amber-900 border-amber-200' },
+                            { key: 'movers', anchor: 'group-movers', label: t('catalog_group_movers'), icon: '💪', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+                            { key: 'junk', anchor: 'group-junk', label: t('catalog_group_junk'), icon: '🧹', color: 'bg-stone-100 text-stone-900 border-stone-300' },
+                          ];
+                        %>
+
+                        <div class="flex flex-wrap gap-2" id="categoryFilterBar">
+                            <button type="button" onclick="setCategoryFilter('all')" data-filter-cat="all" class="filter-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition border bg-emerald-600 text-white border-emerald-600">
+                                <%= t('filter_all') %>
+                            </button>
+                            <% groups.forEach(function (group) { %>
+                              <button type="button" onclick="setCategoryFilter('<%= group.key %>')" data-filter-cat="<%= group.key %>" class="filter-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">
+                                  <%= group.icon %> <%= group.label %>
+                              </button>
+                            <% }); %>
+                        </div>
+
+                        <div class="hidden flex-wrap gap-2" id="sizeFilterBar">
+                            <button type="button" onclick="setSizeFilter('all')" data-filter-size="all" class="filter-btn px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-emerald-600 text-white border-emerald-600">
+                                <%= t('filter_all_sizes') %>
+                            </button>
+                            <button type="button" onclick="setSizeFilter('L')" data-filter-size="L" class="filter-btn min-w-[42px] text-center px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">L</button>
+                            <button type="button" onclick="setSizeFilter('XL')" data-filter-size="XL" class="filter-btn min-w-[42px] text-center px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">XL</button>
+                            <button type="button" onclick="setSizeFilter('XXL')" data-filter-size="XXL" class="filter-btn min-w-[42px] text-center px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">XXL</button>
+                        </div>
 
                     <% groups.forEach(function (group) { %>
                       <% const groupMasters = masters.filter((m) => m.category === group.key); %>
                       <% if (groupMasters.length) { %>
-                        <div id="<%= group.anchor %>" class="scroll-mt-24">
-                            <h3 class="text-sm font-extrabold text-slate-800 flex items-center gap-2 mb-3">
+                        <div id="<%= group.anchor %>" data-group="<%= group.key %>" class="scroll-mt-24">
+                            <h3 class="text-sm font-extrabold text-stone-800 flex items-center gap-2 mb-3">
                                 <span class="text-lg"><%= group.icon %></span>
                                 <span><%= group.label %></span>
-                                <span class="text-[11px] font-bold text-slate-400"><%= groupMasters.length %></span>
+                                <span class="text-[11px] font-bold text-stone-400"><%= groupMasters.length %></span>
                             </h3>
                             <div class="space-y-3">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-slate-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-4">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-4" data-category="<%= group.key %>" data-size="<%= master.vehicle_size || '' %>">
 
                                       <div class="flex sm:flex-col items-center sm:items-start gap-3 sm:gap-2 sm:w-16 shrink-0">
                                           <% if (master.avatar_url) { %>
-                                            <img src="<%= master.avatar_url %>" alt="<%= master.name %>" class="w-14 h-14 rounded-2xl object-cover border border-slate-200">
+                                            <img src="<%= master.avatar_url %>" alt="<%= master.name %>" class="w-14 h-14 rounded-2xl object-cover border border-stone-200">
                                           <% } else { %>
                                             <div class="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-black text-lg shrink-0">
                                                 <%= master.name.charAt(0).toUpperCase() %>
@@ -235,8 +245,8 @@
 
                                       <div class="flex-1 min-w-0 space-y-1.5">
                                           <div class="flex items-center gap-2 flex-wrap">
-                                              <h3 class="font-extrabold text-slate-900 text-sm sm:text-base"><%= master.name %></h3>
-                                              <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                              <h3 class="font-extrabold text-stone-900 text-sm sm:text-base"><%= master.name %></h3>
+                                              <span class="font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
                                                   <i class="fa-solid fa-circle-check"></i><%= t('catalog_verified') %>
                                               </span>
                                               <% if (master.rating > 0) { %>
@@ -255,11 +265,11 @@
                                           <% } %>
 
                                           <% if (master.description) { %>
-                                            <p class="text-xs text-slate-600 leading-snug"><%= master.description %></p>
+                                            <p class="text-xs text-stone-600 leading-snug"><%= master.description %></p>
                                           <% } %>
 
                                           <% if (master.price_text) { %>
-                                            <p class="text-sm font-black text-slate-900 pt-1"><%= master.price_text %></p>
+                                            <p class="font-mono text-sm font-bold text-stone-900 pt-1"><%= master.price_text %></p>
                                           <% } %>
                                       </div>
 
@@ -280,60 +290,59 @@
                       <% } %>
                     <% }); %>
 
-                </div>
+                    </section>
 
-            </div>
         </div>
 
     </main>
 
-    <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-700/60 grid grid-cols-4">
-        <button type="button" onclick="switchTab('details')" data-mobile-tab="details" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-emerald-400">
+    <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-4">
+        <button type="button" onclick="scrollToId('post-section')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-emerald-400">
             <i class="fa-solid fa-square-plus text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_post') %></span>
         </button>
-        <button type="button" onclick="switchTab('specialists', 'group-transport')" data-mobile-tab="specialists" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-slate-300">
+        <button type="button" onclick="setCategoryFilter('transport', 'group-transport')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
             <i class="fa-solid fa-truck text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_transport') %></span>
         </button>
-        <button type="button" onclick="switchTab('specialists', 'group-junk')" data-mobile-tab="specialists" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-slate-300">
+        <button type="button" onclick="setCategoryFilter('junk', 'group-junk')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
             <i class="fa-solid fa-broom text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_junk') %></span>
         </button>
-        <button type="button" onclick="switchTab('specialists')" data-mobile-tab="specialists" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-slate-300">
+        <button type="button" onclick="setCategoryFilter('all', 'masters-section')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
             <i class="fa-solid fa-address-book text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_masters') %></span>
         </button>
     </nav>
 
-    <footer class="bg-slate-900 text-slate-400 py-8 border-t border-slate-800 text-xs">
+    <footer class="bg-stone-900 text-stone-400 py-8 border-t border-stone-800 text-xs">
         <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
                 <span class="text-base font-black text-white">xtender<span class="text-emerald-500">.ge</span></span>
-                <p class="text-slate-500 text-[11px]"><%= t('footer_desc') %></p>
+                <p class="text-stone-500 text-[11px]"><%= t('footer_desc') %></p>
             </div>
-            <p class="text-slate-500 text-[11px]"><%= t('footer_copy') %></p>
+            <p class="font-mono text-stone-500 text-[11px]"><%= t('footer_copy') %></p>
         </div>
     </footer>
 
-    <div id="driver-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
-            <button onclick="closeModal('driver-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold hover:bg-slate-200 transition">✕</button>
+    <div id="driver-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
+            <button onclick="closeModal('driver-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
 
             <div class="text-center space-y-2">
                 <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mx-auto">
                     <i class="fa-solid fa-truck-fast"></i>
                 </div>
-                <h3 class="text-base font-bold text-slate-900"><%= t('driver_modal_title') %></h3>
-                <p class="text-xs text-slate-500"><%= t('driver_modal_desc') %></p>
+                <h3 class="text-base font-bold text-stone-900"><%= t('driver_modal_title') %></h3>
+                <p class="text-xs text-stone-500"><%= t('driver_modal_desc') %></p>
             </div>
 
-            <div class="bg-slate-900 text-white p-4 rounded-2xl space-y-2 text-xs">
-                <div class="flex justify-between items-center font-bold border-b border-slate-800 pb-2">
+            <div class="bg-stone-900 text-white p-4 rounded-2xl space-y-2 text-xs">
+                <div class="flex justify-between items-center font-bold border-b border-stone-800 pb-2">
                     <span class="text-amber-400"><%= t('driver_modal_plan_name') %></span>
-                    <span class="text-emerald-400 text-sm"><%= t('driver_modal_plan_price') %></span>
+                    <span class="font-mono text-emerald-400 text-sm"><%= t('driver_modal_plan_price') %></span>
                 </div>
-                <p class="text-slate-300 text-[11px] leading-relaxed"><%= t('driver_modal_plan_desc') %></p>
+                <p class="text-stone-300 text-[11px] leading-relaxed"><%= t('driver_modal_plan_desc') %></p>
             </div>
 
             <div id="toast-message" class="hidden p-2.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl text-center">
@@ -375,37 +384,55 @@
             document.getElementById('attachmentsPreview').classList.add('hidden');
         }
 
-        const tabPanelDetails = document.getElementById('tabPanel-details');
-        const tabPanelSpecialists = document.getElementById('tabPanel-specialists');
-        const tabBtns = document.querySelectorAll('[data-tab-btn]');
-        const mobileTabBtns = document.querySelectorAll('[data-mobile-tab]');
+        let activeCategory = 'all';
+        let activeSize = 'all';
 
-        function switchTab(name, anchorId) {
-            const isSpecialists = name === 'specialists';
-            tabPanelSpecialists.classList.toggle('hidden', !isSpecialists);
-            tabPanelDetails.classList.toggle('hidden', isSpecialists);
+        const catFilterBtns = document.querySelectorAll('[data-filter-cat]');
+        const sizeFilterBtns = document.querySelectorAll('[data-filter-size]');
+        const sizeFilterBar = document.getElementById('sizeFilterBar');
 
-            tabBtns.forEach((btn) => {
-                const active = btn.dataset.tabBtn === name;
-                btn.classList.toggle('bg-emerald-50', active);
-                btn.classList.toggle('text-emerald-700', active);
-                btn.classList.toggle('text-slate-600', !active);
-                btn.classList.toggle('hover:bg-slate-50', !active);
+        function styleFilterBtn(btn, active) {
+            btn.classList.toggle('bg-emerald-600', active);
+            btn.classList.toggle('text-white', active);
+            btn.classList.toggle('border-emerald-600', active);
+            btn.classList.toggle('bg-white', !active);
+            btn.classList.toggle('text-stone-600', !active);
+            btn.classList.toggle('border-stone-200', !active);
+        }
+
+        function applyFilters() {
+            document.querySelectorAll('[data-group]').forEach((group) => {
+                const show = activeCategory === 'all' || group.dataset.group === activeCategory;
+                group.classList.toggle('hidden', !show);
             });
-            mobileTabBtns.forEach((btn) => {
-                const active = btn.dataset.mobileTab === name;
-                btn.classList.toggle('text-emerald-400', active);
-                btn.classList.toggle('text-slate-300', !active);
+            document.querySelectorAll('.master-card').forEach((card) => {
+                let show = activeCategory === 'all' || card.dataset.category === activeCategory;
+                if (show && activeCategory === 'transport' && activeSize !== 'all') {
+                    show = card.dataset.size === activeSize;
+                }
+                card.classList.toggle('hidden', !show);
             });
+            sizeFilterBar.classList.toggle('hidden', activeCategory !== 'transport');
+            sizeFilterBar.classList.toggle('flex', activeCategory === 'transport');
+            catFilterBtns.forEach((btn) => styleFilterBtn(btn, btn.dataset.filterCat === activeCategory));
+            sizeFilterBtns.forEach((btn) => styleFilterBtn(btn, btn.dataset.filterSize === activeSize));
+        }
 
-            if (anchorId) {
-                setTimeout(() => {
-                    const el = document.getElementById(anchorId);
-                    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 50);
-            } else {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
+        function scrollToId(id) {
+            const el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function setCategoryFilter(cat, anchorId) {
+            activeCategory = cat;
+            activeSize = 'all';
+            applyFilters();
+            if (anchorId) setTimeout(() => scrollToId(anchorId), 50);
+        }
+
+        function setSizeFilter(size) {
+            activeSize = size;
+            applyFilters();
         }
 
         const attachmentsInput = document.getElementById('attachments');
@@ -422,7 +449,7 @@
             attachmentsPreview.classList.add('flex');
             files.forEach((file) => {
                 const chip = document.createElement('span');
-                chip.className = 'px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-600 flex items-center gap-1';
+                chip.className = 'px-2.5 py-1 rounded-lg bg-stone-100 border border-stone-200 text-[11px] font-semibold text-stone-600 flex items-center gap-1';
                 chip.innerHTML = '<i class="fa-solid fa-paperclip text-[10px]"></i> ' + file.name;
                 attachmentsPreview.appendChild(chip);
             });
@@ -552,7 +579,7 @@
 
         function showToast(text) {
             const toast = document.createElement('div');
-            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-slate-700 flex items-center gap-2';
+            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-stone-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-stone-700 flex items-center gap-2';
             toast.innerHTML = '<span>' + text + '</span>';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3200);

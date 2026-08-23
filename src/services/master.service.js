@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 
-const FIELDS = 'id, name, phone, category, vehicle_type, price_text, description, avatar_url, rating';
+const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating';
 
 async function listMasters({ category } = {}) {
   if (category) {
