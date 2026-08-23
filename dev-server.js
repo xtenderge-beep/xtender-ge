@@ -1,6 +1,9 @@
 process.env.NODE_ENV = 'development';
 process.env.PORT = process.env.PORT || '3000';
 process.env.DOMAIN = 'localhost:' + process.env.PORT;
+// schema.sql is already applied below via pg-mem's native API; running it again through
+// app.js's own migration-on-boot (wire-protocol path) hits an unrelated pg-mem parser limit.
+process.env.SKIP_DB_MIGRATIONS = '1';
 
 const { newDb } = require('pg-mem');
 const fs = require('fs');

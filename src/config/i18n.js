@@ -97,8 +97,11 @@ const dictionaries = {
     freeform_services_label: 'რომელი სერვისი გჭირდებათ?',
     photo_argument_generic: 'ფოტო ან ვიდეო დაეხმარება შემსრულებელს ზუსტი ფასის თქმაში — ასე ის ვერ გაზრდის ფასს ადგილზე.',
 
-    composer_headline: 'რა გჭირდებათ?',
+    composer_headline: 'მოგვიყევით, რა უნდა გაკეთდეს',
+    composer_subtitle: 'თუ ფოტოს დაამატებთ, შემსრულებლების შემოთავაზება მეტი იქნება',
     composer_publish: 'გამოქვეყნება',
+    sidebar_tab_details: 'დეტალები',
+    sidebar_tab_specialists: 'შემსრულებლები',
     composer_publish_hint: 'შემსრულებლები დაგირეკავენ ფასის შეთავაზებით',
     composer_photo_btn: 'ფოტო',
     composer_char_hint: 'თავისუფალი ტექსტი',
@@ -148,7 +151,7 @@ const dictionaries = {
     live_delete_btn: 'განაცხადის წაშლა სისტემიდან',
 
     filter_all: 'ყველა',
-    catalog_title: 'გზა 2: მანქანების, მუშებისა და ნაგვის გატანის ბაზა',
+    catalog_title: 'ყველა შემსრულებელი',
     catalog_hint: 'შეგიძლიათ დამოუკიდებლად დარეკოთ ნებისმიერ რეგისტრირებულ შემსრულებელს ან მისწეროთ WhatsApp-ში',
     catalog_verified: 'თბილისის ბაზაში',
 
@@ -293,10 +296,13 @@ const dictionaries = {
     freeform_services_label: 'Какая услуга вам нужна?',
     photo_argument_generic: 'Фото или видео помогут исполнителю точно назвать цену — так он не сможет завысить её на месте.',
 
-    composer_headline: 'Что вы хотите сделать?',
+    composer_headline: 'Расскажите, что нужно сделать',
+    composer_subtitle: 'Если добавите фото, предложений от исполнителей будет больше',
     composer_publish: 'Опубликовать',
     composer_publish_hint: 'Исполнители перезвонят с предложением цены',
     composer_photo_btn: 'Фото',
+    sidebar_tab_details: 'Детали заявки',
+    sidebar_tab_specialists: 'Специалисты',
     composer_char_hint: 'Свободный текст',
     mobilenav_home: 'Главная',
     mobilenav_post: 'Заявка',
@@ -344,7 +350,7 @@ const dictionaries = {
     live_delete_btn: 'Удалить заявку из системы',
 
     filter_all: 'Все',
-    catalog_title: 'Способ 2: База Машин, Грузчиков и Вывоза Мусора',
+    catalog_title: 'Все специалисты',
     catalog_hint: 'Вы можете самостоятельно позвонить любому зарегистрированному исполнителю или написать в WhatsApp',
     catalog_verified: 'В базе Тбилиси',
 
@@ -489,10 +495,13 @@ const dictionaries = {
     freeform_services_label: 'Which service do you need?',
     photo_argument_generic: 'A photo or video helps the provider quote an exact price — so they can\'t raise it on-site.',
 
-    composer_headline: 'What do you need?',
+    composer_headline: 'Tell us what needs to be done',
+    composer_subtitle: 'Adding a photo means more offers from providers',
     composer_publish: 'Publish',
     composer_publish_hint: 'Providers will call you back with a price',
     composer_photo_btn: 'Photo',
+    sidebar_tab_details: 'Task details',
+    sidebar_tab_specialists: 'Specialists',
     composer_char_hint: 'Free text',
     mobilenav_home: 'Home',
     mobilenav_post: 'Post',
@@ -540,7 +549,7 @@ const dictionaries = {
     live_delete_btn: 'Delete request from the system',
 
     filter_all: 'All',
-    catalog_title: 'Way 2: Database of Vehicles, Movers & Junk Removal',
+    catalog_title: 'All specialists',
     catalog_hint: 'Call any registered provider yourself, or message them on WhatsApp',
     catalog_verified: 'In the Tbilisi database',
 

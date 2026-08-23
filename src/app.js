@@ -66,6 +66,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 
 async function runMigrations() {
+  if (process.env.SKIP_DB_MIGRATIONS) return;
   const schema = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
   await pool.query(schema);
   console.log('Database schema is up to date');
