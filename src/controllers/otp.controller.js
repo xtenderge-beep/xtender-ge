@@ -1,5 +1,6 @@
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
+const { getBaseUrl } = require('../config/url');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 
@@ -20,8 +21,7 @@ async function send(req, res) {
     districtName: districtName || '',
   });
 
-  const base = process.env.DOMAIN ? `http://${process.env.DOMAIN}` : 'http://localhost:3000';
-  const link = `${base}/o/${order.owner_token}`;
+  const link = `${getBaseUrl()}/o/${order.owner_token}`;
   const result = await otpService.sendCode(phone, link);
 
   if (!result.success) {

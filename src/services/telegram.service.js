@@ -1,5 +1,6 @@
 const axios = require('axios');
 const orderService = require('./order.service');
+const { getBaseUrl } = require('../config/url');
 
 const API_BASE = 'https://api.telegram.org/bot';
 const SIZE_LABELS = { L: 'L', XL: 'XL', XXL: 'XXL' };
@@ -64,7 +65,7 @@ async function notifyModerator(order) {
     return null;
   }
 
-  const base = process.env.DOMAIN ? `http://${process.env.DOMAIN}` : 'http://localhost:3000';
+  const base = getBaseUrl();
   const text = [
     '🆕 Новая заявка на модерацию',
     '',

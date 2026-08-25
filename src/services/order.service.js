@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const smsService = require('./sms.service');
+const { getBaseUrl } = require('../config/url');
 
 const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const SHORT_ID_LENGTH = 10;
@@ -175,7 +176,7 @@ async function notifyMasters(order, category, vehicleSize) {
   }
 
   const { rows: masters } = await pool.query(query, params);
-  const base = process.env.DOMAIN ? `http://${process.env.DOMAIN}` : 'http://localhost:3000';
+  const base = getBaseUrl();
 
   await Promise.all(
     masters.map((master) => {
