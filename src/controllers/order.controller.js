@@ -35,7 +35,8 @@ function rememberOrderToken(req, res, token) {
 }
 
 async function create(req, res) {
-  const { phone, token } = req.body;
+  const { token } = req.body;
+  const phone = (req.body.phone || '').replace(/\s+/g, '');
 
   if (!phone || !PHONE_REGEX.test(phone)) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });

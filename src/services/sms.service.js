@@ -1,9 +1,14 @@
 const axios = require('axios');
 
-const SMS_API_URL = 'https://api.smsoffice.ge/v2/send/';
+const SMS_GATEWAY_URL = process.env.SMS_GATEWAY_URL || 'http://212.72.155.180:2375/api/sendmsg.php';
 
 function isDevMode() {
-  return process.env.NODE_ENV === 'development' || !process.env.SMS_API_KEY;
+  return process.env.NODE_ENV === 'development' || !process.env.SMS_GATEWAY_USERNAME;
+}
+
+function normalizePhone(phone) {
+  const digits = phone.replace(/\D/g, '');
+  return digits.length === 9 ? `995${digits}` : digits;
 }
 
 async function send(phone, text) {
@@ -12,13 +17,17 @@ async function send(phone, text) {
     return { success: true, dev: true };
   }
 
-  const response = await axios.post(SMS_API_URL, {
-    apikey: process.env.SMS_API_KEY,
-    destination: phone,
-    sender: process.env.SMS_SENDER_ID,
-    content: text,
+  const response = await axios.get(SMS_GATEWAY_URL, {
+    params: {
+      username: process.env.SMS_GATEWAY_USERNAME,
+      password: process.env.SMS_GATEWAY_PASSWORD,
+      num: normalizePhone(phone),
+      msg: text,
+      utf: 1,
+    },
   });
 
+  console.log(`[SMS GATEWAY] to=${normalizePhone(phone)} response=${JSON.stringify(response.data)}`);
   return response.data;
 }
 

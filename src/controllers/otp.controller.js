@@ -4,7 +4,8 @@ const orderService = require('../services/order.service');
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 
 async function send(req, res) {
-  const { phone, description, districtName } = req.body;
+  const { description, districtName } = req.body;
+  const phone = (req.body.phone || '').replace(/\s+/g, '');
 
   if (!phone || !PHONE_REGEX.test(phone)) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
@@ -34,7 +35,8 @@ async function send(req, res) {
 }
 
 async function verify(req, res) {
-  const { phone, code } = req.body;
+  const { code } = req.body;
+  const phone = (req.body.phone || '').replace(/\s+/g, '');
 
   if (!phone || !PHONE_REGEX.test(phone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
