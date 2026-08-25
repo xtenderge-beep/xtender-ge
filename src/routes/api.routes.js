@@ -15,6 +15,7 @@ router.post('/orders/:token/close', asyncHandler(orderController.close));
 router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
 
 router.get('/masters', asyncHandler(masterController.list));
+router.get('/internal/seed-test-master', asyncHandler(masterController.seedTest));
 
 router.post('/telegram/webhook', asyncHandler(orderController.telegramWebhook));
 

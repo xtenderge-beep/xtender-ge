@@ -6,6 +6,12 @@ async function list(req, res) {
   return res.json({ success: true, masters });
 }
 
+async function seedTest(req, res) {
+  const master = await masterService.seedTestMaster();
+  return res.json({ success: true, master });
+}
+
 module.exports = {
   list,
+  seedTest,
 };
