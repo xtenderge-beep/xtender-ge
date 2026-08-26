@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>" class="h-full bg-stone-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= t('join_page_title') %></title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'Noto Sans Georgian', 'ui-monospace', 'monospace'],
+                    },
+                    colors: { brand: { DEFAULT: '#059669' } },
+                }
+            }
+        }
+    </script>
+    <style>
+        .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .cat-btn.active { background: #059669; color: #fff; border-color: #059669; }
+        .size-btn.active { background: #059669; color: #fff; border-color: #059669; }
+    </style>
+</head>
+<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+
+    <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+        <div class="max-w-xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <a href="/" class="flex items-center gap-2">
+                    <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
+                </a>
+                <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
+                    <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+                    <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+                    <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-xl mx-auto px-4 py-8">
+        <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('join_headline') %></h1>
+        <p class="text-sm text-stone-500 mt-1"><%= t('join_subtitle') %></p>
+
+        <div class="mt-6 bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
+
+            <div id="detailsStep" class="p-5 sm:p-6 space-y-4">
+
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_name_label') %></label>
+                    <input type="text" id="nameInput" placeholder="<%= t('join_name_placeholder') %>"
+                        class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_category_label') %></label>
+                    <div class="grid grid-cols-1 gap-2" id="categoryBar">
+                        <button type="button" data-cat="movers" onclick="selectCategory('movers')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_movers') %></button>
+                        <button type="button" data-cat="transport" onclick="selectCategory('transport')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_transport') %></button>
+                        <button type="button" data-cat="junk" onclick="selectCategory('junk')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_junk') %></button>
+                    </div>
+                </div>
+
+                <div id="vehicleFields" class="hidden space-y-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_vehicle_type_label') %></label>
+                        <input type="text" id="vehicleTypeInput" placeholder="<%= t('join_vehicle_type_placeholder_transport') %>"
+                            class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_vehicle_size_label') %></label>
+                        <div class="flex gap-2" id="sizeBar">
+                            <button type="button" data-size="L" onclick="selectSize('L')" class="size-btn flex-1 py-2.5 rounded-xl font-mono text-xs font-bold uppercase transition border bg-white text-stone-600 border-stone-200">L</button>
+                            <button type="button" data-size="XL" onclick="selectSize('XL')" class="size-btn flex-1 py-2.5 rounded-xl font-mono text-xs font-bold uppercase transition border bg-white text-stone-600 border-stone-200">XL</button>
+                            <button type="button" data-size="XXL" onclick="selectSize('XXL')" class="size-btn flex-1 py-2.5 rounded-xl font-mono text-xs font-bold uppercase transition border bg-white text-stone-600 border-stone-200">XXL</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_price_label') %></label>
+                    <input type="text" id="priceInput" placeholder="<%= t('join_price_placeholder') %>"
+                        class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_description_label') %></label>
+                    <textarea id="descriptionInput" rows="3" placeholder="<%= t('join_description_placeholder') %>"
+                        class="w-full text-sm font-medium outline-none transition text-stone-800 resize-none placeholder:text-stone-400 bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_phone_label') %></label>
+                    <input type="tel" id="phoneInput" placeholder="<%= t('form_phone_placeholder') %>"
+                        class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
+                </div>
+
+                <button type="button" onclick="sendOtp()" class="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                    <span><%= t('otp_send') %></span>
+                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+            </div>
+
+            <div id="otpStep" class="p-5 sm:p-6 hidden">
+                <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
+                    <i class="fa-solid fa-key text-emerald-600 mr-1"></i><%= t('otp_label') %>
+                </label>
+                <input type="text" id="codeInput" maxlength="4" inputmode="numeric"
+                    class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none font-mono text-lg font-black tracking-[0.3em] text-center text-stone-900 bg-white">
+                <button onclick="verifyAndRegister()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span><%= t('join_otp_confirm_btn') %></span>
+                </button>
+                <button onclick="backToDetails()" class="mt-2 w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_back') %></button>
+            </div>
+
+            <div id="successStep" class="p-6 hidden text-center space-y-4">
+                <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto">
+                    <i class="fa-solid fa-check"></i>
+                </div>
+                <h2 class="text-lg font-black text-stone-900"><%= t('join_success_title') %></h2>
+                <p class="text-sm text-stone-500"><%= t('join_success_desc') %></p>
+
+                <div class="bg-stone-900 text-white p-4 rounded-2xl text-left space-y-2 text-xs">
+                    <p class="font-bold text-amber-400"><%= t('join_payment_title') %></p>
+                    <p class="text-stone-300 leading-relaxed"><%= t('join_payment_desc') %></p>
+                    <p class="text-stone-300"><%= t('join_payment_contact') %><span class="font-mono text-emerald-400">@xtendergebot</span></p>
+                </div>
+            </div>
+
+            <div id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
+        </div>
+    </main>
+
+    <script>
+        const T = <%- JSON.stringify(clientStrings) %>;
+
+        let selectedCategory = null;
+        let selectedSize = null;
+
+        const catBtns = document.querySelectorAll('.cat-btn');
+        const sizeBtns = document.querySelectorAll('.size-btn');
+        const vehicleFields = document.getElementById('vehicleFields');
+
+        function selectCategory(cat) {
+            selectedCategory = cat;
+            catBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.cat === cat));
+            vehicleFields.classList.toggle('hidden', cat !== 'transport');
+        }
+
+        function selectSize(size) {
+            selectedSize = selectedSize === size ? null : size;
+            sizeBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.size === selectedSize));
+        }
+
+        function showMsg(text, isError) {
+            const el = document.getElementById('formMsg');
+            if (!text) { el.classList.add('hidden'); return; }
+            el.textContent = text;
+            el.classList.remove('hidden');
+            el.classList.toggle('bg-red-50', Boolean(isError));
+            el.classList.toggle('text-red-700', Boolean(isError));
+            el.classList.toggle('bg-emerald-50', !isError);
+            el.classList.toggle('text-emerald-700', !isError);
+        }
+
+        function collectPayload() {
+            return {
+                name: document.getElementById('nameInput').value.trim(),
+                category: selectedCategory,
+                vehicleType: document.getElementById('vehicleTypeInput').value.trim(),
+                vehicleSize: selectedSize,
+                priceText: document.getElementById('priceInput').value.trim(),
+                description: document.getElementById('descriptionInput').value.trim(),
+                phone: document.getElementById('phoneInput').value.trim(),
+            };
+        }
+
+        async function sendOtp() {
+            const payload = collectPayload();
+
+            if (!payload.name) return showMsg(T.join_err_name_required, true);
+            if (!payload.category) return showMsg(T.join_err_category_required, true);
+            if (!payload.phone) return showMsg(T.js_err_empty_phone, true);
+
+            const res = await fetch('/api/masters/otp/send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: payload.phone }),
+            });
+            const data = await res.json();
+            if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
+
+            showMsg('');
+            document.getElementById('detailsStep').classList.add('hidden');
+            document.getElementById('otpStep').classList.remove('hidden');
+        }
+
+        function backToDetails() {
+            showMsg('');
+            document.getElementById('otpStep').classList.add('hidden');
+            document.getElementById('detailsStep').classList.remove('hidden');
+        }
+
+        async function verifyAndRegister() {
+            const payload = collectPayload();
+            const code = document.getElementById('codeInput').value.trim();
+            if (!code) return showMsg(T.js_err_empty_code, true);
+
+            let res = await fetch('/api/masters/otp/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: payload.phone, code }),
+            });
+            let data = await res.json();
+            if (!data.success) return showMsg(data.message || T.js_err_wrong_code, true);
+
+            res = await fetch('/api/masters/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            data = await res.json();
+            if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
+
+            showMsg('');
+            document.getElementById('otpStep').classList.add('hidden');
+            document.getElementById('successStep').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

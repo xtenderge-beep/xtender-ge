@@ -59,8 +59,8 @@ async function seedMasters() {
     const isSubscribed = i % 7 !== 0;
     const subscriptionUntil = i % 11 === 0 ? new Date(Date.now() - 24 * 60 * 60 * 1000) : null;
     await fakePool.query(
-      `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, is_flatbed, is_subscribed, subscription_until)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)
+      `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, is_flatbed, is_subscribed, subscription_until, balance_tetri)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10, 10000)
        ON CONFLICT (phone) DO NOTHING`,
       [name, phone, template.category, vehicleType, vehicleSize, template.price, template.desc, isFlatbed, isSubscribed, subscriptionUntil]
     );

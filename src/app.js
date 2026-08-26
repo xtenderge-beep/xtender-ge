@@ -46,6 +46,10 @@ app.get('/', asyncHandler(async (req, res) => {
   res.render('index', { masters, clientStrings: clientStrings(req.lang) });
 }));
 
+app.get('/join', (req, res) => {
+  res.render('join', { clientStrings: clientStrings(req.lang) });
+});
+
 app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));

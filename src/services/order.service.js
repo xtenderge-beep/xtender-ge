@@ -5,6 +5,7 @@ const { getBaseUrl } = require('../config/url');
 
 const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const SHORT_ID_LENGTH = 10;
+const COST_PER_NOTIFICATION_TETRI = 30;
 
 function generateShortId() {
   const bytes = crypto.randomBytes(SHORT_ID_LENGTH);
@@ -130,15 +131,16 @@ async function getMasterCountsByCategory() {
   const { rows } = await pool.query(
     `SELECT category, vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true
+     WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
      GROUP BY category, vehicle_size
      UNION ALL
      SELECT 'flatbed' AS category, NULL AS vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true
+     WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
-       AND category = 'transport' AND is_flatbed = true`
+       AND category = 'transport' AND is_flatbed = true`,
+    [COST_PER_NOTIFICATION_TETRI]
   );
   return rows;
 }
@@ -159,9 +161,9 @@ async function getOrderFunnelStats(orderId) {
 }
 
 async function notifyMasters(order, category, vehicleSize) {
-  const params = [];
+  const params = [COST_PER_NOTIFICATION_TETRI];
   let query = `SELECT id, phone FROM masters
-               WHERE is_active = true AND is_subscribed = true
+               WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
                  AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
   if (category === 'flatbed') {
@@ -178,15 +180,26 @@ async function notifyMasters(order, category, vehicleSize) {
   const { rows: masters } = await pool.query(query, params);
   const base = getBaseUrl();
 
+  const notifiedIds = [];
   await Promise.all(
-    masters.map((master) => {
+    masters.map(async (master) => {
       const link = `${base}/order/${order.token}?master=${master.id}`;
       const text = `Xtender: новая заявка: ${link}`;
-      return smsService.sendOrderNotification(master.phone, text).catch((err) => {
+      try {
+        await smsService.sendOrderNotification(master.phone, text);
+        notifiedIds.push(master.id);
+      } catch (err) {
         console.error(`Failed to notify master ${master.id}:`, err.message);
-      });
+      }
     })
   );
+
+  if (notifiedIds.length) {
+    await pool.query(
+      `UPDATE masters SET balance_tetri = balance_tetri - $1 WHERE id = ANY($2::int[])`,
+      [COST_PER_NOTIFICATION_TETRI, notifiedIds]
+    );
+  }
 
   return masters.length;
 }

@@ -1,7 +1,11 @@
 const orderService = require('../services/order.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
+const masterService = require('../services/master.service');
 const { clientStrings } = require('../config/i18n');
+const { toE164 } = require('../config/phone');
+
+const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -76,12 +80,61 @@ async function create(req, res) {
   return res.json({ success: true, token: order.token });
 }
 
+async function handleModeratorMessage(message) {
+  const chatId = String((message.chat || {}).id);
+  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) return;
+
+  const match = TOPUP_REGEX.exec((message.text || '').trim());
+  if (!match) return;
+
+  const phone = toE164(match[1]);
+  const amountGel = parseFloat(match[2]);
+  const amountTetri = Math.round(amountGel * 100);
+
+  const master = await masterService.topUpBalance(phone, amountTetri);
+  if (!master) {
+    await telegramService.sendMessageToModerator(`Исполнитель с номером ${phone} не найден`);
+    return;
+  }
+
+  await telegramService.sendMessageToModerator(
+    `💰 Баланс пополнен: ${master.name} (${master.phone}) +${amountGel} GEL → баланс ${(master.balance_tetri / 100).toFixed(2)} GEL`
+  );
+}
+
+async function handleMasterApproval(callback) {
+  const masterId = parseInt(callback.data.split(':')[1], 10);
+  const master = await masterService.approveMaster(masterId);
+
+  if (!master) {
+    await telegramService.answerCallback(callback.id, 'Исполнитель не найден');
+    return;
+  }
+
+  await telegramService.answerCallback(callback.id, 'Одобрено');
+  await telegramService.confirmMasterApproved(callback.message.chat.id, callback.message.message_id, master);
+}
+
 async function telegramWebhook(req, res) {
   try {
     const update = req.body;
-    const callback = update.callback_query;
 
-    if (!callback || !callback.data || !callback.data.startsWith('cat:')) {
+    if (update.message && update.message.text) {
+      await handleModeratorMessage(update.message);
+      return res.sendStatus(200);
+    }
+
+    const callback = update.callback_query;
+    if (!callback || !callback.data) {
+      return res.sendStatus(200);
+    }
+
+    if (callback.data.startsWith('master_approve:')) {
+      await handleMasterApproval(callback);
+      return res.sendStatus(200);
+    }
+
+    if (!callback.data.startsWith('cat:')) {
       return res.sendStatus(200);
     }
 

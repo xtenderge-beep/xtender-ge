@@ -10,8 +10,8 @@ function generateCode() {
   return String(Math.floor(1000 + Math.random() * 9000));
 }
 
-async function checkRateLimit(phone) {
-  const key = `otp_limit:${phone}`;
+async function checkRateLimit(phone, purpose) {
+  const key = `otp_limit:${purpose}:${phone}`;
   const count = await redis.incr(key);
   if (count === 1) {
     await redis.expire(key, RATE_LIMIT_TTL_SECONDS);
@@ -19,14 +19,14 @@ async function checkRateLimit(phone) {
   return count <= RATE_LIMIT_MAX_REQUESTS;
 }
 
-async function sendCode(phone, orderLink) {
-  const allowed = await checkRateLimit(phone);
+async function sendCode(phone, orderLink, purpose = 'order') {
+  const allowed = await checkRateLimit(phone, purpose);
   if (!allowed) {
     return { success: false, reason: 'rate_limited' };
   }
 
   const code = generateCode();
-  await redis.set(`otp:${phone}`, code, 'EX', OTP_TTL_SECONDS);
+  await redis.set(`otp:${purpose}:${phone}`, code, 'EX', OTP_TTL_SECONDS);
 
   if (orderLink) {
     await smsService.sendOrderNotification(phone, `Xtender: код ${code}, заявка: ${orderLink}`);
@@ -37,8 +37,8 @@ async function sendCode(phone, orderLink) {
   return { success: true };
 }
 
-async function verifyCode(phone, code) {
-  const key = `otp:${phone}`;
+async function verifyCode(phone, code, purpose = 'order') {
+  const key = `otp:${purpose}:${phone}`;
   const storedCode = await redis.get(key);
 
   if (!storedCode || storedCode !== String(code)) {
@@ -46,17 +46,17 @@ async function verifyCode(phone, code) {
   }
 
   await redis.del(key);
-  await redis.set(`verified:${phone}`, '1', 'EX', VERIFIED_TTL_SECONDS);
+  await redis.set(`verified:${purpose}:${phone}`, '1', 'EX', VERIFIED_TTL_SECONDS);
   return true;
 }
 
-async function isPhoneVerified(phone) {
-  const value = await redis.get(`verified:${phone}`);
+async function isPhoneVerified(phone, purpose = 'order') {
+  const value = await redis.get(`verified:${purpose}:${phone}`);
   return value === '1';
 }
 
-async function clearVerified(phone) {
-  await redis.del(`verified:${phone}`);
+async function clearVerified(phone, purpose = 'order') {
+  await redis.del(`verified:${purpose}:${phone}`);
 }
 
 module.exports = {

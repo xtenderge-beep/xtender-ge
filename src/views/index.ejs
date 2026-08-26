@@ -345,13 +345,9 @@
                 <p class="text-stone-300 text-[11px] leading-relaxed"><%= t('driver_modal_plan_desc') %></p>
             </div>
 
-            <div id="toast-message" class="hidden p-2.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl text-center">
-                <%= t('driver_modal_toast') %>
-            </div>
-
-            <button onclick="showDriverContact()" class="w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
+<a href="/join" class="block text-center w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
                 <%= t('driver_modal_btn') %>
-            </button>
+            </a>
         </div>
     </div>
 
@@ -565,16 +561,6 @@
         function closeModal(id) {
             document.getElementById(id).classList.add('hidden');
             document.getElementById(id).classList.remove('flex');
-        }
-
-        function showDriverContact() {
-            const toast = document.getElementById('toast-message');
-            toast.classList.remove('hidden');
-            setTimeout(() => {
-                window.open('https://wa.me/995599000000?text=' + encodeURIComponent('Здравствуйте! Хочу подключить SMS-подписку для исполнителей за 39 GEL'), '_blank');
-                closeModal('driver-modal');
-                toast.classList.add('hidden');
-            }, 1000);
         }
 
         function showToast(text) {

@@ -14,6 +14,7 @@ const CATEGORY_LABELS = {
 };
 
 function isEnabled() {
+  if (process.env.NODE_ENV === 'development') return false;
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_MODERATOR_CHAT_ID);
 }
 
@@ -85,6 +86,61 @@ async function notifyModerator(order) {
   });
 
   return data.result.message_id;
+}
+
+const MASTER_CATEGORY_LABELS = {
+  movers: '💪 Грузчик / разнорабочий',
+  transport: '🚚 Водитель',
+  junk: '🧹 Вывоз мусора',
+};
+
+async function notifyModeratorNewMaster(master) {
+  if (!isEnabled()) {
+    console.log(`[TELEGRAM DEV MODE] new master registration: ${master.name} ${master.phone}`);
+    return null;
+  }
+
+  const lines = [
+    '🆕 Новая регистрация исполнителя',
+    '',
+    `👤 ${master.name}`,
+    `📞 ${master.phone}`,
+    `${MASTER_CATEGORY_LABELS[master.category] || master.category}`,
+  ];
+  if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
+  if (master.description) lines.push(`📝 ${master.description}`);
+
+  const { data } = await axios.post(apiUrl('sendMessage'), {
+    chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
+    text: lines.join('\n'),
+    reply_markup: {
+      inline_keyboard: [[{ text: '✅ Одобрить', callback_data: `master_approve:${master.id}` }]],
+    },
+  });
+
+  return data.result.message_id;
+}
+
+async function confirmMasterApproved(chatId, messageId, master) {
+  if (!isEnabled()) return;
+  await axios
+    .post(apiUrl('editMessageText'), {
+      chat_id: chatId,
+      message_id: messageId,
+      text: `✅ Одобрено\n\n👤 ${master.name}\n📞 ${master.phone}`,
+    })
+    .catch((err) => {
+      console.error('Failed to update master approval message:', err.message);
+    });
+}
+
+async function sendMessageToModerator(text) {
+  if (!isEnabled()) return;
+  await axios
+    .post(apiUrl('sendMessage'), { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, text })
+    .catch((err) => {
+      console.error('Failed to send message to moderator:', err.message);
+    });
 }
 
 async function answerCallback(callbackQueryId, text) {
@@ -175,6 +231,9 @@ async function setWebhook(url) {
 module.exports = {
   isEnabled,
   notifyModerator,
+  notifyModeratorNewMaster,
+  confirmMasterApproved,
+  sendMessageToModerator,
   answerCallback,
   updateMessage,
   setWebhook,

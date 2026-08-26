@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { toE164 } = require('../config/phone');
 
 const SMS_GATEWAY_URL = process.env.SMS_GATEWAY_URL || 'http://212.72.155.180:2375/api/sendmsg.php';
 
@@ -7,8 +8,7 @@ function isDevMode() {
 }
 
 function normalizePhone(phone) {
-  const digits = phone.replace(/\D/g, '');
-  return digits.length === 9 ? `995${digits}` : digits;
+  return toE164(phone).slice(1);
 }
 
 async function send(phone, text) {
