@@ -233,9 +233,21 @@ async function updateMessage(order) {
   await refreshMessage(order, keyboard);
 }
 
-async function setWebhook(url) {
+async function setWebhook() {
   if (!isEnabled()) return;
-  await axios.post(apiUrl('setWebhook'), { url });
+
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!secretToken) {
+    console.error(
+      'TELEGRAM_WEBHOOK_SECRET is not set — the webhook is being (re)registered WITHOUT secret_token verification. ' +
+      'Anyone who finds the webhook URL can forge Telegram updates (fake balance top-ups, fake approvals). Set TELEGRAM_WEBHOOK_SECRET and redeploy.'
+    );
+  }
+
+  const url = `${getBaseUrl()}/api/telegram/webhook`;
+  await axios.post(apiUrl('setWebhook'), { url, secret_token: secretToken }).catch((err) => {
+    console.error('Failed to register Telegram webhook:', err.response ? JSON.stringify(err.response.data) : err.message);
+  });
 }
 
 module.exports = {

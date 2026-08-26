@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const apiRoutes = require('./routes/api.routes');
 const orderController = require('./controllers/order.controller');
 const masterService = require('./services/master.service');
+const telegramService = require('./services/telegram.service');
 const { normalizeLang, translate, clientStrings } = require('./config/i18n');
 const asyncHandler = require('./middleware/asyncHandler');
 const pool = require('./config/db');
@@ -89,6 +90,9 @@ runMigrations()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Xtender server running on port ${PORT}`);
+    });
+    telegramService.setWebhook().catch((err) => {
+      console.error('Failed to (re)register Telegram webhook on startup:', err.message);
     });
   })
   .catch((err) => {

@@ -207,6 +207,11 @@ async function handleMasterApproval(callback) {
 }
 
 async function telegramWebhook(req, res) {
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
+    return res.sendStatus(401);
+  }
+
   try {
     const update = req.body;
 
