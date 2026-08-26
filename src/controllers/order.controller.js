@@ -2,10 +2,12 @@ const orderService = require('../services/order.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
 const masterService = require('../services/master.service');
+const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
+const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -80,26 +82,115 @@ async function create(req, res) {
   return res.json({ success: true, token: order.token });
 }
 
-async function handleModeratorMessage(message) {
-  const chatId = String((message.chat || {}).id);
-  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) return;
+function adminFlowKey(chatId) {
+  return `admin_flow:${chatId}`;
+}
 
-  const match = TOPUP_REGEX.exec((message.text || '').trim());
-  if (!match) return;
+async function getAdminFlow(chatId) {
+  const raw = await redis.get(adminFlowKey(chatId));
+  return raw ? JSON.parse(raw) : null;
+}
 
-  const phone = toE164(match[1]);
-  const amountGel = parseFloat(match[2]);
+async function setAdminFlow(chatId, state) {
+  await redis.set(adminFlowKey(chatId), JSON.stringify(state), 'EX', ADMIN_FLOW_TTL_SECONDS);
+}
+
+async function clearAdminFlow(chatId) {
+  await redis.del(adminFlowKey(chatId));
+}
+
+async function applyTopUp(phone, amountGel) {
   const amountTetri = Math.round(amountGel * 100);
-
   const master = await masterService.topUpBalance(phone, amountTetri);
   if (!master) {
     await telegramService.sendMessageToModerator(`Исполнитель с номером ${phone} не найден`);
     return;
   }
-
   await telegramService.sendMessageToModerator(
     `💰 Баланс пополнен: ${master.name} (${master.phone}) +${amountGel} GEL → баланс ${(master.balance_tetri / 100).toFixed(2)} GEL`
   );
+}
+
+function formatMasterInfo(master) {
+  const status = master.is_active ? '✅ активен' : '⏳ на модерации';
+  return [
+    `👤 ${master.name} (${master.phone})`,
+    `Категория: ${master.category}${master.vehicle_type ? ' — ' + master.vehicle_type : ''}`,
+    `Статус: ${status}`,
+    `Баланс: ${(master.balance_tetri / 100).toFixed(2)} GEL`,
+  ].join('\n');
+}
+
+async function handleAdminFlowStep(chatId, flow, rawText) {
+  if (flow.step === 'phone') {
+    const phoneDigits = rawText.replace(/\s+/g, '');
+    if (!PHONE_REGEX.test(phoneDigits)) {
+      await telegramService.askModerator('Это не похоже на номер телефона. Введите номер телефона исполнителя:');
+      return;
+    }
+    const phone = toE164(phoneDigits);
+
+    if (flow.action === 'balance') {
+      await clearAdminFlow(chatId);
+      const master = await masterService.getMasterByPhone(phone);
+      if (!master) {
+        await telegramService.sendMessageToModerator(`Исполнитель с номером ${phone} не найден`);
+        return;
+      }
+      await telegramService.sendMessageToModerator(formatMasterInfo(master));
+      return;
+    }
+
+    await setAdminFlow(chatId, { action: 'topup', step: 'amount', phone });
+    await telegramService.askModerator('Введите сумму пополнения в GEL (например 10):');
+    return;
+  }
+
+  if (flow.step === 'amount') {
+    const amountGel = parseFloat(rawText.replace(',', '.'));
+    if (!Number.isFinite(amountGel) || amountGel <= 0) {
+      await telegramService.askModerator('Некорректная сумма. Введите сумму пополнения в GEL:');
+      return;
+    }
+    await clearAdminFlow(chatId);
+    await applyTopUp(flow.phone, amountGel);
+  }
+}
+
+async function handleModeratorMessage(message) {
+  const chatId = String((message.chat || {}).id);
+  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) return;
+
+  const text = (message.text || '').trim();
+
+  if (text === '/start' || text === '/menu') {
+    await clearAdminFlow(chatId);
+    await telegramService.sendMessageToModerator('Меню администратора 👇');
+    return;
+  }
+
+  if (text === '💰 Пополнить баланс') {
+    await setAdminFlow(chatId, { action: 'topup', step: 'phone' });
+    await telegramService.askModerator('Введите номер телефона исполнителя:');
+    return;
+  }
+
+  if (text === '🔍 Проверить баланс') {
+    await setAdminFlow(chatId, { action: 'balance', step: 'phone' });
+    await telegramService.askModerator('Введите номер телефона исполнителя:');
+    return;
+  }
+
+  const flow = await getAdminFlow(chatId);
+  if (flow) {
+    await handleAdminFlowStep(chatId, flow, text);
+    return;
+  }
+
+  const match = TOPUP_REGEX.exec(text);
+  if (match) {
+    await applyTopUp(toE164(match[1]), parseFloat(match[2]));
+  }
 }
 
 async function handleMasterApproval(callback) {

@@ -13,6 +13,12 @@ const CATEGORY_LABELS = {
   flatbed: '🚛 Бортовые / стройматериалы',
 };
 
+const ADMIN_MENU_KEYBOARD = {
+  keyboard: [[{ text: '💰 Пополнить баланс' }, { text: '🔍 Проверить баланс' }]],
+  resize_keyboard: true,
+};
+const FORCE_REPLY = { force_reply: true };
+
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_MODERATOR_CHAT_ID);
@@ -134,13 +140,17 @@ async function confirmMasterApproved(chatId, messageId, master) {
     });
 }
 
-async function sendMessageToModerator(text) {
+async function sendMessageToModerator(text, replyMarkup = ADMIN_MENU_KEYBOARD) {
   if (!isEnabled()) return;
   await axios
-    .post(apiUrl('sendMessage'), { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, text })
+    .post(apiUrl('sendMessage'), { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, text, reply_markup: replyMarkup })
     .catch((err) => {
       console.error('Failed to send message to moderator:', err.message);
     });
+}
+
+async function askModerator(text) {
+  return sendMessageToModerator(text, FORCE_REPLY);
 }
 
 async function answerCallback(callbackQueryId, text) {
@@ -234,6 +244,7 @@ module.exports = {
   notifyModeratorNewMaster,
   confirmMasterApproved,
   sendMessageToModerator,
+  askModerator,
   answerCallback,
   updateMessage,
   setWebhook,

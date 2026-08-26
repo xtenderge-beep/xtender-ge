@@ -39,6 +39,14 @@ async function approveMaster(id) {
   return rows[0] || null;
 }
 
+async function getMasterByPhone(phone) {
+  const { rows } = await pool.query(
+    `SELECT ${FIELDS}, is_active, balance_tetri FROM masters WHERE phone = $1`,
+    [phone]
+  );
+  return rows[0] || null;
+}
+
 async function topUpBalance(phone, amountTetri) {
   const { rows } = await pool.query(
     `UPDATE masters SET balance_tetri = balance_tetri + $1 WHERE phone = $2 RETURNING *`,
@@ -65,6 +73,7 @@ async function listMasters({ category } = {}) {
 module.exports = {
   registerMaster,
   getMasterByToken,
+  getMasterByPhone,
   approveMaster,
   topUpBalance,
   listMasters,
