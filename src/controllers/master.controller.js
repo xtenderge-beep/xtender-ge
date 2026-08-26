@@ -7,8 +7,22 @@ const { getBaseUrl } = require('../config/url');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
-const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
+const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
+const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
 const OTP_PURPOSE = 'master';
+
+function parseCargoDimension(value) {
+  const num = parseInt(value, 10);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+function buildVehicleType({ vehicleType, cargoLength, cargoWidth, cargoHeight, bodyType }) {
+  const parts = [];
+  if (vehicleType) parts.push(vehicleType);
+  if (cargoLength && cargoWidth && cargoHeight) parts.push(`${cargoLength}×${cargoWidth}×${cargoHeight} см`);
+  if (bodyType) parts.push(BODY_TYPE_LABELS[bodyType]);
+  return parts.length ? parts.join(', ') : null;
+}
 
 async function list(req, res) {
   const { category } = req.query;
@@ -53,9 +67,11 @@ async function register(req, res) {
   const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
   const name = (req.body.name || '').trim();
   const category = req.body.category;
-  const vehicleType = (req.body.vehicleType || '').trim();
-  const vehicleSize = req.body.vehicleSize;
-  const priceText = (req.body.priceText || '').trim();
+  const vehicleTypeInput = (req.body.vehicleType || '').trim();
+  const cargoLength = parseCargoDimension(req.body.cargoLength);
+  const cargoWidth = parseCargoDimension(req.body.cargoWidth);
+  const cargoHeight = parseCargoDimension(req.body.cargoHeight);
+  const bodyType = req.body.bodyType || null;
   const description = (req.body.description || '').trim();
   const termsAccepted = Boolean(req.body.termsAccepted);
 
@@ -68,8 +84,8 @@ async function register(req, res) {
   if (!ALLOWED_CATEGORIES.has(category)) {
     return res.status(400).json({ success: false, message: 'Invalid category' });
   }
-  if (vehicleSize && !ALLOWED_SIZES.has(vehicleSize)) {
-    return res.status(400).json({ success: false, message: 'Invalid vehicle size' });
+  if (bodyType && !ALLOWED_BODY_TYPES.has(bodyType)) {
+    return res.status(400).json({ success: false, message: 'Invalid body type' });
   }
   if (!termsAccepted) {
     return res.status(400).json({ success: false, message: 'Terms must be accepted' });
@@ -85,9 +101,11 @@ async function register(req, res) {
     name,
     phone,
     category,
-    vehicleType: category === 'transport' ? vehicleType : null,
-    vehicleSize: category === 'transport' ? vehicleSize : null,
-    priceText,
+    vehicleType: category === 'transport'
+      ? buildVehicleType({ vehicleType: vehicleTypeInput, cargoLength, cargoWidth, cargoHeight, bodyType })
+      : null,
+    vehicleSize: null,
+    priceText: null,
     description,
   });
   await otpService.clearVerified(phone, OTP_PURPOSE);
