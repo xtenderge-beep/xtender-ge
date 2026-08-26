@@ -145,3 +145,7 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS balance_tetri INTEGER NOT NULL DEFA
 -- по той же схеме, что owner_token у заявки клиента.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS master_token VARCHAR(20);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_masters_master_token ON masters(master_token);
+
+-- Фиксация момента согласия на получение SMS-уведомлений (чекбокс на /join) —
+-- нужна как доказательство явного согласия, а не просто текст на странице.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;

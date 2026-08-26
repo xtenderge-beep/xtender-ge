@@ -50,6 +50,10 @@ app.get('/join', (req, res) => {
   res.render('join', { clientStrings: clientStrings(req.lang) });
 });
 
+app.get('/terms', (req, res) => {
+  res.render('terms');
+});
+
 app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));

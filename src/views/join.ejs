@@ -66,7 +66,6 @@
                     <div class="grid grid-cols-1 gap-2" id="categoryBar">
                         <button type="button" data-cat="movers" onclick="selectCategory('movers')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_movers') %></button>
                         <button type="button" data-cat="transport" onclick="selectCategory('transport')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_transport') %></button>
-                        <button type="button" data-cat="junk" onclick="selectCategory('junk')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_junk') %></button>
                     </div>
                 </div>
 
@@ -103,6 +102,11 @@
                     <input type="tel" id="phoneInput" placeholder="<%= t('form_phone_placeholder') %>"
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
+
+                <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
+                    <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><%= t('join_terms_label') %> <a href="/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
+                </label>
 
                 <button type="button" onclick="sendOtp()" class="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                     <span><%= t('otp_send') %></span>
@@ -184,6 +188,7 @@
                 priceText: document.getElementById('priceInput').value.trim(),
                 description: document.getElementById('descriptionInput').value.trim(),
                 phone: document.getElementById('phoneInput').value.trim(),
+                termsAccepted: document.getElementById('termsCheckbox').checked,
             };
         }
 
@@ -193,6 +198,7 @@
             if (!payload.name) return showMsg(T.join_err_name_required, true);
             if (!payload.category) return showMsg(T.join_err_category_required, true);
             if (!payload.phone) return showMsg(T.js_err_empty_phone, true);
+            if (!payload.termsAccepted) return showMsg(T.join_err_terms_required, true);
 
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',

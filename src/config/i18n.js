@@ -207,9 +207,8 @@ const dictionaries = {
     join_name_placeholder: 'თქვენი სახელი',
     join_phone_label: 'ტელეფონის ნომერი',
     join_category_label: 'კატეგორია',
-    join_category_movers: '💪 მუშა / დამტვირთავი',
-    join_category_transport: '🚚 მძღოლი (მანქანით)',
-    join_category_junk: '🧹 ნაგვის გატანა',
+    join_category_movers: '💪 დამხმარე მუშა',
+    join_category_transport: '🚚 მძღოლი მანქანით',
     join_vehicle_type_label: 'დეტალები',
     join_vehicle_type_placeholder_movers: 'მაგ: დამტვირთავი, დამხმარე მუშა',
     join_vehicle_type_placeholder_transport: 'მაგ: Ford Transit',
@@ -236,6 +235,14 @@ const dictionaries = {
     master_status_category_label: 'კატეგორია',
     master_status_topup_hint: 'ბალანსის შესავსებად დაგვიკავშირდით: ',
     master_status_not_found: 'გვერდი ვერ მოიძებნა',
+
+    join_terms_label: 'ვეთანხმები SMS შეტყობინებების მიღებას შეკვეთებზე, პროფილის დამტკიცების შემდეგ.',
+    join_terms_link: 'დეტალურად',
+    join_err_terms_required: 'საჭიროა წესებზე დათანხმება',
+
+    terms_page_title: 'xtender.ge — შემსრულებლის პირობები',
+    terms_headline: 'შემსრულებლის პირობები',
+    terms_body: 'xtender.ge-ზე შემსრულებლად რეგისტრაციისას თქვენ გვაწვდით სახელს, ტელეფონის ნომერს და მომსახურების კატეგორიას შეკვეთების განაწილების სისტემაში მონაწილეობისთვის.\n\nმოდერატორის მიერ პროფილის დამტკიცების შემდეგ მიიღებთ SMS შეტყობინებებს კლიენტების ახალი შეკვეთების შესახებ თქვენ მიერ არჩეულ კატეგორიაში, მითითებულ ნომერზე. რეგისტრაციითა და ტელეფონის SMS-კოდით დადასტურებით თქვენ eთანხმებით ასეთი შეტყობინებების მიღებაზე.\n\nმომსახურება ფასიანია: თითოეულ SMS შეტყობინებაზე ბალანსიდან იჭრება 30 თეთრი (0.30 ლარი). შეტყობინებები იგზავნება მხოლოდ საკმარისი ბალანსის შემთხვევაში — თანხის უკმარისობისას შეკვეთა უბრალოდ არ გამოგეგზავნებათ, ჯარიმის ან დავალიანების გარეშე.\n\nბალანსის შევსება ხდება ხელით, სერვისის ადმინისტრატორთან Telegram-ში (@xtendergebot), მინიმალური შევსება — 5 ლარი.\n\nნებისმიერ დროს შეგიძლიათ უარი თქვათ შეტყობინებებზე და მოითხოვოთ თქვენი მონაცემების წაშლა Telegram-ში @xtendergebot-თან დაკავშირებით.',
   },
   ru: {
     site_title_index: 'xtender.ge — Грузоперевозки, Грузчики и Вывоз Мусора в Тбилиси',
@@ -443,9 +450,8 @@ const dictionaries = {
     join_name_placeholder: 'Ваше имя',
     join_phone_label: 'Номер телефона',
     join_category_label: 'Категория',
-    join_category_movers: '💪 Грузчик / разнорабочий',
-    join_category_transport: '🚚 Водитель (с машиной)',
-    join_category_junk: '🧹 Вывоз мусора',
+    join_category_movers: '💪 Разнорабочий',
+    join_category_transport: '🚚 Водитель с машиной',
     join_vehicle_type_label: 'Детали',
     join_vehicle_type_placeholder_movers: 'Например: грузчик, разнорабочий',
     join_vehicle_type_placeholder_transport: 'Например: Ford Transit',
@@ -472,6 +478,14 @@ const dictionaries = {
     master_status_category_label: 'Категория',
     master_status_topup_hint: 'Для пополнения баланса свяжитесь с нами: ',
     master_status_not_found: 'Страница не найдена',
+
+    join_terms_label: 'Согласен(а) получать SMS-уведомления о заявках после одобрения профиля.',
+    join_terms_link: 'Подробнее',
+    join_err_terms_required: 'Нужно принять условия использования',
+
+    terms_page_title: 'xtender.ge — Условия для исполнителей',
+    terms_headline: 'Условия для исполнителей',
+    terms_body: 'Регистрируясь как исполнитель на xtender.ge, вы указываете имя, номер телефона и категорию услуг для участия в системе распределения заявок.\n\nПосле одобрения профиля модератором вы получаете SMS-уведомления о новых заявках клиентов в выбранной категории на указанный номер телефона. Регистрируясь и подтверждая номер телефона по SMS-коду, вы даёте согласие на получение таких уведомлений.\n\nУслуга платная: за каждое SMS-уведомление о заявке с баланса списывается 30 тетри (0.30 GEL). Уведомления отправляются только при достаточном балансе — при нехватке средств заявка просто не будет отправлена, без штрафов и долгов.\n\nПополнение баланса — вручную, через администратора сервиса в Telegram (@xtendergebot), минимальная сумма пополнения — 5 GEL.\n\nВы можете в любой момент отказаться от уведомлений и запросить удаление своих данных, написав в Telegram @xtendergebot.',
   },
   en: {
     site_title_index: 'xtender.ge — Moving, Movers and Junk Removal in Tbilisi',
@@ -679,9 +693,8 @@ const dictionaries = {
     join_name_placeholder: 'Your name',
     join_phone_label: 'Phone number',
     join_category_label: 'Category',
-    join_category_movers: '💪 Mover / laborer',
-    join_category_transport: '🚚 Driver (with vehicle)',
-    join_category_junk: '🧹 Junk removal',
+    join_category_movers: '💪 General laborer',
+    join_category_transport: '🚚 Driver with a vehicle',
     join_vehicle_type_label: 'Details',
     join_vehicle_type_placeholder_movers: 'E.g.: mover, general laborer',
     join_vehicle_type_placeholder_transport: 'E.g.: Ford Transit',
@@ -708,6 +721,14 @@ const dictionaries = {
     master_status_category_label: 'Category',
     master_status_topup_hint: 'To top up your balance, contact us: ',
     master_status_not_found: 'Page not found',
+
+    join_terms_label: 'I agree to receive SMS notifications about requests after my profile is approved.',
+    join_terms_link: 'Learn more',
+    join_err_terms_required: 'You need to accept the terms of use',
+
+    terms_page_title: 'xtender.ge — Terms for providers',
+    terms_headline: 'Terms for providers',
+    terms_body: 'By registering as a provider on xtender.ge, you provide your name, phone number, and service category to participate in the request-dispatch system.\n\nOnce a moderator approves your profile, you will receive SMS notifications about new customer requests in your chosen category at the phone number you provided. By registering and confirming your phone via SMS code, you consent to receiving such notifications.\n\nThe service is paid: each SMS notification about a request deducts 30 tetri (0.30 GEL) from your balance. Notifications are only sent if your balance is sufficient — if it isn\'t, the request simply won\'t be sent to you, with no penalty or debt.\n\nBalance top-ups are manual, through the service administrator on Telegram (@xtendergebot); the minimum top-up is 5 GEL.\n\nYou may opt out of notifications and request deletion of your data at any time by contacting @xtendergebot on Telegram.',
   },
 };
 

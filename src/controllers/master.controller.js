@@ -6,7 +6,7 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
-const ALLOWED_CATEGORIES = new Set(['movers', 'transport', 'junk']);
+const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
 const OTP_PURPOSE = 'master';
 
@@ -57,6 +57,7 @@ async function register(req, res) {
   const vehicleSize = req.body.vehicleSize;
   const priceText = (req.body.priceText || '').trim();
   const description = (req.body.description || '').trim();
+  const termsAccepted = Boolean(req.body.termsAccepted);
 
   if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
@@ -69,6 +70,9 @@ async function register(req, res) {
   }
   if (vehicleSize && !ALLOWED_SIZES.has(vehicleSize)) {
     return res.status(400).json({ success: false, message: 'Invalid vehicle size' });
+  }
+  if (!termsAccepted) {
+    return res.status(400).json({ success: false, message: 'Terms must be accepted' });
   }
 
   const phone = toE164(rawPhone);

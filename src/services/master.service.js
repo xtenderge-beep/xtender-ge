@@ -6,8 +6,8 @@ const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_tex
 async function registerMaster({ name, phone, category, vehicleType, vehicleSize, priceText, description }) {
   const masterToken = generateShortId();
   const { rows } = await pool.query(
-    `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, balance_tetri, master_token)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, false, 0, $8)
+    `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, balance_tetri, master_token, terms_accepted_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, false, 0, $8, NOW())
      ON CONFLICT (phone) DO UPDATE SET
        name = EXCLUDED.name,
        category = EXCLUDED.category,
@@ -16,7 +16,8 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
        price_text = EXCLUDED.price_text,
        description = EXCLUDED.description,
        is_active = false,
-       master_token = COALESCE(masters.master_token, EXCLUDED.master_token)
+       master_token = COALESCE(masters.master_token, EXCLUDED.master_token),
+       terms_accepted_at = NOW()
      RETURNING *`,
     [name, phone, category, vehicleType || null, vehicleSize || null, priceText || null, description || null, masterToken]
   );
