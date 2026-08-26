@@ -52,6 +52,7 @@ src/
     upload.js             — конфигурация multer (фото/PDF к заявке)
     url.js                — getBaseUrl() — единая точка сборки base URL (https://$DOMAIN)
     phone.js              — toE164() — нормализация телефона в формат +995XXXXXXXXX
+    shortId.js             — generateShortId() — общий генератор коротких ID (токены заявок и мастеров)
   controllers/
     otp.controller.js     — POST /api/otp/send, /api/otp/verify (клиент)
     order.controller.js   — заявки, Telegram-вебхук (диспетчеризация + одобрение мастеров + /topup)
@@ -69,6 +70,8 @@ src/
     order.ejs             — страница заявки (для мастера и для клиента через /o/)
     my-orders.ejs          — список заявок клиента (по cookie)
     join.ejs               — регистрация исполнителя (форма + OTP)
+    master-status.ejs       — личная страница исполнителя (/master/:token) — статус + баланс
+    terms.ejs                — условия/согласие на SMS-уведомления (/terms)
 scripts/
   seed-masters.js          — генерирует 50 демо-мастеров (тестовые данные)
 schema.sql                 — полная схема БД, накатывается автоматически при каждом старте (idempotent)
@@ -104,7 +107,7 @@ node dev-server.js
 | `SMS_GATEWAY_PASSWORD` | пароль SMS-шлюза |
 | `TELEGRAM_BOT_TOKEN` | токен бота-модератора (`@xtendergebot`) |
 | `TELEGRAM_MODERATOR_CHAT_ID` | chat_id, куда шлются заявки на модерацию |
-| `TELEGRAM_WEBHOOK_SECRET` | секрет для проверки `X-Telegram-Bot-Api-Secret-Token` — без него `/api/telegram/webhook` принимает запросы от кого угодно (см. «Известные ограничения») |
+| `TELEGRAM_WEBHOOK_SECRET` | секрет для проверки заголовка `X-Telegram-Bot-Api-Secret-Token` на `/api/telegram/webhook`. Установлен в проде и подтверждён (без заголовка/с неверным — 401). Приложение само переустанавливает вебхук с этим секретом при каждом старте (`telegramService.setWebhook()` в `app.js`) |
 | `NODE_ENV` | `development` включает dev-режимы (SMS/Telegram не отправляются по-настоящему) |
 | `SKIP_DB_MIGRATIONS` | пропустить авто-накат `schema.sql` при старте (нужно только `dev-server.js`) |
 
@@ -115,7 +118,7 @@ node dev-server.js
 Схема живёт в одном файле `schema.sql` и накатывается автоматически при каждом запуске (`runMigrations()` в `app.js`), включая прод — миграции идемпотентны (`CREATE TABLE IF NOT EXISTS` + отдельные `ALTER TABLE ADD COLUMN IF NOT EXISTS` для полей, добавленных позже).
 
 Основные таблицы:
-- **masters** — каталог исполнителей: категория, тип/размер машины, цена, телефон, активность, подписка, `balance_tetri` (баланс в тетри)
+- **masters** — каталог исполнителей: категория, тип/размер машины, цена, телефон, активность, подписка, `balance_tetri` (баланс в тетри), `master_token` (личная ссылка), `terms_accepted_at` (момент согласия). `price_text` — поле есть в схеме (заполнено у демо-мастеров), но форма `/join` его больше не собирает
 - **orders** — заявки: описание, район, статус (`unverified` → `pending_review` → `closed`), `token` (для мастеров) и `owner_token` (для клиента) — два независимых коротких (10 символов) идентификатора, чтобы мастер не мог подделать доступ владельца
 - **order_dispatches** — какой категории (и размера) уже отправлена рассылка по заявке — защита от повторных SMS
 - **order_views** — клики мастеров по заявке (переход/звонок/WhatsApp) — данные для воронки
@@ -137,9 +140,9 @@ node dev-server.js
 | POST | `/api/masters/otp/send` | OTP для регистрации исполнителя (отдельный namespace от клиентского) |
 | POST | `/api/masters/otp/verify` | подтверждение телефона исполнителя |
 | POST | `/api/masters/register` | создаёт мастера (`is_active=false`), уведомляет модератора в Telegram |
-| POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`) |
+| POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
-Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`.
+Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (условия/согласие на SMS), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`.
 
 ## Деплой
 
@@ -150,7 +153,6 @@ Railway, автодеплой при `git push` в `main` (репозитори�
 ## Известные ограничения
 
 - Нет живых обновлений без перезагрузки страницы (обычные серверные страницы, без WebSocket)
-- `POST /api/telegram/webhook` проверяет `TELEGRAM_WEBHOOK_SECRET` через заголовок `X-Telegram-Bot-Api-Secret-Token` — но **только если переменная выставлена**; без неё эндпоинт по-прежнему открыт кому угодно (подделка `/topup`, самоодобрение регистрации). Приложение само переустанавливает вебхук с секретом при каждом старте (`telegramService.setWebhook()` в `app.js`), как только переменная задана в Railway
 - Используемый SMS-шлюз сам дописывает служебную строку к тексту SMS (например `NO XTENDER-94710`) — в API шлюза нет параметра для имени отправителя, разбираемся с провайдером шлюза
 - SMS-шлюз работает по `http://`, не `https://` — креды и текст сообщения идут в незашифрованном виде
 - Мастерам, уже проявившим интерес к заявке, не приходит SMS при её закрытии клиентом (осознанное решение)
