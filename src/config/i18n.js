@@ -227,6 +227,15 @@ const dictionaries = {
     join_payment_contact: 'ბალანსის შესავსებად დაგვიკავშირდით: ',
     join_err_name_required: 'შეიყვანეთ სახელი',
     join_err_category_required: 'აირჩიეთ კატეგორია',
+
+    master_status_page_title: 'xtender.ge — ჩემი ბალანსი',
+    master_status_headline: 'ჩემი ანგარიში',
+    master_status_pending: '⏳ თქვენი განაცხადი მოდერაციაშია',
+    master_status_active: '✅ თქვენ აქტიური ხართ',
+    master_status_balance_label: 'ბალანსი',
+    master_status_category_label: 'კატეგორია',
+    master_status_topup_hint: 'ბალანსის შესავსებად დაგვიკავშირდით: ',
+    master_status_not_found: 'გვერდი ვერ მოიძებნა',
   },
   ru: {
     site_title_index: 'xtender.ge — Грузоперевозки, Грузчики и Вывоз Мусора в Тбилиси',
@@ -454,6 +463,15 @@ const dictionaries = {
     join_payment_contact: 'Для пополнения баланса свяжитесь с нами: ',
     join_err_name_required: 'Введите имя',
     join_err_category_required: 'Выберите категорию',
+
+    master_status_page_title: 'xtender.ge — Мой баланс',
+    master_status_headline: 'Мой аккаунт',
+    master_status_pending: '⏳ Ваша заявка на модерации',
+    master_status_active: '✅ Вы активны',
+    master_status_balance_label: 'Баланс',
+    master_status_category_label: 'Категория',
+    master_status_topup_hint: 'Для пополнения баланса свяжитесь с нами: ',
+    master_status_not_found: 'Страница не найдена',
   },
   en: {
     site_title_index: 'xtender.ge — Moving, Movers and Junk Removal in Tbilisi',
@@ -681,6 +699,15 @@ const dictionaries = {
     join_payment_contact: 'To top up your balance, contact us: ',
     join_err_name_required: 'Enter your name',
     join_err_category_required: 'Select a category',
+
+    master_status_page_title: 'xtender.ge — My Balance',
+    master_status_headline: 'My Account',
+    master_status_pending: '⏳ Your application is under review',
+    master_status_active: '✅ You are active',
+    master_status_balance_label: 'Balance',
+    master_status_category_label: 'Category',
+    master_status_topup_hint: 'To top up your balance, contact us: ',
+    master_status_not_found: 'Page not found',
   },
 };
 

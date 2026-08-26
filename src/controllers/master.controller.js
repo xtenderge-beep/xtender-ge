@@ -1,7 +1,9 @@
 const masterService = require('../services/master.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
+const smsService = require('../services/sms.service');
 const { toE164 } = require('../config/phone');
+const { getBaseUrl } = require('../config/url');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport', 'junk']);
@@ -86,11 +88,16 @@ async function register(req, res) {
   });
   await otpService.clearVerified(phone, OTP_PURPOSE);
 
+  const link = `${getBaseUrl()}/master/${master.master_token}`;
+
   telegramService.notifyModeratorNewMaster(master).catch((err) => {
     console.error('Failed to notify moderator about new master:', err.message);
   });
+  smsService.sendOrderNotification(phone, `Xtender: заявка на регистрацию принята. Ваш баланс: ${link}`).catch((err) => {
+    console.error('Failed to send registration confirmation SMS:', err.message);
+  });
 
-  return res.json({ success: true });
+  return res.json({ success: true, link });
 }
 
 module.exports = {

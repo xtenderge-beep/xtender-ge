@@ -54,6 +54,11 @@ app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
 
+app.get('/master/:token', asyncHandler(async (req, res) => {
+  const master = await masterService.getMasterByToken(req.params.token);
+  res.render('master-status', { master, clientStrings: clientStrings(req.lang) });
+}));
+
 app.use('/api', apiRoutes);
 
 app.use((err, req, res, next) => {

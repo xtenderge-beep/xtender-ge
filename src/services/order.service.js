@@ -1,20 +1,9 @@
-const crypto = require('crypto');
 const pool = require('../config/db');
 const smsService = require('./sms.service');
 const { getBaseUrl } = require('../config/url');
+const { generateShortId } = require('../config/shortId');
 
-const SHORT_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const SHORT_ID_LENGTH = 10;
 const COST_PER_NOTIFICATION_TETRI = 30;
-
-function generateShortId() {
-  const bytes = crypto.randomBytes(SHORT_ID_LENGTH);
-  let id = '';
-  for (let i = 0; i < SHORT_ID_LENGTH; i++) {
-    id += SHORT_ID_ALPHABET[bytes[i] % SHORT_ID_ALPHABET.length];
-  }
-  return id;
-}
 
 async function createPendingOrder({ phone, description, districtName }) {
   const token = generateShortId();

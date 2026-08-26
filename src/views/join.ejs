@@ -135,6 +135,8 @@
                     <p class="text-stone-300 leading-relaxed"><%= t('join_payment_desc') %></p>
                     <p class="text-stone-300"><%= t('join_payment_contact') %><span class="font-mono text-emerald-400">@xtendergebot</span></p>
                 </div>
+
+                <a id="statusLink" href="#" class="block w-full py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs break-all"></a>
             </div>
 
             <div id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
@@ -235,6 +237,11 @@
             showMsg('');
             document.getElementById('otpStep').classList.add('hidden');
             document.getElementById('successStep').classList.remove('hidden');
+            if (data.link) {
+                const statusLink = document.getElementById('statusLink');
+                statusLink.href = data.link;
+                statusLink.textContent = data.link;
+            }
         }
     </script>
 </body>

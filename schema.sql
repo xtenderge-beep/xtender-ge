@@ -140,3 +140,8 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
 -- через /join создаёт мастера с is_active = false — до подтверждения модератором в Telegram
 -- он не виден в каталоге и не участвует в рассылке (обе выборки уже фильтруют по is_active).
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS balance_tetri INTEGER NOT NULL DEFAULT 0;
+
+-- Личная ссылка исполнителя (/master/<token>) — посмотреть баланс, без пароля/логина,
+-- по той же схеме, что owner_token у заявки клиента.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS master_token VARCHAR(20);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_masters_master_token ON masters(master_token);
