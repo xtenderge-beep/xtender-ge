@@ -1,0 +1,52 @@
+<%- include('./_header', { active: 'overview' }) %>
+
+<h1 class="text-2xl font-black text-stone-900 mb-5">Обзор</h1>
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Активны</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.mastersActive %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">На модерации</p>
+        <p class="text-2xl font-black text-amber-600 mt-1"><%= stats.mastersPending %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Забанены</p>
+        <p class="text-2xl font-black text-red-600 mt-1"><%= stats.mastersBanned %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Мало баланса</p>
+        <p class="text-2xl font-black text-amber-600 mt-1"><%= stats.lowBalanceCount %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Суммарный баланс</p>
+        <p class="text-2xl font-black text-emerald-700 mt-1"><%= stats.totalBalanceGel.toFixed(2) %> ₾</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Заявок сегодня</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.ordersToday %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Заявок за неделю</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.ordersThisWeek %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Отзывов на модерации</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.pendingReviewsCount %></p>
+    </div>
+</div>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-4">
+    <p class="text-xs font-bold text-stone-500 uppercase">Среднее время реакции мастеров</p>
+    <% if (stats.responseStats.avgSeconds === null) { %>
+      <p class="text-sm text-stone-500 mt-1">Пока нет данных</p>
+    <% } else { %>
+      <p class="text-lg font-black text-stone-900 mt-1">
+        <%= Math.round(stats.responseStats.avgSeconds / 60) %> мин
+        <span class="text-xs font-semibold text-stone-500">(ответили <%= stats.responseStats.respondedCount %> из <%= stats.responseStats.totalCount %> уведомлений)</span>
+      </p>
+    <% } %>
+</div>
+
+<%- include('./_footer') %>

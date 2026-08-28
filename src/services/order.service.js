@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const smsService = require('./sms.service');
+const masterService = require('./master.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
@@ -120,13 +121,13 @@ async function getMasterCountsByCategory() {
   const { rows } = await pool.query(
     `SELECT category, vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
+     WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
      GROUP BY category, vehicle_size
      UNION ALL
      SELECT 'flatbed' AS category, NULL AS vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
+     WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
        AND category = 'transport' AND is_flatbed = true`,
     [COST_PER_NOTIFICATION_TETRI]
@@ -152,7 +153,7 @@ async function getOrderFunnelStats(orderId) {
 async function notifyMasters(order, category, vehicleSize) {
   const params = [COST_PER_NOTIFICATION_TETRI];
   let query = `SELECT id, phone FROM masters
-               WHERE is_active = true AND is_subscribed = true AND balance_tetri >= $1
+               WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
                  AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
   if (category === 'flatbed') {
@@ -184,9 +185,8 @@ async function notifyMasters(order, category, vehicleSize) {
   );
 
   if (notifiedIds.length) {
-    await pool.query(
-      `UPDATE masters SET balance_tetri = balance_tetri - $1 WHERE id = ANY($2::int[])`,
-      [COST_PER_NOTIFICATION_TETRI, notifiedIds]
+    await pool.withTransaction((client) =>
+      masterService.chargeMastersForLead(notifiedIds, COST_PER_NOTIFICATION_TETRI, order.id, client)
     );
   }
 

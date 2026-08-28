@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <url>
+    <loc>https://xtender.ge/</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/ru</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/en</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/"/>
+  </url>
+
+  <url>
+    <loc>https://xtender.ge/join</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/join"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/join"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/join"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/join"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/ru/join</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/join"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/join"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/join"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/join"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/en/join</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/join"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/join"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/join"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/join"/>
+  </url>
+
+  <url>
+    <loc>https://xtender.ge/terms</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/terms"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/ru/terms</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/terms"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/en/terms</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/terms"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/terms"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/terms"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/terms"/>
+  </url>
+
+</urlset>

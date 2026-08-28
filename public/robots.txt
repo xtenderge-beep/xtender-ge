@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /my-orders
+Disallow: /order/
+Disallow: /o/
+Disallow: /master/
+Disallow: /api/
+Disallow: /lang/
+Disallow: /health
+
+Sitemap: https://xtender.ge/sitemap.xml

@@ -6,14 +6,21 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const apiRoutes = require('./routes/api.routes');
+const publicRoutes = require('./routes/public.routes');
 const orderController = require('./controllers/order.controller');
+const reviewController = require('./controllers/review.controller');
 const masterService = require('./services/master.service');
 const telegramService = require('./services/telegram.service');
 const { normalizeLang, translate, clientStrings } = require('./config/i18n');
 const asyncHandler = require('./middleware/asyncHandler');
 const pool = require('./config/db');
+const adminAuth = require('./config/adminAuth');
 
 const app = express();
+
+// За прокси Railway; без этого req.ip/req.secure не отражают реального клиента —
+// важно для рейт-лимита логина в админку и для secure-флага её cookie.
+app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -42,18 +49,8 @@ app.get('/lang/:code', (req, res) => {
   res.redirect(back);
 });
 
-app.get('/', asyncHandler(async (req, res) => {
-  const masters = await masterService.listMasters();
-  res.render('index', { masters, clientStrings: clientStrings(req.lang) });
-}));
-
-app.get('/join', (req, res) => {
-  res.render('join', { clientStrings: clientStrings(req.lang) });
-});
-
-app.get('/terms', (req, res) => {
-  res.render('terms');
-});
+app.use('/', publicRoutes);
+app.use('/:locale(ru|en)', publicRoutes);
 
 app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
@@ -64,7 +61,19 @@ app.get('/master/:token', asyncHandler(async (req, res) => {
   res.render('master-status', { master, clientStrings: clientStrings(req.lang) });
 }));
 
+app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
+
 app.use('/api', apiRoutes);
+
+// Fail closed: без обеих переменных окружения /admin/* должен быть недоступен,
+// а не молча пускать всех без пароля — прецедент именно такой дыры уже был
+// с TELEGRAM_WEBHOOK_SECRET (см. HANDOFF.md), не повторяем для того, что двигает деньги.
+if (adminAuth.isConfigured()) {
+  app.use('/admin', require('./routes/admin.routes'));
+} else {
+  console.error('ADMIN_PASSWORD/ADMIN_SESSION_SECRET не заданы — /admin отключён (503)');
+  app.use('/admin', (req, res) => res.status(503).send('Admin dashboard not configured'));
+}
 
 app.use((err, req, res, next) => {
   if (err && (err.name === 'MulterError' || err.message === 'Unsupported file type')) {

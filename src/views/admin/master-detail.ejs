@@ -1,0 +1,84 @@
+<%- include('./_header', { active: 'masters' }) %>
+
+<a href="/admin/masters" class="text-xs font-bold text-stone-500 hover:text-stone-800">&larr; Все специалисты</a>
+
+<div class="mt-3 bg-white rounded-2xl border border-stone-200 p-5">
+    <div class="flex items-center gap-2 flex-wrap">
+        <h1 class="text-xl font-black text-stone-900"><%= master.name %></h1>
+        <% if (master.is_banned) { %>
+          <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">Забанен<% if (master.banned_reason) { %>: <%= master.banned_reason %><% } %></span>
+        <% } else if (!master.is_active) { %>
+          <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">На модерации</span>
+        <% } else { %>
+          <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">Активен</span>
+        <% } %>
+    </div>
+    <p class="text-sm text-stone-600 mt-2">
+        <%= master.phone %> · <%= master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
+    </p>
+    <p class="text-sm text-stone-600 mt-1">Рейтинг: <b><%= master.computed_rating %></b> (<%= master.review_count %> отзывов)</p>
+    <p class="text-lg font-black text-stone-900 mt-2">Баланс: <%= (master.balance_tetri / 100).toFixed(2) %> ₾</p>
+
+    <% if (error === 'invalid_amount') { %>
+      <p class="mt-2 text-sm text-red-600 font-semibold">Некорректная сумма коррекции.</p>
+    <% } %>
+
+    <div class="mt-4 flex flex-wrap gap-3">
+        <% if (master.is_banned) { %>
+          <form method="POST" action="/admin/masters/<%= master.id %>/unban">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition">Разбанить</button>
+          </form>
+        <% } else { %>
+          <form method="POST" action="/admin/masters/<%= master.id %>/ban" class="flex items-center gap-2">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="text" name="reason" placeholder="Причина бана (необязательно)" class="border border-stone-300 rounded-xl px-3 py-2 text-xs">
+              <button type="submit" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition">Забанить</button>
+          </form>
+        <% } %>
+    </div>
+
+    <form method="POST" action="/admin/masters/<%= master.id %>/balance-correction" class="mt-4 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <label class="text-xs font-bold text-stone-500">Коррекция баланса (₾, можно отрицательное):</label>
+        <input type="text" name="amountGel" required placeholder="напр. 10 или -5" class="border border-stone-300 rounded-xl px-3 py-2 text-xs w-32">
+        <input type="text" name="note" placeholder="Причина" class="border border-stone-300 rounded-xl px-3 py-2 text-xs">
+        <button type="submit" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">Применить</button>
+    </form>
+</div>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase">Время реакции</h2>
+    <% if (responseStats.avgSeconds === null) { %>
+      <p class="text-sm text-stone-500 mt-1">Пока нет данных</p>
+    <% } else { %>
+      <p class="text-sm text-stone-700 mt-1">
+        В среднем <b><%= Math.round(responseStats.avgSeconds / 60) %> мин</b>,
+        ответил на <%= responseStats.respondedCount %> из <%= responseStats.totalCount %> уведомлений
+      </p>
+    <% } %>
+</div>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">История баланса</h2>
+    <% if (!history.length) { %>
+      <p class="text-sm text-stone-500">Пока нет операций (журнал ведётся с момента запуска этой функции — историю до этого он не объясняет).</p>
+    <% } else { %>
+      <div class="space-y-1.5">
+          <% history.forEach(function (h) { %>
+            <div class="flex items-center justify-between text-sm border-b border-stone-100 pb-1.5">
+                <span class="text-stone-500 font-mono text-xs"><%= new Date(h.created_at).toLocaleString('ru') %></span>
+                <span class="text-stone-600">
+                    <%= h.reason === 'topup' ? 'Пополнение' : h.reason === 'lead_charge' ? 'Списание за лид' : 'Коррекция' %>
+                    <% if (h.note) { %> — <%= h.note %><% } %>
+                </span>
+                <span class="font-mono font-bold <%= h.amount_tetri >= 0 ? 'text-emerald-700' : 'text-red-600' %>">
+                    <%= h.amount_tetri >= 0 ? '+' : '' %><%= (h.amount_tetri / 100).toFixed(2) %> ₾
+                </span>
+            </div>
+          <% }); %>
+      </div>
+    <% } %>
+</div>
+
+<%- include('./_footer') %>

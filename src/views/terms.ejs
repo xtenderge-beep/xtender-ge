@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= t('terms_page_title') %></title>
+    <meta name="description" content="<%= t('meta_description_terms') %>">
+
+    <link rel="canonical" href="<%= seo.canonical %>">
+    <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
+    <link rel="alternate" hreflang="ru" href="<%= seo.alternates.ru %>">
+    <link rel="alternate" hreflang="en" href="<%= seo.alternates.en %>">
+    <link rel="alternate" hreflang="x-default" href="<%= seo.xDefault %>">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="xtender.ge">
+    <meta property="og:title" content="<%= t('terms_page_title') %>">
+    <meta property="og:description" content="<%= t('meta_description_terms') %>">
+    <meta property="og:url" content="<%= seo.canonical %>">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="<%= t('terms_page_title') %>">
+    <meta name="twitter:description" content="<%= t('meta_description_terms') %>">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,9 +45,9 @@
                     <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
                 </a>
                 <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
-                    <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
-                    <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
-                    <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                    <a href="<%= seo.alternates.ka %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+                    <a href="<%= seo.alternates.ru %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+                    <a href="<%= seo.alternates.en %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
                 </div>
             </div>
         </div>

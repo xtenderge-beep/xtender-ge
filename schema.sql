@@ -149,3 +149,40 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_masters_master_token ON masters(master_tok
 -- Фиксация момента согласия на получение SMS-уведомлений (чекбокс на /join) —
 -- нужна как доказательство явного согласия, а не просто текст на странице.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
+
+-- === Админ-панель: бан мастеров, история баланса, отзывы (2026-08-28) ===
+
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS banned_reason TEXT;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+
+-- Полная история изменений баланса. amount_tetri знаковый (+ пополнение/коррекция вверх,
+-- - списание за лид/коррекция вниз). order_id заполнен только для lead_charge и одновременно
+-- фиксирует, каким мастерам реально ушло уведомление по заявке — раньше это нигде не хранилось.
+CREATE TABLE IF NOT EXISTS balance_transactions (
+    id SERIAL PRIMARY KEY,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    amount_tetri INTEGER NOT NULL,
+    reason VARCHAR(30) NOT NULL CHECK (reason IN ('topup', 'lead_charge', 'admin_correction')),
+    note TEXT,
+    order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_master_id ON balance_transactions(master_id);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_order_id ON balance_transactions(order_id);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_created_at ON balance_transactions(created_at);
+
+-- Публичные отзывы клиентов. is_approved=false по умолчанию — висит в очереди модерации
+-- (/admin/reviews), в каталоге на сайте учитываются только approved.
+CREATE TABLE IF NOT EXISTS master_reviews (
+    id SERIAL PRIMARY KEY,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment TEXT,
+    is_approved BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (order_id, master_id)
+);
+CREATE INDEX IF NOT EXISTS idx_master_reviews_master_id ON master_reviews(master_id);
+CREATE INDEX IF NOT EXISTS idx_master_reviews_is_approved ON master_reviews(is_approved);

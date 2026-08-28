@@ -2,6 +2,7 @@ const express = require('express');
 const otpController = require('../controllers/otp.controller');
 const orderController = require('../controllers/order.controller');
 const masterController = require('../controllers/master.controller');
+const reviewController = require('../controllers/review.controller');
 const { upload } = require('../config/upload');
 const asyncHandler = require('../middleware/asyncHandler');
 
@@ -20,5 +21,7 @@ router.post('/masters/otp/verify', asyncHandler(masterController.verifyOtp));
 router.post('/masters/register', asyncHandler(masterController.register));
 
 router.post('/telegram/webhook', asyncHandler(orderController.telegramWebhook));
+
+router.post('/reviews', asyncHandler(reviewController.submit));
 
 module.exports = router;

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-stone-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>xtender.ge — Админка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .admin-nav-link.active { color: #fff; }
+    </style>
+</head>
+<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+
+    <header class="bg-stone-900 text-stone-300 sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
+            <nav class="flex items-center gap-5 text-sm font-bold">
+                <span class="text-emerald-400 font-black">xtender.ge / admin</span>
+                <a href="/admin" class="admin-nav-link hover:text-white transition <%= active === 'overview' ? 'active' : '' %>">Обзор</a>
+                <a href="/admin/masters" class="admin-nav-link hover:text-white transition <%= active === 'masters' ? 'active' : '' %>">Специалисты</a>
+                <a href="/admin/orders" class="admin-nav-link hover:text-white transition <%= active === 'orders' ? 'active' : '' %>">Заявки</a>
+                <a href="/admin/reviews" class="admin-nav-link hover:text-white transition <%= active === 'reviews' ? 'active' : '' %>">Отзывы</a>
+            </nav>
+            <form method="POST" action="/admin/logout">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="text-xs text-stone-400 hover:text-white transition font-semibold">Выйти</button>
+            </form>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-6">

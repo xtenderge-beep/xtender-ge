@@ -4,6 +4,54 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= t('site_title_index') %></title>
+    <meta name="description" content="<%= t('meta_description_index') %>">
+
+    <link rel="canonical" href="<%= seo.canonical %>">
+    <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
+    <link rel="alternate" hreflang="ru" href="<%= seo.alternates.ru %>">
+    <link rel="alternate" hreflang="en" href="<%= seo.alternates.en %>">
+    <link rel="alternate" hreflang="x-default" href="<%= seo.xDefault %>">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="xtender.ge">
+    <meta property="og:title" content="<%= t('site_title_index') %>">
+    <meta property="og:description" content="<%= t('meta_description_index') %>">
+    <meta property="og:url" content="<%= seo.canonical %>">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="<%= t('site_title_index') %>">
+    <meta name="twitter:description" content="<%= t('meta_description_index') %>">
+
+    <%
+      const orgJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'MovingCompany',
+        name: 'xtender.ge',
+        url: seo.canonical,
+        areaServed: {
+          '@type': 'City',
+          name: 'Tbilisi',
+          address: { '@type': 'PostalAddress', addressLocality: 'Tbilisi', addressCountry: 'GE' },
+        },
+        makesOffer: [
+          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_transport'), areaServed: 'Tbilisi' } },
+          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_movers'), areaServed: 'Tbilisi' } },
+          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_junk'), areaServed: 'Tbilisi' } },
+        ],
+      };
+      const faqItems = [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t('faq_a' + n) }));
+      const faqJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqItems.map((item) => ({
+          '@type': 'Question',
+          name: item.q,
+          acceptedAnswer: { '@type': 'Answer', text: item.a },
+        })),
+      };
+    %>
+    <script type="application/ld+json"><%- JSON.stringify(orgJsonLd) %></script>
+    <script type="application/ld+json"><%- JSON.stringify(faqJsonLd) %></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,9 +119,9 @@
                     </a>
 
                     <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
-                        <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
-                        <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
-                        <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                        <a href="<%= seo.alternates.ka %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+                        <a href="<%= seo.alternates.ru %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+                        <a href="<%= seo.alternates.en %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
                     </div>
 
                     <button onclick="openModal('driver-modal')" class="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
@@ -89,13 +137,18 @@
 
         <div class="max-w-3xl mx-auto px-4 pt-6 pb-28 sm:pb-16">
 
+                    <section id="seo-hero" class="mb-6 fade-in-up">
+                        <h1 class="text-xl sm:text-2xl font-black tracking-tight text-stone-900"><%= t('seo_hero_h1') %></h1>
+                        <p class="text-sm text-stone-500 mt-1.5 max-w-2xl"><%= t('seo_hero_lead') %></p>
+                    </section>
+
                     <section id="post-section" class="fade-in-up">
                         <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
                             <div id="detailsStep" class="p-5 sm:p-6">
                                 <input type="hidden" id="description">
 
-                                <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-stone-900"><%= t('composer_headline') %></h1>
+                                <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-stone-900"><%= t('composer_headline') %></h2>
                                 <p class="text-sm text-stone-500 mt-1"><%= t('composer_subtitle') %></p>
 
                                 <div class="mt-5">
@@ -290,6 +343,47 @@
                       <% } %>
                     <% }); %>
 
+                    </section>
+
+                    <section id="how-it-works" class="mt-12">
+                        <h2 class="text-xl font-extrabold text-stone-900"><%= t('how_it_works_title') %></h2>
+                        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <% [1, 2, 3, 4].forEach(function (n) { %>
+                              <div class="bg-white rounded-2xl border border-stone-200/90 p-4">
+                                  <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center"><%= n %></div>
+                                  <h3 class="mt-2 text-sm font-extrabold text-stone-900"><%= t('how_it_works_step' + n + '_title') %></h3>
+                                  <p class="mt-1 text-xs text-stone-600 leading-snug"><%= t('how_it_works_step' + n + '_desc') %></p>
+                              </div>
+                            <% }); %>
+                        </div>
+                    </section>
+
+                    <section id="service-categories" class="mt-10">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <% groups.forEach(function (group) { %>
+                              <div class="bg-white rounded-2xl border border-stone-200/90 p-4">
+                                  <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>"><%= group.icon %> <%= t('service_desc_' + group.key + '_title') %></span>
+                                  <p class="mt-2 text-xs text-stone-600 leading-snug"><%= t('service_desc_' + group.key + '_body') %></p>
+                              </div>
+                            <% }); %>
+                        </div>
+                    </section>
+
+                    <section id="coverage" class="mt-10">
+                        <h2 class="text-xl font-extrabold text-stone-900"><%= t('coverage_title') %></h2>
+                        <p class="mt-1 text-sm text-stone-600"><%= t('coverage_body') %></p>
+                    </section>
+
+                    <section id="faq" class="mt-10">
+                        <h2 class="text-xl font-extrabold text-stone-900"><%= t('faq_title') %></h2>
+                        <div class="mt-4 space-y-3">
+                            <% [1, 2, 3, 4, 5].forEach(function (n) { %>
+                              <div class="bg-white rounded-2xl border border-stone-200/90 p-4">
+                                  <h3 class="text-sm font-extrabold text-stone-900"><%= t('faq_q' + n) %></h3>
+                                  <p class="mt-1 text-xs text-stone-600 leading-snug"><%= t('faq_a' + n) %></p>
+                              </div>
+                            <% }); %>
+                        </div>
                     </section>
 
         </div>

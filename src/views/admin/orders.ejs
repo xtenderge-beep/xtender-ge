@@ -1,0 +1,24 @@
+<%- include('./_header', { active: 'orders' }) %>
+
+<h1 class="text-2xl font-black text-stone-900 mb-5">Заявки (<%= orders.length %>)</h1>
+
+<div class="space-y-2">
+    <% orders.forEach(function (o) { %>
+      <a href="/admin/orders/<%= o.token %>" class="block bg-white rounded-2xl border border-stone-200 p-4 hover:border-emerald-300 transition">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+              <span class="font-mono text-xs text-stone-500"><%= new Date(o.created_at).toLocaleString('ru') %></span>
+              <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
+                  <%= o.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
+                  <%= o.status %>
+              </span>
+          </div>
+          <p class="text-sm text-stone-800 mt-1.5 line-clamp-2"><%= o.description %></p>
+          <p class="text-xs text-stone-500 mt-1.5">
+              Категории: <%= (o.target_categories || []).join(', ') || '—' %>
+              · 👀 <%= o.view_count %> · 📞 <%= o.call_count %> · 💬 <%= o.whatsapp_count %>
+          </p>
+      </a>
+    <% }); %>
+</div>
+
+<%- include('./_footer') %>

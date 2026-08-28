@@ -2,9 +2,12 @@ const orderService = require('../services/order.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
 const masterService = require('../services/master.service');
+const reviewService = require('../services/review.service');
+const smsService = require('../services/sms.service');
 const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
+const { getBaseUrl } = require('../config/url');
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 const ADMIN_FLOW_TTL_SECONDS = 300;
@@ -364,6 +367,14 @@ async function close(req, res) {
 
   telegramService.updateMessage(order).catch((err) => {
     console.error('Failed to update Telegram message on close:', err.message);
+  });
+
+  reviewService.getEligibleMasters(order.id).then((masters) => {
+    if (!masters.length) return null;
+    const link = `${getBaseUrl()}/review/${order.owner_token}`;
+    return smsService.sendOrderNotification(order.phone, `Xtender: заявка закрыта. Оцените исполнителя: ${link}`);
+  }).catch((err) => {
+    console.error('Failed to send review invite SMS:', err.message);
   });
 
   return res.json({ success: true, message: 'Order closed' });
