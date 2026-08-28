@@ -4,6 +4,8 @@ const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
 const reviewService = require('../services/review.service');
+const orderService = require('../services/order.service');
+const telegramService = require('../services/telegram.service');
 const { toE164 } = require('../config/phone');
 
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
@@ -152,6 +154,21 @@ async function orderDetail(req, res) {
   res.render('admin/order-detail', { order });
 }
 
+// Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
+// исполнителя (в отличие от orderController.close): это административное действие,
+// а не подтверждение клиента, что работа сделана.
+async function closeOrder(req, res) {
+  const { token } = req.params;
+  const order = await orderService.closeOrder(token);
+  if (!order) return res.status(404).send('Заявка не найдена');
+
+  telegramService.updateMessage(order).catch((err) => {
+    console.error('Failed to update Telegram message on admin close:', err.message);
+  });
+
+  res.redirect(`/admin/orders/${token}`);
+}
+
 async function reviewsQueue(req, res) {
   const pending = await reviewService.listPending();
   res.render('admin/reviews', { pending });
@@ -181,6 +198,7 @@ module.exports = {
   correctBalance,
   ordersList,
   orderDetail,
+  closeOrder,
   reviewsQueue,
   approveReview,
   rejectReview,

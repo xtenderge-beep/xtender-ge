@@ -24,6 +24,7 @@ router.post('/masters/:id/balance-correction', verifyCsrf, asyncHandler(adminCon
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token', asyncHandler(adminController.orderDetail));
+router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
 
 router.get('/reviews', asyncHandler(adminController.reviewsQueue));
 router.post('/reviews/:id/approve', verifyCsrf, asyncHandler(adminController.approveReview));
