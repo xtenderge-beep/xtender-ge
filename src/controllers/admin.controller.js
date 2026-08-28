@@ -4,6 +4,10 @@ const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
 const reviewService = require('../services/review.service');
+const { toE164 } = require('../config/phone');
+
+const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
+const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
 
 const LOGIN_RATE_LIMIT_MAX = 10;
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
@@ -71,6 +75,43 @@ async function approveMaster(req, res) {
   res.redirect('/admin/masters');
 }
 
+async function updateMaster(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body.name || '').trim();
+  const phoneRaw = (req.body.phone || '').trim();
+  const category = req.body.category;
+  const vehicleType = (req.body.vehicleType || '').trim();
+  const priceText = (req.body.priceText || '').trim();
+  const description = (req.body.description || '').trim();
+
+  if (!name || !phoneRaw || !ALLOWED_CATEGORIES.has(category)) {
+    return res.redirect(`/admin/masters/${id}?error=invalid_fields`);
+  }
+
+  const vehicleSize = category === 'transport' && ALLOWED_SIZES.has(req.body.vehicleSize) ? req.body.vehicleSize : null;
+  const isFlatbed = category === 'transport' && req.body.isFlatbed === 'on';
+
+  try {
+    await masterService.updateMasterProfile(id, {
+      name,
+      phone: toE164(phoneRaw),
+      category,
+      vehicleType,
+      vehicleSize,
+      isFlatbed,
+      priceText,
+      description,
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.redirect(`/admin/masters/${id}?error=phone_taken`);
+    }
+    throw err;
+  }
+
+  res.redirect(`/admin/masters/${id}`);
+}
+
 async function banMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   const reason = (req.body.reason || '').trim() || null;
@@ -133,6 +174,7 @@ module.exports = {
   overview,
   mastersList,
   masterDetail,
+  updateMaster,
   approveMaster,
   banMaster,
   unbanMaster,

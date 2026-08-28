@@ -102,6 +102,20 @@ async function topUpBalance(phone, amountTetri) {
   return pool.withTransaction((client) => adjustBalance({ phone, amountTetri, reason: 'topup' }, client));
 }
 
+// Редактирование профиля из админки — единственное место, где допускается менять
+// category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
+// остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
+// мастера до одного тира).
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, isFlatbed, priceText, description }) {
+  const { rows } = await pool.query(
+    `UPDATE masters SET name = $1, phone = $2, category = $3, vehicle_type = $4, vehicle_size = $5,
+            is_flatbed = $6, price_text = $7, description = $8
+     WHERE id = $9 RETURNING *`,
+    [name, phone, category, vehicleType || null, vehicleSize || null, isFlatbed, priceText || null, description || null, id]
+  );
+  return rows[0] || null;
+}
+
 const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url';
 
 async function listMasters({ category } = {}) {
@@ -128,6 +142,7 @@ module.exports = {
   getMasterByToken,
   getMasterByPhone,
   approveMaster,
+  updateMasterProfile,
   adjustBalance,
   chargeMastersForLead,
   topUpBalance,

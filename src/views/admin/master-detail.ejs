@@ -21,6 +21,10 @@
 
     <% if (error === 'invalid_amount') { %>
       <p class="mt-2 text-sm text-red-600 font-semibold">Некорректная сумма коррекции.</p>
+    <% } else if (error === 'invalid_fields') { %>
+      <p class="mt-2 text-sm text-red-600 font-semibold">Заполните имя, телефон и категорию.</p>
+    <% } else if (error === 'phone_taken') { %>
+      <p class="mt-2 text-sm text-red-600 font-semibold">Этот номер телефона уже занят другим мастером.</p>
     <% } %>
 
     <div class="mt-4 flex flex-wrap gap-3">
@@ -44,6 +48,57 @@
         <input type="text" name="amountGel" required placeholder="напр. 10 или -5" class="border border-stone-300 rounded-xl px-3 py-2 text-xs w-32">
         <input type="text" name="note" placeholder="Причина" class="border border-stone-300 rounded-xl px-3 py-2 text-xs">
         <button type="submit" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">Применить</button>
+    </form>
+</div>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Редактировать данные</h2>
+    <form method="POST" action="/admin/masters/<%= master.id %>/update" class="space-y-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="text-xs font-bold text-stone-500">Имя</label>
+                <input type="text" name="name" required value="<%= master.name %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="text-xs font-bold text-stone-500">Телефон</label>
+                <input type="text" name="phone" required value="<%= master.phone %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
+            </div>
+            <div>
+                <label class="text-xs font-bold text-stone-500">Категория</label>
+                <select name="category" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
+                    <option value="transport" <%= master.category === 'transport' ? 'selected' : '' %>>Машины</option>
+                    <option value="movers" <%= master.category === 'movers' ? 'selected' : '' %>>Грузчики</option>
+                    <option value="junk" <%= master.category === 'junk' ? 'selected' : '' %>>Вывоз мусора</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-bold text-stone-500">Размер (только для машин)</label>
+                <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
+                    <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Любой размер</option>
+                    <option value="L" <%= master.vehicle_size === 'L' ? 'selected' : '' %>>L</option>
+                    <option value="XL" <%= master.vehicle_size === 'XL' ? 'selected' : '' %>>XL</option>
+                    <option value="XXL" <%= master.vehicle_size === 'XXL' ? 'selected' : '' %>>XXL</option>
+                </select>
+            </div>
+        </div>
+        <div>
+            <label class="text-xs font-bold text-stone-500">Детали (тип машины / инструмент и т.п.)</label>
+            <input type="text" name="vehicleType" value="<%= master.vehicle_type || '' %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+            <label class="text-xs font-bold text-stone-500">Цена</label>
+            <input type="text" name="priceText" value="<%= master.price_text || '' %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
+        </div>
+        <div>
+            <label class="text-xs font-bold text-stone-500">Описание</label>
+            <textarea name="description" rows="2" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500"><%= master.description || '' %></textarea>
+        </div>
+        <label class="flex items-center gap-2 text-xs font-bold text-stone-500">
+            <input type="checkbox" name="isFlatbed" <%= master.is_flatbed ? 'checked' : '' %>>
+            Бортовой кузов (открытый, только для машин)
+        </label>
+        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить</button>
     </form>
 </div>
 
