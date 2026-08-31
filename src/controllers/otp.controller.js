@@ -22,7 +22,7 @@ async function send(req, res) {
   });
 
   const link = `${getBaseUrl()}/o/${order.owner_token}`;
-  const result = await otpService.sendCode(phone, link);
+  const result = await otpService.sendCode(phone, link, 'order', order.id);
 
   if (!result.success) {
     if (result.reason === 'rate_limited') {

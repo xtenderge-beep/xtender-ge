@@ -866,7 +866,7 @@
             res = await fetch('/api/orders', { method: 'POST', body: formData });
             data = await res.json();
             if (data.success) {
-                showLiveOrder(data.token);
+                showLiveOrder(data.token, data.id);
             } else {
                 showMsg(data.message || T.js_err_create_order, true);
             }
@@ -874,9 +874,9 @@
 
         let activeOrderToken = null;
 
-        function showLiveOrder(token) {
+        function showLiveOrder(token, id) {
             activeOrderToken = token;
-            document.getElementById('live-order-id').textContent = '#' + token.slice(0, 8);
+            document.getElementById('live-order-id').textContent = '#' + (id != null ? id : token.slice(0, 8));
             const liveSection = document.getElementById('tender-live-section');
             liveSection.classList.remove('hidden');
             liveSection.scrollIntoView({ behavior: 'smooth' });

@@ -174,7 +174,7 @@ async function notifyMasters(order, category, vehicleSize) {
   await Promise.all(
     masters.map(async (master) => {
       const link = `${base}/order/${order.token}?master=${master.id}`;
-      const text = `Xtender: новая заявка: ${link}`;
+      const text = `Xtender: new order #${order.id}: ${link}`;
       try {
         await smsService.sendOrderNotification(master.phone, text);
         notifiedIds.push(master.id);
