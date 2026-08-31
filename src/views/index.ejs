@@ -386,85 +386,81 @@
                             </h3>
                             <div class="space-y-3">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3.5" data-category="<%= group.key %>" data-size="<%= master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-category="<%= group.key %>" data-size="<%= master.vehicle_size || '' %>">
 
-                                      <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+                                      <% const ratingStars = Math.round(Number(master.rating) || 0); %>
 
-                                      <div class="flex-1 min-w-0 space-y-1.5">
-                                          <div class="flex items-center gap-2 flex-wrap">
-                                              <h3 class="font-extrabold text-stone-900 text-sm sm:text-base"><%= master.name %></h3>
-                                              <% if (master.price_text) { %>
-                                                <span class="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap"><%= master.price_text %></span>
+                                      <div class="flex items-start justify-between gap-3">
+                                          <div class="flex-1 min-w-0">
+                                              <div class="flex items-center gap-2 flex-wrap">
+                                                  <h3 class="font-extrabold text-stone-900 text-sm sm:text-base"><%= master.name %></h3>
+                                                  <% if (master.price_text) { %>
+                                                    <span class="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap"><%= master.price_text %></span>
+                                                  <% } %>
+                                              </div>
+
+                                              <% if (master.reviews.length) { %>
+                                                <button type="button" class="review-toggle mt-1 flex items-center gap-1.5 text-xs">
+                                                    <span class="tracking-tight text-amber-500 text-[13px]"><%= '★'.repeat(ratingStars) %><span class="text-stone-300"><%= '★'.repeat(5 - ratingStars) %></span></span>
+                                                    <span class="font-bold text-stone-900"><%= Number(master.rating).toFixed(1) %></span>
+                                                    <span class="text-stone-400"><%= master.reviews.length %> <%= reviewsWord(master.reviews.length) %></span>
+                                                    <i class="fa-solid fa-chevron-down text-[8px] text-stone-400 transition review-chevron"></i>
+                                                </button>
+                                              <% } else { %>
+                                                <div class="mt-1 flex items-center gap-1.5 text-xs">
+                                                    <span class="tracking-tight text-stone-300 text-[13px]">★★★★★</span>
+                                                    <span class="font-bold text-stone-400">5.0</span>
+                                                    <span class="text-stone-400"><%= t('reviews_none') %></span>
+                                                </div>
                                               <% } %>
                                           </div>
 
-                                          <div class="flex items-center gap-1.5 flex-wrap">
-                                              <span class="font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-                                                  <i class="fa-solid fa-circle-check text-[9px]"></i><%= t('catalog_verified') %>
-                                              </span>
-                                              <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>">
-                                                  <%= group.icon %> <%= group.label %>
-                                              </span>
-                                              <% if (master.vehicle_type) { %>
-                                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-stone-100 border border-stone-200 text-stone-700">🚚 <%= master.vehicle_type %></span>
-                                              <% } %>
-                                          </div>
-
-                                          <% if (master.description) { %>
-                                            <p class="text-xs text-stone-600 leading-snug"><%= master.description %></p>
-                                          <% } %>
+                                          <span class="shrink-0 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>">
+                                              <%= group.icon %> <%= group.label %>
+                                          </span>
                                       </div>
 
-                                      <div class="sm:w-40 shrink-0 flex sm:flex-col gap-2">
-                                          <a href="tel:<%= master.phone %>" class="flex-1 sm:flex-none px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                                      <% if (master.vehicle_type) { %>
+                                        <p class="text-xs font-semibold text-emerald-700 -mt-1">🚚 <%= master.vehicle_type %></p>
+                                      <% } %>
+
+                                      <% if (master.description) { %>
+                                        <p class="text-xs text-stone-600 leading-snug -mt-1"><%= master.description %></p>
+                                      <% } %>
+
+                                      <% if (master.reviews.length) { %>
+                                        <div class="review-list hidden space-y-2">
+                                            <% master.reviews.forEach(function (rv) { %>
+                                              <div class="bg-stone-50 border border-stone-100 rounded-xl p-3">
+                                                  <div class="flex items-center justify-between gap-2">
+                                                      <span class="text-[11px] tracking-tight text-amber-500"><%= '★'.repeat(rv.rating) %><span class="text-stone-300"><%= '★'.repeat(5 - rv.rating) %></span></span>
+                                                      <span class="text-[10px] text-stone-400"><%= new Date(rv.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+                                                  </div>
+                                                  <% if (rv.comment) { %>
+                                                    <p class="text-xs text-stone-700 leading-snug mt-1.5"><%= rv.comment %></p>
+                                                  <% } %>
+                                                  <p class="text-[10px] font-semibold text-stone-400 mt-1.5"><%= t('reviews_author') %></p>
+                                              </div>
+                                            <% }); %>
+                                        </div>
+                                      <% } %>
+
+                                      <div class="flex gap-2">
+                                          <a href="tel:<%= master.phone %>" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
                                               <i class="fa-solid fa-phone text-[10px]"></i>
                                               <span><%= t('btn_call') %></span>
                                           </a>
-                                          <a href="https://wa.me/<%= master.phone.replace(/\D/g, '') %>" target="_blank" rel="noopener" class="flex-1 sm:flex-none px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70">
+                                          <a href="https://wa.me/<%= master.phone.replace(/\D/g, '') %>" target="_blank" rel="noopener" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70">
                                               <i class="fa-brands fa-whatsapp"></i>
                                               <span>WhatsApp</span>
                                           </a>
                                       </div>
 
-                                      </div>
-
-                                      <div class="review-footer border-t border-stone-100 pt-3">
-                                          <div class="flex items-center justify-between gap-3 flex-wrap">
-                                              <% if (master.reviews.length) { %>
-                                                <button type="button" class="review-toggle text-xs font-bold text-stone-600 hover:text-stone-900 flex items-center gap-1.5">
-                                                    <i class="fa-solid fa-star text-[10px] text-amber-500"></i>
-                                                    <span class="text-stone-900"><%= Number(master.rating).toFixed(1) %></span>
-                                                    <span class="text-stone-300">·</span>
-                                                    <span><%= master.reviews.length %> <%= reviewsWord(master.reviews.length) %></span>
-                                                    <i class="fa-solid fa-chevron-down text-[8px] text-stone-400 transition review-chevron"></i>
-                                                </button>
-                                              <% } else { %>
-                                                <span class="text-xs font-semibold text-stone-400 flex items-center gap-1.5">
-                                                    <i class="fa-regular fa-star text-[10px]"></i><%= t('reviews_none') %>
-                                                </span>
-                                              <% } %>
-                                              <button type="button" class="review-leave-btn text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5"
-                                                      data-master-id="<%= master.id %>" data-master-name="<%= master.name %>">
-                                                  <i class="fa-solid fa-pen text-[10px]"></i><%= t('reviews_leave_btn') %>
-                                              </button>
-                                          </div>
-
-                                          <% if (master.reviews.length) { %>
-                                            <div class="review-list hidden mt-3 space-y-2">
-                                                <% master.reviews.forEach(function (rv) { %>
-                                                  <div class="bg-stone-50 border border-stone-100 rounded-xl p-3">
-                                                      <div class="flex items-center justify-between gap-2">
-                                                          <span class="text-[11px] tracking-tight text-amber-500"><%= '★'.repeat(rv.rating) %><span class="text-stone-300"><%= '★'.repeat(5 - rv.rating) %></span></span>
-                                                          <span class="text-[10px] text-stone-400"><%= new Date(rv.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
-                                                      </div>
-                                                      <% if (rv.comment) { %>
-                                                        <p class="text-xs text-stone-700 leading-snug mt-1.5"><%= rv.comment %></p>
-                                                      <% } %>
-                                                      <p class="text-[10px] font-semibold text-stone-400 mt-1.5"><%= t('reviews_author') %></p>
-                                                  </div>
-                                                <% }); %>
-                                            </div>
-                                          <% } %>
+                                      <div class="border-t border-stone-100 pt-3">
+                                          <button type="button" class="review-leave-btn text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5"
+                                                  data-master-id="<%= master.id %>" data-master-name="<%= master.name %>">
+                                              <i class="fa-solid fa-pen text-[10px]"></i><%= t('reviews_leave_btn') %>
+                                          </button>
                                       </div>
                                   </div>
                                 <% }); %>
@@ -926,7 +922,7 @@
         // --- Отзывы: разворачивание списка в карточке ---
         document.querySelectorAll('.review-toggle').forEach((btn) => {
             btn.addEventListener('click', () => {
-                const list = btn.closest('.review-footer').querySelector('.review-list');
+                const list = btn.closest('.master-card').querySelector('.review-list');
                 const chevron = btn.querySelector('.review-chevron');
                 const open = list.classList.toggle('hidden');
                 if (chevron) chevron.classList.toggle('rotate-180', !open);
