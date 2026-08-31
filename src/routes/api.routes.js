@@ -19,6 +19,7 @@ router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));
 router.post('/masters/otp/verify', asyncHandler(masterController.verifyOtp));
 router.post('/masters/register', asyncHandler(masterController.register));
+router.post('/master/:token/topup-receipt', upload.single('receipt'), asyncHandler(masterController.submitTopupReceipt));
 
 router.post('/telegram/webhook', asyncHandler(orderController.telegramWebhook));
 

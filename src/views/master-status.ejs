@@ -26,12 +26,13 @@
     </script>
     <style>
         .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
     </style>
 </head>
 <body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
 <%
-    const TELEGRAM_BOT = 'https://t.me/xtendergebot';
     const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
     const categoryLabels = {
         transport: t('catalog_group_transport'),
@@ -118,11 +119,67 @@
                                 <%= t('master_status_pending_hint') %>
                             </div>
                         <% } %>
-                        <a href="<%= TELEGRAM_BOT %>" target="_blank" rel="noopener"
-                           class="flex items-center justify-center gap-2 w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition">
-                            <i class="fa-brands fa-telegram"></i><%= t('master_status_topup_btn') %>
-                        </a>
-                        <p class="text-[11px] text-stone-400 text-center"><%= t('master_status_topup_note') %></p>
+
+                        <details class="topup-box group rounded-2xl border border-stone-200 bg-stone-50 overflow-hidden" <%= master.is_active ? '' : 'open' %>>
+                            <summary class="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer text-sm font-bold text-stone-800">
+                                <span class="flex items-center gap-2"><i class="fa-solid fa-building-columns text-emerald-600"></i><%= t('topup_title') %></span>
+                                <i class="fa-solid fa-chevron-down text-[10px] text-stone-400 transition group-open:rotate-180"></i>
+                            </summary>
+
+                            <div class="px-4 pb-4 space-y-4 text-sm">
+                                <p class="text-stone-600"><%= t('topup_intro') %></p>
+
+                                <div class="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100">
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <span class="text-xs text-stone-400 shrink-0"><%= t('topup_account_label') %></span>
+                                        <span class="flex items-center gap-2 min-w-0">
+                                            <span id="iban" class="font-mono font-bold text-stone-900 text-[13px] truncate"><%= payment.BANK_ACCOUNT %></span>
+                                            <button type="button" id="ibanCopy" class="shrink-0 text-emerald-600 hover:text-emerald-700" aria-label="<%= t('topup_copy') %>"><i class="fa-regular fa-copy"></i></button>
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <span class="text-xs text-stone-400"><%= t('topup_bank_label') %></span>
+                                        <span class="font-semibold text-stone-800"><%= payment.BANK_NAME %></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <span class="text-xs text-stone-400"><%= t('topup_recipient_label') %></span>
+                                        <span class="font-semibold text-stone-800"><%= payment.RECIPIENT_NAME %></span>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-3 px-3 py-2.5">
+                                        <span class="text-xs text-stone-400"><%= t('topup_min_label') %></span>
+                                        <span class="font-semibold text-stone-800"><%= payment.MIN_TOPUP_GEL %> GEL</span>
+                                    </div>
+                                </div>
+
+                                <p class="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5 flex items-start gap-2">
+                                    <i class="fa-solid fa-circle-info mt-0.5 shrink-0"></i><span><%= t('topup_purpose_note') %></span>
+                                </p>
+
+                                <div class="space-y-2.5">
+                                    <div>
+                                        <p class="font-bold text-stone-800 text-[11px] uppercase tracking-wide mb-1"><i class="fa-solid fa-mobile-screen text-stone-400 mr-1"></i><%= t('topup_method_app_title') %></p>
+                                        <p class="text-xs text-stone-600 leading-snug"><%= t('topup_method_app_text') %></p>
+                                    </div>
+                                    <div>
+                                        <p class="font-bold text-stone-800 text-[11px] uppercase tracking-wide mb-1"><i class="fa-solid fa-building-columns text-stone-400 mr-1"></i><%= t('topup_method_other_title') %></p>
+                                        <p class="text-xs text-stone-600 leading-snug"><%= t('topup_method_other_text') %></p>
+                                    </div>
+                                </div>
+
+                                <div class="border-t border-stone-200 pt-3 space-y-2">
+                                    <p class="text-xs text-stone-500 leading-snug"><%= t('topup_receipt_note') %></p>
+                                    <form id="receiptForm" class="flex flex-col gap-2">
+                                        <label class="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-stone-300 bg-white text-xs font-bold text-stone-600 cursor-pointer hover:border-emerald-400 transition">
+                                            <i class="fa-solid fa-paperclip"></i><span id="receiptName"><%= t('topup_receipt_choose') %></span>
+                                            <input type="file" id="receiptFile" accept="image/*,application/pdf" class="hidden">
+                                        </label>
+                                        <button type="submit" id="receiptSubmit" disabled
+                                                class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition"><%= t('topup_receipt_send') %></button>
+                                        <p id="receiptMsg" class="hidden text-xs font-bold"></p>
+                                    </form>
+                                </div>
+                            </div>
+                        </details>
                     <% } %>
                 </div>
             </div>
@@ -229,5 +286,69 @@
             </div>
         <% } %>
     </main>
+
+    <% if (master && !master.is_banned) { %>
+    <script>
+        (function () {
+            var ibanCopy = document.getElementById('ibanCopy');
+            if (ibanCopy) {
+                ibanCopy.addEventListener('click', function () {
+                    var iban = document.getElementById('iban').textContent.trim();
+                    if (!navigator.clipboard) return;
+                    navigator.clipboard.writeText(iban).then(function () {
+                        var orig = ibanCopy.innerHTML;
+                        ibanCopy.innerHTML = '<i class="fa-solid fa-check"></i>';
+                        setTimeout(function () { ibanCopy.innerHTML = orig; }, 1500);
+                    });
+                });
+            }
+
+            var form = document.getElementById('receiptForm');
+            if (!form) return;
+            var file = document.getElementById('receiptFile');
+            var nameEl = document.getElementById('receiptName');
+            var submit = document.getElementById('receiptSubmit');
+            var msg = document.getElementById('receiptMsg');
+            var CHOOSE = <%- JSON.stringify(t('topup_receipt_choose')) %>;
+            var SENT = <%- JSON.stringify(t('topup_receipt_sent')) %>;
+            var ERR = <%- JSON.stringify(t('topup_receipt_error')) %>;
+
+            file.addEventListener('change', function () {
+                if (file.files.length) { nameEl.textContent = file.files[0].name; submit.disabled = false; }
+                else { nameEl.textContent = CHOOSE; submit.disabled = true; }
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!file.files.length) return;
+                submit.disabled = true;
+                msg.classList.add('hidden');
+                var fd = new FormData();
+                fd.append('receipt', file.files[0]);
+                fetch('/api/master/<%= master.master_token %>/topup-receipt', { method: 'POST', body: fd })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        msg.classList.remove('hidden');
+                        if (d.success) {
+                            msg.className = 'text-xs font-bold text-emerald-700';
+                            msg.textContent = SENT;
+                            form.reset();
+                            nameEl.textContent = CHOOSE;
+                        } else {
+                            msg.className = 'text-xs font-bold text-red-600';
+                            msg.textContent = ERR;
+                            submit.disabled = false;
+                        }
+                    })
+                    .catch(function () {
+                        msg.classList.remove('hidden');
+                        msg.className = 'text-xs font-bold text-red-600';
+                        msg.textContent = ERR;
+                        submit.disabled = false;
+                    });
+            });
+        })();
+    </script>
+    <% } %>
 </body>
 </html>

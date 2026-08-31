@@ -140,6 +140,34 @@ async function confirmMasterApproved(chatId, messageId, master) {
     });
 }
 
+async function sendTopupReceipt(master, fileUrl, isImage) {
+  if (!isEnabled()) {
+    console.log(`[TELEGRAM DEV MODE] topup receipt from ${master.name} ${master.phone}: ${fileUrl}`);
+    return;
+  }
+
+  const caption = [
+    '💳 Чек на пополнение баланса',
+    '',
+    `👤 ${master.name}`,
+    `📞 ${master.phone}`,
+    `💰 Баланс сейчас: ${(master.balance_tetri / 100).toFixed(2)} GEL`,
+    '',
+    'Проверьте сумму на чеке и начислите через «💰 Пополнить баланс».',
+  ].join('\n');
+
+  const method = isImage ? 'sendPhoto' : 'sendDocument';
+  const body = { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, caption };
+  body[isImage ? 'photo' : 'document'] = fileUrl;
+
+  await axios.post(apiUrl(method), body).catch((err) => {
+    console.error(
+      'Failed to send topup receipt to moderator:',
+      err.response ? JSON.stringify(err.response.data) : err.message
+    );
+  });
+}
+
 async function sendMessageToModerator(text, replyMarkup = ADMIN_MENU_KEYBOARD) {
   if (!isEnabled()) return;
   await axios
@@ -255,6 +283,7 @@ module.exports = {
   notifyModerator,
   notifyModeratorNewMaster,
   confirmMasterApproved,
+  sendTopupReceipt,
   sendMessageToModerator,
   askModerator,
   answerCallback,

@@ -3,13 +3,17 @@ const reviewService = require('../services/review.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
 const smsService = require('../services/sms.service');
+const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const { clientStrings } = require('../config/i18n');
+const payment = require('../config/payment');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 // В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
 const LEAD_PRICE_TETRI = 30;
+const RECEIPT_RATE_MAX = 5;
+const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
@@ -135,7 +139,7 @@ async function statusPage(req, res) {
   if (!master) {
     return res.status(404).render('master-status', {
       master: null, reviews: [], activity: null, history: [],
-      leadPriceTetri: LEAD_PRICE_TETRI, clientStrings: strings,
+      leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
     });
   }
 
@@ -147,8 +151,29 @@ async function statusPage(req, res) {
 
   res.render('master-status', {
     master, reviews, activity, history,
-    leadPriceTetri: LEAD_PRICE_TETRI, clientStrings: strings,
+    leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
   });
+}
+
+// Исполнитель прикрепляет чек о банковском переводе — файл уходит модератору в
+// Telegram (sendPhoto/sendDocument по URL из public/uploads). Начисление баланса
+// остаётся ручным: модератор смотрит чек и делает /topup.
+async function submitTopupReceipt(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
+  if (!req.file) return res.status(400).json({ success: false, message: 'No file' });
+
+  const key = `topup_receipt_limit:${master.id}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, RECEIPT_RATE_WINDOW_SECONDS);
+  if (count > RECEIPT_RATE_MAX) {
+    return res.status(429).json({ success: false, message: 'Too many requests' });
+  }
+
+  const fileUrl = `${getBaseUrl()}/uploads/${req.file.filename}`;
+  await telegramService.sendTopupReceipt(master, fileUrl, req.file.mimetype.startsWith('image/'));
+
+  return res.json({ success: true });
 }
 
 module.exports = {
@@ -157,4 +182,5 @@ module.exports = {
   verifyOtp,
   register,
   statusPage,
+  submitTopupReceipt,
 };

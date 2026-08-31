@@ -26,7 +26,7 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
 
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
-    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at
+    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token
      FROM masters WHERE master_token = $1`,
     [token]
   );
