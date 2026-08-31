@@ -102,7 +102,7 @@ async function approveMaster(id) {
 
 async function getMasterByPhone(phone) {
   const { rows } = await pool.query(
-    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason FROM masters WHERE phone = $1`,
+    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, master_token FROM masters WHERE phone = $1`,
     [phone]
   );
   return rows[0] || null;

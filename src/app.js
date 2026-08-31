@@ -56,6 +56,7 @@ app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
 
+app.get('/master', asyncHandler(masterController.statusPage));
 app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));

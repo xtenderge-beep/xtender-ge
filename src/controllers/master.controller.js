@@ -14,6 +14,7 @@ const PHONE_REGEX = /^\+?\d{9,15}$/;
 const LEAD_PRICE_TETRI = 30;
 const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
+const MASTER_LOGIN_PURPOSE = 'master_login';
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
@@ -132,13 +133,15 @@ async function register(req, res) {
 
 // Личный кабинет исполнителя — /master/<master_token>. Ссылка постоянная, приходит
 // в SMS после регистрации; на неё же ведёт плашка со страницы каждого лида.
+// Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
 async function statusPage(req, res) {
   const strings = clientStrings(req.lang);
-  const master = await masterService.getMasterByToken(req.params.token);
+  const master = req.params.token ? await masterService.getMasterByToken(req.params.token) : null;
 
   if (!master) {
-    return res.status(404).render('master-status', {
-      master: null, reviews: [], activity: null, history: [],
+    const badToken = Boolean(req.params.token);
+    return res.status(badToken ? 404 : 200).render('master-status', {
+      master: null, badToken, reviews: [], activity: null, history: [],
       leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
     });
   }
@@ -150,9 +153,50 @@ async function statusPage(req, res) {
   ]);
 
   res.render('master-status', {
-    master, reviews, activity, history,
+    master, badToken: false, reviews, activity, history,
     leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
   });
+}
+
+// Вход в кабинет по телефону: код отправляем только если на номер есть профиль.
+async function loginRequestCode(req, res) {
+  const phone = toE164((req.body.phone || '').replace(/\s+/g, ''));
+  if (!PHONE_REGEX.test(phone)) {
+    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  }
+
+  const master = await masterService.getMasterByPhone(phone);
+  if (!master) {
+    return res.status(404).json({ success: false, message: 'not_registered' });
+  }
+
+  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE);
+  if (!result.success) {
+    if (result.reason === 'rate_limited') {
+      return res.status(429).json({ success: false, message: 'Too many requests' });
+    }
+    return res.status(500).json({ success: false, message: 'Failed to send code' });
+  }
+  return res.json({ success: true });
+}
+
+async function loginVerify(req, res) {
+  const phone = toE164((req.body.phone || '').replace(/\s+/g, ''));
+  const { code } = req.body;
+  if (!PHONE_REGEX.test(phone) || !code) {
+    return res.status(400).json({ success: false, message: 'Invalid input' });
+  }
+
+  const ok = await otpService.verifyCode(phone, code, MASTER_LOGIN_PURPOSE);
+  if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+
+  const master = await masterService.getMasterByPhone(phone);
+  if (!master || !master.master_token) {
+    return res.status(404).json({ success: false, message: 'not_registered' });
+  }
+
+  await otpService.clearVerified(phone, MASTER_LOGIN_PURPOSE);
+  return res.json({ success: true, link: `/master/${master.master_token}` });
 }
 
 // Исполнитель прикрепляет чек о банковском переводе — файл уходит модератору в
@@ -182,5 +226,7 @@ module.exports = {
   verifyOtp,
   register,
   statusPage,
+  loginRequestCode,
+  loginVerify,
   submitTopupReceipt,
 };
