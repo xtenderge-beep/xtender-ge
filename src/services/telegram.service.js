@@ -153,7 +153,8 @@ async function sendTopupReceipt(master, fileUrl, isImage) {
     `📞 ${master.phone}`,
     `💰 Баланс сейчас: ${(master.balance_tetri / 100).toFixed(2)} GEL`,
     '',
-    'Проверьте сумму на чеке и начислите через «💰 Пополнить баланс».',
+    `Сверьте с поступлением на счёт в банке (сумма + номер ${master.phone} в комментарии перевода). ` +
+      'Чек — не основание: начисляйте только после того, как увидели деньги на счёте, через «💰 Пополнить баланс».',
   ].join('\n');
 
   const method = isImage ? 'sendPhoto' : 'sendDocument';
