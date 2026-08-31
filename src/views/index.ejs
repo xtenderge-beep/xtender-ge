@@ -443,23 +443,19 @@
 
     </main>
 
-    <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-4">
+    <nav class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-3">
         <button type="button" onclick="scrollToId('post-section')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-emerald-400">
             <i class="fa-solid fa-square-plus text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_post') %></span>
-        </button>
-        <button type="button" onclick="setCategoryFilter('transport', 'group-transport')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
-            <i class="fa-solid fa-truck text-base"></i>
-            <span class="text-[10px] font-bold"><%= t('mobilenav_transport') %></span>
-        </button>
-        <button type="button" onclick="setCategoryFilter('junk', 'group-junk')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
-            <i class="fa-solid fa-broom text-base"></i>
-            <span class="text-[10px] font-bold"><%= t('mobilenav_junk') %></span>
         </button>
         <button type="button" onclick="setCategoryFilter('all', 'masters-section')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
             <i class="fa-solid fa-address-book text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_masters') %></span>
         </button>
+        <a href="/my-orders" class="flex flex-col items-center justify-center gap-0.5 py-2.5 text-stone-300">
+            <i class="fa-solid fa-list-check text-base"></i>
+            <span class="text-[10px] font-bold"><%= t('my_orders_nav') %></span>
+        </a>
     </nav>
 
     <footer class="bg-stone-900 text-stone-400 py-8 border-t border-stone-800 text-xs">

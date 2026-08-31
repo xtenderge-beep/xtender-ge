@@ -105,11 +105,8 @@ const dictionaries = {
     composer_publish_hint: 'შემსრულებლები დაგირეკავენ ფასის შეთავაზებით',
     composer_photo_btn: 'ფოტო',
     composer_char_hint: 'თავისუფალი ტექსტი',
-    mobilenav_home: 'მთავარი',
     mobilenav_post: 'განაცხადი',
     mobilenav_masters: 'შემსრულებლები',
-    mobilenav_transport: 'გადაზიდვა',
-    mobilenav_junk: 'ნაგვის გატანა',
     catalog_group_transport: 'გადაზიდვა / გადასახლება',
     catalog_group_movers: 'მუშები',
     catalog_group_junk: 'სამშენებლო ნარჩენების გატანა',
@@ -157,10 +154,6 @@ const dictionaries = {
 
     btn_call: 'დარეკვა',
     btn_whatsapp: 'WhatsApp',
-
-    mobile_bar_title: 'გადაზიდვები • მუშები • ნაგვის გატანა',
-    mobile_bar_sub: 'SMS-განაწილება ან პირდაპირი ზარი',
-    mobile_bar_btn: 'განაცხადის გაგზავნა',
 
     footer_desc: 'შეკვეთების ავტომატური განაწილების სერვისი თბილისში: გადაზიდვები, მუშები, სამშენებლო ნარჩენების გატანა.',
     footer_copy: '© 2026 xtender.ge • თბილისი, საქართველო',
@@ -416,11 +409,8 @@ const dictionaries = {
     filter_all: 'Все',
     filter_all_sizes: 'Все размеры',
     composer_char_hint: 'Свободный текст',
-    mobilenav_home: 'Главная',
     mobilenav_post: 'Заявка',
-    mobilenav_masters: 'Исполнители',
-    mobilenav_transport: 'Перевозки',
-    mobilenav_junk: 'Мусор',
+    mobilenav_masters: 'Специалисты',
     catalog_group_transport: 'Перевозки / Переезд',
     catalog_group_movers: 'Грузчики',
     catalog_group_junk: 'Вывоз строймусора',
@@ -468,10 +458,6 @@ const dictionaries = {
 
     btn_call: 'Позвонить',
     btn_whatsapp: 'WhatsApp',
-
-    mobile_bar_title: 'Перевозки • Грузчики • Мусор',
-    mobile_bar_sub: 'СМС-Рассылка или прямой звонок',
-    mobile_bar_btn: 'Подать заявку',
 
     footer_desc: 'Информационный сервис рассылки заказов по Тбилиси: Перевозки, Грузчики, Вывоз строймусора.',
     footer_copy: '© 2026 xtender.ge • Тбилиси, Грузия',
@@ -727,11 +713,8 @@ const dictionaries = {
     filter_all: 'All',
     filter_all_sizes: 'All sizes',
     composer_char_hint: 'Free text',
-    mobilenav_home: 'Home',
     mobilenav_post: 'Post',
-    mobilenav_masters: 'Providers',
-    mobilenav_transport: 'Transport',
-    mobilenav_junk: 'Junk',
+    mobilenav_masters: 'Specialists',
     catalog_group_transport: 'Transport / Moving',
     catalog_group_movers: 'Movers',
     catalog_group_junk: 'Junk removal',
@@ -779,10 +762,6 @@ const dictionaries = {
 
     btn_call: 'Call',
     btn_whatsapp: 'WhatsApp',
-
-    mobile_bar_title: 'Transport • Movers • Junk',
-    mobile_bar_sub: 'SMS dispatch or direct call',
-    mobile_bar_btn: 'Post a request',
 
     footer_desc: 'Automatic order dispatch service in Tbilisi: Moving, Movers, Construction waste removal.',
     footer_copy: '© 2026 xtender.ge • Tbilisi, Georgia',
