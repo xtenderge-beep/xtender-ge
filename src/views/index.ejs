@@ -100,8 +100,8 @@
         <div class="max-w-5xl mx-auto px-4 sm:px-6">
             <div class="flex items-center justify-between h-16 sm:h-20">
 
-                <a href="/" class="flex items-center gap-2">
-                    <span class="text-2xl sm:text-3xl font-black tracking-tight text-stone-900">
+                <a href="/" class="flex items-center gap-2 shrink-0">
+                    <span class="text-xl sm:text-3xl font-black tracking-tight text-stone-900">
                         xtender<span class="text-emerald-600">.ge</span>
                     </span>
                 </a>
@@ -124,14 +124,9 @@
                         <a href="<%= seo.alternates.en %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
                     </div>
 
-                    <a href="/master" class="px-2.5 sm:px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition flex items-center gap-1.5" title="<%= t('master_login_title') %>">
-                        <i class="fa-solid fa-right-to-bracket text-emerald-600"></i>
-                        <span class="hidden sm:inline"><%= t('master_login_nav') %></span>
-                    </a>
-
-                    <a href="/join" class="px-2.5 sm:px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
-                        <i class="fa-solid fa-truck text-amber-400"></i>
-                        <span class="hidden sm:inline"><%= t('become_provider_btn') %></span>
+                    <a href="/master" class="px-3 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                        <i class="fa-solid fa-helmet-safety text-amber-400"></i>
+                        <span><%= t('master_hub_title') %></span>
                     </a>
                 </div>
             </div>
@@ -250,16 +245,13 @@
                             <p class="text-xs text-stone-500 mt-1"><%= t('catalog_hint') %></p>
                         </div>
 
-                        <div class="bg-stone-900 text-white rounded-2xl px-4 py-3.5 shadow-sm">
-                            <p class="flex items-center gap-2.5">
-                                <i class="fa-solid fa-truck-fast text-amber-400 text-lg shrink-0"></i>
+                        <a href="/master" class="group flex items-center justify-between gap-3 bg-stone-900 hover:bg-stone-800 text-white rounded-2xl px-4 py-3.5 transition shadow-sm">
+                            <span class="flex items-center gap-2.5 min-w-0">
+                                <i class="fa-solid fa-helmet-safety text-amber-400 text-lg shrink-0"></i>
                                 <span class="text-xs sm:text-sm font-semibold text-stone-200 leading-snug"><%= t('become_provider_cta') %></span>
-                            </p>
-                            <div class="flex flex-col sm:flex-row gap-2 mt-3">
-                                <a href="/join" class="flex-1 text-center px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition"><%= t('become_provider_btn') %></a>
-                                <a href="/master" class="flex-1 text-center px-3 py-2 rounded-xl bg-stone-700 hover:bg-stone-600 text-white text-xs font-bold transition"><%= t('master_login_title') %></a>
-                            </div>
-                        </div>
+                            </span>
+                            <span class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 text-white text-xs font-black transition whitespace-nowrap"><%= t('master_hub_title') %></span>
+                        </a>
 
                         <%
                           const groups = [
@@ -473,10 +465,7 @@
                 <p class="text-stone-500 text-[11px]"><%= t('footer_desc') %></p>
             </div>
             <div class="flex flex-col sm:items-end gap-1.5">
-                <div class="flex gap-3">
-                    <a href="/join" class="text-stone-400 hover:text-white transition"><%= t('become_provider_btn') %></a>
-                    <a href="/master" class="text-stone-400 hover:text-white transition"><%= t('master_login_title') %></a>
-                </div>
+                <a href="/master" class="text-stone-400 hover:text-white transition font-bold"><%= t('master_hub_title') %></a>
                 <p class="font-mono text-stone-500 text-[11px]"><%= t('footer_copy') %></p>
             </div>
         </div>
