@@ -534,7 +534,7 @@
     </main>
 
     <nav id="mobileNav" class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-3 transition-transform duration-300 ease-out">
-        <button type="button" onclick="scrollToId('post-section')" class="flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[44px] text-emerald-400 active:scale-95 transition-transform">
+        <button type="button" onclick="openComposer()" class="flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[44px] text-emerald-400 active:scale-95 transition-transform">
             <i class="fa-solid fa-square-plus text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_post') %></span>
         </button>
@@ -783,6 +783,18 @@
             const ae = document.activeElement;
             if (ae && composePostSection.contains(ae)) ae.blur();
             if (composeMobileNav) composeMobileNav.classList.remove('translate-y-full');
+        }
+
+        // Кнопка «Заявка» в нижнем меню — открыть композер сразу (не просто скролл).
+        function openComposer() {
+            goToDetailsStep();
+            if (window.innerWidth < 640) {
+                enterCompose();
+                if (composeInput) composeInput.focus();
+            } else {
+                scrollToId('post-section');
+                if (composeInput) composeInput.focus();
+            }
         }
 
         if (composeInput) composeInput.addEventListener('focus', enterCompose);
