@@ -9,7 +9,7 @@ const dictionaries = {
     nav_transport: '🚚 გადაზიდვები',
     nav_movers: '💪 მუშები',
     nav_junk: '🧹 ნაგვის გატანა',
-    nav_drivers_btn: 'შემსრულებლებისთვის',
+    become_provider_btn: 'გახდი შემსრულებელი',
 
     hero_badge: 'შეკვეთების ავტომატური განაწილების სერვისი თბილისში',
     hero_title_1: 'გადაწყვიტეთ თქვენი ამოცანა',
@@ -165,12 +165,7 @@ const dictionaries = {
     footer_desc: 'შეკვეთების ავტომატური განაწილების სერვისი თბილისში: გადაზიდვები, მუშები, სამშენებლო ნარჩენების გატანა.',
     footer_copy: '© 2026 xtender.ge • თბილისი, საქართველო',
 
-    driver_modal_title: 'შემსრულებლებსა და მძღოლებს',
-    driver_modal_desc: 'მიიღეთ SMS მომხმარებელთა შეკვეთებით თბილისში (გადაზიდვები, მუშები, სამშენებლო ნარჩენები)',
-    driver_modal_plan_name: 'გადახდა შეკვეთაზე',
-    driver_modal_plan_price: '30 თეთრი / შეკვეთა',
-    driver_modal_plan_desc: 'იხდით მხოლოდ რეალურ შეკვეთებზე თქვენს კატეგორიაში. მინიმალური შევსება — 5 ლარი.',
-    driver_modal_btn: '📱 რეგისტრაცია',
+    become_provider_cta: 'ხართ შემსრულებელი? მიიღეთ კლიენტების განაცხადები თქვენს კატეგორიაში.',
 
     order_hash: 'შეკვეთა #',
     order_not_found: 'შეკვეთა ვერ მოიძებნა',
@@ -324,7 +319,7 @@ const dictionaries = {
     nav_transport: '🚚 Перевозки',
     nav_movers: '💪 Грузчики',
     nav_junk: '🧹 Вывоз мусора',
-    nav_drivers_btn: 'Исполнителям',
+    become_provider_btn: 'Стать исполнителем',
 
     hero_badge: 'Информационный сервис рассылки заказов по Тбилиси',
     hero_title_1: 'Решите вашу задачу за',
@@ -481,12 +476,7 @@ const dictionaries = {
     footer_desc: 'Информационный сервис рассылки заказов по Тбилиси: Перевозки, Грузчики, Вывоз строймусора.',
     footer_copy: '© 2026 xtender.ge • Тбилиси, Грузия',
 
-    driver_modal_title: 'Исполнителям и Водителям',
-    driver_modal_desc: 'Получайте СМС с заказами клиентов по Тбилиси (Перевозки, Грузчики, Строймусор)',
-    driver_modal_plan_name: 'Оплата за заявку',
-    driver_modal_plan_price: '30 тетри / заявка',
-    driver_modal_plan_desc: 'Платите только за реальные заявки в вашей категории. Минимальное пополнение баланса — 5 GEL.',
-    driver_modal_btn: '📱 Регистрация',
+    become_provider_cta: 'Вы исполнитель? Получайте заявки клиентов в своей категории.',
 
     order_hash: 'Заказ #',
     order_not_found: 'Заказ не найден',
@@ -640,7 +630,7 @@ const dictionaries = {
     nav_transport: '🚚 Transport',
     nav_movers: '💪 Movers',
     nav_junk: '🧹 Junk removal',
-    nav_drivers_btn: 'For providers',
+    become_provider_btn: 'Become a provider',
 
     hero_badge: 'Automatic order dispatch service in Tbilisi',
     hero_title_1: 'Solve your task in',
@@ -797,12 +787,7 @@ const dictionaries = {
     footer_desc: 'Automatic order dispatch service in Tbilisi: Moving, Movers, Construction waste removal.',
     footer_copy: '© 2026 xtender.ge • Tbilisi, Georgia',
 
-    driver_modal_title: 'For Providers and Drivers',
-    driver_modal_desc: 'Receive SMS with customer orders across Tbilisi (Moving, Movers, Construction waste)',
-    driver_modal_plan_name: 'Pay per request',
-    driver_modal_plan_price: '30 tetri / request',
-    driver_modal_plan_desc: 'You only pay for real requests in your category. Minimum balance top-up is 5 GEL.',
-    driver_modal_btn: '📱 Register',
+    become_provider_cta: 'Are you a provider? Get customer requests in your category.',
 
     order_hash: 'Order #',
     order_not_found: 'Order not found',

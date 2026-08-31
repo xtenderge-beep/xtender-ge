@@ -124,10 +124,10 @@
                         <a href="<%= seo.alternates.en %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
                     </div>
 
-                    <button onclick="openModal('driver-modal')" class="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                    <a href="/join" class="px-3.5 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                         <i class="fa-solid fa-truck text-amber-400"></i>
-                        <span class="hidden sm:inline"><%= t('nav_drivers_btn') %></span>
-                    </button>
+                        <span class="hidden sm:inline"><%= t('become_provider_btn') %></span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -244,6 +244,14 @@
                             </h2>
                             <p class="text-xs text-stone-500 mt-1"><%= t('catalog_hint') %></p>
                         </div>
+
+                        <a href="/join" class="group flex items-center justify-between gap-3 bg-stone-900 hover:bg-stone-800 text-white rounded-2xl px-4 py-3.5 transition shadow-sm">
+                            <span class="flex items-center gap-2.5 min-w-0">
+                                <i class="fa-solid fa-truck-fast text-amber-400 text-lg shrink-0"></i>
+                                <span class="text-xs sm:text-sm font-semibold text-stone-200 leading-snug"><%= t('become_provider_cta') %></span>
+                            </span>
+                            <span class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 text-white text-xs font-black transition whitespace-nowrap"><%= t('become_provider_btn') %></span>
+                        </a>
 
                         <%
                           const groups = [
@@ -463,32 +471,6 @@
             <p class="font-mono text-stone-500 text-[11px]"><%= t('footer_copy') %></p>
         </div>
     </footer>
-
-    <div id="driver-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
-            <button onclick="closeModal('driver-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
-
-            <div class="text-center space-y-2">
-                <div class="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center text-2xl mx-auto">
-                    <i class="fa-solid fa-truck-fast"></i>
-                </div>
-                <h3 class="text-base font-bold text-stone-900"><%= t('driver_modal_title') %></h3>
-                <p class="text-xs text-stone-500"><%= t('driver_modal_desc') %></p>
-            </div>
-
-            <div class="bg-stone-900 text-white p-4 rounded-2xl space-y-2 text-xs">
-                <div class="flex justify-between items-center font-bold border-b border-stone-800 pb-2">
-                    <span class="text-amber-400"><%= t('driver_modal_plan_name') %></span>
-                    <span class="font-mono text-emerald-400 text-sm"><%= t('driver_modal_plan_price') %></span>
-                </div>
-                <p class="text-stone-300 text-[11px] leading-relaxed"><%= t('driver_modal_plan_desc') %></p>
-            </div>
-
-<a href="/join" class="block text-center w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
-                <%= t('driver_modal_btn') %>
-            </a>
-        </div>
-    </div>
 
     <div id="review-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
