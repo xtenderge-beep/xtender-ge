@@ -251,6 +251,13 @@
                             { key: 'movers', anchor: 'group-movers', label: t('catalog_group_movers'), icon: '💪', color: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
                             { key: 'junk', anchor: 'group-junk', label: t('catalog_group_junk'), icon: '🧹', color: 'bg-stone-100 text-stone-900 border-stone-300' },
                           ];
+                          const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
+                          function reviewsWord(n) {
+                            const m10 = n % 10, m100 = n % 100;
+                            if (m10 === 1 && m100 !== 11) return t('reviews_word_one');
+                            if (m10 >= 2 && m10 <= 4 && !(m100 >= 12 && m100 <= 14)) return t('reviews_word_few');
+                            return t('reviews_word_many');
+                          }
                         %>
 
                         <div class="flex flex-wrap gap-2" id="categoryFilterBar">
@@ -284,7 +291,9 @@
                             </h3>
                             <div class="space-y-3">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col sm:flex-row gap-4" data-category="<%= group.key %>" data-size="<%= master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3.5" data-category="<%= group.key %>" data-size="<%= master.vehicle_size || '' %>">
+
+                                      <div class="flex flex-col sm:flex-row gap-4">
 
                                       <div class="flex sm:flex-col items-center sm:items-start gap-3 sm:gap-2 sm:w-16 shrink-0">
                                           <% if (master.avatar_url) { %>
@@ -302,11 +311,6 @@
                                               <span class="font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
                                                   <i class="fa-solid fa-circle-check"></i><%= t('catalog_verified') %>
                                               </span>
-                                              <% if (master.rating > 0) { %>
-                                                <span class="text-[11px] font-bold text-amber-600 flex items-center gap-1">
-                                                    <i class="fa-solid fa-star text-[10px]"></i><%= master.rating %>
-                                                </span>
-                                              <% } %>
                                           </div>
 
                                           <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>">
@@ -335,6 +339,47 @@
                                               <i class="fa-brands fa-whatsapp"></i>
                                               <span>WhatsApp</span>
                                           </a>
+                                      </div>
+
+                                      </div>
+
+                                      <div class="review-footer border-t border-stone-100 pt-3">
+                                          <div class="flex items-center justify-between gap-3 flex-wrap">
+                                              <% if (master.reviews.length) { %>
+                                                <button type="button" class="review-toggle text-xs font-bold text-stone-600 hover:text-stone-900 flex items-center gap-1.5">
+                                                    <i class="fa-solid fa-star text-[10px] text-amber-500"></i>
+                                                    <span class="text-stone-900"><%= Number(master.rating).toFixed(1) %></span>
+                                                    <span class="text-stone-300">·</span>
+                                                    <span><%= master.reviews.length %> <%= reviewsWord(master.reviews.length) %></span>
+                                                    <i class="fa-solid fa-chevron-down text-[8px] text-stone-400 transition review-chevron"></i>
+                                                </button>
+                                              <% } else { %>
+                                                <span class="text-xs font-semibold text-stone-400 flex items-center gap-1.5">
+                                                    <i class="fa-regular fa-star text-[10px]"></i><%= t('reviews_none') %>
+                                                </span>
+                                              <% } %>
+                                              <button type="button" class="review-leave-btn text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5"
+                                                      data-master-id="<%= master.id %>" data-master-name="<%= master.name %>">
+                                                  <i class="fa-solid fa-pen text-[10px]"></i><%= t('reviews_leave_btn') %>
+                                              </button>
+                                          </div>
+
+                                          <% if (master.reviews.length) { %>
+                                            <div class="review-list hidden mt-3 space-y-2">
+                                                <% master.reviews.forEach(function (rv) { %>
+                                                  <div class="bg-stone-50 border border-stone-100 rounded-xl p-3">
+                                                      <div class="flex items-center justify-between gap-2">
+                                                          <span class="text-[11px] tracking-tight text-amber-500"><%= '★'.repeat(rv.rating) %><span class="text-stone-300"><%= '★'.repeat(5 - rv.rating) %></span></span>
+                                                          <span class="text-[10px] text-stone-400"><%= new Date(rv.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+                                                      </div>
+                                                      <% if (rv.comment) { %>
+                                                        <p class="text-xs text-stone-700 leading-snug mt-1.5"><%= rv.comment %></p>
+                                                      <% } %>
+                                                      <p class="text-[10px] font-semibold text-stone-400 mt-1.5"><%= t('reviews_author') %></p>
+                                                  </div>
+                                                <% }); %>
+                                            </div>
+                                          <% } %>
                                       </div>
                                   </div>
                                 <% }); %>
@@ -442,6 +487,54 @@
 <a href="/join" class="block text-center w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs transition shadow-lg shadow-emerald-600/20">
                 <%= t('driver_modal_btn') %>
             </a>
+        </div>
+    </div>
+
+    <div id="review-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
+            <button onclick="closeModal('review-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
+
+            <div class="space-y-1">
+                <h3 class="text-base font-bold text-stone-900"><%= t('reviews_modal_title') %></h3>
+                <p id="review-modal-master" class="text-sm font-extrabold text-emerald-700"></p>
+            </div>
+
+            <p id="review-modal-msg" class="hidden text-xs font-bold p-3 rounded-xl"></p>
+
+            <div id="review-step-phone" class="space-y-3">
+                <p class="text-xs text-stone-500"><%= t('reviews_phone_hint') %></p>
+                <input id="review-phone" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
+                       class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
+                <button type="button" onclick="reviewRequestCode()" id="review-phone-btn"
+                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
+            </div>
+
+            <div id="review-step-code" class="hidden space-y-3">
+                <input id="review-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
+                       class="w-full text-center tracking-[0.4em] font-mono text-lg border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
+                <button type="button" onclick="reviewVerifyCode()" id="review-code-btn"
+                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
+            </div>
+
+            <div id="review-step-rating" class="hidden space-y-3">
+                <p class="text-xs font-bold text-stone-500 uppercase tracking-wide"><%= t('review_rating_label') %></p>
+                <div id="review-stars" class="flex gap-1.5 text-3xl text-stone-300">
+                    <% [1,2,3,4,5].forEach(function (n) { %>
+                      <button type="button" class="review-star transition hover:text-amber-400" data-star="<%= n %>"><i class="fa-solid fa-star"></i></button>
+                    <% }); %>
+                </div>
+                <textarea id="review-comment" rows="3" placeholder="<%= t('review_comment_placeholder') %>"
+                          class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 resize-none"></textarea>
+                <button type="button" onclick="reviewSubmit()" id="review-submit-btn"
+                        class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition"><%= t('review_submit_btn') %></button>
+            </div>
+
+            <div id="review-step-done" class="hidden text-center py-4">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto mb-3">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+                <p class="text-sm font-semibold text-stone-700"><%= t('reviews_thanks') %></p>
+            </div>
         </div>
     </div>
 
@@ -663,6 +756,147 @@
             toast.innerHTML = '<span>' + text + '</span>';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3200);
+        }
+
+        // --- Отзывы: разворачивание списка в карточке ---
+        document.querySelectorAll('.review-toggle').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const list = btn.closest('.review-footer').querySelector('.review-list');
+                const chevron = btn.querySelector('.review-chevron');
+                const open = list.classList.toggle('hidden');
+                if (chevron) chevron.classList.toggle('rotate-180', !open);
+            });
+        });
+
+        // --- Отзывы: форма «оставить отзыв» (телефон -> код -> оценка) ---
+        const reviewModalMsg = document.getElementById('review-modal-msg');
+        const reviewSteps = {
+            phone: document.getElementById('review-step-phone'),
+            code: document.getElementById('review-step-code'),
+            rating: document.getElementById('review-step-rating'),
+            done: document.getElementById('review-step-done'),
+        };
+        let reviewMasterId = null;
+        let reviewRating = 0;
+
+        function reviewShowStep(name) {
+            Object.entries(reviewSteps).forEach(([key, el]) => el.classList.toggle('hidden', key !== name));
+        }
+
+        function reviewMsg(text, isError) {
+            if (!text) { reviewModalMsg.classList.add('hidden'); return; }
+            reviewModalMsg.classList.remove('hidden');
+            reviewModalMsg.textContent = text;
+            reviewModalMsg.className = 'text-xs font-bold p-3 rounded-xl ' + (isError
+                ? 'bg-red-50 text-red-700 border border-red-200'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200');
+        }
+
+        document.querySelectorAll('.review-leave-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                reviewMasterId = btn.dataset.masterId;
+                reviewRating = 0;
+                document.getElementById('review-modal-master').textContent = btn.dataset.masterName;
+                document.getElementById('review-phone').value = '';
+                document.getElementById('review-code').value = '';
+                document.getElementById('review-comment').value = '';
+                paintReviewStars(0);
+                reviewMsg('');
+                reviewShowStep('phone');
+                openModal('review-modal');
+            });
+        });
+
+        function paintReviewStars(upTo) {
+            document.querySelectorAll('.review-star').forEach((s) => {
+                s.classList.toggle('text-amber-400', Number(s.dataset.star) <= upTo);
+                s.classList.toggle('text-stone-300', Number(s.dataset.star) > upTo);
+            });
+        }
+        document.querySelectorAll('.review-star').forEach((s) => {
+            s.addEventListener('mouseenter', () => paintReviewStars(Number(s.dataset.star)));
+            s.addEventListener('mouseleave', () => paintReviewStars(reviewRating));
+            s.addEventListener('click', () => { reviewRating = Number(s.dataset.star); paintReviewStars(reviewRating); });
+        });
+
+        async function reviewRequestCode() {
+            const phone = document.getElementById('review-phone').value.trim();
+            if (!phone) return reviewMsg(T.js_err_empty_phone, true);
+            const btn = document.getElementById('review-phone-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/reviews/request-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    reviewMsg(T.js_ok_code_sent, false);
+                    reviewShowStep('code');
+                } else {
+                    reviewMsg(data.message || T.js_err_send_code, true);
+                }
+            } catch (e) {
+                reviewMsg(T.js_err_send_code, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function reviewVerifyCode() {
+            const phone = document.getElementById('review-phone').value.trim();
+            const code = document.getElementById('review-code').value.trim();
+            if (!code) return reviewMsg(T.js_err_empty_code, true);
+            const btn = document.getElementById('review-code-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/reviews/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, code, masterId: reviewMasterId }),
+                });
+                const data = await res.json();
+                if (!data.success) return reviewMsg(data.message || T.js_err_wrong_code, true);
+                if (data.eligible) {
+                    reviewMsg('');
+                    reviewShowStep('rating');
+                } else {
+                    reviewMsg(data.reason === 'already_reviewed' ? T.reviews_err_already : T.reviews_err_not_eligible, true);
+                }
+            } catch (e) {
+                reviewMsg(T.js_err_wrong_code, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function reviewSubmit() {
+            if (!reviewRating) return reviewMsg(T.reviews_pick_rating, true);
+            const phone = document.getElementById('review-phone').value.trim();
+            const comment = document.getElementById('review-comment').value;
+            const btn = document.getElementById('review-submit-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/reviews', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, masterId: reviewMasterId, rating: reviewRating, comment }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    reviewMsg('');
+                    reviewShowStep('done');
+                } else if (res.status === 409) {
+                    reviewMsg(T.reviews_err_already, true);
+                } else {
+                    reviewMsg(data.message || T.js_err_send_code, true);
+                }
+            } catch (e) {
+                reviewMsg(T.js_err_send_code, true);
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         resetWizard();

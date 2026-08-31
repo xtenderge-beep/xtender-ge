@@ -22,6 +22,8 @@ router.post('/masters/register', asyncHandler(masterController.register));
 
 router.post('/telegram/webhook', asyncHandler(orderController.telegramWebhook));
 
+router.post('/reviews/request-code', asyncHandler(reviewController.requestCode));
+router.post('/reviews/verify', asyncHandler(reviewController.verifyForMaster));
 router.post('/reviews', asyncHandler(reviewController.submit));
 
 module.exports = router;

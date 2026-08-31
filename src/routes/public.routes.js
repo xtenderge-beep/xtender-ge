@@ -2,6 +2,7 @@ const express = require('express');
 const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const { buildSeo } = require('../config/seo');
 const masterService = require('../services/master.service');
+const reviewService = require('../services/review.service');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
@@ -19,6 +20,13 @@ function resolveLocale(req, res, suffix) {
 router.get('/', asyncHandler(async (req, res) => {
   const locale = resolveLocale(req, res, '/');
   const masters = await masterService.listMasters();
+  const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
+  const reviewsByMaster = new Map();
+  reviews.forEach((rv) => {
+    if (!reviewsByMaster.has(rv.master_id)) reviewsByMaster.set(rv.master_id, []);
+    reviewsByMaster.get(rv.master_id).push(rv);
+  });
+  masters.forEach((m) => { m.reviews = reviewsByMaster.get(m.id) || []; });
   res.render('index', { masters, clientStrings: clientStrings(locale) });
 }));
 

@@ -126,7 +126,7 @@ async function listMasters({ category } = {}) {
     where += ` AND m.category = $${params.length}`;
   }
   const { rows } = await pool.query(
-    `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating
+    `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating, COUNT(r.id)::int AS review_count
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
      WHERE ${where}
