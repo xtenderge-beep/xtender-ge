@@ -51,14 +51,14 @@ src/
     i18n.js               — словари ka/ru/en, t()/clientStrings()
     upload.js             — конфигурация multer (фото/PDF к заявке)
     url.js                — getBaseUrl() — единая точка сборки base URL (https://$DOMAIN)
-    phone.js              — toE164() — нормализация телефона в формат +995XXXXXXXXX
+    phone.js              — toE164() (+995XXXXXXXXX) + phoneVariants() (все варианты записи номера для матчинга по orders.phone)
     shortId.js             — generateShortId() — общий генератор коротких ID (токены заявок и мастеров)
   controllers/
     otp.controller.js     — POST /api/otp/send, /api/otp/verify (клиент)
     order.controller.js   — заявки, Telegram-вебхук (диспетчеризация + одобрение мастеров + /topup)
     master.controller.js  — каталог, OTP и регистрация исполнителей
   services/
-    otp.service.js        — генерация/проверка кода, rate-limit через Redis (параметризовано по purpose: order/master)
+    otp.service.js        — генерация/проверка кода, rate-limit через Redis (параметризовано по purpose: order/master/review)
     order.service.js      — CRUD заявок, рассылка SMS мастерам (с проверкой/списанием баланса), статистика
     master.service.js     — каталог, регистрация, одобрение, пополнение баланса
     sms.service.js        — отправка SMS через внешний шлюз
@@ -72,6 +72,7 @@ src/
     join.ejs               — регистрация исполнителя (форма + OTP)
     master-status.ejs       — личная страница исполнителя (/master/:token) — статус + баланс
     terms.ejs                — условия/согласие на SMS-уведомления (/terms)
+    review.ejs               — форма отзыва по SMS-ссылке после закрытия заявки (/review/:ownerToken)
 scripts/
   seed-masters.js          — генерирует 50 демо-мастеров (тестовые данные)
 schema.sql                 — полная схема БД, накатывается автоматически при каждом старте (idempotent)
@@ -140,6 +141,9 @@ node dev-server.js
 | POST | `/api/masters/otp/send` | OTP для регистрации исполнителя (отдельный namespace от клиентского) |
 | POST | `/api/masters/otp/verify` | подтверждение телефона исполнителя |
 | POST | `/api/masters/register` | создаёт мастера (`is_active=false`), уведомляет модератора в Telegram |
+| POST | `/api/reviews/request-code` | отзыв из каталога: шлёт OTP на телефон (purpose `review`) |
+| POST | `/api/reviews/verify` | проверяет код + говорит, может ли этот номер оценить этого мастера (`eligible` / `already_reviewed` / `not_eligible`) |
+| POST | `/api/reviews` | сохраняет отзыв в очередь модерации. Принимает `{ownerToken,…}` (флоу по SMS-ссылке `/review/<owner_token>`) или `{phone,…}` (флоу из каталога, телефон должен быть verified) |
 | POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
 Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (условия/согласие на SMS), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`.
