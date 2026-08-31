@@ -2,7 +2,7 @@
 <html lang="<%= lang %>" class="h-full bg-stone-50 scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <title><%= t('site_title_index') %></title>
     <meta name="description" content="<%= t('meta_description_index') %>">
 
@@ -94,22 +94,45 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
 
-        /* Compose mode: on mobile, focusing the task field hides everything
-           around it and lifts the action bar (with Publish) to the top. */
-        .composer-close { display: none; }
+        /* Compose mode: on mobile, focusing the task field opens a full-screen
+           composer (Facebook-style) — top bar with back + Publish, the field
+           fills the rest, Photo sits on a bottom bar above the keyboard. */
+        .compose-topbar { display: none; }
         @media (max-width: 639px) {
+            body.compose-active { overflow: hidden; }
+            body.compose-active header,
+            body.compose-active #mobileNav,
             body.compose-active #seo-hero,
             body.compose-active .composer-toprow,
             body.compose-active .composer-chips,
             body.compose-active .composer-trust-line,
-            body.compose-active .composer-trust-badges { display: none; }
-            body.compose-active .composer-actionbar {
-                order: -2; margin-top: 0; padding-top: 0;
-                border-top: 0; border-bottom: 1px solid #f5f5f4; padding-bottom: 0.5rem;
+            body.compose-active .composer-trust-badges { display: none !important; }
+
+            body.compose-active #post-section {
+                position: fixed; inset: 0; z-index: 50; margin: 0; background: #fff;
+                animation: none; transform: none;
             }
-            body.compose-active #attachmentsPreview { order: -1; padding-top: 0.5rem; }
-            body.compose-active .composer-textarea { min-height: 44vh; }
-            body.compose-active .composer-close { display: inline-flex; }
+            body.compose-active .composer-card {
+                height: 100%; display: flex; flex-direction: column;
+                border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
+            }
+            body.compose-active #detailsStep {
+                flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0;
+            }
+            body.compose-active .compose-topbar { display: flex; }
+            body.compose-active .composer-inputbox,
+            body.compose-active .composer-inputbox:focus-within {
+                flex: 1; min-height: 0; border: 0; border-radius: 0;
+                box-shadow: none; margin: 0; padding: 14px 16px;
+            }
+            body.compose-active .composer-textarea {
+                flex: 1; min-height: 0; height: 100%; overflow-y: auto;
+            }
+            body.compose-active .composer-actionbar {
+                margin: 0; padding: 10px 16px; border-top: 1px solid #e7e5e4;
+            }
+            body.compose-active .composer-inline-publish { display: none; }
+            body.compose-active #attachmentsPreview { padding: 0 16px 8px; }
         }
     </style>
 </head>
@@ -169,11 +192,19 @@
                         </p>
                     </section>
 
-                    <section id="post-section" class="fade-in-up scroll-mt-[64px]">
-                        <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
+                    <section id="post-section" class="fade-in-up scroll-mt-20">
+                        <div class="composer-card bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
                             <div id="detailsStep" class="p-3.5 sm:p-5">
                                 <input type="hidden" id="description">
+
+                                <div class="compose-topbar hidden items-center gap-3 px-3 py-2.5 border-b border-stone-200 bg-white shrink-0">
+                                    <button type="button" onclick="exitCompose()" aria-label="<%= t('otp_back') %>" class="w-9 h-9 -ml-1 flex items-center justify-center rounded-full text-stone-600 hover:bg-stone-100 active:scale-95 transition shrink-0">
+                                        <i class="fa-solid fa-arrow-left text-base"></i>
+                                    </button>
+                                    <span class="flex-1 font-extrabold text-stone-900 text-sm"><%= t('composer_tag') %></span>
+                                    <button type="button" onclick="submitFreeform()" class="px-3 py-1.5 rounded-lg text-emerald-600 font-extrabold text-sm uppercase tracking-wide hover:bg-emerald-50 active:scale-95 transition shrink-0"><%= t('composer_publish') %></button>
+                                </div>
 
                                 <div class="composer-toprow flex items-center justify-between gap-2">
                                     <span class="text-[11px] font-bold uppercase tracking-wider text-stone-500"><%= t('composer_label') %></span>
@@ -195,23 +226,20 @@
                                     <% }); %>
                                 </div>
 
-                                <div class="mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
+                                <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
                                     <textarea id="freeformInput" rows="3" placeholder="<%= t('freeform_placeholder') %>"
                                         class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"></textarea>
 
                                     <div id="attachmentsPreview" class="hidden flex-wrap gap-1.5 pt-2"></div>
 
                                     <div class="composer-actionbar flex items-center justify-between gap-2 pt-2 mt-1 border-t border-stone-100">
-                                        <div class="flex items-center gap-1.5">
-                                            <button type="button" onclick="exitCompose()" aria-label="<%= t('otp_back') %>" class="composer-close items-center justify-center w-9 h-9 shrink-0 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition active:scale-95 text-base">✕</button>
-                                            <label for="attachments" class="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 px-3 py-2.5 min-h-[44px] rounded-lg cursor-pointer transition active:scale-95">
-                                                <i class="fa-regular fa-image text-emerald-600"></i>
-                                                <span><%= t('composer_photo_btn') %></span>
-                                            </label>
-                                            <input type="file" id="attachments" multiple accept="image/*,application/pdf" class="hidden">
-                                        </div>
+                                        <label for="attachments" class="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600 bg-stone-100 hover:bg-stone-200 px-3 py-2.5 min-h-[44px] rounded-lg cursor-pointer transition active:scale-95">
+                                            <i class="fa-regular fa-image text-emerald-600"></i>
+                                            <span><%= t('composer_photo_btn') %></span>
+                                        </label>
+                                        <input type="file" id="attachments" multiple accept="image/*,application/pdf" class="hidden">
 
-                                        <button type="button" onclick="submitFreeform()" class="inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-600/30 transition">
+                                        <button type="button" onclick="submitFreeform()" class="composer-inline-publish inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-600/30 transition">
                                             <span><%= t('composer_publish') %></span>
                                             <i class="fa-solid fa-arrow-right text-[11px]"></i>
                                         </button>
@@ -710,8 +738,13 @@
         });
 
         function submitFreeform() {
-            const text = document.getElementById('freeformInput').value.trim();
-            if (!text) return showMsg(T.js_err_wizard_required, true);
+            const field = document.getElementById('freeformInput');
+            const text = field.value.trim();
+            if (!text) {
+                if (document.body.classList.contains('compose-active')) { showToast(T.js_err_wizard_required); field.focus(); }
+                else showMsg(T.js_err_wizard_required, true);
+                return;
+            }
             showMsg('');
             descriptionInput.value = text;
             goToPhoneStep();
@@ -722,6 +755,7 @@
             exitCompose();
             detailsStep.classList.add('hidden');
             phoneStep.classList.remove('hidden');
+            if (window.innerWidth < 640) composePostSection.scrollIntoView({ block: 'start' });
         }
 
         function goToDetailsStep() {
@@ -732,7 +766,7 @@
         }
 
         // --- Режим фокуса (compose mode): на мобильном тап в поле задачи
-        //     прячет всё вокруг и поднимает панель с «Опубликовать» наверх ---
+        //     открывает полноэкранный композер (в стиле Facebook) ---
         const composePostSection = document.getElementById('post-section');
         const composeMobileNav = document.getElementById('mobileNav');
         const composeInput = document.getElementById('freeformInput');
@@ -741,7 +775,6 @@
             if (window.innerWidth >= 640) return;
             document.body.classList.add('compose-active');
             if (composeMobileNav) composeMobileNav.classList.add('translate-y-full');
-            setTimeout(() => composePostSection.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
         }
 
         function exitCompose() {
@@ -753,13 +786,6 @@
         }
 
         if (composeInput) composeInput.addEventListener('focus', enterCompose);
-
-        // Тап вне карточки формы — выйти из режима фокуса.
-        document.addEventListener('click', (e) => {
-            if (!document.body.classList.contains('compose-active')) return;
-            if (composePostSection.contains(e.target)) return;
-            exitCompose();
-        });
 
         // --- Мобильная форма: чипсы категорий + клавиатура vs нижнее меню ---
         (function () {
@@ -892,7 +918,7 @@
 
         function showToast(text) {
             const toast = document.createElement('div');
-            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-stone-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-stone-700 flex items-center gap-2';
+            toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[70] bg-stone-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-stone-700 flex items-center gap-2';
             toast.innerHTML = '<span>' + text + '</span>';
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3200);
