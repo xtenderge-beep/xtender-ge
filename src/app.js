@@ -9,9 +9,9 @@ const apiRoutes = require('./routes/api.routes');
 const publicRoutes = require('./routes/public.routes');
 const orderController = require('./controllers/order.controller');
 const reviewController = require('./controllers/review.controller');
-const masterService = require('./services/master.service');
+const masterController = require('./controllers/master.controller');
 const telegramService = require('./services/telegram.service');
-const { normalizeLang, translate, clientStrings } = require('./config/i18n');
+const { normalizeLang, translate } = require('./config/i18n');
 const asyncHandler = require('./middleware/asyncHandler');
 const pool = require('./config/db');
 const adminAuth = require('./config/adminAuth');
@@ -56,10 +56,7 @@ app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
 
-app.get('/master/:token', asyncHandler(async (req, res) => {
-  const master = await masterService.getMasterByToken(req.params.token);
-  res.render('master-status', { master, clientStrings: clientStrings(req.lang) });
-}));
+app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
 

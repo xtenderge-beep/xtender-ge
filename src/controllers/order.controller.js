@@ -13,6 +13,8 @@ const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
+// В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
+const LEAD_PRICE_TETRI = 30;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed']);
 const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
@@ -288,6 +290,7 @@ async function show(req, res) {
       isOwner: false,
       masterId: null,
       funnel: null,
+      masterAccount: null,
       clientStrings: clientStrings(req.lang),
     });
   }
@@ -297,12 +300,27 @@ async function show(req, res) {
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
 
+  // Плашка «баланс · мой аккаунт» + предупреждение о низком балансе — только для мастера,
+  // открывшего лид по своей ссылке (?master=<id>), не для владельца заявки.
+  let masterAccount = null;
+  if (masterId && !isOwner) {
+    const m = await masterService.getMasterById(Number(masterId));
+    if (m && !m.is_banned) {
+      masterAccount = {
+        token: m.master_token,
+        balanceTetri: m.balance_tetri,
+        leadsLeft: Math.floor(m.balance_tetri / LEAD_PRICE_TETRI),
+      };
+    }
+  }
+
   return res.render('order', {
     order,
     files,
     isOwner,
     masterId,
     funnel,
+    masterAccount,
     clientStrings: clientStrings(req.lang),
   });
 }
@@ -318,6 +336,7 @@ async function showByOwnerToken(req, res) {
       isOwner: false,
       masterId: null,
       funnel: null,
+      masterAccount: null,
       clientStrings: clientStrings(req.lang),
     });
   }
@@ -338,6 +357,7 @@ async function showByOwnerToken(req, res) {
     isOwner: true,
     masterId: null,
     funnel,
+    masterAccount: null,
     clientStrings: clientStrings(req.lang),
   });
 }

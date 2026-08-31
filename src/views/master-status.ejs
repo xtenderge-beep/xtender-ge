@@ -30,22 +30,44 @@
 </head>
 <body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
-    <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+<%
+    const TELEGRAM_BOT = 'https://t.me/xtendergebot';
+    const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
+    const categoryLabels = {
+        transport: t('catalog_group_transport'),
+        movers: t('catalog_group_movers'),
+        junk: t('catalog_group_junk'),
+    };
+    function historyReason(reason) {
+        if (reason === 'topup') return t('master_status_history_topup');
+        if (reason === 'lead_charge') return t('master_status_history_lead');
+        return t('master_status_history_correction');
+    }
+%>
+
+    <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm sticky top-0 z-20">
         <div class="max-w-xl mx-auto px-4">
-            <div class="flex items-center justify-between h-16">
-                <a href="/" class="flex items-center gap-2">
+            <div class="flex items-center justify-between h-16 gap-3">
+                <a href="/" class="flex items-center gap-2 shrink-0">
                     <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
                 </a>
-                <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
-                    <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
-                    <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
-                    <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                <div class="flex items-center gap-2">
+                    <% if (master) { %>
+                        <span class="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                            <%= (master.balance_tetri / 100).toFixed(2) %> ₾
+                        </span>
+                    <% } %>
+                    <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
+                        <a href="/lang/ka" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
+                        <a href="/lang/ru" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
+                        <a href="/lang/en" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                    </div>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-xl mx-auto px-4 py-8">
+    <main class="max-w-xl mx-auto px-4 py-8 space-y-4">
         <% if (!master) { %>
             <div class="bg-white rounded-2xl border border-stone-200/80 shadow-sm p-6 text-center text-sm text-stone-500 font-medium">
                 <%= t('master_status_not_found') %>
@@ -53,23 +75,156 @@
         <% } else { %>
             <h1 class="text-xl font-black tracking-tight text-stone-900"><%= t('master_status_headline') %></h1>
 
-            <div class="mt-4 bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 <%= master.is_active ? 'border-l-emerald-600' : 'border-l-amber-500' %> overflow-hidden">
+            <%
+                const statusColor = master.is_banned ? 'border-l-red-500'
+                    : master.is_active ? 'border-l-emerald-600' : 'border-l-amber-500';
+                const leadsLeft = Math.floor(master.balance_tetri / leadPriceTetri);
+            %>
+
+            <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 <%= statusColor %> overflow-hidden">
                 <div class="p-5 sm:p-6 space-y-4">
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold <%= master.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %>">
-                        <%= master.is_active ? t('master_status_active') : t('master_status_pending') %>
-                    </span>
+                    <% if (master.is_banned) { %>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-50 text-red-700"><%= t('master_status_banned') %></span>
+                    <% } else if (master.is_active) { %>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700"><%= t('master_status_active') %></span>
+                    <% } else { %>
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700"><%= t('master_status_pending') %></span>
+                    <% } %>
 
                     <div>
                         <h2 class="font-extrabold text-stone-900 text-lg"><%= master.name %></h2>
-                        <p class="text-xs text-stone-500"><%= t('master_status_category_label') %>: <%= master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %></p>
+                        <p class="text-xs text-stone-500">
+                            <%= categoryLabels[master.category] || master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
+                        </p>
                     </div>
 
-                    <div class="bg-stone-900 text-white p-4 rounded-2xl flex items-center justify-between">
-                        <span class="text-xs font-bold text-stone-300"><%= t('master_status_balance_label') %></span>
-                        <span class="font-mono text-xl font-bold text-emerald-400"><%= (master.balance_tetri / 100).toFixed(2) %> GEL</span>
+                    <div class="bg-stone-900 text-white p-4 rounded-2xl space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-stone-300"><%= t('master_status_balance_label') %></span>
+                            <span class="font-mono text-xl font-bold text-emerald-400"><%= (master.balance_tetri / 100).toFixed(2) %> GEL</span>
+                        </div>
+                        <div class="text-[11px] text-stone-400 text-right">
+                            ≈ <span class="font-mono font-bold text-stone-200"><%= leadsLeft %></span> <%= t('master_status_leads_word') %>
+                        </div>
                     </div>
 
-                    <p class="text-xs text-stone-500"><%= t('master_status_topup_hint') %><span class="font-mono text-stone-700">@xtendergebot</span></p>
+                    <% if (master.is_banned) { %>
+                        <div class="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800 font-medium">
+                            <%= t('master_status_banned_hint') %><% if (master.banned_reason) { %> <span class="text-red-600">(<%= master.banned_reason %>)</span><% } %>
+                        </div>
+                    <% } else { %>
+                        <% if (!master.is_active) { %>
+                            <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
+                                <%= t('master_status_pending_hint') %>
+                            </div>
+                        <% } %>
+                        <a href="<%= TELEGRAM_BOT %>" target="_blank" rel="noopener"
+                           class="flex items-center justify-center gap-2 w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition">
+                            <i class="fa-brands fa-telegram"></i><%= t('master_status_topup_btn') %>
+                        </a>
+                        <p class="text-[11px] text-stone-400 text-center"><%= t('master_status_topup_note') %></p>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_reviews_title') %></h2>
+                <% if (!reviews.length) { %>
+                    <p class="text-sm text-stone-400"><%= t('master_status_reviews_none') %></p>
+                <% } else { %>
+                    <%
+                        const avg = (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1);
+                    %>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-amber-500 text-sm"><i class="fa-solid fa-star text-xs"></i></span>
+                        <span class="font-bold text-stone-900"><%= avg %></span>
+                        <span class="text-xs text-stone-400"><%= reviews.length %></span>
+                    </div>
+                    <div class="space-y-2">
+                        <% reviews.forEach(function (rv) { %>
+                            <div class="bg-stone-50 border border-stone-100 rounded-xl p-3">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[11px] tracking-tight text-amber-500"><%= '★'.repeat(rv.rating) %><span class="text-stone-300"><%= '★'.repeat(5 - rv.rating) %></span></span>
+                                    <span class="text-[10px] text-stone-400"><%= new Date(rv.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></span>
+                                </div>
+                                <% if (rv.comment) { %>
+                                    <p class="text-xs text-stone-700 leading-snug mt-1.5"><%= rv.comment %></p>
+                                <% } %>
+                                <p class="text-[10px] font-semibold text-stone-400 mt-1.5"><%= t('reviews_author') %></p>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_activity_title') %></h2>
+                <% if (activity && activity.totalCount > 0) { %>
+                    <div class="space-y-2 text-sm">
+                        <% if (activity.avgSeconds !== null) { %>
+                            <div class="flex items-center justify-between">
+                                <span class="text-stone-500"><%= t('master_status_response_avg') %></span>
+                                <span class="font-bold text-stone-900"><%= Math.max(1, Math.round(activity.avgSeconds / 60)) %> <%= t('master_status_minutes_short') %></span>
+                            </div>
+                        <% } %>
+                        <div class="flex items-center justify-between">
+                            <span class="text-stone-500"><%= t('master_status_responded') %></span>
+                            <span class="font-bold text-stone-900"><%= activity.respondedCount %> / <%= activity.totalCount %></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-stone-500"><%= t('master_status_leads_30d') %></span>
+                            <span class="font-bold text-stone-900"><%= activity.leads30d %></span>
+                        </div>
+                    </div>
+                <% } else { %>
+                    <p class="text-sm text-stone-400"><%= t('master_status_response_none') %></p>
+                <% } %>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_history_title') %></h2>
+                <% if (!history.length) { %>
+                    <p class="text-sm text-stone-400"><%= t('master_status_history_none') %></p>
+                <% } else { %>
+                    <div class="divide-y divide-stone-100">
+                        <% history.forEach(function (h) { %>
+                            <div class="flex items-center justify-between gap-3 py-2 text-sm">
+                                <div class="min-w-0">
+                                    <div class="text-stone-700"><%= historyReason(h.reason) %><% if (h.note) { %> <span class="text-stone-400">— <%= h.note %></span><% } %></div>
+                                    <div class="text-[10px] text-stone-400 font-mono"><%= new Date(h.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></div>
+                                </div>
+                                <span class="font-mono font-bold shrink-0 <%= h.amount_tetri >= 0 ? 'text-emerald-700' : 'text-red-600' %>">
+                                    <%= h.amount_tetri >= 0 ? '+' : '−' %><%= (Math.abs(h.amount_tetri) / 100).toFixed(2) %> ₾
+                                </span>
+                            </div>
+                        <% }); %>
+                    </div>
+                <% } %>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-1"><%= t('master_status_profile_title') %></h2>
+                <p class="text-[11px] text-stone-400 mb-3"><%= t('master_status_profile_hint') %></p>
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-start justify-between gap-3">
+                        <span class="text-stone-500"><%= t('master_status_category_label') %></span>
+                        <span class="font-semibold text-stone-800 text-right"><%= categoryLabels[master.category] || master.category %></span>
+                    </div>
+                    <% if (master.vehicle_type) { %>
+                        <div class="flex items-start justify-between gap-3">
+                            <span class="text-stone-500">—</span>
+                            <span class="font-semibold text-stone-800 text-right"><%= master.vehicle_type %></span>
+                        </div>
+                    <% } %>
+                    <% if (master.price_text) { %>
+                        <div class="flex items-start justify-between gap-3">
+                            <span class="text-stone-500"><%= t('master_status_price_label') %></span>
+                            <span class="font-mono font-bold text-stone-900 text-right"><%= master.price_text %></span>
+                        </div>
+                    <% } %>
+                    <% if (master.description) { %>
+                        <p class="text-xs text-stone-600 leading-snug pt-1 border-t border-stone-100"><%= master.description %></p>
+                    <% } %>
                 </div>
             </div>
         <% } %>

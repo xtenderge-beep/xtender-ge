@@ -26,10 +26,70 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
 
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
-    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason FROM masters WHERE master_token = $1`,
+    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at
+     FROM masters WHERE master_token = $1`,
     [token]
   );
   return rows[0] || null;
+}
+
+// Лёгкий getter по id — для плашки «баланс / мой аккаунт» на странице лида.
+async function getMasterById(id) {
+  const { rows } = await pool.query(
+    `SELECT id, name, master_token, balance_tetri, is_active, is_banned FROM masters WHERE id = $1`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+// Активность мастера для его личного кабинета: среднее время реакции + сколько
+// уведомлений отвечено + лидов за 30 дней. Время реакции считается так же, как в
+// adminService.getResponseStats (balance_transactions reason='lead_charge' —
+// единственное место, где хранится связка «мастер X уведомлён о заявке Y в момент T»);
+// при правке одного — синхронизировать второй. Без коррелированных подзапросов и
+// date_trunc/INTERVAL — pg-mem (локальная разработка) их не тянет.
+async function getMasterActivity(masterId) {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [respRes, recentRes] = await Promise.all([
+    pool.query(
+      `SELECT AVG(EXTRACT(EPOCH FROM responded_at) - EXTRACT(EPOCH FROM notified_at)) AS avg_seconds,
+              COUNT(responded_at)::int AS responded_count,
+              COUNT(*)::int AS total_count
+       FROM (
+         SELECT bt.order_id, bt.created_at AS notified_at, MIN(ov.viewed_at) AS responded_at
+         FROM balance_transactions bt
+         LEFT JOIN order_views ov
+           ON ov.order_id = bt.order_id AND ov.master_id = bt.master_id AND ov.event_type IN ('view', 'call')
+         WHERE bt.reason = 'lead_charge' AND bt.master_id = $1
+         GROUP BY bt.order_id, bt.created_at
+       ) sub`,
+      [masterId]
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS count FROM balance_transactions
+       WHERE master_id = $1 AND reason = 'lead_charge' AND created_at >= $2`,
+      [masterId, since]
+    ),
+  ]);
+  const r = respRes.rows[0];
+  return {
+    avgSeconds: r.avg_seconds === null ? null : Number(r.avg_seconds),
+    respondedCount: r.responded_count,
+    totalCount: r.total_count,
+    leads30d: recentRes.rows[0].count,
+  };
+}
+
+async function getMasterBalanceHistory(masterId, limit = 40) {
+  const { rows } = await pool.query(
+    `SELECT amount_tetri, reason, note, created_at
+     FROM balance_transactions
+     WHERE master_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [masterId, limit]
+  );
+  return rows;
 }
 
 async function approveMaster(id) {
@@ -140,7 +200,10 @@ async function listMasters({ category } = {}) {
 module.exports = {
   registerMaster,
   getMasterByToken,
+  getMasterById,
   getMasterByPhone,
+  getMasterActivity,
+  getMasterBalanceHistory,
   approveMaster,
   updateMasterProfile,
   adjustBalance,

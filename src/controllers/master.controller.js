@@ -1,11 +1,15 @@
 const masterService = require('../services/master.service');
+const reviewService = require('../services/review.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
 const smsService = require('../services/sms.service');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
+const { clientStrings } = require('../config/i18n');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
+// В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
+const LEAD_PRICE_TETRI = 30;
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
@@ -122,9 +126,35 @@ async function register(req, res) {
   return res.json({ success: true, link });
 }
 
+// Личный кабинет исполнителя — /master/<master_token>. Ссылка постоянная, приходит
+// в SMS после регистрации; на неё же ведёт плашка со страницы каждого лида.
+async function statusPage(req, res) {
+  const strings = clientStrings(req.lang);
+  const master = await masterService.getMasterByToken(req.params.token);
+
+  if (!master) {
+    return res.status(404).render('master-status', {
+      master: null, reviews: [], activity: null, history: [],
+      leadPriceTetri: LEAD_PRICE_TETRI, clientStrings: strings,
+    });
+  }
+
+  const [reviews, activity, history] = await Promise.all([
+    reviewService.listApprovedForMasters([master.id]),
+    masterService.getMasterActivity(master.id),
+    masterService.getMasterBalanceHistory(master.id),
+  ]);
+
+  res.render('master-status', {
+    master, reviews, activity, history,
+    leadPriceTetri: LEAD_PRICE_TETRI, clientStrings: strings,
+  });
+}
+
 module.exports = {
   list,
   sendOtp,
   verifyOtp,
   register,
+  statusPage,
 };
