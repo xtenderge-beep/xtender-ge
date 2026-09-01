@@ -197,6 +197,29 @@ async function statusPage(req, res) {
 
 const SUPPORT_RATE_MAX = 15;
 const SUPPORT_RATE_WINDOW_SECONDS = 3600;
+const PROMO_RATE_MAX = 10;
+const PROMO_RATE_WINDOW_SECONDS = 3600;
+
+// Активация промокода из кабинета — для тех, кто не ввёл его при регистрации
+// (опечатался, получил код позже). Одно применение на профиль (promo_code_used).
+async function activatePromo(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false });
+  if (master.is_banned) return res.status(403).json({ success: false });
+  if (master.promo_code_used) return res.json({ success: false, reason: 'already' });
+
+  const code = (req.body.code || '').trim().toUpperCase();
+  if (!/^[A-Z0-9_-]{2,40}$/.test(code)) return res.status(400).json({ success: false, reason: 'invalid' });
+
+  const key = `promo_rate:${master.id}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, PROMO_RATE_WINDOW_SECONDS);
+  if (count > PROMO_RATE_MAX) return res.status(429).json({ success: false, reason: 'rate' });
+
+  const bonusTetri = await promoService.apply(master.id, code);
+  if (!bonusTetri) return res.json({ success: false, reason: 'invalid' });
+  return res.json({ success: true, bonusGel: bonusTetri / 100 });
+}
 
 async function sendSupportMessage(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
@@ -300,5 +323,6 @@ module.exports = {
   loginVerify,
   unlinkTelegram,
   sendSupportMessage,
+  activatePromo,
   submitTopupReceipt,
 };

@@ -300,6 +300,19 @@
                     </div>
                 </div>
 
+                <% if (!master.is_banned && !master.promo_code_used) { %>
+                    <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                        <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_promo_title') %></h2>
+                        <form id="promoForm" class="flex flex-col sm:flex-row gap-2">
+                            <input id="promoCabInput" type="text" autocomplete="off" placeholder="<%= t('master_promo_placeholder') %>"
+                                   class="flex-1 px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
+                            <button type="submit" id="promoCabBtn"
+                                    class="shrink-0 px-5 py-3 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:opacity-40 text-white text-sm font-bold transition"><%= t('master_promo_activate') %></button>
+                        </form>
+                        <p id="promoCabMsg" class="hidden text-xs font-bold mt-2"></p>
+                    </div>
+                <% } %>
+
                 <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_history_title') %></h2>
                     <% if (!history.length) { %>
@@ -558,6 +571,44 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
             });
+
+            var promoForm = document.getElementById('promoForm');
+            if (promoForm) {
+                var pInput = document.getElementById('promoCabInput');
+                var pBtn = document.getElementById('promoCabBtn');
+                var pMsg = document.getElementById('promoCabMsg');
+                var P_OK = <%- JSON.stringify(t('js_promo_ok')) %>;
+                var P_ALREADY = <%- JSON.stringify(t('js_promo_already')) %>;
+                var P_INVALID = <%- JSON.stringify(t('js_promo_invalid')) %>;
+                promoForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var code = pInput.value.trim();
+                    if (!code) return;
+                    pBtn.disabled = true;
+                    pMsg.classList.add('hidden');
+                    fetch('/api/master/<%= master ? master.master_token : "" %>/promo', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code: code }),
+                    }).then(function (r) { return r.json(); }).then(function (d) {
+                        if (d.success) {
+                            pMsg.className = 'text-xs font-bold text-emerald-700 mt-2';
+                            pMsg.textContent = P_OK.replace('{amount}', Number(d.bonusGel).toFixed(2));
+                            pMsg.classList.remove('hidden');
+                            setTimeout(function () { window.location.reload(); }, 1200);
+                        } else {
+                            pBtn.disabled = false;
+                            pMsg.className = 'text-xs font-bold text-red-600 mt-2';
+                            pMsg.textContent = d.reason === 'already' ? P_ALREADY : P_INVALID;
+                            pMsg.classList.remove('hidden');
+                        }
+                    }).catch(function () {
+                        pBtn.disabled = false;
+                        pMsg.className = 'text-xs font-bold text-red-600 mt-2';
+                        pMsg.textContent = P_INVALID;
+                        pMsg.classList.remove('hidden');
+                    });
+                });
+            }
 
             var supportFab = document.getElementById('supportFab');
             var supportCard = document.getElementById('supportCard');

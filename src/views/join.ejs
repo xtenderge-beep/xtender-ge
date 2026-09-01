@@ -45,6 +45,8 @@
         .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .cat-btn.active { background: #059669; color: #fff; border-color: #059669; }
         .body-btn.active { background: #059669; color: #fff; border-color: #059669; }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
     </style>
 </head>
 <body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
@@ -127,11 +129,14 @@
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
-                <div>
-                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_promo_label') %></label>
+                <details class="group">
+                    <summary class="cursor-pointer text-xs font-bold text-emerald-700 flex items-center gap-1.5 select-none">
+                        <i class="fa-solid fa-tag text-[10px]"></i><%= t('join_promo_toggle') %>
+                        <i class="fa-solid fa-chevron-down text-[9px] text-stone-400 transition group-open:rotate-180"></i>
+                    </summary>
                     <input type="text" id="promoInput" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
-                        class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
-                </div>
+                        class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
+                </details>
 
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">

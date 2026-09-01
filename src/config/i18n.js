@@ -306,6 +306,12 @@ const dictionaries = {
     master_support_moderator: 'მხარდაჭერა',
     js_support_sent: 'გაიგზავნა',
     js_support_error: 'გაგზავნა ვერ მოხერხდა',
+    master_promo_title: 'პრომოკოდი',
+    master_promo_placeholder: 'მაგ: START5',
+    master_promo_activate: 'გააქტიურება',
+    js_promo_ok: '🎁 დაგერიცხათ {amount} ₾',
+    js_promo_already: 'პრომოკოდი უკვე გააქტიურებულია',
+    js_promo_invalid: 'კოდი ვერ მოიძებნა ან ამოწურულია',
 
     topup_title: 'როგორ შევავსოთ ბალანსი',
     topup_intro: 'გადარიცხეთ საჭირო თანხა ანგარიშზე:',
@@ -333,6 +339,7 @@ const dictionaries = {
     join_terms_link: 'დეტალურად',
     join_err_terms_required: 'საჭიროა წესებზე დათანხმება',
     join_promo_label: 'პრომოკოდი (ასეთის არსებობისას)',
+    join_promo_toggle: 'გაქვთ პრომოკოდი?',
     join_promo_placeholder: 'მაგ: START5',
     join_promo_applied: 'ბალანსზე დაგერიცხათ {amount} ₾',
 
@@ -714,6 +721,12 @@ const dictionaries = {
     master_support_moderator: 'Поддержка',
     js_support_sent: 'Отправлено',
     js_support_error: 'Не удалось отправить',
+    master_promo_title: 'Промокод',
+    master_promo_placeholder: 'например START5',
+    master_promo_activate: 'Активировать',
+    js_promo_ok: '🎁 Зачислено {amount} ₾',
+    js_promo_already: 'Промокод уже активирован',
+    js_promo_invalid: 'Код не найден или исчерпан',
 
     topup_title: 'Как пополнить баланс',
     topup_intro: 'Переведите нужную сумму на счёт:',
@@ -741,6 +754,7 @@ const dictionaries = {
     join_terms_link: 'Подробнее',
     join_err_terms_required: 'Нужно принять условия использования',
     join_promo_label: 'Промокод (если есть)',
+    join_promo_toggle: 'Есть промокод?',
     join_promo_placeholder: 'например START5',
     join_promo_applied: 'На баланс зачислено {amount} ₾',
 
@@ -1122,6 +1136,12 @@ const dictionaries = {
     master_support_moderator: 'Support',
     js_support_sent: 'Sent',
     js_support_error: 'Could not send',
+    master_promo_title: 'Promo code',
+    master_promo_placeholder: 'e.g. START5',
+    master_promo_activate: 'Activate',
+    js_promo_ok: '🎁 {amount} ₾ added',
+    js_promo_already: 'Promo code already used',
+    js_promo_invalid: 'Code not found or exhausted',
 
     topup_title: 'How to top up your balance',
     topup_intro: 'Transfer the amount you need to the account:',
@@ -1149,6 +1169,7 @@ const dictionaries = {
     join_terms_link: 'Learn more',
     join_err_terms_required: 'You need to accept the terms of use',
     join_promo_label: 'Promo code (if you have one)',
+    join_promo_toggle: 'Have a promo code?',
     join_promo_placeholder: 'e.g. START5',
     join_promo_applied: '{amount} ₾ added to your balance',
 
