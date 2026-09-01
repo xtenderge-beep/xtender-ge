@@ -201,13 +201,20 @@ async function handleModeratorMessage(message) {
     await telegramService.sendToChat(
       chatId,
       'Меню модератора 👇\n\n' +
-        '/ref 5 Имя — ваша ссылка для регистрации с бонусом\n' +
-        '/mystats — сколько исполнителей вы привели\n' +
-        '/invite 5 Имя — ссылка без привязки к менеджеру\n' +
+        '/invite 5 Имя — ссылка для регистрации с бонусом\n' +
         '/promo КОД 5 100 — код-кампания\n' +
         '/support — открытые вопросы\n' +
-        '/topup +995… 10 — пополнить баланс'
+        '/topup +995… 10 — пополнить баланс\n' +
+        '/id — узнать ID чата\n\n' +
+        '(/ref и /mystats — для менеджеров: заведите себя в /admin/managers)'
     );
+    return;
+  }
+
+  // /ref и /mystats долетают сюда только от env-модератора (у менеджера их
+  // перехватывает webhook раньше). Подсказываем правильную команду.
+  if (text === '/mystats' || text === '/ref' || text.startsWith('/ref ')) {
+    await telegramService.sendToChat(chatId, 'Это команды менеджера. Ваша ссылка без привязки: /invite 5 Имя');
     return;
   }
 
