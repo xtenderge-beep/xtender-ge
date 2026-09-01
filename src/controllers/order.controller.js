@@ -131,21 +131,12 @@ function formatMasterInfo(master) {
   ].join('\n');
 }
 
-// Ответ модератора исполнителю в поддержку — из native-reply или из кнопки «Ответить».
+// Ответ модератора исполнителю в поддержку из бота — native-reply или кнопка «Ответить».
 async function deliverSupportReply(masterId, body) {
-  const master = await masterService.getMasterById(masterId);
-  if (!master) {
-    await telegramService.sendMessageToModerator(`Исполнитель #${masterId} не найден`);
-    return;
-  }
-  await supportService.addMessage({ masterId, sender: 'moderator', body });
-  await telegramService.sendMessageToModerator(`✅ Ответ отправлен: ${master.name} (#${masterId})`);
-  if (master.telegram_id) {
-    await telegramService.sendToChat(
-      master.telegram_id,
-      `💬 Поддержка ответила:\n${body}\n\nВесь диалог — в кабинете, вкладка «Профиль».`
-    );
-  }
+  const master = await supportService.postModeratorReply(masterId, body);
+  await telegramService.sendMessageToModerator(
+    master ? `✅ Ответ отправлен: ${master.name} (#${masterId})` : `Исполнитель #${masterId} не найден`
+  );
 }
 
 async function handleAdminFlowStep(chatId, flow, rawText) {

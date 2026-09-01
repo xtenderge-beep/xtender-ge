@@ -6,6 +6,8 @@ const adminService = require('../services/admin.service');
 const reviewService = require('../services/review.service');
 const orderService = require('../services/order.service');
 const telegramService = require('../services/telegram.service');
+const supportService = require('../services/support.service');
+const promoService = require('../services/promo.service');
 const { toE164 } = require('../config/phone');
 
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
@@ -174,6 +176,59 @@ async function reviewsQueue(req, res) {
   res.render('admin/reviews', { pending });
 }
 
+async function supportList(req, res) {
+  const threads = await supportService.listThreads();
+  res.render('admin/support', { threads });
+}
+
+async function supportThread(req, res) {
+  const masterId = parseInt(req.params.masterId, 10);
+  const master = await masterService.getMasterById(masterId);
+  if (!master) return res.status(404).send('Исполнитель не найден');
+  const messages = await supportService.listForMaster(masterId, 200);
+  res.render('admin/support-thread', { master, messages });
+}
+
+async function supportReply(req, res) {
+  const masterId = parseInt(req.params.masterId, 10);
+  const body = (req.body.body || '').trim().slice(0, 2000);
+  if (body) await supportService.postModeratorReply(masterId, body);
+  res.redirect(`/admin/support/${masterId}`);
+}
+
+async function promoList(req, res) {
+  const codes = await promoService.listCodes();
+  res.render('admin/promo', { codes, error: req.query.error || null });
+}
+
+async function promoCreate(req, res) {
+  const code = (req.body.code || '').trim().toUpperCase();
+  const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
+  const maxRedemptions = req.body.maxRedemptions ? parseInt(req.body.maxRedemptions, 10) : null;
+  const expiresAt = req.body.expiresAt ? new Date(req.body.expiresAt) : null;
+
+  if (!/^[A-Z0-9_-]{2,40}$/.test(code) || !Number.isFinite(amountGel) || amountGel <= 0) {
+    return res.redirect('/admin/promo?error=invalid');
+  }
+  if (maxRedemptions !== null && (!Number.isFinite(maxRedemptions) || maxRedemptions < 1)) {
+    return res.redirect('/admin/promo?error=invalid');
+  }
+
+  await promoService.createCode({
+    code,
+    amountTetri: Math.round(amountGel * 100),
+    maxRedemptions,
+    expiresAt: expiresAt && !isNaN(expiresAt.getTime()) ? expiresAt : null,
+  });
+  res.redirect('/admin/promo');
+}
+
+async function promoToggle(req, res) {
+  const id = parseInt(req.params.id, 10);
+  await promoService.setActive(id, req.body.active === 'true');
+  res.redirect('/admin/promo');
+}
+
 async function approveReview(req, res) {
   await reviewService.approve(parseInt(req.params.id, 10));
   res.redirect('/admin/reviews');
@@ -202,4 +257,10 @@ module.exports = {
   reviewsQueue,
   approveReview,
   rejectReview,
+  supportList,
+  supportThread,
+  supportReply,
+  promoList,
+  promoCreate,
+  promoToggle,
 };

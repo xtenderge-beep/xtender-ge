@@ -1,0 +1,47 @@
+<%- include('./_header', { active: 'support' }) %>
+
+<%
+    const catLabels = { movers: 'Грузчики', transport: 'Машины', junk: 'Мусор' };
+%>
+
+<a href="/admin/support" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; все обращения</a>
+
+<div class="flex items-center justify-between flex-wrap gap-2 mt-2 mb-5">
+    <h1 class="text-2xl font-black text-stone-900">
+        #<%= master.id %> · <%= master.name %>
+        <span class="text-sm font-semibold text-stone-400"><%= catLabels[master.category] || master.category %></span>
+    </h1>
+    <a href="/admin/masters/<%= master.id %>" class="text-xs font-bold text-emerald-700 hover:underline">карточка исполнителя &rarr;</a>
+</div>
+
+<div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5">
+    <div class="space-y-3 mb-4 max-h-[60vh] overflow-y-auto">
+        <% if (!messages.length) { %>
+            <p class="text-sm text-stone-400">Сообщений нет.</p>
+        <% } %>
+        <% messages.forEach(function (m) { %>
+            <div class="flex <%= m.sender === 'moderator' ? 'justify-end' : 'justify-start' %>">
+                <div class="max-w-[80%] rounded-2xl px-3 py-2 <%= m.sender === 'moderator' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-800' %>">
+                    <div class="text-[10px] font-bold uppercase tracking-wide <%= m.sender === 'moderator' ? 'text-emerald-100' : 'text-stone-400' %>">
+                        <%= m.sender === 'moderator' ? 'Вы' : 'Исполнитель' %> · <%= new Date(m.created_at).toLocaleString('ru') %>
+                    </div>
+                    <p class="text-sm leading-snug whitespace-pre-wrap break-words"><%= m.body %></p>
+                </div>
+            </div>
+        <% }); %>
+    </div>
+
+    <form method="POST" action="/admin/support/<%= master.id %>/reply" class="border-t border-stone-100 pt-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <textarea name="body" rows="3" required maxlength="2000" placeholder="Ответ исполнителю…"
+                  class="w-full text-sm outline-none text-stone-800 resize-none bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
+        <div class="flex items-center justify-between mt-2">
+            <p class="text-[11px] text-stone-400">
+                <% if (master.telegram_id) { %>Придёт исполнителю в Telegram и в кабинет.<% } else { %>Исполнитель увидит ответ в кабинете (Telegram не подключён).<% } %>
+            </p>
+            <button type="submit" class="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Отправить</button>
+        </div>
+    </form>
+</div>
+
+<%- include('./_footer') %>

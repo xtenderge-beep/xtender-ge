@@ -30,4 +30,12 @@ router.get('/reviews', asyncHandler(adminController.reviewsQueue));
 router.post('/reviews/:id/approve', verifyCsrf, asyncHandler(adminController.approveReview));
 router.post('/reviews/:id/reject', verifyCsrf, asyncHandler(adminController.rejectReview));
 
+router.get('/support', asyncHandler(adminController.supportList));
+router.get('/support/:masterId', asyncHandler(adminController.supportThread));
+router.post('/support/:masterId/reply', verifyCsrf, asyncHandler(adminController.supportReply));
+
+router.get('/promo', asyncHandler(adminController.promoList));
+router.post('/promo', verifyCsrf, asyncHandler(adminController.promoCreate));
+router.post('/promo/:id/toggle', verifyCsrf, asyncHandler(adminController.promoToggle));
+
 module.exports = router;

@@ -24,10 +24,14 @@ async function createCode({ code, amountTetri, maxRedemptions = null, expiresAt 
 
 async function listCodes() {
   const { rows } = await pool.query(
-    `SELECT code, amount_tetri, max_redemptions, redeemed_count, expires_at, is_active, created_at
+    `SELECT id, code, amount_tetri, max_redemptions, redeemed_count, expires_at, is_active, created_at
      FROM promo_codes ORDER BY created_at DESC`
   );
   return rows;
+}
+
+async function setActive(id, isActive) {
+  await pool.query(`UPDATE promo_codes SET is_active = $1 WHERE id = $2`, [isActive, id]);
 }
 
 // Проверка без списания — для показа на форме / ранней валидации.
@@ -76,4 +80,4 @@ async function apply(masterId, code) {
   return amountTetri;
 }
 
-module.exports = { createCode, listCodes, peek, apply };
+module.exports = { createCode, listCodes, setActive, peek, apply };

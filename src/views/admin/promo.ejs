@@ -1,0 +1,70 @@
+<%- include('./_header', { active: 'promo' }) %>
+
+<h1 class="text-2xl font-black text-stone-900 mb-5">Промокоды</h1>
+
+<% if (error) { %>
+  <p class="text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">Проверьте поля: код (латиница/цифры/-/_, 2–40), сумма &gt; 0, лимит — целое ≥ 1.</p>
+<% } %>
+
+<div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 mb-6">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Новый код</h2>
+    <form method="POST" action="/admin/promo" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Код</label>
+            <input name="code" required placeholder="START5" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase text-stone-900">
+        </div>
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Сумма, GEL</label>
+            <input name="amountGel" required inputmode="decimal" placeholder="5" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Лимит (необяз.)</label>
+            <input name="maxRedemptions" inputmode="numeric" placeholder="100" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Истекает (необяз.)</label>
+            <input name="expiresAt" type="date" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div class="sm:col-span-4">
+            <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">Создать</button>
+            <span class="text-[11px] text-stone-400 ml-2">Существующий код с тем же именем — перезапишется и снова станет активным.</span>
+        </div>
+    </form>
+</div>
+
+<% if (!codes.length) { %>
+  <p class="text-sm text-stone-500">Кодов пока нет.</p>
+<% } %>
+
+<div class="space-y-2">
+    <% codes.forEach(function (c) { %>
+      <%
+          const limitTxt = c.max_redemptions ? (c.redeemed_count + ' / ' + c.max_redemptions) : (c.redeemed_count + ' / ∞');
+          const expired = c.expires_at && new Date(c.expires_at) < new Date();
+          const exhausted = c.max_redemptions && c.redeemed_count >= c.max_redemptions;
+      %>
+      <div class="bg-white rounded-2xl border <%= c.is_active && !expired && !exhausted ? 'border-stone-200' : 'border-stone-200 opacity-60' %> p-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+              <span class="font-mono font-black text-stone-900 text-lg"><%= c.code %></span>
+              <span class="text-sm font-bold text-emerald-700 ml-2"><%= (c.amount_tetri / 100).toFixed(2) %> GEL</span>
+              <div class="text-xs text-stone-500 mt-0.5">
+                  Использован: <span class="font-bold"><%= limitTxt %></span>
+                  <% if (c.expires_at) { %> · до <%= new Date(c.expires_at).toLocaleDateString('ru') %><% } %>
+                  <% if (!c.is_active) { %> · <span class="text-stone-400 font-bold">выключен</span><% } %>
+                  <% if (expired) { %> · <span class="text-red-500 font-bold">истёк</span><% } %>
+                  <% if (exhausted) { %> · <span class="text-red-500 font-bold">исчерпан</span><% } %>
+              </div>
+          </div>
+          <form method="POST" action="/admin/promo/<%= c.id %>/toggle">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="active" value="<%= c.is_active ? 'false' : 'true' %>">
+              <button type="submit" class="px-3 py-2 <%= c.is_active ? 'bg-stone-100 hover:bg-stone-200 text-stone-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-bold rounded-xl transition">
+                  <%= c.is_active ? 'Выключить' : 'Включить' %>
+              </button>
+          </form>
+      </div>
+    <% }); %>
+</div>
+
+<%- include('./_footer') %>

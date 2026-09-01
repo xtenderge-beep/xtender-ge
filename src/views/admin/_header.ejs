@@ -20,6 +20,8 @@
                 <a href="/admin/masters" class="admin-nav-link hover:text-white transition <%= active === 'masters' ? 'active' : '' %>">Специалисты</a>
                 <a href="/admin/orders" class="admin-nav-link hover:text-white transition <%= active === 'orders' ? 'active' : '' %>">Заявки</a>
                 <a href="/admin/reviews" class="admin-nav-link hover:text-white transition <%= active === 'reviews' ? 'active' : '' %>">Отзывы</a>
+                <a href="/admin/support" class="admin-nav-link hover:text-white transition <%= active === 'support' ? 'active' : '' %>">Поддержка</a>
+                <a href="/admin/promo" class="admin-nav-link hover:text-white transition <%= active === 'promo' ? 'active' : '' %>">Промокоды</a>
             </nav>
             <form method="POST" action="/admin/logout">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
