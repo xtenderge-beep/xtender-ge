@@ -27,11 +27,12 @@ const CONTACT_KEYBOARD = {
 
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
-  return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_MODERATOR_CHAT_ID);
+  return Boolean(process.env.TELEGRAM_BOT_TOKEN);
 }
 
-// Кому слать модераторские сообщения: env-модератор (бутстрап) + все активные
-// менеджеры с is_moderator и привязанным Telegram. Строками, дедуп.
+// Кому слать модераторские сообщения: env-модератор (`TELEGRAM_MODERATOR_CHAT_ID`,
+// если задан — необязателен) + все активные менеджеры с is_moderator и привязанным
+// Telegram. Строками, дедуп. Пусто → заявки/уведомления никуда не уходят (не падение).
 async function getModeratorChatIds() {
   const ids = new Set();
   if (process.env.TELEGRAM_MODERATOR_CHAT_ID) ids.add(String(process.env.TELEGRAM_MODERATOR_CHAT_ID));
