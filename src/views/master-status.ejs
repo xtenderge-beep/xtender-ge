@@ -371,7 +371,7 @@
                     <% } %>
                 </div>
 
-                <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                <div id="supportCard" class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6 scroll-mt-32">
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-1"><%= t('master_support_title') %></h2>
                     <p class="text-[11px] text-stone-400 mb-3"><%= t('master_support_hint') %></p>
 
@@ -454,6 +454,11 @@
 
                 <a href="/master/logout" class="block text-center text-xs font-bold text-stone-400 hover:text-red-600 transition py-2"><%= t('master_logout') %></a>
             </section>
+
+            <button type="button" id="supportFab"
+                    class="sm:hidden fixed bottom-4 right-4 z-30 flex items-center gap-2 pl-3.5 pr-4 py-3 rounded-full bg-stone-900 text-white text-sm font-bold shadow-lg shadow-stone-900/25 active:scale-95 transition">
+                <i class="fa-solid fa-headset text-emerald-400"></i><%= t('master_support_title') %>
+            </button>
         <% } %>
     </main>
 
@@ -553,6 +558,23 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
             });
+
+            var supportFab = document.getElementById('supportFab');
+            var supportCard = document.getElementById('supportCard');
+            if (supportFab && supportCard) {
+                supportFab.addEventListener('click', function () {
+                    activate('profile');
+                    supportCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    var input = document.getElementById('supportInput');
+                    if (input) setTimeout(function () { input.focus(); }, 350);
+                });
+                // прячем кнопку, когда блок поддержки и так на экране
+                if ('IntersectionObserver' in window) {
+                    new IntersectionObserver(function (entries) {
+                        supportFab.classList.toggle('hidden', entries[0].isIntersecting);
+                    }).observe(supportCard);
+                }
+            }
 
             var filters = document.querySelectorAll('[data-lead-filter]');
             var cards = document.querySelectorAll('.lead-card');
