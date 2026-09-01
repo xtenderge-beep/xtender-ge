@@ -31,8 +31,11 @@ async function send(phone, text) {
   return response.data;
 }
 
+// Код авторизации (регистрация исполнителя, вход в кабинет, отзыв). Максимально
+// коротко и на латинице — кириллица форсит UCS-2 (70 символов) и шлюз её иногда
+// коверкает; шлюз к тому же сам дописывает служебную строку с именем отправителя.
 function sendOtp(phone, code) {
-  return send(phone, `Xtender: ваш код подтверждения ${code}`);
+  return send(phone, `Code: ${code}`);
 }
 
 function sendOrderNotification(phone, text) {
