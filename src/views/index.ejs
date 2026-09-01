@@ -168,10 +168,13 @@
                         <span><%= t('my_orders_nav') %></span>
                     </a>
 
-                    <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
-                        <a href="<%= seo.alternates.ka %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ka' ? 'active' : 'hover:bg-white/50' %>">GE</a>
-                        <a href="<%= seo.alternates.ru %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'ru' ? 'active' : 'hover:bg-white/50' %>">RU</a>
-                        <a href="<%= seo.alternates.en %>" class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === 'en' ? 'active' : 'hover:bg-white/50' %>">EN</a>
+                    <div class="flex items-center gap-1">
+                        <% [['ka','🇬🇪','GE'],['ru','🇷🇺','RU'],['en','🇬🇧','EN']].forEach(function (f) { %>
+                            <a href="<%= seo.alternates[f[0]] %>" title="<%= f[2] %>" aria-label="<%= f[2] %>"
+                               class="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-base sm:text-lg leading-none transition <%= lang === f[0] ? 'ring-2 ring-emerald-500 bg-white shadow-sm' : 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 active:scale-95' %>">
+                                <%= f[1] %>
+                            </a>
+                        <% }); %>
                     </div>
 
                     <a href="/master" class="px-3 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">

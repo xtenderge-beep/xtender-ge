@@ -18,7 +18,20 @@ function resolveLocale(req, res, suffix) {
   return locale;
 }
 
+// Пришли на публичную страницу БЕЗ языкового префикса, но в куке уже выбран ru/en —
+// уводим на префиксную версию (напр. /join → /ru/join), чтобы весь путь был на одном
+// языке. Googlebot куку не шлёт → всегда видит ka на «голых» URL, SEO не страдает.
+function redirectToCookieLocale(req, res, path) {
+  if (req.params.locale) return false;
+  const cookieLang = normalizeLang(req.cookies.lang);
+  if (cookieLang === 'ka') return false;
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(302, `/${cookieLang}${path}${qs}`);
+  return true;
+}
+
 router.get('/', asyncHandler(async (req, res) => {
+  if (redirectToCookieLocale(req, res, '')) return;
   const locale = resolveLocale(req, res, '/');
   const masters = await masterService.listMasters();
   const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
@@ -32,6 +45,7 @@ router.get('/', asyncHandler(async (req, res) => {
 }));
 
 router.get('/join', asyncHandler(async (req, res) => {
+  if (redirectToCookieLocale(req, res, '/join')) return;
   const locale = resolveLocale(req, res, '/join');
   const codeParam = (req.query.promo || '').trim().toUpperCase().slice(0, 40);
   let promo = null;
@@ -50,6 +64,7 @@ router.get('/r/:code', (req, res) => {
 });
 
 router.get('/terms', (req, res) => {
+  if (redirectToCookieLocale(req, res, '/terms')) return;
   resolveLocale(req, res, '/terms');
   res.render('terms');
 });
