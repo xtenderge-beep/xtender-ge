@@ -249,26 +249,6 @@ async function handleMasterContact(message) {
   }
 }
 
-async function handleLeadCallback(callback) {
-  const [, action, token, masterIdRaw] = callback.data.split(':');
-  const masterId = parseInt(masterIdRaw, 10);
-  const order = await orderService.getOrderByToken(token);
-
-  if (!order || order.status === 'closed') {
-    await telegramService.answerCallback(callback.id, 'Заявка закрыта или не найдена');
-    return;
-  }
-
-  const eventType = action === 'call' ? 'call' : 'whatsapp';
-  await orderService.logView(order.id, masterId, eventType);
-  telegramService.updateMessage(order).catch(() => {});
-  await telegramService.revealLeadContact(callback, order, masterId);
-  await telegramService.answerCallback(
-    callback.id,
-    eventType === 'call' ? '📞 Номер клиента — в сообщении' : '💬 Ссылка на WhatsApp — в сообщении'
-  );
-}
-
 async function telegramWebhook(req, res) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
@@ -294,11 +274,6 @@ async function telegramWebhook(req, res) {
 
     const callback = update.callback_query;
     if (!callback || !callback.data) {
-      return res.sendStatus(200);
-    }
-
-    if (callback.data.startsWith('lead:')) {
-      await handleLeadCallback(callback);
       return res.sendStatus(200);
     }
 

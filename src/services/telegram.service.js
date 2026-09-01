@@ -219,6 +219,13 @@ async function sendToChat(chatId, text, replyMarkup) {
 
 // Лид в бот исполнителя. Возвращает true при успешной отправке — иначе caller
 // (order.service notifyMasters) откатывается на SMS, чтобы заявка не потерялась.
+//
+// Номер клиента и WhatsApp-ссылка сюда сознательно НЕ попадают — единственная кнопка
+// ведёт на /order/<token>?master=, ту же страницу, что открывает SMS-лид. Там уже есть
+// вся защита от закрытой заявки (кнопки Call/WhatsApp скрываются по order.status в
+// момент открытия страницы, не в момент отправки лида) и логирование звонка/WhatsApp/
+// просмотра — доделывать её отдельно под Telegram не нужно, и нечему "утекать" в
+// сообщении после того, как заказчик закроет заявку.
 async function sendLeadToMaster(master, order, link) {
   if (!isEnabled()) {
     console.log(`[TELEGRAM DEV MODE] lead #${order.id} -> master ${master.id} via Telegram (chat ${master.telegram_id})`);
@@ -227,20 +234,13 @@ async function sendLeadToMaster(master, order, link) {
 
   const lines = [`🆕 Заявка #${order.id}`, '', order.description];
   if (order.district_name) lines.push('', `📍 ${order.district_name}`);
+  lines.push('', 'Нажмите ниже, чтобы посмотреть детали и позвонить или написать в WhatsApp.');
 
   try {
     await axios.post(apiUrl('sendMessage'), {
       chat_id: master.telegram_id,
       text: lines.join('\n'),
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: '📞 Позвонить', callback_data: `lead:call:${order.token}:${master.id}` },
-            { text: '💬 WhatsApp', callback_data: `lead:wa:${order.token}:${master.id}` },
-          ],
-          [{ text: '📄 Открыть заявку', url: link }],
-        ],
-      },
+      reply_markup: { inline_keyboard: [[{ text: '📄 Открыть заявку', url: link }]] },
     });
     return true;
   } catch (err) {
@@ -250,38 +250,6 @@ async function sendLeadToMaster(master, order, link) {
     );
     return false;
   }
-}
-
-// После тапа «Позвонить»/«WhatsApp» в боте — раскрываем контакт клиента прямо в
-// сообщении: номер (Telegram сам делает его кликабельным) + кнопка WhatsApp + ссылка
-// на страницу лида с ?master= (там логируется просмотр и работает форма отзыва).
-async function revealLeadContact(callback, order, masterId) {
-  if (!isEnabled()) return;
-
-  const chat = callback.message.chat.id;
-  const messageId = callback.message.message_id;
-  const digits = String(order.phone).replace(/\D/g, '');
-  const baseText = callback.message.text || `🆕 Заявка #${order.id}`;
-  const text = baseText.includes('📞 ') ? baseText : `${baseText}\n\n📞 ${order.phone}`;
-  const link = `${getBaseUrl()}/order/${order.token}?master=${masterId}`;
-
-  await axios
-    .post(apiUrl('editMessageText'), {
-      chat_id: chat,
-      message_id: messageId,
-      text,
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '💬 Открыть WhatsApp', url: `https://wa.me/${digits}` }],
-          [{ text: '📄 Открыть заявку', url: link }],
-        ],
-      },
-    })
-    .catch((err) => {
-      // "message is not modified" (повторный тап) — не ошибка
-      const data = err.response ? JSON.stringify(err.response.data) : err.message;
-      if (!data.includes('not modified')) console.error('Failed to reveal lead contact:', data);
-    });
 }
 
 function formatDispatchLine(category, vehicleSize, masterCount) {
@@ -382,6 +350,5 @@ module.exports = {
   setWebhook,
   sendToChat,
   sendLeadToMaster,
-  revealLeadContact,
   CONTACT_KEYBOARD,
 };
