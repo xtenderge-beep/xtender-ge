@@ -1,0 +1,74 @@
+<%- include('./_header', { active: 'promo' }) %>
+
+<%
+    const c = stats.info;
+    const link = baseUrl + '/join?promo=' + c.code;
+    const limitTxt = c.max_redemptions ? (c.redeemed_count + ' / ' + c.max_redemptions) : (c.redeemed_count + ' / ∞');
+%>
+
+<a href="/admin/promo" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; все промокоды</a>
+
+<div class="flex items-baseline gap-3 flex-wrap mt-2 mb-1">
+    <h1 class="text-2xl font-black text-stone-900 font-mono"><%= c.code %></h1>
+    <span class="text-lg font-bold text-emerald-700"><%= (c.amount_tetri / 100).toFixed(2) %> GEL</span>
+    <% if (!c.is_active) { %><span class="text-xs font-bold text-stone-400">выключен</span><% } %>
+</div>
+<% if (c.label) { %><p class="text-sm font-semibold text-stone-600 mb-4">Метка: <%= c.label %></p><% } %>
+
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Регистраций</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= limitTxt %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Активны</p>
+        <p class="text-2xl font-black text-emerald-700 mt-1"><%= stats.masters.filter(function (m) { return m.is_active && !m.is_banned; }).length %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Выдано бонусов</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= (stats.bonusPaidTetri / 100).toFixed(2) %> ₾</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Срок</p>
+        <p class="text-lg font-black text-stone-900 mt-1"><%= c.expires_at ? new Date(c.expires_at).toLocaleDateString('ru') : 'без срока' %></p>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl border border-stone-200 p-3 mb-6 flex items-center gap-2">
+    <input readonly value="<%= link %>" class="flex-1 text-xs font-mono text-stone-500 bg-stone-50 border border-stone-200 rounded-lg px-2 py-1.5" onclick="this.select()">
+    <button type="button" id="copyLink" class="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1.5" data-link="<%= link %>">копировать ссылку</button>
+</div>
+
+<h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Пришли по этому коду</h2>
+<% if (!stats.masters.length) { %>
+  <p class="text-sm text-stone-500">Пока никто не зарегистрировался.</p>
+<% } %>
+<div class="space-y-2">
+    <% stats.masters.forEach(function (m) { %>
+      <a href="/admin/masters/<%= m.id %>" class="flex items-center justify-between gap-3 bg-white rounded-2xl border border-stone-200 p-3 hover:shadow-md transition">
+          <div>
+              <span class="font-extrabold text-stone-900"><%= m.name %></span>
+              <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
+              <div class="text-[11px] text-stone-400 mt-0.5">
+                  <%= new Date(m.created_at).toLocaleDateString('ru') %> ·
+                  <% if (m.is_banned) { %><span class="text-red-500 font-bold">бан</span>
+                  <% } else if (m.is_active) { %><span class="text-emerald-600 font-bold">активен</span>
+                  <% } else { %><span class="text-amber-600 font-bold">на модерации</span><% } %>
+              </div>
+          </div>
+          <span class="font-mono text-sm font-bold text-stone-700"><%= (m.balance_tetri / 100).toFixed(2) %> ₾</span>
+      </a>
+    <% }); %>
+</div>
+
+<script>
+    var cb = document.getElementById('copyLink');
+    if (cb) cb.addEventListener('click', function () {
+        navigator.clipboard && navigator.clipboard.writeText(cb.getAttribute('data-link')).then(function () {
+            var t = cb.textContent; cb.textContent = 'скопировано';
+            setTimeout(function () { cb.textContent = t; }, 1500);
+        });
+    });
+</script>
+
+<%- include('./_footer') %>

@@ -8,11 +8,11 @@
 
 <div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 mb-6">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Новый код</h2>
-    <form method="POST" action="/admin/promo" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <form method="POST" action="/admin/promo" class="grid grid-cols-1 sm:grid-cols-5 gap-3">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div>
             <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Код</label>
-            <input name="code" required placeholder="START5" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase text-stone-900">
+            <input name="code" required placeholder="GIORGI5" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase text-stone-900">
         </div>
         <div>
             <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Сумма, GEL</label>
@@ -26,9 +26,13 @@
             <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Истекает (необяз.)</label>
             <input name="expiresAt" type="date" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
         </div>
-        <div class="sm:col-span-4">
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Метка (кому/канал)</label>
+            <input name="label" maxlength="120" placeholder="Агент Гиорги" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div class="sm:col-span-5">
             <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">Создать</button>
-            <span class="text-[11px] text-stone-400 ml-2">Существующий код с тем же именем — перезапишется и снова станет активным.</span>
+            <span class="text-[11px] text-stone-400 ml-2">Код с тем же именем — перезапишется и снова станет активным.</span>
         </div>
     </form>
 </div>
@@ -43,28 +47,47 @@
           const limitTxt = c.max_redemptions ? (c.redeemed_count + ' / ' + c.max_redemptions) : (c.redeemed_count + ' / ∞');
           const expired = c.expires_at && new Date(c.expires_at) < new Date();
           const exhausted = c.max_redemptions && c.redeemed_count >= c.max_redemptions;
+          const link = baseUrl + '/join?promo=' + c.code;
       %>
-      <div class="bg-white rounded-2xl border <%= c.is_active && !expired && !exhausted ? 'border-stone-200' : 'border-stone-200 opacity-60' %> p-4 flex items-center justify-between flex-wrap gap-3">
-          <div>
-              <span class="font-mono font-black text-stone-900 text-lg"><%= c.code %></span>
-              <span class="text-sm font-bold text-emerald-700 ml-2"><%= (c.amount_tetri / 100).toFixed(2) %> GEL</span>
-              <div class="text-xs text-stone-500 mt-0.5">
-                  Использован: <span class="font-bold"><%= limitTxt %></span>
-                  <% if (c.expires_at) { %> · до <%= new Date(c.expires_at).toLocaleDateString('ru') %><% } %>
-                  <% if (!c.is_active) { %> · <span class="text-stone-400 font-bold">выключен</span><% } %>
-                  <% if (expired) { %> · <span class="text-red-500 font-bold">истёк</span><% } %>
-                  <% if (exhausted) { %> · <span class="text-red-500 font-bold">исчерпан</span><% } %>
+      <div class="bg-white rounded-2xl border <%= c.is_active && !expired && !exhausted ? 'border-stone-200' : 'border-stone-200 opacity-60' %> p-4">
+          <div class="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                  <a href="/admin/promo/<%= c.code %>" class="font-mono font-black text-stone-900 text-lg hover:text-emerald-700"><%= c.code %></a>
+                  <span class="text-sm font-bold text-emerald-700 ml-2"><%= (c.amount_tetri / 100).toFixed(2) %> GEL</span>
+                  <% if (c.label) { %><span class="text-xs font-semibold text-stone-500 ml-2">· <%= c.label %></span><% } %>
+                  <div class="text-xs text-stone-500 mt-0.5">
+                      Регистраций: <a href="/admin/promo/<%= c.code %>" class="font-bold hover:underline"><%= limitTxt %></a>
+                      <% if (c.expires_at) { %> · до <%= new Date(c.expires_at).toLocaleDateString('ru') %><% } %>
+                      <% if (!c.is_active) { %> · <span class="text-stone-400 font-bold">выключен</span><% } %>
+                      <% if (expired) { %> · <span class="text-red-500 font-bold">истёк</span><% } %>
+                      <% if (exhausted) { %> · <span class="text-red-500 font-bold">исчерпан</span><% } %>
+                  </div>
               </div>
+              <form method="POST" action="/admin/promo/<%= c.id %>/toggle">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input type="hidden" name="active" value="<%= c.is_active ? 'false' : 'true' %>">
+                  <button type="submit" class="px-3 py-2 <%= c.is_active ? 'bg-stone-100 hover:bg-stone-200 text-stone-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-bold rounded-xl transition">
+                      <%= c.is_active ? 'Выключить' : 'Включить' %>
+                  </button>
+              </form>
           </div>
-          <form method="POST" action="/admin/promo/<%= c.id %>/toggle">
-              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <input type="hidden" name="active" value="<%= c.is_active ? 'false' : 'true' %>">
-              <button type="submit" class="px-3 py-2 <%= c.is_active ? 'bg-stone-100 hover:bg-stone-200 text-stone-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-bold rounded-xl transition">
-                  <%= c.is_active ? 'Выключить' : 'Включить' %>
-              </button>
-          </form>
+          <div class="mt-2 flex items-center gap-2">
+              <input readonly value="<%= link %>" class="flex-1 text-xs font-mono text-stone-500 bg-stone-50 border border-stone-200 rounded-lg px-2 py-1.5" onclick="this.select()">
+              <button type="button" class="copy-btn shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-900 px-2 py-1.5" data-link="<%= link %>">копировать</button>
+          </div>
       </div>
     <% }); %>
 </div>
+
+<script>
+    document.querySelectorAll('.copy-btn').forEach(function (b) {
+        b.addEventListener('click', function () {
+            navigator.clipboard && navigator.clipboard.writeText(b.getAttribute('data-link')).then(function () {
+                var t = b.textContent; b.textContent = 'скопировано';
+                setTimeout(function () { b.textContent = t; }, 1500);
+            });
+        });
+    });
+</script>
 
 <%- include('./_footer') %>

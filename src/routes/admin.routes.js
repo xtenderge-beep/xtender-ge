@@ -36,6 +36,7 @@ router.post('/support/:masterId/reply', verifyCsrf, asyncHandler(adminController
 
 router.get('/promo', asyncHandler(adminController.promoList));
 router.post('/promo', verifyCsrf, asyncHandler(adminController.promoCreate));
+router.get('/promo/:code', asyncHandler(adminController.promoDetail));
 router.post('/promo/:id/toggle', verifyCsrf, asyncHandler(adminController.promoToggle));
 
 module.exports = router;

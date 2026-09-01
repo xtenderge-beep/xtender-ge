@@ -3,6 +3,7 @@ const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const { buildSeo } = require('../config/seo');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
+const promoService = require('../services/promo.service');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router({ mergeParams: true });
@@ -30,9 +31,22 @@ router.get('/', asyncHandler(async (req, res) => {
   res.render('index', { masters, clientStrings: clientStrings(locale) });
 }));
 
-router.get('/join', (req, res) => {
+router.get('/join', asyncHandler(async (req, res) => {
   const locale = resolveLocale(req, res, '/join');
-  res.render('join', { clientStrings: clientStrings(locale) });
+  const codeParam = (req.query.promo || '').trim().toUpperCase().slice(0, 40);
+  let promo = null;
+  if (codeParam) {
+    const valid = await promoService.peek(codeParam);
+    promo = valid
+      ? { code: valid.code, amountGel: valid.amount_tetri / 100, valid: true }
+      : { code: codeParam, valid: false };
+  }
+  res.render('join', { clientStrings: clientStrings(locale), promo });
+}));
+
+// Короткая реферальная ссылка: /r/КОД → форма регистрации с подставленным промокодом.
+router.get('/r/:code', (req, res) => {
+  res.redirect(`/join?promo=${encodeURIComponent((req.params.code || '').toUpperCase())}`);
 });
 
 router.get('/terms', (req, res) => {

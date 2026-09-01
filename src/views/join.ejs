@@ -129,12 +129,20 @@
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
-                <details class="group">
+                <% const hasPromo = typeof promo !== 'undefined' && promo; %>
+                <% if (hasPromo && promo.valid) { %>
+                    <div class="flex items-center gap-2 text-sm font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                        <i class="fa-solid fa-gift"></i><span><%= t('join_promo_banner').replace('{code}', promo.code).replace('{amount}', promo.amountGel.toFixed(2)) %></span>
+                    </div>
+                <% } else if (hasPromo && !promo.valid) { %>
+                    <p class="text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-2.5"><%= t('join_promo_bad').replace('{code}', promo.code) %></p>
+                <% } %>
+                <details class="group" <%= hasPromo ? 'open' : '' %>>
                     <summary class="cursor-pointer text-xs font-bold text-emerald-700 flex items-center gap-1.5 select-none">
                         <i class="fa-solid fa-tag text-[10px]"></i><%= t('join_promo_toggle') %>
                         <i class="fa-solid fa-chevron-down text-[9px] text-stone-400 transition group-open:rotate-180"></i>
                     </summary>
-                    <input type="text" id="promoInput" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
+                    <input type="text" id="promoInput" value="<%= hasPromo ? promo.code : '' %>" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
                         class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
                 </details>
 

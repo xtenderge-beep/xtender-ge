@@ -340,6 +340,8 @@ const dictionaries = {
     join_err_terms_required: 'საჭიროა წესებზე დათანხმება',
     join_promo_label: 'პრომოკოდი (ასეთის არსებობისას)',
     join_promo_toggle: 'გაქვთ პრომოკოდი?',
+    join_promo_banner: 'პრომოკოდი {code} — {amount} ₾ ბალანსზე რეგისტრაციისას',
+    join_promo_bad: 'პრომოკოდი {code} არ არის აქტიური ან ამოწურულია',
     join_promo_placeholder: 'მაგ: START5',
     join_promo_applied: 'ბალანსზე დაგერიცხათ {amount} ₾',
 
@@ -755,6 +757,8 @@ const dictionaries = {
     join_err_terms_required: 'Нужно принять условия использования',
     join_promo_label: 'Промокод (если есть)',
     join_promo_toggle: 'Есть промокод?',
+    join_promo_banner: 'Промокод {code} — {amount} ₾ на баланс при регистрации',
+    join_promo_bad: 'Промокод {code} недействителен или исчерпан',
     join_promo_placeholder: 'например START5',
     join_promo_applied: 'На баланс зачислено {amount} ₾',
 
@@ -1170,6 +1174,8 @@ const dictionaries = {
     join_err_terms_required: 'You need to accept the terms of use',
     join_promo_label: 'Promo code (if you have one)',
     join_promo_toggle: 'Have a promo code?',
+    join_promo_banner: 'Promo code {code} — {amount} ₾ on your balance when you register',
+    join_promo_bad: 'Promo code {code} is not active or is used up',
     join_promo_placeholder: 'e.g. START5',
     join_promo_applied: '{amount} ₾ added to your balance',
 

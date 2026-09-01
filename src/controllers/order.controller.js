@@ -12,8 +12,8 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
-// /promo КОД 5 [100]  — код, сумма GEL, необязательный лимит использований
-const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?$/;
+// /promo КОД 5 [100] [метка]  — код, сумма GEL, необяз. лимит, необяз. метка (агент/канал)
+const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?(?:\s+(.+))?$/;
 const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
@@ -224,18 +224,22 @@ async function handleModeratorMessage(message) {
     const code = promoMatch[1].toUpperCase();
     const amountGel = parseFloat(promoMatch[2].replace(',', '.'));
     const maxRedemptions = promoMatch[3] ? parseInt(promoMatch[3], 10) : null;
+    const label = (promoMatch[4] || '').trim().slice(0, 120) || null;
     if (!Number.isFinite(amountGel) || amountGel <= 0) {
-      await telegramService.sendMessageToModerator('Некорректная сумма. Пример: /promo START5 5 100');
+      await telegramService.sendMessageToModerator('Некорректная сумма. Пример: /promo START5 5 100 Агент Гиорги');
       return;
     }
     const saved = await promoService.createCode({
       code,
       amountTetri: Math.round(amountGel * 100),
       maxRedemptions,
+      label,
     });
     await telegramService.sendMessageToModerator(
       `🎟 Промокод ${saved.code}: ${(saved.amount_tetri / 100).toFixed(2)} GEL за регистрацию` +
-        `${saved.max_redemptions ? `, лимит ${saved.max_redemptions}` : ', без лимита'}`
+        `${saved.max_redemptions ? `, лимит ${saved.max_redemptions}` : ', без лимита'}` +
+        `${saved.label ? `\nМетка: ${saved.label}` : ''}` +
+        `\nСсылка: ${getBaseUrl()}/join?promo=${saved.code}`
     );
     return;
   }

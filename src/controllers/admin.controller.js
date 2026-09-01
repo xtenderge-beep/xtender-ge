@@ -70,7 +70,8 @@ async function masterDetail(req, res) {
   if (!master) return res.status(404).send('Мастер не найден');
   const history = await adminService.getMasterBalanceHistory(id);
   const responseStats = await adminService.getResponseStats(id);
-  res.render('admin/master-detail', { master, history, responseStats, error: req.query.error || null });
+  const promoOrigin = master.promo_code_used ? await promoService.getCode(master.promo_code_used) : null;
+  res.render('admin/master-detail', { master, history, responseStats, promoOrigin, error: req.query.error || null });
 }
 
 async function approveMaster(req, res) {
@@ -196,9 +197,13 @@ async function supportReply(req, res) {
   res.redirect(`/admin/support/${masterId}`);
 }
 
+function baseUrl(req) {
+  return `${req.protocol}://${req.get('host')}`;
+}
+
 async function promoList(req, res) {
   const codes = await promoService.listCodes();
-  res.render('admin/promo', { codes, error: req.query.error || null });
+  res.render('admin/promo', { codes, error: req.query.error || null, baseUrl: baseUrl(req) });
 }
 
 async function promoCreate(req, res) {
@@ -206,6 +211,7 @@ async function promoCreate(req, res) {
   const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
   const maxRedemptions = req.body.maxRedemptions ? parseInt(req.body.maxRedemptions, 10) : null;
   const expiresAt = req.body.expiresAt ? new Date(req.body.expiresAt) : null;
+  const label = (req.body.label || '').trim().slice(0, 120) || null;
 
   if (!/^[A-Z0-9_-]{2,40}$/.test(code) || !Number.isFinite(amountGel) || amountGel <= 0) {
     return res.redirect('/admin/promo?error=invalid');
@@ -219,8 +225,15 @@ async function promoCreate(req, res) {
     amountTetri: Math.round(amountGel * 100),
     maxRedemptions,
     expiresAt: expiresAt && !isNaN(expiresAt.getTime()) ? expiresAt : null,
+    label,
   });
   res.redirect('/admin/promo');
+}
+
+async function promoDetail(req, res) {
+  const stats = await promoService.getCodeStats((req.params.code || '').toUpperCase());
+  if (!stats) return res.status(404).send('Промокод не найден');
+  res.render('admin/promo-detail', { stats, baseUrl: baseUrl(req) });
 }
 
 async function promoToggle(req, res) {
@@ -262,5 +275,6 @@ module.exports = {
   supportReply,
   promoList,
   promoCreate,
+  promoDetail,
   promoToggle,
 };

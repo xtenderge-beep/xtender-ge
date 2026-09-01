@@ -202,8 +202,12 @@ CREATE TABLE IF NOT EXISTS promo_codes (
     redeemed_count INTEGER NOT NULL DEFAULT 0,
     expires_at TIMESTAMPTZ,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    label VARCHAR(120),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- label добавлен позже — метка «кому принадлежит код / кто раздаёт» (агент, канал).
+-- По ней в /admin/promo видно, кто из зарегистрированных исполнителей чей.
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS label VARCHAR(120);
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS promo_code_used VARCHAR(40);
 
 -- Чат поддержки исполнителя с модератором. Исполнитель пишет из кабинета (или, если
