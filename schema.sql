@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
     id SERIAL PRIMARY KEY,
     master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
     amount_tetri INTEGER NOT NULL,
-    reason VARCHAR(30) NOT NULL CHECK (reason IN ('topup', 'lead_charge', 'admin_correction')),
+    reason VARCHAR(30) NOT NULL CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo')),
     note TEXT,
     order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -185,6 +185,39 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_master_id ON balance_transactions(master_id);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_order_id ON balance_transactions(order_id);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_created_at ON balance_transactions(created_at);
+
+-- reason='promo' добавлен позже — на уже созданной таблице CHECK нужно пересоздать.
+ALTER TABLE balance_transactions DROP CONSTRAINT IF EXISTS balance_transactions_reason_check;
+ALTER TABLE balance_transactions ADD CONSTRAINT balance_transactions_reason_check
+    CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo'));
+
+-- Промокоды на welcome-бонус при регистрации на /join. Гасится один раз на номер
+-- (masters.promo_code_used), сумма просто падает на balance_tetri через adjustBalance
+-- (reason='promo') — отдельно «бонусные» и «настоящие» деньги не различаем.
+CREATE TABLE IF NOT EXISTS promo_codes (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(40) NOT NULL UNIQUE,
+    amount_tetri INTEGER NOT NULL CHECK (amount_tetri > 0),
+    max_redemptions INTEGER,
+    redeemed_count INTEGER NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS promo_code_used VARCHAR(40);
+
+-- Чат поддержки исполнителя с модератором. Исполнитель пишет из кабинета (или, если
+-- привязан Telegram, боту напрямую) → модератору в бот с шапкой "💬 #<master_id> · имя"
+-- и кнопкой/reply для ответа. tg_message_id — id пересланного сообщения, для reply-цепочек.
+CREATE TABLE IF NOT EXISTS support_messages (
+    id SERIAL PRIMARY KEY,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    sender VARCHAR(10) NOT NULL CHECK (sender IN ('master', 'moderator')),
+    body TEXT NOT NULL,
+    tg_message_id BIGINT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_messages_master_id ON support_messages(master_id);
 
 -- Публичные отзывы клиентов. is_approved=false по умолчанию — висит в очереди модерации
 -- (/admin/reviews), в каталоге на сайте учитываются только approved.

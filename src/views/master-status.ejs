@@ -372,6 +372,37 @@
                 </div>
 
                 <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                    <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-1"><%= t('master_support_title') %></h2>
+                    <p class="text-[11px] text-stone-400 mb-3"><%= t('master_support_hint') %></p>
+
+                    <div id="supportThread" class="space-y-2 mb-3 max-h-72 overflow-y-auto">
+                        <% if (!supportMessages.length) { %>
+                            <p class="text-sm text-stone-400"><%= t('master_support_empty') %></p>
+                        <% } else { %>
+                            <% supportMessages.forEach(function (sm) { %>
+                                <div class="flex <%= sm.sender === 'master' ? 'justify-end' : 'justify-start' %>">
+                                    <div class="max-w-[85%] rounded-2xl px-3 py-2 <%= sm.sender === 'master' ? 'bg-emerald-600 text-white' : 'bg-stone-100 text-stone-800' %>">
+                                        <div class="text-[10px] font-bold uppercase tracking-wide <%= sm.sender === 'master' ? 'text-emerald-100' : 'text-stone-400' %>">
+                                            <%= sm.sender === 'master' ? t('master_support_you') : t('master_support_moderator') %>
+                                            · <%= new Date(sm.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short' }) %>
+                                        </div>
+                                        <p class="text-sm leading-snug whitespace-pre-wrap break-words"><%= sm.body %></p>
+                                    </div>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    </div>
+
+                    <form id="supportForm" class="flex flex-col gap-2">
+                        <textarea id="supportInput" rows="2" maxlength="2000" placeholder="<%= t('master_support_placeholder') %>"
+                                  class="w-full text-sm outline-none transition text-stone-800 resize-none placeholder:text-stone-400 bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
+                        <button type="submit" id="supportSubmit"
+                                class="py-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:opacity-40 text-white text-sm font-bold transition"><%= t('master_support_send') %></button>
+                        <p id="supportMsg" class="hidden text-xs font-bold"></p>
+                    </form>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_activity_title') %></h2>
                     <% if (activity && activity.totalCount > 0) { %>
                         <div class="space-y-2 text-sm">
@@ -552,6 +583,52 @@
                         .then(function (r) { return r.json(); })
                         .then(function (d) { if (d.success) window.location.reload(); else tgUnlink.disabled = false; })
                         .catch(function () { tgUnlink.disabled = false; });
+                });
+            }
+
+            var supportForm = document.getElementById('supportForm');
+            if (supportForm) {
+                var sInput = document.getElementById('supportInput');
+                var sBtn = document.getElementById('supportSubmit');
+                var sMsg = document.getElementById('supportMsg');
+                var S_SENT = <%- JSON.stringify(t('js_support_sent')) %>;
+                var S_ERR = <%- JSON.stringify(t('js_support_error')) %>;
+                var sThread = document.getElementById('supportThread');
+                supportForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var body = sInput.value.trim();
+                    if (!body) return;
+                    sBtn.disabled = true;
+                    sMsg.classList.add('hidden');
+                    fetch('/api/master/<%= master ? master.master_token : "" %>/support', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ body: body }),
+                    }).then(function (r) { return r.json(); }).then(function (d) {
+                        sBtn.disabled = false;
+                        if (d.success) {
+                            var wrap = document.createElement('div');
+                            wrap.className = 'flex justify-end';
+                            wrap.innerHTML = '<div class="max-w-[85%] rounded-2xl px-3 py-2 bg-emerald-600 text-white"><p class="text-sm leading-snug whitespace-pre-wrap break-words"></p></div>';
+                            wrap.querySelector('p').textContent = body;
+                            var empty = sThread.querySelector('p.text-stone-400');
+                            if (empty) empty.remove();
+                            sThread.appendChild(wrap);
+                            sThread.scrollTop = sThread.scrollHeight;
+                            sInput.value = '';
+                            sMsg.className = 'text-xs font-bold text-emerald-700';
+                            sMsg.textContent = S_SENT;
+                            sMsg.classList.remove('hidden');
+                        } else {
+                            sMsg.className = 'text-xs font-bold text-red-600';
+                            sMsg.textContent = S_ERR;
+                            sMsg.classList.remove('hidden');
+                        }
+                    }).catch(function () {
+                        sBtn.disabled = false;
+                        sMsg.className = 'text-xs font-bold text-red-600';
+                        sMsg.textContent = S_ERR;
+                        sMsg.classList.remove('hidden');
+                    });
                 });
             }
         })();

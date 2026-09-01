@@ -1,9 +1,10 @@
 const pool = require('../config/db');
+const supportService = require('./support.service');
 
 const LOW_BALANCE_THRESHOLD_TETRI = 60; // меньше чем на 2 лида по текущей цене
 
 async function getOverviewStats() {
-  const [statusCounts, balanceSum, lowBalanceCount, ordersToday, ordersWeek, pendingReviews, responseStats, telegramCount] =
+  const [statusCounts, balanceSum, lowBalanceCount, ordersToday, ordersWeek, pendingReviews, responseStats, telegramCount, supportOpenCount] =
     await Promise.all([
       pool.query(
         `SELECT
@@ -27,6 +28,7 @@ async function getOverviewStats() {
       pool.query(
         `SELECT COUNT(*)::int AS count FROM masters WHERE is_banned = false AND is_active = true AND telegram_id IS NOT NULL`
       ),
+      supportService.countOpenThreads(),
     ]);
 
   return {
@@ -39,6 +41,7 @@ async function getOverviewStats() {
     ordersThisWeek: ordersWeek.rows[0].count,
     pendingReviewsCount: pendingReviews.rows[0].count,
     mastersWithTelegram: telegramCount.rows[0].count,
+    supportOpenCount,
     responseStats,
   };
 }

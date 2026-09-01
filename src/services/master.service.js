@@ -27,7 +27,7 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
-            telegram_id, telegram_linked_at, missed_dispatch_count
+            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used
      FROM masters WHERE master_token = $1`,
     [token]
   );
@@ -66,11 +66,22 @@ async function unlinkTelegram(masterToken) {
   return rows[0] || null;
 }
 
-// Лёгкий getter по id — для плашки «баланс / мой аккаунт» на странице лида.
+// Лёгкий getter по id — для плашки «баланс / мой аккаунт» на странице лида и для
+// ответа модератора в поддержке (нужен telegram_id, чтобы пингнуть).
 async function getMasterById(id) {
   const { rows } = await pool.query(
-    `SELECT id, name, master_token, balance_tetri, is_active, is_banned FROM masters WHERE id = $1`,
+    `SELECT id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+     FROM masters WHERE id = $1`,
     [id]
+  );
+  return rows[0] || null;
+}
+
+async function getMasterByTelegramId(telegramId) {
+  const { rows } = await pool.query(
+    `SELECT id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+     FROM masters WHERE telegram_id = $1`,
+    [telegramId]
   );
   return rows[0] || null;
 }
@@ -271,6 +282,7 @@ module.exports = {
   registerMaster,
   getMasterByToken,
   getMasterById,
+  getMasterByTelegramId,
   getMasterByPhone,
   getMasterActivity,
   getMasterBalanceHistory,

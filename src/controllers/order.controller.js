@@ -4,12 +4,17 @@ const telegramService = require('../services/telegram.service');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
 const smsService = require('../services/sms.service');
+const promoService = require('../services/promo.service');
+const supportService = require('../services/support.service');
 const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
+// /promo КОД 5 [100]  — код, сумма GEL, необязательный лимит использований
+const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?$/;
+const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
@@ -126,7 +131,30 @@ function formatMasterInfo(master) {
   ].join('\n');
 }
 
+// Ответ модератора исполнителю в поддержку — из native-reply или из кнопки «Ответить».
+async function deliverSupportReply(masterId, body) {
+  const master = await masterService.getMasterById(masterId);
+  if (!master) {
+    await telegramService.sendMessageToModerator(`Исполнитель #${masterId} не найден`);
+    return;
+  }
+  await supportService.addMessage({ masterId, sender: 'moderator', body });
+  await telegramService.sendMessageToModerator(`✅ Ответ отправлен: ${master.name} (#${masterId})`);
+  if (master.telegram_id) {
+    await telegramService.sendToChat(
+      master.telegram_id,
+      `💬 Поддержка ответила:\n${body}\n\nВесь диалог — в кабинете, вкладка «Профиль».`
+    );
+  }
+}
+
 async function handleAdminFlowStep(chatId, flow, rawText) {
+  if (flow.action === 'support_reply') {
+    await clearAdminFlow(chatId);
+    await deliverSupportReply(flow.masterId, rawText);
+    return;
+  }
+
   if (flow.step === 'phone') {
     const phoneDigits = rawText.replace(/\s+/g, '');
     if (!PHONE_REGEX.test(phoneDigits)) {
@@ -168,9 +196,71 @@ async function handleModeratorMessage(message) {
 
   const text = (message.text || '').trim();
 
+  // Native-reply на вопрос в поддержку («💬 #<id> …») — самый естественный жест.
+  const repliedText = message.reply_to_message && message.reply_to_message.text;
+  const supportMatch = repliedText && repliedText.match(SUPPORT_HEADER_REGEX);
+  if (supportMatch && text) {
+    await clearAdminFlow(chatId);
+    await deliverSupportReply(parseInt(supportMatch[1], 10), text);
+    return;
+  }
+
   if (text === '/start' || text === '/menu') {
     await clearAdminFlow(chatId);
     await telegramService.sendMessageToModerator('Меню администратора 👇');
+    return;
+  }
+
+  if (text === '/support') {
+    await clearAdminFlow(chatId);
+    const open = await supportService.openThreads();
+    if (!open.length) {
+      await telegramService.sendMessageToModerator('Открытых вопросов нет ✅');
+      return;
+    }
+    const lines = open.map((t) => {
+      const mins = Math.round((Date.now() - new Date(t.created_at).getTime()) / 60000);
+      const ago = mins < 60 ? `${mins} мин` : `${Math.round(mins / 60)} ч`;
+      return `#${t.master_id} ${t.name} — ${ago} назад:\n«${(t.body || '').slice(0, 80)}»`;
+    });
+    await telegramService.sendMessageToModerator(`Открытые вопросы (${open.length}):\n\n${lines.join('\n\n')}`);
+    return;
+  }
+
+  const promoMatch = PROMO_REGEX.exec(text);
+  if (promoMatch) {
+    await clearAdminFlow(chatId);
+    const code = promoMatch[1].toUpperCase();
+    const amountGel = parseFloat(promoMatch[2].replace(',', '.'));
+    const maxRedemptions = promoMatch[3] ? parseInt(promoMatch[3], 10) : null;
+    if (!Number.isFinite(amountGel) || amountGel <= 0) {
+      await telegramService.sendMessageToModerator('Некорректная сумма. Пример: /promo START5 5 100');
+      return;
+    }
+    const saved = await promoService.createCode({
+      code,
+      amountTetri: Math.round(amountGel * 100),
+      maxRedemptions,
+    });
+    await telegramService.sendMessageToModerator(
+      `🎟 Промокод ${saved.code}: ${(saved.amount_tetri / 100).toFixed(2)} GEL за регистрацию` +
+        `${saved.max_redemptions ? `, лимит ${saved.max_redemptions}` : ', без лимита'}`
+    );
+    return;
+  }
+
+  if (text === '/promo') {
+    await clearAdminFlow(chatId);
+    const codes = (await promoService.listCodes()).filter((c) => c.is_active);
+    if (!codes.length) {
+      await telegramService.sendMessageToModerator('Активных промокодов нет.\nСоздать: /promo КОД 5 100');
+      return;
+    }
+    const lines = codes.map((c) => {
+      const limit = c.max_redemptions ? `${c.redeemed_count}/${c.max_redemptions}` : `${c.redeemed_count}/∞`;
+      return `${c.code} — ${(c.amount_tetri / 100).toFixed(2)} GEL · использован ${limit}`;
+    });
+    await telegramService.sendMessageToModerator(`Промокоды:\n\n${lines.join('\n')}`);
     return;
   }
 
@@ -249,6 +339,29 @@ async function handleMasterContact(message) {
   }
 }
 
+// Обычный текст боту от привязанного исполнителя — это вопрос в поддержку.
+async function handleMasterText(message) {
+  const master = await masterService.getMasterByTelegramId(message.from.id);
+  if (!master) return; // незнакомый чат — молчим
+  const body = message.text.trim().slice(0, 2000);
+  if (!body) return;
+  await supportService.forwardQuestion(master, body);
+  await telegramService.sendToChat(message.chat.id, '✅ Вопрос отправлен модератору. Ответ придёт сюда и в кабинет.');
+}
+
+async function handleSupportReplyCallback(callback) {
+  const chatId = String(callback.message.chat.id);
+  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) {
+    await telegramService.answerCallback(callback.id, '');
+    return;
+  }
+  const masterId = parseInt(callback.data.split(':')[1], 10);
+  const master = await masterService.getMasterById(masterId);
+  await telegramService.answerCallback(callback.id, 'Введите ответ');
+  await setAdminFlow(chatId, { action: 'support_reply', masterId });
+  await telegramService.askModerator(`Ответ для ${master ? master.name : 'исполнителя'} (#${masterId}):`);
+}
+
 async function telegramWebhook(req, res) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
@@ -268,12 +381,19 @@ async function telegramWebhook(req, res) {
         await handleMasterContact(message);
       } else if (message.text && message.text.trim().startsWith('/start')) {
         await handleMasterStart(message);
+      } else if (message.text) {
+        await handleMasterText(message);
       }
       return res.sendStatus(200);
     }
 
     const callback = update.callback_query;
     if (!callback || !callback.data) {
+      return res.sendStatus(200);
+    }
+
+    if (callback.data.startsWith('support:')) {
+      await handleSupportReplyCallback(callback);
       return res.sendStatus(200);
     }
 

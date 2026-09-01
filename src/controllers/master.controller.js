@@ -3,6 +3,8 @@ const reviewService = require('../services/review.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
 const smsService = require('../services/sms.service');
+const promoService = require('../services/promo.service');
+const supportService = require('../services/support.service');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
@@ -125,6 +127,18 @@ async function register(req, res) {
   });
   await otpService.clearVerified(phone, OTP_PURPOSE);
 
+  // Промокод: welcome-бонус на баланс. Ошибка/невалидный код не ломает регистрацию.
+  let promoBonusGel = 0;
+  const promoInput = (req.body.promoCode || '').trim().toUpperCase();
+  if (promoInput) {
+    try {
+      const bonusTetri = await promoService.apply(master.id, promoInput);
+      if (bonusTetri) promoBonusGel = bonusTetri / 100;
+    } catch (err) {
+      console.error('Promo apply failed:', err.message);
+    }
+  }
+
   const link = `${getBaseUrl()}/master/${master.master_token}`;
 
   telegramService.notifyModeratorNewMaster(master).catch((err) => {
@@ -134,7 +148,7 @@ async function register(req, res) {
     console.error('Failed to send registration confirmation SMS:', err.message);
   });
 
-  return res.json({ success: true, link });
+  return res.json({ success: true, link, promoBonusGel });
 }
 
 // Личный кабинет исполнителя — /master/<master_token>. Ссылка постоянная, приходит
@@ -155,7 +169,7 @@ async function statusPage(req, res) {
   if (!master) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
-      master: null, badToken, reviews: [], activity: null, history: [], leads: [],
+      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [],
       leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
@@ -167,17 +181,37 @@ async function statusPage(req, res) {
     maxAge: MASTER_COOKIE_MAX_AGE_MS,
   });
 
-  const [reviews, activity, history, leads] = await Promise.all([
+  const [reviews, activity, history, leads, supportMessages] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
     masterService.getMasterActivity(master.id),
     masterService.getMasterBalanceHistory(master.id),
     masterService.getMasterLeads(master.id),
+    supportService.listForMaster(master.id),
   ]);
 
   res.render('master-status', {
-    master, badToken: false, reviews, activity, history, leads,
+    master, badToken: false, reviews, activity, history, leads, supportMessages,
     leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
+}
+
+const SUPPORT_RATE_MAX = 15;
+const SUPPORT_RATE_WINDOW_SECONDS = 3600;
+
+async function sendSupportMessage(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
+
+  const body = (req.body.body || '').trim().slice(0, 2000);
+  if (!body) return res.status(400).json({ success: false, message: 'Empty message' });
+
+  const key = `support_rate:${master.id}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, SUPPORT_RATE_WINDOW_SECONDS);
+  if (count > SUPPORT_RATE_MAX) return res.status(429).json({ success: false, message: 'Too many messages' });
+
+  await supportService.forwardQuestion(master, body);
+  return res.json({ success: true });
 }
 
 // «Выйти» из кабинета на общем устройстве — чистим cookie запоминания.
@@ -265,5 +299,6 @@ module.exports = {
   loginRequestCode,
   loginVerify,
   unlinkTelegram,
+  sendSupportMessage,
   submitTopupReceipt,
 };

@@ -127,6 +127,12 @@
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
+                <div>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_promo_label') %></label>
+                    <input type="text" id="promoInput" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
+                        class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
+                </div>
+
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
                     <span><%= t('join_terms_label') %> <a href="/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
@@ -157,6 +163,8 @@
                 </div>
                 <h2 class="text-lg font-black text-stone-900"><%= t('join_success_title') %></h2>
                 <p class="text-sm text-stone-500"><%= t('join_success_desc') %></p>
+
+                <p id="promoBonusMsg" class="hidden text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3"></p>
 
                 <div class="bg-stone-900 text-white p-4 rounded-2xl text-left space-y-2 text-xs">
                     <p class="font-bold text-amber-400"><%= t('join_payment_title') %></p>
@@ -214,6 +222,7 @@
                 bodyType: selectedBodyType,
                 description: document.getElementById('descriptionInput').value.trim(),
                 phone: document.getElementById('phoneInput').value.trim(),
+                promoCode: document.getElementById('promoInput').value.trim(),
                 termsAccepted: document.getElementById('termsCheckbox').checked,
             };
         }
@@ -273,6 +282,11 @@
                 const statusLink = document.getElementById('statusLink');
                 statusLink.href = data.link;
                 statusLink.textContent = data.link;
+            }
+            if (data.promoBonusGel && data.promoBonusGel > 0) {
+                const pb = document.getElementById('promoBonusMsg');
+                pb.textContent = '🎁 ' + T.join_promo_applied.replace('{amount}', data.promoBonusGel.toFixed(2));
+                pb.classList.remove('hidden');
             }
         }
     </script>

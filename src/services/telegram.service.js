@@ -217,6 +217,33 @@ async function sendToChat(chatId, text, replyMarkup) {
     });
 }
 
+// Вопрос в поддержку от исполнителя → модератору. Шапка "💬 #<id> · имя · категория"
+// — по ней бот находит мастера, когда модератор отвечает (native reply или кнопка).
+// replyToMessageId связывает сообщения одного треда в цепочку. Возвращает message_id.
+async function forwardSupportMessage(master, body, replyToMessageId) {
+  if (!isEnabled()) {
+    console.log(`[TELEGRAM DEV MODE] support Q from master ${master.id} (${master.name}): ${body}`);
+    return null;
+  }
+
+  const cat = MASTER_CATEGORY_LABELS[master.category] || master.category || '';
+  const bal = master.balance_tetri != null ? ` · ${(master.balance_tetri / 100).toFixed(2)} ₾` : '';
+  const text = `💬 #${master.id} · ${master.name} · ${cat}${bal}\n━━━━━━━━━━\n${body}`;
+
+  try {
+    const { data } = await axios.post(apiUrl('sendMessage'), {
+      chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
+      text,
+      ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
+      reply_markup: { inline_keyboard: [[{ text: '✍️ Ответить', callback_data: `support:${master.id}` }]] },
+    });
+    return data.result.message_id;
+  } catch (err) {
+    console.error('Failed to forward support message:', err.response ? JSON.stringify(err.response.data) : err.message);
+    return null;
+  }
+}
+
 // Лид в бот исполнителя. Возвращает true при успешной отправке — иначе caller
 // (order.service notifyMasters) откатывается на SMS, чтобы заявка не потерялась.
 //
@@ -350,5 +377,6 @@ module.exports = {
   setWebhook,
   sendToChat,
   sendLeadToMaster,
+  forwardSupportMessage,
   CONTACT_KEYBOARD,
 };
