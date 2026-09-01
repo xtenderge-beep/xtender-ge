@@ -207,15 +207,17 @@ async function promoList(req, res) {
 }
 
 async function promoCreate(req, res) {
-  const code = (req.body.code || '').trim().toUpperCase();
+  let code = (req.body.code || '').trim().toUpperCase();
   const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
   const maxRedemptions = req.body.maxRedemptions ? parseInt(req.body.maxRedemptions, 10) : null;
   const expiresAt = req.body.expiresAt ? new Date(req.body.expiresAt) : null;
   const label = (req.body.label || '').trim().slice(0, 120) || null;
 
-  if (!/^[A-Z0-9_-]{2,40}$/.test(code) || !Number.isFinite(amountGel) || amountGel <= 0) {
+  if (!Number.isFinite(amountGel) || amountGel <= 0) {
     return res.redirect('/admin/promo?error=invalid');
   }
+  if (!code) code = await promoService.generateCode(); // пустой код → генерируем сами
+  else if (!/^[A-Z0-9_-]{2,40}$/.test(code)) return res.redirect('/admin/promo?error=invalid');
   if (maxRedemptions !== null && (!Number.isFinite(maxRedemptions) || maxRedemptions < 1)) {
     return res.redirect('/admin/promo?error=invalid');
   }

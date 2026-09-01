@@ -1,5 +1,19 @@
+const crypto = require('crypto');
 const pool = require('../config/db');
 const masterService = require('./master.service');
+
+// Автогенерация кода «в моменте» (команда /invite, форма без кода). Алфавит без
+// похожих символов (I L O 0 1). Проверяем уникальность, добираем длину при коллизии.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+async function generateCode(len = 6) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const bytes = crypto.randomBytes(len);
+    let code = '';
+    for (let i = 0; i < len; i++) code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+    if (!(await getCode(code))) return code;
+  }
+  return generateCode(len + 2);
+}
 
 // Промокод при регистрации. Корректность не зависит от отката транзакции (pg-mem его
 // не делает, см. HANDOFF): каждый шаг атомарен, при провале гашения кода явно
@@ -105,4 +119,4 @@ async function apply(masterId, code) {
   return amountTetri;
 }
 
-module.exports = { createCode, listCodes, getCode, getCodeStats, setActive, peek, apply };
+module.exports = { createCode, generateCode, listCodes, getCode, getCodeStats, setActive, peek, apply };

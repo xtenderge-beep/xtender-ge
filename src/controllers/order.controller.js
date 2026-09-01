@@ -14,6 +14,8 @@ const { getBaseUrl } = require('../config/url');
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 // /promo КОД 5 [100] [метка]  — код, сумма GEL, необяз. лимит, необяз. метка (агент/канал)
 const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?(?:\s+(.+))?$/;
+const INVITE_HELP =
+  'Формат: /invite 5 Имя\n5 — бонус в GEL, «Имя» (необязательно) — кому ссылка (видно в дашборде).\nКод создастся сам, ссылка одноразовая.';
 const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
@@ -198,7 +200,13 @@ async function handleModeratorMessage(message) {
 
   if (text === '/start' || text === '/menu') {
     await clearAdminFlow(chatId);
-    await telegramService.sendMessageToModerator('Меню администратора 👇');
+    await telegramService.sendMessageToModerator(
+      'Меню администратора 👇\n\n' +
+        '/invite 5 Имя — ссылка для регистрации с бонусом\n' +
+        '/promo КОД 5 100 — код-кампания\n' +
+        '/support — открытые вопросы\n' +
+        '/topup +995… 10 — пополнить баланс'
+    );
     return;
   }
 
@@ -244,11 +252,35 @@ async function handleModeratorMessage(message) {
     return;
   }
 
+  if (text === '/invite' || text.startsWith('/invite ')) {
+    await clearAdminFlow(chatId);
+    const rest = text.slice('/invite'.length).trim();
+    const m = rest.match(/^([\d.,]+)(?:\s+(.+))?$/);
+    const amountGel = m ? parseFloat(m[1].replace(',', '.')) : NaN;
+    if (!Number.isFinite(amountGel) || amountGel <= 0) {
+      await telegramService.sendMessageToModerator(INVITE_HELP);
+      return;
+    }
+    const label = (m[2] || '').trim().slice(0, 120) || null;
+    const saved = await promoService.createCode({
+      code: await promoService.generateCode(),
+      amountTetri: Math.round(amountGel * 100),
+      maxRedemptions: 1,
+      label,
+    });
+    await telegramService.sendMessageToModerator(
+      `🎟 Ссылка для регистрации${saved.label ? ` — ${saved.label}` : ''}:\n` +
+        `${getBaseUrl()}/join?promo=${saved.code}\n\n` +
+        `+${amountGel.toFixed(2)} GEL на баланс, одноразовая.`
+    );
+    return;
+  }
+
   if (text === '/promo') {
     await clearAdminFlow(chatId);
     const codes = (await promoService.listCodes()).filter((c) => c.is_active);
     if (!codes.length) {
-      await telegramService.sendMessageToModerator('Активных промокодов нет.\nСоздать: /promo КОД 5 100');
+      await telegramService.sendMessageToModerator('Активных промокодов нет.\nЛичная ссылка: /invite 5 Имя\nКампания: /promo КОД 5 100');
       return;
     }
     const lines = codes.map((c) => {
