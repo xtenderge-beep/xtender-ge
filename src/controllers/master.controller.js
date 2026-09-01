@@ -15,6 +15,7 @@ const LEAD_PRICE_TETRI = 30;
 const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'xtendergebot';
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
@@ -142,7 +143,7 @@ async function statusPage(req, res) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
       master: null, badToken, reviews: [], activity: null, history: [], leads: [],
-      leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
+      leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
 
@@ -155,7 +156,7 @@ async function statusPage(req, res) {
 
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads,
-    leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
+    leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }
 
@@ -203,6 +204,13 @@ async function loginVerify(req, res) {
 // Исполнитель прикрепляет чек о банковском переводе — файл уходит модератору в
 // Telegram (sendPhoto/sendDocument по URL из public/uploads). Начисление баланса
 // остаётся ручным: модератор смотрит чек и делает /topup.
+async function unlinkTelegram(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
+  await masterService.unlinkTelegram(req.params.token);
+  return res.json({ success: true });
+}
+
 async function submitTopupReceipt(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
   if (!master) return res.status(404).json({ success: false, message: 'Not found' });
@@ -229,5 +237,6 @@ module.exports = {
   statusPage,
   loginRequestCode,
   loginVerify,
+  unlinkTelegram,
   submitTopupReceipt,
 };

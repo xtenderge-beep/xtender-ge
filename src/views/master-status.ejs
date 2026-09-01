@@ -351,6 +351,22 @@
 
             <section data-tab="profile" class="hidden space-y-4">
                 <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                    <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_tg_title') %></h2>
+                    <% if (master.telegram_id) { %>
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-sm font-semibold text-emerald-700"><%= t('master_tg_connected') %></span>
+                            <button type="button" id="tgUnlink" class="shrink-0 text-xs font-bold text-stone-400 hover:text-red-600 transition underline"><%= t('master_tg_disconnect') %></button>
+                        </div>
+                    <% } else { %>
+                        <p class="text-xs text-stone-500 leading-snug mb-3"><%= t('master_tg_sms_note') %> <%= t('master_tg_connect_hint') %></p>
+                        <a href="https://t.me/<%= botUsername %>?start=<%= master.master_token %>" target="_blank" rel="noopener"
+                           class="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-[#229ED9] hover:brightness-95 text-white text-sm font-bold transition">
+                            <i class="fa-brands fa-telegram"></i><%= t('master_tg_connect') %>
+                        </a>
+                    <% } %>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_activity_title') %></h2>
                     <% if (activity && activity.totalCount > 0) { %>
                         <div class="space-y-2 text-sm">
@@ -512,6 +528,17 @@
                     });
                 });
             });
+
+            var tgUnlink = document.getElementById('tgUnlink');
+            if (tgUnlink) {
+                tgUnlink.addEventListener('click', function () {
+                    tgUnlink.disabled = true;
+                    fetch('/api/master/<%= master ? master.master_token : "" %>/telegram/unlink', { method: 'POST' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) { if (d.success) window.location.reload(); else tgUnlink.disabled = false; })
+                        .catch(function () { tgUnlink.disabled = false; });
+                });
+            }
         })();
     </script>
     <% } %>

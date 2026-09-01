@@ -150,6 +150,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_masters_master_token ON masters(master_tok
 -- нужна как доказательство явного согласия, а не просто текст на странице.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
 
+-- Telegram как альтернативный канал доставки лидов. Исполнитель привязывает чат
+-- через t.me/<bot>?start=<master_token> из кабинета либо отправив свой номер боту.
+-- Привязан telegram_id → лид уходит в бот (бесплатно, с текстом заявки, кликабельно),
+-- SMS остаётся откатом на случай сбоя отправки. telegram_id для приватного чата = chat_id.
+-- (telegram_id с UNIQUE есть в CREATE TABLE выше и в проде с первой миграции —
+-- ADD COLUMN IF NOT EXISTS тут просто на всякий случай; telegram_linked_at новая.)
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS telegram_id BIGINT;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS telegram_linked_at TIMESTAMPTZ;
+
 -- === Админ-панель: бан мастеров, история баланса, отзывы (2026-08-28) ===
 
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;

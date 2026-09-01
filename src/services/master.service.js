@@ -26,9 +26,42 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
 
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
-    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token
+    `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
+            telegram_id, telegram_linked_at
      FROM masters WHERE master_token = $1`,
     [token]
+  );
+  return rows[0] || null;
+}
+
+// Привязка Telegram-чата к профилю. Сначала снимаем этот telegram_id с любого другого
+// профиля (уникальный индекс не даст двум мастерам делить один чат), потом ставим.
+// В той же транзакции, чтобы между «снять» и «поставить» не влезла параллельная привязка.
+async function linkTelegram({ masterToken, phone, telegramId }) {
+  if (!masterToken && !phone) throw new Error('linkTelegram requires masterToken or phone');
+  const idColumn = masterToken ? 'master_token' : 'phone'; // литерал, не пользовательский ввод
+  const idValue = masterToken || phone;
+  return pool.withTransaction(async (client) => {
+    await client.query(
+      `UPDATE masters SET telegram_id = NULL, telegram_linked_at = NULL
+       WHERE telegram_id = $1 AND ${idColumn} <> $2`,
+      [telegramId, idValue]
+    );
+    const { rows } = await client.query(
+      `UPDATE masters SET telegram_id = $1, telegram_linked_at = NOW()
+       WHERE ${idColumn} = $2
+       RETURNING id, name, category, master_token, telegram_id`,
+      [telegramId, idValue]
+    );
+    return rows[0] || null;
+  });
+}
+
+async function unlinkTelegram(masterToken) {
+  const { rows } = await pool.query(
+    `UPDATE masters SET telegram_id = NULL, telegram_linked_at = NULL
+     WHERE master_token = $1 RETURNING id`,
+    [masterToken]
   );
   return rows[0] || null;
 }
@@ -240,6 +273,8 @@ module.exports = {
   getMasterActivity,
   getMasterBalanceHistory,
   getMasterLeads,
+  linkTelegram,
+  unlinkTelegram,
   approveMaster,
   updateMasterProfile,
   adjustBalance,

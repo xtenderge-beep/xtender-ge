@@ -18,6 +18,11 @@ const ADMIN_MENU_KEYBOARD = {
   resize_keyboard: true,
 };
 const FORCE_REPLY = { force_reply: true };
+const CONTACT_KEYBOARD = {
+  keyboard: [[{ text: '📱 Отправить номер', request_contact: true }]],
+  resize_keyboard: true,
+  one_time_keyboard: true,
+};
 
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
@@ -194,6 +199,91 @@ async function answerCallback(callbackQueryId, text) {
     });
 }
 
+// === Исполнитель: привязка чата + доставка лидов в бот ===
+
+async function sendToChat(chatId, text, replyMarkup) {
+  if (!isEnabled()) {
+    console.log(`[TELEGRAM DEV MODE] -> chat ${chatId}: ${text}`);
+    return;
+  }
+  await axios
+    .post(apiUrl('sendMessage'), {
+      chat_id: chatId,
+      text,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    })
+    .catch((err) => {
+      console.error('Failed to send message to chat:', err.response ? JSON.stringify(err.response.data) : err.message);
+    });
+}
+
+// Лид в бот исполнителя. Возвращает true при успешной отправке — иначе caller
+// (order.service notifyMasters) откатывается на SMS, чтобы заявка не потерялась.
+async function sendLeadToMaster(master, order, link) {
+  if (!isEnabled()) {
+    console.log(`[TELEGRAM DEV MODE] lead #${order.id} -> master ${master.id} via Telegram (chat ${master.telegram_id})`);
+    return true;
+  }
+
+  const lines = [`🆕 Заявка #${order.id}`, '', order.description];
+  if (order.district_name) lines.push('', `📍 ${order.district_name}`);
+
+  try {
+    await axios.post(apiUrl('sendMessage'), {
+      chat_id: master.telegram_id,
+      text: lines.join('\n'),
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📞 Позвонить', callback_data: `lead:call:${order.token}:${master.id}` },
+            { text: '💬 WhatsApp', callback_data: `lead:wa:${order.token}:${master.id}` },
+          ],
+          [{ text: '📄 Открыть заявку', url: link }],
+        ],
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error(
+      `Failed to send lead #${order.id} to master ${master.id} on Telegram:`,
+      err.response ? JSON.stringify(err.response.data) : err.message
+    );
+    return false;
+  }
+}
+
+// После тапа «Позвонить»/«WhatsApp» в боте — раскрываем контакт клиента прямо в
+// сообщении: номер (Telegram сам делает его кликабельным) + кнопка WhatsApp + ссылка
+// на страницу лида с ?master= (там логируется просмотр и работает форма отзыва).
+async function revealLeadContact(callback, order, masterId) {
+  if (!isEnabled()) return;
+
+  const chat = callback.message.chat.id;
+  const messageId = callback.message.message_id;
+  const digits = String(order.phone).replace(/\D/g, '');
+  const baseText = callback.message.text || `🆕 Заявка #${order.id}`;
+  const text = baseText.includes('📞 ') ? baseText : `${baseText}\n\n📞 ${order.phone}`;
+  const link = `${getBaseUrl()}/order/${order.token}?master=${masterId}`;
+
+  await axios
+    .post(apiUrl('editMessageText'), {
+      chat_id: chat,
+      message_id: messageId,
+      text,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '💬 Открыть WhatsApp', url: `https://wa.me/${digits}` }],
+          [{ text: '📄 Открыть заявку', url: link }],
+        ],
+      },
+    })
+    .catch((err) => {
+      // "message is not modified" (повторный тап) — не ошибка
+      const data = err.response ? JSON.stringify(err.response.data) : err.message;
+      if (!data.includes('not modified')) console.error('Failed to reveal lead contact:', data);
+    });
+}
+
 function formatDispatchLine(category, vehicleSize, masterCount) {
   let label = CATEGORY_LABELS[category] || category;
   if (vehicleSize) label += ` (${SIZE_LABELS[vehicleSize] || vehicleSize})`;
@@ -290,4 +380,8 @@ module.exports = {
   answerCallback,
   updateMessage,
   setWebhook,
+  sendToChat,
+  sendLeadToMaster,
+  revealLeadContact,
+  CONTACT_KEYBOARD,
 };

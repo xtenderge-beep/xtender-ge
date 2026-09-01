@@ -211,6 +211,64 @@ async function handleMasterApproval(callback) {
   await telegramService.confirmMasterApproved(callback.message.chat.id, callback.message.message_id, master);
 }
 
+// === Исполнитель в боте: привязка Telegram-чата + кнопки на лиде ===
+
+const TG_LINK_PROMPT =
+  'Отправьте свой номер телефона кнопкой ниже — найду ваш профиль исполнителя и подключу уведомления о заявках сюда.';
+const TG_LINK_OK = (name) => `✅ Готово${name ? ', ' + name : ''}! Новые заявки будут приходить сюда, в Telegram.`;
+
+async function handleMasterStart(message) {
+  const payload = (message.text || '').trim().split(/\s+/)[1];
+  if (payload) {
+    const master = await masterService.linkTelegram({ masterToken: payload, telegramId: message.from.id });
+    if (master) {
+      await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master.name), { remove_keyboard: true });
+      return;
+    }
+  }
+  await telegramService.sendToChat(message.chat.id, TG_LINK_PROMPT, telegramService.CONTACT_KEYBOARD);
+}
+
+async function handleMasterContact(message) {
+  const contact = message.contact || {};
+  // request_contact гарантирует, что это собственный номер отправителя (user_id === from.id);
+  // пересланный чужой контакт отсекаем.
+  if (!contact.phone_number || contact.user_id !== message.from.id) {
+    await telegramService.sendToChat(message.chat.id, 'Пришлите свой номер кнопкой «📱 Отправить номер».');
+    return;
+  }
+  const master = await masterService.linkTelegram({ phone: toE164(contact.phone_number), telegramId: message.from.id });
+  if (master) {
+    await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master.name), { remove_keyboard: true });
+  } else {
+    await telegramService.sendToChat(
+      message.chat.id,
+      `На этот номер не зарегистрирован профиль исполнителя. Регистрация: ${getBaseUrl()}/join`,
+      { remove_keyboard: true }
+    );
+  }
+}
+
+async function handleLeadCallback(callback) {
+  const [, action, token, masterIdRaw] = callback.data.split(':');
+  const masterId = parseInt(masterIdRaw, 10);
+  const order = await orderService.getOrderByToken(token);
+
+  if (!order || order.status === 'closed') {
+    await telegramService.answerCallback(callback.id, 'Заявка закрыта или не найдена');
+    return;
+  }
+
+  const eventType = action === 'call' ? 'call' : 'whatsapp';
+  await orderService.logView(order.id, masterId, eventType);
+  telegramService.updateMessage(order).catch(() => {});
+  await telegramService.revealLeadContact(callback, order, masterId);
+  await telegramService.answerCallback(
+    callback.id,
+    eventType === 'call' ? '📞 Номер клиента — в сообщении' : '💬 Ссылка на WhatsApp — в сообщении'
+  );
+}
+
 async function telegramWebhook(req, res) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
@@ -220,13 +278,27 @@ async function telegramWebhook(req, res) {
   try {
     const update = req.body;
 
-    if (update.message && update.message.text) {
-      await handleModeratorMessage(update.message);
+    if (update.message) {
+      const message = update.message;
+      const isModerator = String((message.chat || {}).id) === String(process.env.TELEGRAM_MODERATOR_CHAT_ID);
+
+      if (isModerator && message.text) {
+        await handleModeratorMessage(message);
+      } else if (message.contact) {
+        await handleMasterContact(message);
+      } else if (message.text && message.text.trim().startsWith('/start')) {
+        await handleMasterStart(message);
+      }
       return res.sendStatus(200);
     }
 
     const callback = update.callback_query;
     if (!callback || !callback.data) {
+      return res.sendStatus(200);
+    }
+
+    if (callback.data.startsWith('lead:')) {
+      await handleLeadCallback(callback);
       return res.sendStatus(200);
     }
 

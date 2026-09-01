@@ -151,8 +151,12 @@ async function getOrderFunnelStats(orderId) {
 }
 
 async function notifyMasters(order, category, vehicleSize) {
+  // Ленивый require — telegram.service требует этот модуль на верхнем уровне,
+  // прямой require здесь замкнул бы цикл на этапе загрузки.
+  const telegramService = require('./telegram.service');
+
   const params = [COST_PER_NOTIFICATION_TETRI];
-  let query = `SELECT id, phone FROM masters
+  let query = `SELECT id, phone, telegram_id FROM masters
                WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
                  AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
@@ -174,13 +178,21 @@ async function notifyMasters(order, category, vehicleSize) {
   await Promise.all(
     masters.map(async (master) => {
       const link = `${base}/order/${order.token}?master=${master.id}`;
-      const text = `Xtender: new order #${order.id}: ${link}`;
-      try {
-        await smsService.sendOrderNotification(master.phone, text);
-        notifiedIds.push(master.id);
-      } catch (err) {
-        console.error(`Failed to notify master ${master.id}:`, err.message);
+
+      // Привязан Telegram → шлём в бот; при сбое откатываемся на SMS, чтобы лид не пропал.
+      let delivered = false;
+      if (master.telegram_id) {
+        delivered = await telegramService.sendLeadToMaster(master, order, link).catch(() => false);
       }
+      if (!delivered) {
+        try {
+          await smsService.sendOrderNotification(master.phone, `Xtender: new order #${order.id}: ${link}`);
+          delivered = true;
+        } catch (err) {
+          console.error(`Failed to notify master ${master.id}:`, err.message);
+        }
+      }
+      if (delivered) notifiedIds.push(master.id);
     })
   );
 
