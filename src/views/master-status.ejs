@@ -164,6 +164,11 @@
             </nav>
 
             <section data-tab="leads" class="space-y-3">
+                <% if (!master.is_banned && master.missed_dispatch_count > 0) { %>
+                    <a href="#" data-tab-jump="balance" class="block p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i><span class="font-bold"><%= master.missed_dispatch_count %></span> <%= t('master_missed_note') %>
+                    </a>
+                <% } %>
                 <% if (!leads.length) { %>
                     <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-6 text-center">
                         <p class="text-sm font-semibold text-stone-700"><%= t('master_leads_none') %></p>
@@ -507,6 +512,14 @@
             var saved = null;
             try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
             activate(saved || 'leads');
+
+            document.querySelectorAll('[data-tab-jump]').forEach(function (el) {
+                el.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    activate(el.getAttribute('data-tab-jump'));
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            });
 
             var filters = document.querySelectorAll('[data-lead-filter]');
             var cards = document.querySelectorAll('.lead-card');

@@ -293,6 +293,7 @@ const dictionaries = {
     master_tg_connect_hint: 'უფრო სწრაფად, შეკვეთის სრული ტექსტით და ღილაკებით „დარეკვა" / „WhatsApp".',
     master_tg_connected: '✅ შეკვეთები მოდის Telegram-ში',
     master_tg_disconnect: 'გათიშვა',
+    master_missed_note: 'შეკვეთა გაიარა თქვენ გვერდით ბალანსის უქონლობის გამო — შეავსეთ, რომ არ დაკარგოთ კლიენტები.',
 
     topup_title: 'როგორ შევავსოთ ბალანსი',
     topup_intro: 'გადარიცხეთ საჭირო თანხა ანგარიშზე:',
@@ -685,6 +686,7 @@ const dictionaries = {
     master_tg_connect_hint: 'Быстрее, с полным текстом заявки и кнопками «Позвонить» / «WhatsApp».',
     master_tg_connected: '✅ Заявки приходят в Telegram',
     master_tg_disconnect: 'Отключить',
+    master_missed_note: 'заявок прошло мимо из-за нехватки баланса — пополните, чтобы не терять клиентов.',
 
     topup_title: 'Как пополнить баланс',
     topup_intro: 'Переведите нужную сумму на счёт:',
@@ -1077,6 +1079,7 @@ const dictionaries = {
     master_tg_connect_hint: 'Faster, with the full order text and “Call” / “WhatsApp” buttons.',
     master_tg_connected: '✅ Orders arrive in Telegram',
     master_tg_disconnect: 'Disconnect',
+    master_missed_note: 'orders passed you by — balance too low. Top up so you stop losing clients.',
 
     topup_title: 'How to top up your balance',
     topup_intro: 'Transfer the amount you need to the account:',

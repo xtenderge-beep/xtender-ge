@@ -27,7 +27,7 @@ async function registerMaster({ name, phone, category, vehicleType, vehicleSize,
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
-            telegram_id, telegram_linked_at
+            telegram_id, telegram_linked_at, missed_dispatch_count
      FROM masters WHERE master_token = $1`,
     [token]
   );
@@ -183,8 +183,10 @@ async function getMasterByPhone(phone) {
 async function adjustBalance({ masterId, phone, amountTetri, reason, orderId = null, note = null }, client = pool) {
   if (!masterId && !phone) throw new Error('adjustBalance requires masterId or phone');
   const idColumn = masterId ? 'id' : 'phone'; // литерал, не пользовательский ввод
+  // Пополнение обнуляет счётчик пропущенных из-за баланса рассылок (см. notifyMasters).
+  const resetMissed = reason === 'topup' ? ', missed_dispatch_count = 0' : '';
   const { rows } = await client.query(
-    `UPDATE masters SET balance_tetri = balance_tetri + $1 WHERE ${idColumn} = $2 RETURNING *`,
+    `UPDATE masters SET balance_tetri = balance_tetri + $1${resetMissed} WHERE ${idColumn} = $2 RETURNING *`,
     [amountTetri, masterId || phone]
   );
   const master = rows[0];

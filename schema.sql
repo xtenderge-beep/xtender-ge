@@ -159,6 +159,11 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS telegram_id BIGINT;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS telegram_linked_at TIMESTAMPTZ;
 
+-- Сколько рассылок по категории мастера прошли мимо него из-за нулевого баланса.
+-- Инкремент в notifyMasters, обнуление при пополнении (adjustBalance reason='topup').
+-- Показывается в кабинете как мотиватор пополнить.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS missed_dispatch_count INTEGER NOT NULL DEFAULT 0;
+
 -- === Админ-панель: бан мастеров, история баланса, отзывы (2026-08-28) ===
 
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;

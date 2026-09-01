@@ -1,10 +1,40 @@
 const pool = require('../config/db');
+const redis = require('../config/redis');
 const smsService = require('./sms.service');
 const masterService = require('./master.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
 const COST_PER_NOTIFICATION_TETRI = 30;
+const LOW_BALANCE_NUDGE_TETRI = 150; // ~5 лидов — ниже этого шлём разовый «пополни»
+const NUDGE_THROTTLE_SECONDS = 24 * 60 * 60;
+
+// Разовый (не чаще раза в сутки) пинок «пополни баланс» — в Telegram, если привязан,
+// иначе SMS. reason: 'low' (списание уронило баланс) | 'missed' (не хватило на лид).
+async function nudgeLowBalance(master, telegramService, reason) {
+  const key = `lowbal_nudge:${master.id}`;
+  const n = await redis.incr(key);
+  if (n === 1) await redis.expire(key, NUDGE_THROTTLE_SECONDS);
+  if (n > 1) return;
+
+  const link = `${getBaseUrl()}/master/${master.master_token}`;
+  const gel = (master.balance_tetri / 100).toFixed(2);
+  try {
+    if (master.telegram_id) {
+      const text = reason === 'missed'
+        ? `⚠️ Заявка по вашей категории ушла мимо — не хватило баланса. Пополните, чтобы снова получать заявки: ${link}`
+        : `⚠️ Баланс ${gel} ₾ заканчивается. Пополните, чтобы не пропускать заявки: ${link}`;
+      await telegramService.sendToChat(master.telegram_id, text);
+    } else {
+      const text = reason === 'missed'
+        ? `Xtender: an order in your category passed you by (low balance). Top up: ${link}`
+        : `Xtender: balance low (${gel} GEL). Top up to keep getting orders: ${link}`;
+      await smsService.sendOrderNotification(master.phone, text);
+    }
+  } catch (err) {
+    console.error(`Failed to nudge master ${master.id} about low balance:`, err.message);
+  }
+}
 
 async function createPendingOrder({ phone, description, districtName }) {
   const token = generateShortId();
@@ -155,23 +185,28 @@ async function notifyMasters(order, category, vehicleSize) {
   // прямой require здесь замкнул бы цикл на этапе загрузки.
   const telegramService = require('./telegram.service');
 
-  const params = [COST_PER_NOTIFICATION_TETRI];
-  let query = `SELECT id, phone, telegram_id FROM masters
-               WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
-                 AND (subscription_until IS NULL OR subscription_until > NOW())`;
-
+  // Условие по категории/размеру строим один раз — оно нужно и для «кому разослать»
+  // (баланс есть), и для «кто подходил, но денег не хватило» (missed). $1 = цена лида.
+  const catParams = [];
+  let catClause;
   if (category === 'flatbed') {
-    query += ` AND category = 'transport' AND is_flatbed = true`;
+    catClause = ` AND category = 'transport' AND is_flatbed = true`;
   } else {
-    params.push(category);
-    query += ` AND category = $${params.length}`;
+    catParams.push(category);
+    catClause = ` AND category = $${catParams.length + 1}`;
     if (vehicleSize) {
-      params.push(vehicleSize);
-      query += ` AND (vehicle_size = $${params.length} OR vehicle_size IS NULL)`;
+      catParams.push(vehicleSize);
+      catClause += ` AND (vehicle_size = $${catParams.length + 1} OR vehicle_size IS NULL)`;
     }
   }
+  const activeWhere = `is_active = true AND is_subscribed = true AND is_banned = false
+                       AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
-  const { rows: masters } = await pool.query(query, params);
+  const { rows: masters } = await pool.query(
+    `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
+     WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`,
+    [COST_PER_NOTIFICATION_TETRI, ...catParams]
+  );
   const base = getBaseUrl();
 
   const notifiedIds = [];
@@ -200,6 +235,33 @@ async function notifyMasters(order, category, vehicleSize) {
     await pool.withTransaction((client) =>
       masterService.chargeMastersForLead(notifiedIds, COST_PER_NOTIFICATION_TETRI, order.id, client)
     );
+
+    // Списание уронило баланс ниже «мало» — разовый пинок «пополни».
+    await Promise.all(
+      masters
+        .filter((m) =>
+          notifiedIds.includes(m.id) &&
+          m.balance_tetri >= LOW_BALANCE_NUDGE_TETRI &&
+          m.balance_tetri - COST_PER_NOTIFICATION_TETRI < LOW_BALANCE_NUDGE_TETRI)
+        .map((m) =>
+          nudgeLowBalance({ ...m, balance_tetri: m.balance_tetri - COST_PER_NOTIFICATION_TETRI }, telegramService, 'low'))
+    );
+  }
+
+  // Подходили под рассылку, но денег не хватило — считаем пропуск + разовый пинок.
+  const { rows: broke } = await pool.query(
+    `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
+     WHERE ${activeWhere} AND balance_tetri < $1${catClause}`,
+    [COST_PER_NOTIFICATION_TETRI, ...catParams]
+  );
+  if (broke.length) {
+    const brokeIds = broke.map((m) => m.id);
+    await pool.query(
+      `UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1
+       WHERE id IN (${brokeIds.map((_, i) => `$${i + 1}`).join(', ')})`,
+      brokeIds
+    );
+    await Promise.all(broke.map((m) => nudgeLowBalance(m, telegramService, 'missed')));
   }
 
   return masters.length;
