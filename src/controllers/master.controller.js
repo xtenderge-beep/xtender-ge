@@ -16,6 +16,11 @@ const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'xtendergebot';
+// «Запомнить на устройстве»: httpOnly-cookie с master_token. Та же модель, что у
+// owner_token заявки и cookie my_orders клиента — не сессия, просто чтобы не гонять
+// через телефон+SMS каждый заход. 30 дней, как у остальных cookie.
+const MASTER_COOKIE = 'master_session';
+const MASTER_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
 const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
@@ -137,6 +142,14 @@ async function register(req, res) {
 // Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
 async function statusPage(req, res) {
   const strings = clientStrings(req.lang);
+
+  // /master без токена, но устройство помнит вход — сразу в кабинет, без телефона и SMS.
+  if (!req.params.token && req.cookies[MASTER_COOKIE]) {
+    const remembered = await masterService.getMasterByToken(req.cookies[MASTER_COOKIE]);
+    if (remembered) return res.redirect(`/master/${remembered.master_token}`);
+    res.clearCookie(MASTER_COOKIE); // токен протух — забываем
+  }
+
   const master = req.params.token ? await masterService.getMasterByToken(req.params.token) : null;
 
   if (!master) {
@@ -146,6 +159,13 @@ async function statusPage(req, res) {
       leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
+
+  // Открыл кабинет по токену (SMS-ссылка, после входа, закладка) — запоминаем устройство.
+  res.cookie(MASTER_COOKIE, master.master_token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: MASTER_COOKIE_MAX_AGE_MS,
+  });
 
   const [reviews, activity, history, leads] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
@@ -158,6 +178,12 @@ async function statusPage(req, res) {
     master, badToken: false, reviews, activity, history, leads,
     leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
+}
+
+// «Выйти» из кабинета на общем устройстве — чистим cookie запоминания.
+function logout(req, res) {
+  res.clearCookie(MASTER_COOKIE);
+  res.redirect('/');
 }
 
 // Вход в кабинет по телефону: код отправляем только если на номер есть профиль.
@@ -235,6 +261,7 @@ module.exports = {
   verifyOtp,
   register,
   statusPage,
+  logout,
   loginRequestCode,
   loginVerify,
   unlinkTelegram,

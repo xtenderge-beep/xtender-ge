@@ -35,6 +35,10 @@ app.use((req, res, next) => {
   req.lang = normalizeLang(req.cookies.lang);
   res.locals.lang = req.lang;
   res.locals.t = translate(req.lang);
+  // Только для подписи кнопки в шапке: «Кабинет» если устройство помнит вход
+  // исполнителя, иначе «Работа». Наличие cookie — подсказка, не гарантия (протухший
+  // токен самоисправится на /master).
+  res.locals.isRememberedProvider = Boolean(req.cookies.master_session);
   next();
 });
 
@@ -57,6 +61,7 @@ app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
 
 app.get('/master', asyncHandler(masterController.statusPage));
+app.get('/master/logout', masterController.logout);
 app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
