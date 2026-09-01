@@ -92,6 +92,41 @@ async function getMasterBalanceHistory(masterId, limit = 40) {
   return rows;
 }
 
+// Все лиды, за которые с мастера реально списали деньги — balance_transactions
+// (reason='lead_charge') это единственное место, где хранится связка «мастеру ушла
+// заявка Y в момент T» (то же, что используют getMasterActivity / adminService.getResponseStats).
+// Плюс отметка, связался ли он уже с клиентом (order_views call/whatsapp) — считаем
+// в производной таблице, а не коррелированным подзапросом (pg-mem их не тянет, см. HANDOFF).
+// Дедуп по order_id в JS: мастер с vehicle_size IS NULL может попасть под две рассылки
+// одной заявки (все размеры + конкретный тир) и получить две строки lead_charge.
+async function getMasterLeads(masterId, limit = 100) {
+  const { rows } = await pool.query(
+    `SELECT o.id, o.token, o.description, o.status, o.created_at, o.closed_at,
+            bt.created_at AS notified_at,
+            COALESCE(ev.call_count, 0) AS call_count,
+            COALESCE(ev.whatsapp_count, 0) AS whatsapp_count,
+            COALESCE(ev.view_count, 0) AS view_count
+     FROM balance_transactions bt
+     JOIN orders o ON o.id = bt.order_id
+     LEFT JOIN (
+       SELECT order_id,
+              SUM(CASE WHEN event_type = 'call' THEN 1 ELSE 0 END)::int AS call_count,
+              SUM(CASE WHEN event_type = 'whatsapp' THEN 1 ELSE 0 END)::int AS whatsapp_count,
+              SUM(CASE WHEN event_type = 'view' THEN 1 ELSE 0 END)::int AS view_count
+       FROM order_views
+       WHERE master_id = $1
+       GROUP BY order_id
+     ) ev ON ev.order_id = o.id
+     WHERE bt.reason = 'lead_charge' AND bt.master_id = $1
+     ORDER BY bt.created_at DESC
+     LIMIT $2`,
+    [masterId, limit]
+  );
+
+  const seen = new Set();
+  return rows.filter((row) => (seen.has(row.id) ? false : seen.add(row.id)));
+}
+
 async function approveMaster(id) {
   const { rows } = await pool.query(
     `UPDATE masters SET is_active = true WHERE id = $1 RETURNING *`,
@@ -204,6 +239,7 @@ module.exports = {
   getMasterByPhone,
   getMasterActivity,
   getMasterBalanceHistory,
+  getMasterLeads,
   approveMaster,
   updateMasterProfile,
   adjustBalance,

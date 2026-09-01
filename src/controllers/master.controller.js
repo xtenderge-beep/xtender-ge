@@ -141,19 +141,20 @@ async function statusPage(req, res) {
   if (!master) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
-      master: null, badToken, reviews: [], activity: null, history: [],
+      master: null, badToken, reviews: [], activity: null, history: [], leads: [],
       leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
     });
   }
 
-  const [reviews, activity, history] = await Promise.all([
+  const [reviews, activity, history, leads] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
     masterService.getMasterActivity(master.id),
     masterService.getMasterBalanceHistory(master.id),
+    masterService.getMasterLeads(master.id),
   ]);
 
   res.render('master-status', {
-    master, badToken: false, reviews, activity, history,
+    master, badToken: false, reviews, activity, history, leads,
     leadPriceTetri: LEAD_PRICE_TETRI, payment, clientStrings: strings,
   });
 }
