@@ -210,6 +210,33 @@ CREATE TABLE IF NOT EXISTS promo_codes (
 ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS label VARCHAR(120);
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS promo_code_used VARCHAR(40);
 
+-- Менеджеры/модераторы. Админ заводит по имени+телефону в /admin/managers; человек
+-- делится контактом в боте → сверяем телефон → привязываем telegram_id. is_moderator —
+-- получает заявки на модерацию + /topup /promo /support; любой менеджер может /ref.
+CREATE TABLE IF NOT EXISTS managers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(50) NOT NULL UNIQUE,
+    telegram_id BIGINT UNIQUE,
+    telegram_linked_at TIMESTAMPTZ,
+    is_moderator BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- manager_id (staff.id): у кода — кто раздаёт, у мастера — кто ведёт (правится в карточке).
+-- Без FK — как promo_code_used: связь тянем join'ом, миграции проще.
+ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS manager_id INTEGER;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS manager_id INTEGER;
+
+-- Одна заявка → сообщение каждому активному модератору. Для правки воронки на месте
+-- у всех разом (updateMessage перебирает эти строки).
+CREATE TABLE IF NOT EXISTS order_moderation_messages (
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    chat_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    PRIMARY KEY (order_id, chat_id)
+);
+
 -- Чат поддержки исполнителя с модератором. Исполнитель пишет из кабинета (или, если
 -- привязан Telegram, боту напрямую) → модератору в бот с шапкой "💬 #<master_id> · имя"
 -- и кнопкой/reply для ответа. tg_message_id — id пересланного сообщения, для reply-цепочек.

@@ -1,5 +1,6 @@
 const axios = require('axios');
 const orderService = require('./order.service');
+const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
 
 const API_BASE = 'https://api.telegram.org/bot';
@@ -27,6 +28,19 @@ const CONTACT_KEYBOARD = {
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
   return Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_MODERATOR_CHAT_ID);
+}
+
+// Кому слать модераторские сообщения: env-модератор (бутстрап) + все активные
+// менеджеры с is_moderator и привязанным Telegram. Строками, дедуп.
+async function getModeratorChatIds() {
+  const ids = new Set();
+  if (process.env.TELEGRAM_MODERATOR_CHAT_ID) ids.add(String(process.env.TELEGRAM_MODERATOR_CHAT_ID));
+  try {
+    (await managerService.listActiveModeratorChatIds()).forEach((id) => ids.add(String(id)));
+  } catch (err) {
+    console.error('getModeratorChatIds:', err.message);
+  }
+  return [...ids];
 }
 
 function apiUrl(method) {
@@ -89,14 +103,19 @@ async function notifyModerator(order) {
     '',
     'Можно нажимать несколько кнопок — каждая шлёт заявку своей категории.',
   ].join('\n');
+  const keyboard = await buildKeyboardWithCounts(order.token);
 
-  const { data } = await axios.post(apiUrl('sendMessage'), {
-    chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
-    text,
-    reply_markup: await buildKeyboardWithCounts(order.token),
-  });
-
-  return data.result.message_id;
+  const sent = [];
+  for (const chatId of await getModeratorChatIds()) {
+    try {
+      const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text, reply_markup: keyboard });
+      sent.push({ chatId, messageId: data.result.message_id });
+    } catch (err) {
+      console.error(`notifyModerator -> ${chatId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
+    }
+  }
+  if (sent.length) await orderService.recordModerationMessages(order.id, sent);
+  return sent.length ? sent[0].messageId : null; // legacy orders.moderation_message_id
 }
 
 const MASTER_CATEGORY_LABELS = {
@@ -121,15 +140,17 @@ async function notifyModeratorNewMaster(master) {
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
 
-  const { data } = await axios.post(apiUrl('sendMessage'), {
-    chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
-    text: lines.join('\n'),
-    reply_markup: {
-      inline_keyboard: [[{ text: '✅ Одобрить', callback_data: `master_approve:${master.id}` }]],
-    },
-  });
-
-  return data.result.message_id;
+  const markup = { inline_keyboard: [[{ text: '✅ Одобрить', callback_data: `master_approve:${master.id}` }]] };
+  let firstId = null;
+  for (const chatId of await getModeratorChatIds()) {
+    try {
+      const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text: lines.join('\n'), reply_markup: markup });
+      if (!firstId) firstId = data.result.message_id;
+    } catch (err) {
+      console.error(`notifyModeratorNewMaster -> ${chatId}:`, err.message);
+    }
+  }
+  return firstId;
 }
 
 async function confirmMasterApproved(chatId, messageId, master) {
@@ -163,28 +184,29 @@ async function sendTopupReceipt(master, fileUrl, isImage) {
   ].join('\n');
 
   const method = isImage ? 'sendPhoto' : 'sendDocument';
-  const body = { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, caption };
-  body[isImage ? 'photo' : 'document'] = fileUrl;
-
-  await axios.post(apiUrl(method), body).catch((err) => {
-    console.error(
-      'Failed to send topup receipt to moderator:',
-      err.response ? JSON.stringify(err.response.data) : err.message
-    );
-  });
+  for (const chatId of await getModeratorChatIds()) {
+    const body = { chat_id: chatId, caption };
+    body[isImage ? 'photo' : 'document'] = fileUrl;
+    await axios.post(apiUrl(method), body).catch((err) => {
+      console.error(`sendTopupReceipt -> ${chatId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
+    });
+  }
 }
 
+// Широковещательно всем модераторам («что-то произошло»: пополнение, ошибка и т.п.).
+// Ответ на конкретную команду шли в chatId адресата через sendToChat.
 async function sendMessageToModerator(text, replyMarkup = ADMIN_MENU_KEYBOARD) {
   if (!isEnabled()) return;
-  await axios
-    .post(apiUrl('sendMessage'), { chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID, text, reply_markup: replyMarkup })
-    .catch((err) => {
-      console.error('Failed to send message to moderator:', err.message);
-    });
+  for (const chatId of await getModeratorChatIds()) {
+    await axios
+      .post(apiUrl('sendMessage'), { chat_id: chatId, text, reply_markup: replyMarkup })
+      .catch((err) => console.error(`sendMessageToModerator -> ${chatId}:`, err.message));
+  }
 }
 
-async function askModerator(text) {
-  return sendMessageToModerator(text, FORCE_REPLY);
+// force_reply-приглашение конкретному модератору (внутри пошагового флоу).
+async function askModerator(chatId, text) {
+  return sendToChat(chatId, text, FORCE_REPLY);
 }
 
 async function answerCallback(callbackQueryId, text) {
@@ -229,19 +251,24 @@ async function forwardSupportMessage(master, body, replyToMessageId) {
   const cat = MASTER_CATEGORY_LABELS[master.category] || master.category || '';
   const bal = master.balance_tetri != null ? ` · ${(master.balance_tetri / 100).toFixed(2)} ₾` : '';
   const text = `💬 #${master.id} · ${master.name} · ${cat}${bal}\n━━━━━━━━━━\n${body}`;
+  const markup = { inline_keyboard: [[{ text: '✍️ Ответить', callback_data: `support:${master.id}` }]] };
 
-  try {
-    const { data } = await axios.post(apiUrl('sendMessage'), {
-      chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
-      text,
-      ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
-      reply_markup: { inline_keyboard: [[{ text: '✍️ Ответить', callback_data: `support:${master.id}` }]] },
-    });
-    return data.result.message_id;
-  } catch (err) {
-    console.error('Failed to forward support message:', err.response ? JSON.stringify(err.response.data) : err.message);
-    return null;
+  let firstId = null;
+  for (const chatId of await getModeratorChatIds()) {
+    try {
+      const { data } = await axios.post(apiUrl('sendMessage'), {
+        chat_id: chatId,
+        text,
+        // цепочку тредим только у первого адресата (там же хранится last tg_message_id)
+        ...(replyToMessageId && !firstId ? { reply_to_message_id: replyToMessageId } : {}),
+        reply_markup: markup,
+      });
+      if (!firstId) firstId = data.result.message_id;
+    } catch (err) {
+      console.error(`forwardSupportMessage -> ${chatId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
+    }
   }
+  return firstId;
 }
 
 // Лид в бот исполнителя. Возвращает true при успешной отправке — иначе caller
@@ -317,32 +344,35 @@ function buildMessageText(order, dispatchLines, funnel) {
 
 async function refreshMessage(order, keyboard) {
   if (!isEnabled()) return;
-  if (!order.moderation_message_id) {
-    console.error(`Cannot update Telegram message for order ${order.token}: moderation_message_id is missing`);
+
+  let msgs = await orderService.getModerationMessages(order.id).catch(() => []);
+  if (!msgs.length && order.moderation_message_id && process.env.TELEGRAM_MODERATOR_CHAT_ID) {
+    msgs = [{ chat_id: String(process.env.TELEGRAM_MODERATOR_CHAT_ID), message_id: order.moderation_message_id }];
+  }
+  if (!msgs.length) {
+    console.error(`No moderation messages recorded for order ${order.token}`);
     return;
   }
 
   const dispatches = await orderService.getOrderDispatches(order.id).catch(() => []);
   const dispatchLines = dispatches.map((d) => formatDispatchLine(d.category, d.vehicle_size, d.master_count));
   const funnel = await orderService.getOrderFunnelStats(order.id);
+  const text = buildMessageText(order, dispatchLines, funnel);
 
-  await axios
-    .post(apiUrl('editMessageText'), {
-      chat_id: process.env.TELEGRAM_MODERATOR_CHAT_ID,
-      message_id: order.moderation_message_id,
-      text: buildMessageText(order, dispatchLines, funnel),
-      reply_markup: keyboard,
-    })
-    .catch((err) => {
-      console.error(
-        `Failed to edit Telegram message ${order.moderation_message_id} for order ${order.token}:`,
-        err.response ? JSON.stringify(err.response.data) : err.message
-      );
-    });
+  for (const m of msgs) {
+    await axios
+      .post(apiUrl('editMessageText'), { chat_id: m.chat_id, message_id: m.message_id, text, reply_markup: keyboard })
+      .catch((err) => {
+        const data = err.response ? JSON.stringify(err.response.data) : err.message;
+        if (!data.includes('not modified')) {
+          console.error(`refreshMessage edit ${m.message_id}@${m.chat_id} (order ${order.token}):`, data);
+        }
+      });
+  }
 }
 
 async function updateMessage(order) {
-  if (!isEnabled() || !order.moderation_message_id) return;
+  if (!isEnabled()) return;
   const keyboard = order.status === 'closed' ? { inline_keyboard: [] } : await buildKeyboardWithCounts(order.token);
   await refreshMessage(order, keyboard);
 }

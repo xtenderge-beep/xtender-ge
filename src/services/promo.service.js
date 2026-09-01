@@ -19,19 +19,20 @@ async function generateCode(len = 6) {
 // не делает, см. HANDOFF): каждый шаг атомарен, при провале гашения кода явно
 // освобождаем пометку мастера.
 
-// Создание кода. amountTetri в тетри, maxRedemptions/expiresAt/label — необязательны.
-async function createCode({ code, amountTetri, maxRedemptions = null, expiresAt = null, label = null }) {
+// Создание кода. amountTetri в тетри; maxRedemptions/expiresAt/label/managerId — необязательны.
+async function createCode({ code, amountTetri, maxRedemptions = null, expiresAt = null, label = null, managerId = null }) {
   const { rows } = await pool.query(
-    `INSERT INTO promo_codes (code, amount_tetri, max_redemptions, expires_at, label)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO promo_codes (code, amount_tetri, max_redemptions, expires_at, label, manager_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (code) DO UPDATE SET
        amount_tetri = EXCLUDED.amount_tetri,
        max_redemptions = EXCLUDED.max_redemptions,
        expires_at = EXCLUDED.expires_at,
        label = COALESCE(EXCLUDED.label, promo_codes.label),
+       manager_id = COALESCE(EXCLUDED.manager_id, promo_codes.manager_id),
        is_active = true
      RETURNING *`,
-    [code, amountTetri, maxRedemptions, expiresAt, label]
+    [code, amountTetri, maxRedemptions, expiresAt, label, managerId]
   );
   return rows[0];
 }
@@ -102,7 +103,7 @@ async function apply(masterId, code) {
      WHERE code = $1 AND is_active = true
        AND (max_redemptions IS NULL OR redeemed_count < max_redemptions)
        AND (expires_at IS NULL OR expires_at > NOW())
-     RETURNING amount_tetri`,
+     RETURNING amount_tetri, manager_id`,
     [code]
   );
   if (!redeem.rows[0]) {
@@ -114,7 +115,11 @@ async function apply(masterId, code) {
     return null;
   }
 
-  const amountTetri = redeem.rows[0].amount_tetri;
+  const { amount_tetri: amountTetri, manager_id: managerId } = redeem.rows[0];
+  if (managerId) {
+    // код менеджера → он становится менеджером этого исполнителя
+    await pool.query(`UPDATE masters SET manager_id = $1 WHERE id = $2 AND manager_id IS NULL`, [managerId, masterId]);
+  }
   await masterService.adjustBalance({ masterId, amountTetri, reason: 'promo', note: code });
   return amountTetri;
 }

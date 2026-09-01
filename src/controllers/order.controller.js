@@ -6,6 +6,7 @@ const reviewService = require('../services/review.service');
 const smsService = require('../services/sms.service');
 const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
+const managerService = require('../services/manager.service');
 const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
@@ -16,6 +17,7 @@ const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?(?:\s+(.+))?$/;
 const INVITE_HELP =
   'Формат: /invite 5 Имя\n5 — бонус в GEL, «Имя» (необязательно) — кому ссылка (видно в дашборде).\nКод создастся сам, ссылка одноразовая.';
+const REF_MAX_GEL = 20; // потолок бонуса, который менеджер ставит сам в /ref
 const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
@@ -134,9 +136,10 @@ function formatMasterInfo(master) {
 }
 
 // Ответ модератора исполнителю в поддержку из бота — native-reply или кнопка «Ответить».
-async function deliverSupportReply(masterId, body) {
+async function deliverSupportReply(chatId, masterId, body) {
   const master = await supportService.postModeratorReply(masterId, body);
-  await telegramService.sendMessageToModerator(
+  await telegramService.sendToChat(
+    chatId,
     master ? `✅ Ответ отправлен: ${master.name} (#${masterId})` : `Исполнитель #${masterId} не найден`
   );
 }
@@ -144,14 +147,14 @@ async function deliverSupportReply(masterId, body) {
 async function handleAdminFlowStep(chatId, flow, rawText) {
   if (flow.action === 'support_reply') {
     await clearAdminFlow(chatId);
-    await deliverSupportReply(flow.masterId, rawText);
+    await deliverSupportReply(chatId, flow.masterId, rawText);
     return;
   }
 
   if (flow.step === 'phone') {
     const phoneDigits = rawText.replace(/\s+/g, '');
     if (!PHONE_REGEX.test(phoneDigits)) {
-      await telegramService.askModerator('Это не похоже на номер телефона. Введите номер телефона исполнителя:');
+      await telegramService.askModerator(chatId, 'Это не похоже на номер телефона. Введите номер телефона исполнителя:');
       return;
     }
     const phone = toE164(phoneDigits);
@@ -159,23 +162,19 @@ async function handleAdminFlowStep(chatId, flow, rawText) {
     if (flow.action === 'balance') {
       await clearAdminFlow(chatId);
       const master = await masterService.getMasterByPhone(phone);
-      if (!master) {
-        await telegramService.sendMessageToModerator(`Исполнитель с номером ${phone} не найден`);
-        return;
-      }
-      await telegramService.sendMessageToModerator(formatMasterInfo(master));
+      await telegramService.sendToChat(chatId, master ? formatMasterInfo(master) : `Исполнитель с номером ${phone} не найден`);
       return;
     }
 
     await setAdminFlow(chatId, { action: 'topup', step: 'amount', phone });
-    await telegramService.askModerator('Введите сумму пополнения в GEL (например 10):');
+    await telegramService.askModerator(chatId, 'Введите сумму пополнения в GEL (например 10):');
     return;
   }
 
   if (flow.step === 'amount') {
     const amountGel = parseFloat(rawText.replace(',', '.'));
     if (!Number.isFinite(amountGel) || amountGel <= 0) {
-      await telegramService.askModerator('Некорректная сумма. Введите сумму пополнения в GEL:');
+      await telegramService.askModerator(chatId, 'Некорректная сумма. Введите сумму пополнения в GEL:');
       return;
     }
     await clearAdminFlow(chatId);
@@ -184,9 +183,8 @@ async function handleAdminFlowStep(chatId, flow, rawText) {
 }
 
 async function handleModeratorMessage(message) {
+  // Доступ уже проверен в telegramWebhook (env-модератор или менеджер с is_moderator).
   const chatId = String((message.chat || {}).id);
-  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) return;
-
   const text = (message.text || '').trim();
 
   // Native-reply на вопрос в поддержку («💬 #<id> …») — самый естественный жест.
@@ -194,15 +192,18 @@ async function handleModeratorMessage(message) {
   const supportMatch = repliedText && repliedText.match(SUPPORT_HEADER_REGEX);
   if (supportMatch && text) {
     await clearAdminFlow(chatId);
-    await deliverSupportReply(parseInt(supportMatch[1], 10), text);
+    await deliverSupportReply(chatId, parseInt(supportMatch[1], 10), text);
     return;
   }
 
   if (text === '/start' || text === '/menu') {
     await clearAdminFlow(chatId);
-    await telegramService.sendMessageToModerator(
-      'Меню администратора 👇\n\n' +
-        '/invite 5 Имя — ссылка для регистрации с бонусом\n' +
+    await telegramService.sendToChat(
+      chatId,
+      'Меню модератора 👇\n\n' +
+        '/ref 5 Имя — ваша ссылка для регистрации с бонусом\n' +
+        '/mystats — сколько исполнителей вы привели\n' +
+        '/invite 5 Имя — ссылка без привязки к менеджеру\n' +
         '/promo КОД 5 100 — код-кампания\n' +
         '/support — открытые вопросы\n' +
         '/topup +995… 10 — пополнить баланс'
@@ -214,7 +215,7 @@ async function handleModeratorMessage(message) {
     await clearAdminFlow(chatId);
     const open = await supportService.openThreads();
     if (!open.length) {
-      await telegramService.sendMessageToModerator('Открытых вопросов нет ✅');
+      await telegramService.sendToChat(chatId, 'Открытых вопросов нет ✅');
       return;
     }
     const lines = open.map((t) => {
@@ -222,7 +223,7 @@ async function handleModeratorMessage(message) {
       const ago = mins < 60 ? `${mins} мин` : `${Math.round(mins / 60)} ч`;
       return `#${t.master_id} ${t.name} — ${ago} назад:\n«${(t.body || '').slice(0, 80)}»`;
     });
-    await telegramService.sendMessageToModerator(`Открытые вопросы (${open.length}):\n\n${lines.join('\n\n')}`);
+    await telegramService.sendToChat(chatId, `Открытые вопросы (${open.length}):\n\n${lines.join('\n\n')}`);
     return;
   }
 
@@ -234,7 +235,7 @@ async function handleModeratorMessage(message) {
     const maxRedemptions = promoMatch[3] ? parseInt(promoMatch[3], 10) : null;
     const label = (promoMatch[4] || '').trim().slice(0, 120) || null;
     if (!Number.isFinite(amountGel) || amountGel <= 0) {
-      await telegramService.sendMessageToModerator('Некорректная сумма. Пример: /promo START5 5 100 Агент Гиорги');
+      await telegramService.sendToChat(chatId, 'Некорректная сумма. Пример: /promo START5 5 100 Агент Гиорги');
       return;
     }
     const saved = await promoService.createCode({
@@ -243,7 +244,7 @@ async function handleModeratorMessage(message) {
       maxRedemptions,
       label,
     });
-    await telegramService.sendMessageToModerator(
+    await telegramService.sendToChat(chatId,
       `🎟 Промокод ${saved.code}: ${(saved.amount_tetri / 100).toFixed(2)} GEL за регистрацию` +
         `${saved.max_redemptions ? `, лимит ${saved.max_redemptions}` : ', без лимита'}` +
         `${saved.label ? `\nМетка: ${saved.label}` : ''}` +
@@ -258,7 +259,7 @@ async function handleModeratorMessage(message) {
     const m = rest.match(/^([\d.,]+)(?:\s+(.+))?$/);
     const amountGel = m ? parseFloat(m[1].replace(',', '.')) : NaN;
     if (!Number.isFinite(amountGel) || amountGel <= 0) {
-      await telegramService.sendMessageToModerator(INVITE_HELP);
+      await telegramService.sendToChat(chatId, INVITE_HELP);
       return;
     }
     const label = (m[2] || '').trim().slice(0, 120) || null;
@@ -268,7 +269,7 @@ async function handleModeratorMessage(message) {
       maxRedemptions: 1,
       label,
     });
-    await telegramService.sendMessageToModerator(
+    await telegramService.sendToChat(chatId,
       `🎟 Ссылка для регистрации${saved.label ? ` — ${saved.label}` : ''}:\n` +
         `${getBaseUrl()}/join?promo=${saved.code}\n\n` +
         `+${amountGel.toFixed(2)} GEL на баланс, одноразовая.`
@@ -280,26 +281,26 @@ async function handleModeratorMessage(message) {
     await clearAdminFlow(chatId);
     const codes = (await promoService.listCodes()).filter((c) => c.is_active);
     if (!codes.length) {
-      await telegramService.sendMessageToModerator('Активных промокодов нет.\nЛичная ссылка: /invite 5 Имя\nКампания: /promo КОД 5 100');
+      await telegramService.sendToChat(chatId, 'Активных промокодов нет.\nЛичная ссылка: /invite 5 Имя\nКампания: /promo КОД 5 100');
       return;
     }
     const lines = codes.map((c) => {
       const limit = c.max_redemptions ? `${c.redeemed_count}/${c.max_redemptions}` : `${c.redeemed_count}/∞`;
       return `${c.code} — ${(c.amount_tetri / 100).toFixed(2)} GEL · использован ${limit}`;
     });
-    await telegramService.sendMessageToModerator(`Промокоды:\n\n${lines.join('\n')}`);
+    await telegramService.sendToChat(chatId, `Промокоды:\n\n${lines.join('\n')}`);
     return;
   }
 
   if (text === '💰 Пополнить баланс') {
     await setAdminFlow(chatId, { action: 'topup', step: 'phone' });
-    await telegramService.askModerator('Введите номер телефона исполнителя:');
+    await telegramService.askModerator(chatId, 'Введите номер телефона исполнителя:');
     return;
   }
 
   if (text === '🔍 Проверить баланс') {
     await setAdminFlow(chatId, { action: 'balance', step: 'phone' });
-    await telegramService.askModerator('Введите номер телефона исполнителя:');
+    await telegramService.askModerator(chatId, 'Введите номер телефона исполнителя:');
     return;
   }
 
@@ -346,7 +347,7 @@ async function handleMasterStart(message) {
   await telegramService.sendToChat(message.chat.id, TG_LINK_PROMPT, telegramService.CONTACT_KEYBOARD);
 }
 
-async function handleMasterContact(message) {
+async function handleContactShared(message) {
   const contact = message.contact || {};
   // request_contact гарантирует, что это собственный номер отправителя (user_id === from.id);
   // пересланный чужой контакт отсекаем.
@@ -354,7 +355,21 @@ async function handleMasterContact(message) {
     await telegramService.sendToChat(message.chat.id, 'Пришлите свой номер кнопкой «📱 Отправить номер».');
     return;
   }
-  const master = await masterService.linkTelegram({ phone: toE164(contact.phone_number), telegramId: message.from.id });
+  const phone = toE164(contact.phone_number);
+
+  // Сначала — менеджер (админ завёл по этому номеру в /admin/managers).
+  const manager = await managerService.getByPhone(phone);
+  if (manager) {
+    const linked = await managerService.linkTelegram(manager.id, message.from.id);
+    const lines = [`✅ Готово, ${linked.name}! Вы менеджер xtender.`, ''];
+    lines.push('/ref 5 Имя — ссылка для регистрации исполнителя (бонус 5 GEL)', '/mystats — сколько вы привели');
+    if (linked.is_moderator) lines.push('', 'Вы также модератор — заявки на модерацию будут приходить сюда.');
+    await telegramService.sendToChat(message.chat.id, lines.join('\n'), { remove_keyboard: true });
+    return;
+  }
+
+  // Иначе — исполнитель.
+  const master = await masterService.linkTelegram({ phone, telegramId: message.from.id });
   if (master) {
     await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master.name), { remove_keyboard: true });
   } else {
@@ -364,6 +379,50 @@ async function handleMasterContact(message) {
       { remove_keyboard: true }
     );
   }
+}
+
+// Команды менеджера (в т.ч. модератора): /ref, /mystats.
+async function handleManagerCommand(message, manager) {
+  const chatId = String(message.chat.id);
+  const text = (message.text || '').trim();
+
+  if (text === '/mystats') {
+    const s = await managerService.getStats(manager.id);
+    await telegramService.sendToChat(
+      chatId,
+      `Ваши исполнители: ${s.total}\nАктивных: ${s.active}\nВыдано бонусов: ${(s.bonusPaidTetri / 100).toFixed(2)} ₾`
+    );
+    return;
+  }
+
+  if (text === '/ref' || text.startsWith('/ref ')) {
+    const rest = text.slice('/ref'.length).trim();
+    const m = rest.match(/^([\d.,]+)(?:\s+(.+))?$/);
+    const amountGel = m ? parseFloat(m[1].replace(',', '.')) : NaN;
+    if (!Number.isFinite(amountGel) || amountGel <= 0 || amountGel > REF_MAX_GEL) {
+      await telegramService.sendToChat(
+        chatId,
+        `Формат: /ref 5 Имя\nСумма 1–${REF_MAX_GEL} GEL, «Имя» (необязательно) — кому ссылка.`
+      );
+      return;
+    }
+    const label = (m[2] || '').trim().slice(0, 120) || null;
+    const saved = await promoService.createCode({
+      code: await promoService.generateCode(),
+      amountTetri: Math.round(amountGel * 100),
+      maxRedemptions: 1,
+      managerId: manager.id,
+      label: label || manager.name,
+    });
+    await telegramService.sendToChat(
+      chatId,
+      `🎟 Ссылка для регистрации${label ? ` — ${label}` : ''}:\n${getBaseUrl()}/join?promo=${saved.code}\n\n` +
+        `+${amountGel.toFixed(2)} GEL на баланс, одноразовая.`
+    );
+    return;
+  }
+
+  await telegramService.sendToChat(chatId, `${manager.name}, команды: /ref 5 Имя · /mystats`);
 }
 
 // Обычный текст боту от привязанного исполнителя — это вопрос в поддержку.
@@ -378,7 +437,10 @@ async function handleMasterText(message) {
 
 async function handleSupportReplyCallback(callback) {
   const chatId = String(callback.message.chat.id);
-  if (chatId !== String(process.env.TELEGRAM_MODERATOR_CHAT_ID)) {
+  const fromId = (callback.from || {}).id;
+  const allowed =
+    chatId === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || (await managerService.isActiveModerator(fromId));
+  if (!allowed) {
     await telegramService.answerCallback(callback.id, '');
     return;
   }
@@ -386,7 +448,7 @@ async function handleSupportReplyCallback(callback) {
   const master = await masterService.getMasterById(masterId);
   await telegramService.answerCallback(callback.id, 'Введите ответ');
   await setAdminFlow(chatId, { action: 'support_reply', masterId });
-  await telegramService.askModerator(`Ответ для ${master ? master.name : 'исполнителя'} (#${masterId}):`);
+  await telegramService.askModerator(chatId, `Ответ для ${master ? master.name : 'исполнителя'} (#${masterId}):`);
 }
 
 async function telegramWebhook(req, res) {
@@ -400,15 +462,31 @@ async function telegramWebhook(req, res) {
 
     if (update.message) {
       const message = update.message;
-      const isModerator = String((message.chat || {}).id) === String(process.env.TELEGRAM_MODERATOR_CHAT_ID);
+      const text = (message.text || '').trim();
+      const fromId = (message.from || {}).id;
 
-      if (isModerator && message.text) {
+      // /id — работает в любом чате (узнать свой ID / ID группы).
+      if (text === '/id') {
+        await telegramService.sendToChat(message.chat.id, `Ваш ID: ${fromId}\nЭтот чат: ${(message.chat || {}).id}`);
+        return res.sendStatus(200);
+      }
+
+      const isEnvModerator = String((message.chat || {}).id) === String(process.env.TELEGRAM_MODERATOR_CHAT_ID);
+      const manager = fromId ? await managerService.getByTelegramId(fromId) : null;
+      const isModerator = isEnvModerator || (manager && manager.is_moderator && manager.is_active);
+      const isManagerCmd = manager && manager.is_active && (text === '/mystats' || text === '/ref' || text.startsWith('/ref '));
+
+      if (message.contact) {
+        await handleContactShared(message);
+      } else if (isManagerCmd) {
+        await handleManagerCommand(message, manager);
+      } else if (isModerator && text) {
         await handleModeratorMessage(message);
-      } else if (message.contact) {
-        await handleMasterContact(message);
-      } else if (message.text && message.text.trim().startsWith('/start')) {
+      } else if (manager && manager.is_active && text) {
+        await handleManagerCommand(message, manager);
+      } else if (text.startsWith('/start')) {
         await handleMasterStart(message);
-      } else if (message.text) {
+      } else if (text) {
         await handleMasterText(message);
       }
       return res.sendStatus(200);

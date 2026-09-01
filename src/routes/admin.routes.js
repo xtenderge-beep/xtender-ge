@@ -39,4 +39,10 @@ router.post('/promo', verifyCsrf, asyncHandler(adminController.promoCreate));
 router.get('/promo/:code', asyncHandler(adminController.promoDetail));
 router.post('/promo/:id/toggle', verifyCsrf, asyncHandler(adminController.promoToggle));
 
+router.get('/managers', asyncHandler(adminController.managersList));
+router.post('/managers', verifyCsrf, asyncHandler(adminController.managerCreate));
+router.get('/managers/:id', asyncHandler(adminController.managerDetail));
+router.post('/managers/:id/update', verifyCsrf, asyncHandler(adminController.managerUpdate));
+router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
+
 module.exports = router;

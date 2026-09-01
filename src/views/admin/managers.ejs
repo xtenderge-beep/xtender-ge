@@ -1,0 +1,61 @@
+<%- include('./_header', { active: 'managers' }) %>
+
+<h1 class="text-2xl font-black text-stone-900 mb-5">Менеджеры</h1>
+
+<% if (error) { %>
+  <p class="text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">Укажите имя и корректный телефон.</p>
+<% } %>
+
+<div class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 mb-6">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Добавить</h2>
+    <form method="POST" action="/admin/managers" class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Имя</label>
+            <input name="name" required placeholder="Гиорги" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div>
+            <label class="block text-[11px] font-bold text-stone-500 uppercase mb-1">Телефон</label>
+            <input name="phone" required placeholder="+995 5XX XX XX XX" class="w-full px-3 py-2 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900">
+        </div>
+        <div class="flex items-center gap-3">
+            <label class="flex items-center gap-2 text-sm font-semibold text-stone-700">
+                <input type="checkbox" name="isModerator" class="w-4 h-4 accent-emerald-600"> модератор
+            </label>
+            <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">Добавить</button>
+        </div>
+    </form>
+    <p class="text-[11px] text-stone-400 mt-2">Человек открывает <span class="font-mono">@xtendergebot</span>, делится номером — по нему привяжется. Chat id узнать: <span class="font-mono">/id</span> в боте.</p>
+</div>
+
+<% if (!managers.length) { %>
+  <p class="text-sm text-stone-500">Менеджеров пока нет.</p>
+<% } %>
+
+<div class="space-y-2">
+    <% managers.forEach(function (m) { %>
+      <div class="bg-white rounded-2xl border <%= m.is_active ? 'border-stone-200' : 'border-stone-200 opacity-60' %> p-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+              <a href="/admin/managers/<%= m.id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= m.name %></a>
+              <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
+              <% if (m.is_moderator) { %><span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 ml-2">модератор</span><% } %>
+              <% if (!m.telegram_id) { %><span class="text-[10px] font-bold text-amber-700 ml-2">не привязан</span><% } %>
+              <div class="text-xs text-stone-500 mt-0.5">Привёл исполнителей: <a href="/admin/managers/<%= m.id %>" class="font-bold hover:underline"><%= m.provider_count %></a></div>
+          </div>
+          <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="isModerator" value="<%= m.is_moderator ? 'false' : 'true' %>">
+              <input type="hidden" name="isActive" value="<%= m.is_active %>">
+              <button type="submit" class="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg transition"><%= m.is_moderator ? '− модератор' : '+ модератор' %></button>
+          </form>
+          <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="isModerator" value="<%= m.is_moderator %>">
+              <input type="hidden" name="isActive" value="<%= m.is_active ? 'false' : 'true' %>">
+              <button type="submit" class="px-2.5 py-1.5 <%= m.is_active ? 'bg-stone-100 hover:bg-stone-200 text-stone-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-bold rounded-lg transition"><%= m.is_active ? 'Выключить' : 'Включить' %></button>
+          </form>
+      </div>
+    <% }); %>
+</div>
+
+<%- include('./_footer') %>

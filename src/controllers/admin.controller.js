@@ -8,6 +8,7 @@ const orderService = require('../services/order.service');
 const telegramService = require('../services/telegram.service');
 const supportService = require('../services/support.service');
 const promoService = require('../services/promo.service');
+const managerService = require('../services/manager.service');
 const { toE164 } = require('../config/phone');
 
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
@@ -71,7 +72,11 @@ async function masterDetail(req, res) {
   const history = await adminService.getMasterBalanceHistory(id);
   const responseStats = await adminService.getResponseStats(id);
   const promoOrigin = master.promo_code_used ? await promoService.getCode(master.promo_code_used) : null;
-  res.render('admin/master-detail', { master, history, responseStats, promoOrigin, error: req.query.error || null });
+  const managers = await managerService.list();
+  const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
+  res.render('admin/master-detail', {
+    master, history, responseStats, promoOrigin, managers, currentManager, error: req.query.error || null,
+  });
 }
 
 async function approveMaster(req, res) {
@@ -238,6 +243,45 @@ async function promoDetail(req, res) {
   res.render('admin/promo-detail', { stats, baseUrl: baseUrl(req) });
 }
 
+async function managersList(req, res) {
+  const managers = await managerService.list();
+  res.render('admin/managers', { managers, error: req.query.error || null });
+}
+
+async function managerCreate(req, res) {
+  const name = (req.body.name || '').trim();
+  const phoneRaw = (req.body.phone || '').trim();
+  if (!name || !/^\+?\d{9,15}$/.test(phoneRaw.replace(/\s+/g, ''))) {
+    return res.redirect('/admin/managers?error=invalid');
+  }
+  await managerService.create({ name, phone: phoneRaw, isModerator: req.body.isModerator === 'on' });
+  res.redirect('/admin/managers');
+}
+
+async function managerUpdate(req, res) {
+  const id = parseInt(req.params.id, 10);
+  await managerService.update(id, {
+    isModerator: req.body.isModerator === 'true',
+    isActive: req.body.isActive === 'true',
+  });
+  res.redirect('/admin/managers');
+}
+
+async function managerDetail(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const manager = await managerService.getById(id);
+  if (!manager) return res.status(404).send('Менеджер не найден');
+  const stats = await managerService.getStats(id);
+  res.render('admin/manager-detail', { manager, stats, baseUrl: baseUrl(req) });
+}
+
+async function assignManager(req, res) {
+  const masterId = parseInt(req.params.id, 10);
+  const managerId = req.body.managerId ? parseInt(req.body.managerId, 10) : null;
+  await managerService.assignProvider(masterId, managerId);
+  res.redirect(`/admin/masters/${masterId}`);
+}
+
 async function promoToggle(req, res) {
   const id = parseInt(req.params.id, 10);
   await promoService.setActive(id, req.body.active === 'true');
@@ -279,4 +323,9 @@ module.exports = {
   promoCreate,
   promoDetail,
   promoToggle,
+  managersList,
+  managerCreate,
+  managerUpdate,
+  managerDetail,
+  assignManager,
 };

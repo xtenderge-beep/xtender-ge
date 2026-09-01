@@ -65,6 +65,33 @@ async function setModerationMessageId(orderId, messageId) {
   await pool.query('UPDATE orders SET moderation_message_id = $1 WHERE id = $2', [messageId, orderId]);
 }
 
+// Сообщения о заявке во всех чатах модераторов — чтобы updateMessage правил воронку
+// у каждого. [{ chatId, messageId }]. Плейсхолдеры вручную (не ANY/UNNEST — pg-mem).
+async function recordModerationMessages(orderId, entries) {
+  if (!entries || !entries.length) return;
+  const values = [];
+  const rows = entries
+    .map((e, i) => {
+      const b = i * 3;
+      values.push(orderId, String(e.chatId), String(e.messageId));
+      return `($${b + 1}, $${b + 2}, $${b + 3})`;
+    })
+    .join(', ');
+  await pool.query(
+    `INSERT INTO order_moderation_messages (order_id, chat_id, message_id) VALUES ${rows}
+     ON CONFLICT (order_id, chat_id) DO UPDATE SET message_id = EXCLUDED.message_id`,
+    values
+  );
+}
+
+async function getModerationMessages(orderId) {
+  const { rows } = await pool.query(
+    'SELECT chat_id, message_id FROM order_moderation_messages WHERE order_id = $1',
+    [orderId]
+  );
+  return rows;
+}
+
 async function getOrderByToken(token) {
   const { rows } = await pool.query('SELECT * FROM orders WHERE token = $1', [token]);
   return rows[0] || null;
@@ -313,6 +340,8 @@ module.exports = {
   getOrderDispatches,
   markFirstDispatch,
   setModerationMessageId,
+  recordModerationMessages,
+  getModerationMessages,
   closeOrder,
   notifyMasters,
   getMasterCountsByCategory,

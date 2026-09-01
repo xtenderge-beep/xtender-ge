@@ -22,6 +22,16 @@
           <a href="/admin/promo/<%= master.promo_code_used %>" class="font-mono font-bold text-emerald-700 hover:underline"><%= master.promo_code_used %></a><% if (promoOrigin && promoOrigin.label) { %> <span class="text-stone-500">(<%= promoOrigin.label %>)</span><% } %>
       </p>
     <% } %>
+    <form method="POST" action="/admin/masters/<%= master.id %>/assign-manager" class="text-sm text-stone-600 mt-1 flex items-center gap-2">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <span>Менеджер:</span>
+        <select name="managerId" onchange="this.form.submit()" class="border border-stone-300 rounded-lg px-2 py-1 text-sm font-semibold outline-none focus:border-emerald-500">
+            <option value="">— не назначен —</option>
+            <% managers.forEach(function (mg) { %>
+                <option value="<%= mg.id %>" <%= currentManager && currentManager.id === mg.id ? 'selected' : '' %>><%= mg.name %></option>
+            <% }); %>
+        </select>
+    </form>
     <p class="text-lg font-black text-stone-900 mt-2">Баланс: <%= (master.balance_tetri / 100).toFixed(2) %> ₾</p>
 
     <% if (error === 'invalid_amount') { %>

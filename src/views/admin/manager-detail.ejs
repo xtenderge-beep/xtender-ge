@@ -1,0 +1,51 @@
+<%- include('./_header', { active: 'managers' }) %>
+
+<a href="/admin/managers" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; все менеджеры</a>
+
+<div class="flex items-baseline gap-3 flex-wrap mt-2 mb-4">
+    <h1 class="text-2xl font-black text-stone-900"><%= manager.name %></h1>
+    <span class="text-sm text-stone-400"><%= manager.phone %></span>
+    <% if (manager.is_moderator) { %><span class="text-xs font-bold text-emerald-700">модератор</span><% } %>
+    <% if (!manager.is_active) { %><span class="text-xs font-bold text-stone-400">выключен</span><% } %>
+    <% if (!manager.telegram_id) { %><span class="text-xs font-bold text-amber-700">Telegram не привязан</span><% } %>
+</div>
+
+<div class="grid grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Привёл</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.total %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Активны</p>
+        <p class="text-2xl font-black text-emerald-700 mt-1"><%= stats.active %></p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Выдано бонусов</p>
+        <p class="text-2xl font-black text-stone-900 mt-1"><%= (stats.bonusPaidTetri / 100).toFixed(2) %> ₾</p>
+    </div>
+</div>
+
+<h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Его исполнители</h2>
+<% if (!stats.providers.length) { %>
+  <p class="text-sm text-stone-500">Пока никого не привёл.</p>
+<% } %>
+<div class="space-y-2">
+    <% stats.providers.forEach(function (m) { %>
+      <a href="/admin/masters/<%= m.id %>" class="flex items-center justify-between gap-3 bg-white rounded-2xl border border-stone-200 p-3 hover:shadow-md transition">
+          <div>
+              <span class="font-extrabold text-stone-900"><%= m.name %></span>
+              <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
+              <div class="text-[11px] text-stone-400 mt-0.5">
+                  <%= new Date(m.created_at).toLocaleDateString('ru') %>
+                  <% if (m.promo_code_used) { %> · код <span class="font-mono"><%= m.promo_code_used %></span><% } %> ·
+                  <% if (m.is_banned) { %><span class="text-red-500 font-bold">бан</span>
+                  <% } else if (m.is_active) { %><span class="text-emerald-600 font-bold">активен</span>
+                  <% } else { %><span class="text-amber-600 font-bold">на модерации</span><% } %>
+              </div>
+          </div>
+          <span class="font-mono text-sm font-bold text-stone-700"><%= (m.balance_tetri / 100).toFixed(2) %> ₾</span>
+      </a>
+    <% }); %>
+</div>
+
+<%- include('./_footer') %>
