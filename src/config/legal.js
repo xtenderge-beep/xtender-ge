@@ -4,8 +4,8 @@ const { getBaseUrl } = require('./url');
 // Версии юридических документов. Пишутся в sms_consent_logs при подтверждении OTP.
 // Поднимать при ЛЮБОМ изменении текста соответствующего документа (legal-content.js).
 // Формат: vMAJOR.MINOR-YYYY-MM-DD (дата вступления редакции в силу).
-const TERMS_VERSION = 'v1.1-2026-09-03';
-const PRIVACY_VERSION = 'v1.0-2026-09-03';
+const TERMS_VERSION = 'v1.2-2026-09-03';
+const PRIVACY_VERSION = 'v1.2-2026-09-03';
 
 // Реквизиты оператора / юридического лица. ЕДИНСТВЕННОЕ место — страницы /terms и
 // /privacy берут отсюда. Заполнить, когда пришлют данные реальной компании; пустые
@@ -16,7 +16,6 @@ const SERVICE_REQUISITES = {
   idCode: null,        // 9-значный ИНН или 11-значный личный номер
   legalAddress: null,  // 'საქართველო, ქ. თბილისი, …'
   email: 'support@xtender.ge',
-  phone: null,         // '+995 5XX XX XX XX'
   website: 'https://xtender.ge',
 };
 

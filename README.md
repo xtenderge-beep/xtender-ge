@@ -155,7 +155,7 @@ node dev-server.js
 | POST | `/api/reviews` | сохраняет отзыв в очередь модерации. Принимает `{ownerToken,…}` (флоу по SMS-ссылке `/review/<owner_token>`) или `{phone,…}` (флоу из каталога, телефон должен быть verified) |
 | POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
-Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (Публичная оферта, `v1.1-2026-09-03`), `/privacy` (Политика конфиденциальности, `v1.0-2026-09-03`), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`. Все — ka/ru/en с префиксом локали. Реквизиты юр. лица на `/terms` и `/privacy` — из `SERVICE_REQUISITES` в `src/config/legal.js` (пока `null` → «уточняется…»).
+Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (Публичная оферта) + `/privacy` (Политика конфиденциальности) — обе `v1.2-2026-09-03`, `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`. Все — ka/ru/en с префиксом локали. Реквизиты юр. лица — из `SERVICE_REQUISITES` в `src/config/legal.js` (`entityName/idCode/legalAddress` пока `null` → «уточняется…»).
 
 Админка (`/admin/*`, вход по `ADMIN_PASSWORD`): обзор, специалисты, заявки, отзывы, поддержка, промокоды, менеджеры, **`/admin/consent`** — журнал согласий на SMS: поиск по номеру, карточка Double Opt-In, кнопка «Скачать JSON» (`/admin/consent/export?phone=` — тот же отчёт, что у `scripts/export-consent-log.js`). Ссылка на журнал по номеру есть и в карточке специалиста.
 

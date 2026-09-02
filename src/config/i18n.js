@@ -336,7 +336,7 @@ const dictionaries = {
     order_master_account_link: 'ჩემი ანგარიში',
     order_master_low_balance: 'ბალანსი იწურება — შეავსეთ, რომ არ გამოტოვოთ განაცხადები.',
 
-    join_terms_label: 'ვეთანხმები საჯარო ოფერტას (სარგებლობის პირობებს), მათ შორის სერვისული SMS-შეტყობინებების მიღებას.',
+    join_terms_label: 'მე ვარ 18 წლის ან მეტის და ვეთანხმები საჯარო ოფერტას (სარგებლობის პირობებს), მათ შორის სერვისის ფასიან მოდელს და სერვისული SMS-შეტყობინებების მიღებას.',
     join_terms_link: 'ოფერტა',
     join_err_terms_required: 'საჭიროა საჯარო ოფერტაზე დათანხმება',
     join_privacy_label: 'ვეთანხმები კონფიდენციალურობის პოლიტიკას და ჩემი სახელისა და ტელეფონის ნომრის საჯაროდ განთავსებას კატალოგში.',
@@ -759,7 +759,7 @@ const dictionaries = {
     order_master_account_link: 'Мой аккаунт',
     order_master_low_balance: 'Баланс заканчивается — пополните, чтобы не пропускать заявки.',
 
-    join_terms_label: 'Принимаю Публичную оферту (Условия использования), включая получение сервисных SMS-уведомлений.',
+    join_terms_label: 'Мне есть 18 лет. Принимаю Публичную оферту (Условия использования), включая платную модель сервиса и получение сервисных SMS-уведомлений.',
     join_terms_link: 'Оферта',
     join_err_terms_required: 'Нужно принять Публичную оферту',
     join_privacy_label: 'Согласен с Политикой конфиденциальности и публичным размещением моего имени и номера телефона в каталоге.',
@@ -1182,7 +1182,7 @@ const dictionaries = {
     order_master_account_link: 'My account',
     order_master_low_balance: "Your balance is running low — top up so you don't miss requests.",
 
-    join_terms_label: 'I accept the Public Terms of Service, including receiving transactional SMS notifications.',
+    join_terms_label: 'I am 18 or older. I accept the Public Terms of Service, including the paid service model and receiving transactional SMS notifications.',
     join_terms_link: 'Terms',
     join_err_terms_required: 'You need to accept the Public Terms of Service',
     join_privacy_label: 'I agree to the Privacy Policy and the public display of my name and phone number in the catalog.',
