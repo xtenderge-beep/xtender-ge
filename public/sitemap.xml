@@ -68,4 +68,26 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/terms"/>
   </url>
 
+  <url>
+    <loc>https://xtender.ge/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/privacy"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/ru/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/privacy"/>
+  </url>
+  <url>
+    <loc>https://xtender.ge/en/privacy</loc>
+    <xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/privacy"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/privacy"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/privacy"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/privacy"/>
+  </url>
+
 </urlset>

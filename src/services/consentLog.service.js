@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { TERMS_VERSION } = require('../config/legal');
+const { TERMS_VERSION, PRIVACY_VERSION } = require('../config/legal');
 
 // Журнал согласий на SMS + доставок (Double Opt-In / аудит). Таблица sms_consent_logs
 // строго append-only — здесь только INSERT и SELECT, никаких UPDATE/DELETE.
@@ -85,7 +85,7 @@ async function recordOtpSent({ phone, purpose, code, masterId = null, orderId = 
 // НЕ ловит ошибку: вызывающий сам решает, критично ли это (для регистрации на /join —
 // критично, verify должен упасть; для входа/заявки/отзыва — залогировать и продолжить).
 async function recordConsentVerified({ phone, purpose, submittedCode, masterId = null, orderId = null,
-  termsVersion = null, language = null, consentText = null,
+  termsVersion = null, language = null, consentText = null, metadata = null,
   providerMessageId = null, providerResponse = null, meta = {} }) {
   return insertRow({
     event_type: VERIFIED_EVENT_BY_PURPOSE[purpose] || 'SMS_OTP_VERIFIED',
@@ -103,6 +103,7 @@ async function recordConsentVerified({ phone, purpose, submittedCode, masterId =
     terms_version: termsVersion,
     consent_language: language,
     consent_text_snapshot: consentText,
+    metadata,
   });
 }
 
@@ -164,12 +165,18 @@ async function exportForPhone(rawPhone) {
   // понятно «согласие подтверждено» vs «записи о согласии нет», а не гадать по пустому полю.
   let doubleOptIn;
   if (optIn) {
+    let optInMeta = null;
+    try {
+      optInMeta = typeof optIn.metadata === 'string' ? JSON.parse(optIn.metadata) : optIn.metadata;
+    } catch { optInMeta = null; }
     doubleOptIn = {
       status: 'VERIFIED',
       verified_at_utc: optIn.timestamp_utc,
       terms_version: optIn.terms_version,
+      privacy_version: optInMeta && optInMeta.privacy_version ? optInMeta.privacy_version : null,
       consent_language: optIn.consent_language,
       consent_text_shown: optIn.consent_text_snapshot,
+      consent_details: optInMeta || null,
       ip_address: optIn.ip_address,
       user_agent: optIn.user_agent,
       x_forwarded_for: optIn.x_forwarded_for,
@@ -198,6 +205,7 @@ async function exportForPhone(rawPhone) {
     report_type: 'sms_consent_audit',
     generated_at_utc: new Date().toISOString(),
     terms_version_current: TERMS_VERSION,
+    privacy_version_current: PRIVACY_VERSION,
     query: { phone: rawPhone, matched_phone_formats: variants },
     subject: {
       profiles: masters.rows.map((p) => ({ ...p, has_explicit_sms_consent: Boolean(optIn) })),

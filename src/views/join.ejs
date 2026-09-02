@@ -148,9 +148,14 @@
                         class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
                 </details>
 
+                <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
-                    <span><%= t('join_terms_label') %> <a href="/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
+                    <span><%= t('join_terms_label') %> <a href="<%= legalPrefix %>/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
+                </label>
+                <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
+                    <input type="checkbox" id="privacyCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><%= t('join_privacy_label') %> <a href="<%= legalPrefix %>/privacy" target="_blank" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
                 </label>
 
                 <button type="button" onclick="sendOtp()" class="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
@@ -239,6 +244,7 @@
                 phone: document.getElementById('phoneInput').value.trim(),
                 promoCode: document.getElementById('promoInput').value.trim(),
                 termsAccepted: document.getElementById('termsCheckbox').checked,
+                privacyAccepted: document.getElementById('privacyCheckbox').checked,
             };
         }
 
@@ -249,6 +255,7 @@
             if (!payload.category) return showMsg(T.join_err_category_required, true);
             if (!payload.phone) return showMsg(T.js_err_empty_phone, true);
             if (!payload.termsAccepted) return showMsg(T.join_err_terms_required, true);
+            if (!payload.privacyAccepted) return showMsg(T.join_err_privacy_required, true);
 
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',
@@ -277,7 +284,12 @@
             let res = await fetch('/api/masters/otp/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: payload.phone, code }),
+                body: JSON.stringify({
+                    phone: payload.phone,
+                    code,
+                    termsAccepted: payload.termsAccepted,
+                    privacyAccepted: payload.privacyAccepted,
+                }),
             });
             let data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_wrong_code, true);

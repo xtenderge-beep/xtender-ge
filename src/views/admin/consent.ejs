@@ -82,7 +82,7 @@
         <div class="text-xs font-extrabold text-emerald-800 uppercase mb-2">Double Opt-In — явное согласие на SMS подтверждено</div>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
           <div><dt class="text-stone-500 text-xs font-bold uppercase">Дата (UTC)</dt><dd class="font-mono"><%= oi.verified_at_utc %></dd></div>
-          <div><dt class="text-stone-500 text-xs font-bold uppercase">Версия оферты</dt><dd class="font-mono"><%= oi.terms_version || '—' %></dd></div>
+          <div><dt class="text-stone-500 text-xs font-bold uppercase">Версия оферты / политики</dt><dd class="font-mono"><%= oi.terms_version || '—' %> / <%= oi.privacy_version || '—' %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">IP</dt><dd class="font-mono"><%= oi.ip_address || '—' %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">Язык</dt><dd class="font-mono"><%= oi.consent_language || '—' %></dd></div>
           <div class="sm:col-span-2"><dt class="text-stone-500 text-xs font-bold uppercase">User-Agent</dt><dd class="font-mono text-xs break-all"><%= oi.user_agent || '—' %></dd></div>

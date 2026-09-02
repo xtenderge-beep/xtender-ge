@@ -10,7 +10,7 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const { clientStrings } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
-const { TERMS_VERSION, consentSnapshot } = require('../config/legal');
+const { TERMS_VERSION, consentSnapshot, consentMeta } = require('../config/legal');
 const payment = require('../config/payment');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
@@ -69,18 +69,26 @@ async function sendOtp(req, res) {
 async function verifyOtp(req, res) {
   const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
   const { code } = req.body;
+  const termsAccepted = Boolean(req.body.termsAccepted);
+  const privacyAccepted = Boolean(req.body.privacyAccepted);
 
   if (!rawPhone || !PHONE_REGEX.test(rawPhone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
+  // Оба согласия обязательны: их же и снимаем в журнал этим подтверждением кода.
+  if (!termsAccepted || !privacyAccepted) {
+    return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
+  }
 
-  // strict: запись согласия на SMS обязательна — если журнал недоступен, регистрацию
-  // считаем несостоявшейся (см. ТЗ Double Opt-In). Текст согласия снимаем на сервере.
+  // strict: запись согласия обязательна — если журнал недоступен, регистрацию считаем
+  // несостоявшейся (Double Opt-In). Текст обоих согласий + версии снимаем на сервере.
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
   const isValid = await otpService.verifyCode(toE164(rawPhone), code, OTP_PURPOSE, {
     meta: requestMeta(req),
     language: req.lang,
     termsVersion: TERMS_VERSION,
-    consentText: consentSnapshot(req.lang, `${req.protocol}://${req.get('host')}`),
+    consentText: consentSnapshot(req.lang, baseUrl),
+    metadata: { ...consentMeta(req.lang, baseUrl), terms_accepted: true, privacy_accepted: true },
     strict: true,
   });
   if (!isValid) {
@@ -101,6 +109,7 @@ async function register(req, res) {
   const bodyType = req.body.bodyType || null;
   const description = (req.body.description || '').trim();
   const termsAccepted = Boolean(req.body.termsAccepted);
+  const privacyAccepted = Boolean(req.body.privacyAccepted);
 
   if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
@@ -114,8 +123,8 @@ async function register(req, res) {
   if (bodyType && !ALLOWED_BODY_TYPES.has(bodyType)) {
     return res.status(400).json({ success: false, message: 'Invalid body type' });
   }
-  if (!termsAccepted) {
-    return res.status(400).json({ success: false, message: 'Terms must be accepted' });
+  if (!termsAccepted || !privacyAccepted) {
+    return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
   }
 
   const phone = toE164(rawPhone);

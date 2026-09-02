@@ -107,6 +107,7 @@ async function verifyCode(phone, code, purpose = 'order', context = {}) {
         termsVersion: context.termsVersion || null,
         language: context.language || null,
         consentText: context.consentText || null,
+        metadata: context.metadata || null,
         providerMessageId: sendMeta.ref || null,
         meta: context.meta || {},
       });

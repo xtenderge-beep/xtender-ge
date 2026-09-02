@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <title><%= t('terms_page_title') %></title>
-    <meta name="description" content="<%= t('meta_description_terms') %>">
+    <title><%= t('privacy_page_title') %></title>
+    <meta name="description" content="<%= t('meta_description_privacy') %>">
 
     <link rel="canonical" href="<%= seo.canonical %>">
     <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
@@ -15,13 +15,13 @@
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="xtender.ge">
-    <meta property="og:title" content="<%= t('terms_page_title') %>">
-    <meta property="og:description" content="<%= t('meta_description_terms') %>">
+    <meta property="og:title" content="<%= t('privacy_page_title') %>">
+    <meta property="og:description" content="<%= t('meta_description_privacy') %>">
     <meta property="og:url" content="<%= seo.canonical %>">
 
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="<%= t('terms_page_title') %>">
-    <meta name="twitter:description" content="<%= t('meta_description_terms') %>">
+    <meta name="twitter:title" content="<%= t('privacy_page_title') %>">
+    <meta name="twitter:description" content="<%= t('meta_description_privacy') %>">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,8 +38,8 @@
 
 <%- include('_legal-doc', {
     doc: legalDoc,
-    docKind: 'terms',
-    headline: t('terms_headline'),
+    docKind: 'privacy',
+    headline: t('privacy_headline'),
     requisites: requisites,
     reqLabels: reqLabels,
     reqPending: reqPending,

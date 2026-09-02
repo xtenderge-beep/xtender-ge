@@ -1,10 +1,19 @@
 const express = require('express');
 const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const { buildSeo } = require('../config/seo');
+const { SERVICE_REQUISITES } = require('../config/legal');
+const legalContent = require('../config/legal-content');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
 const promoService = require('../services/promo.service');
 const asyncHandler = require('../middleware/asyncHandler');
+
+const LEGAL_LOCALS = {
+  requisites: SERVICE_REQUISITES,
+  reqLabels: legalContent.REQUISITE_LABELS,
+  reqPending: legalContent.REQUISITE_PENDING,
+  labels: legalContent.LABELS,
+};
 
 const router = express.Router({ mergeParams: true });
 const LANG_COOKIE_OPTS = { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax' };
@@ -66,7 +75,13 @@ router.get('/r/:code', (req, res) => {
 router.get('/terms', (req, res) => {
   if (redirectToCookieLocale(req, res, '/terms')) return;
   resolveLocale(req, res, '/terms');
-  res.render('terms');
+  res.render('terms', { legalDoc: legalContent.terms, ...LEGAL_LOCALS });
+});
+
+router.get('/privacy', (req, res) => {
+  if (redirectToCookieLocale(req, res, '/privacy')) return;
+  resolveLocale(req, res, '/privacy');
+  res.render('privacy', { legalDoc: legalContent.privacy, ...LEGAL_LOCALS });
 });
 
 module.exports = router;

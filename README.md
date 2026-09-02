@@ -53,7 +53,8 @@ src/
     url.js                — getBaseUrl() — единая точка сборки base URL (https://$DOMAIN)
     phone.js              — toE164() (+995XXXXXXXXX) + phoneVariants() (все варианты записи номера для матчинга по orders.phone)
     shortId.js             — generateShortId() — общий генератор коротких ID (токены заявок и мастеров)
-    legal.js              — TERMS_VERSION + consentSnapshot(lang) — версия оферты и точный текст согласия для журнала
+    legal.js              — TERMS_VERSION / PRIVACY_VERSION, SERVICE_REQUISITES (реквизиты юр. лица — одно место), consentSnapshot/consentMeta для журнала
+    legal-content.js      — полный текст Оферты + Политики конфиденциальности (ka/ru/en) блоками; рендерится в terms.ejs/privacy.ejs
     requestMeta.js        — requestMeta(req) → { ip, userAgent, xForwardedFor } для журнала согласий
   controllers/
     otp.controller.js     — POST /api/otp/send, /api/otp/verify (клиент)
@@ -74,7 +75,7 @@ src/
     my-orders.ejs          — список заявок клиента (по cookie)
     join.ejs               — регистрация исполнителя (форма + OTP)
     master-status.ejs       — личная страница исполнителя (/master/:token) — статус + баланс
-    terms.ejs                — условия/согласие на SMS-уведомления (/terms)
+    terms.ejs / privacy.ejs — Публичная оферта (/terms) и Политика конфиденциальности (/privacy); текст в legal-content.js, общий рендер _legal-doc.ejs
     review.ejs               — форма отзыва по SMS-ссылке после закрытия заявки (/review/:ownerToken)
 scripts/
   seed-masters.js          — генерирует 50 демо-мастеров (тестовые данные)
@@ -154,7 +155,7 @@ node dev-server.js
 | POST | `/api/reviews` | сохраняет отзыв в очередь модерации. Принимает `{ownerToken,…}` (флоу по SMS-ссылке `/review/<owner_token>`) или `{phone,…}` (флоу из каталога, телефон должен быть verified) |
 | POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
-Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (условия/согласие на SMS), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`.
+Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (Публичная оферта, `v1.1-2026-09-03`), `/privacy` (Политика конфиденциальности, `v1.0-2026-09-03`), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`. Все — ka/ru/en с префиксом локали. Реквизиты юр. лица на `/terms` и `/privacy` — из `SERVICE_REQUISITES` в `src/config/legal.js` (пока `null` → «уточняется…»).
 
 Админка (`/admin/*`, вход по `ADMIN_PASSWORD`): обзор, специалисты, заявки, отзывы, поддержка, промокоды, менеджеры, **`/admin/consent`** — журнал согласий на SMS: поиск по номеру, карточка Double Opt-In, кнопка «Скачать JSON» (`/admin/consent/export?phone=` — тот же отчёт, что у `scripts/export-consent-log.js`). Ссылка на журнал по номеру есть и в карточке специалиста.
 
