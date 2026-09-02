@@ -2,6 +2,7 @@ const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
 const { getBaseUrl } = require('../config/url');
 const { requestMeta } = require('../config/requestMeta');
+const { TERMS_VERSION } = require('../config/legal');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 
@@ -46,6 +47,7 @@ async function verify(req, res) {
   const isValid = await otpService.verifyCode(phone, code, 'order', {
     meta: requestMeta(req),
     language: req.lang,
+    termsVersion: TERMS_VERSION,
   });
 
   if (!isValid) {

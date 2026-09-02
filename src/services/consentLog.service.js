@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const { TERMS_VERSION } = require('../config/legal');
 
 // Журнал согласий на SMS + доставок (Double Opt-In / аудит). Таблица sms_consent_logs
 // строго append-only — здесь только INSERT и SELECT, никаких UPDATE/DELETE.
@@ -25,6 +26,7 @@ const VERIFIED_EVENT_BY_PURPOSE = {
   order: 'ORDER_SMS_OTP_VERIFIED',
   review: 'REVIEW_SMS_OTP_VERIFIED',
 };
+const VERIFIED_EVENT_TYPES = Object.values(VERIFIED_EVENT_BY_PURPOSE);
 
 // `channel` не пишем — колонка сама дефолтится в 'sms' (явный NULL перебил бы DEFAULT).
 const COLUMNS = [
@@ -155,34 +157,56 @@ async function exportForPhone(rawPhone) {
   ]);
 
   const optIn = logs.rows.find((r) => r.event_type === 'CONSENT_SMS_OTP_VERIFIED') || null;
+  const verifiedEvents = logs.rows.filter((r) => VERIFIED_EVENT_TYPES.includes(r.event_type));
+  const latestVerified = verifiedEvents.length ? verifiedEvents[verifiedEvents.length - 1] : null;
+
+  // double_opt_in — всегда объект со статусом (не null): регулятору должно быть однозначно
+  // понятно «согласие подтверждено» vs «записи о согласии нет», а не гадать по пустому полю.
+  let doubleOptIn;
+  if (optIn) {
+    doubleOptIn = {
+      status: 'VERIFIED',
+      verified_at_utc: optIn.timestamp_utc,
+      terms_version: optIn.terms_version,
+      consent_language: optIn.consent_language,
+      consent_text_shown: optIn.consent_text_snapshot,
+      ip_address: optIn.ip_address,
+      user_agent: optIn.user_agent,
+      x_forwarded_for: optIn.x_forwarded_for,
+      otp_reference_id: optIn.otp_reference_id,
+      otp_code_sha256: optIn.otp_code_hash,
+      log_row_id: Number(optIn.id),
+    };
+  } else {
+    doubleOptIn = {
+      status: masters.rows.length ? 'NO_CONSENT_RECORD_FOR_EXISTING_PROFILE' : 'NO_RECORD',
+      note: masters.rows.length
+        ? 'Профиль на этот номер есть, но записи CONSENT_SMS_OTP_VERIFIED нет: профиль заведён '
+          + 'до внедрения журнала согласий (2026-09-03) либо иным каналом. Явное согласие по '
+          + 'этому номеру документально не зафиксировано — при необходимости провести повторное согласие через /join.'
+        : 'По этому номеру нет ни профиля, ни событий журнала.',
+      latest_phone_verification: latestVerified && {
+        event_type: latestVerified.event_type,
+        at_utc: latestVerified.timestamp_utc,
+        ip_address: latestVerified.ip_address,
+        terms_version_at_the_time: latestVerified.terms_version,
+      },
+    };
+  }
 
   return {
     report_type: 'sms_consent_audit',
     generated_at_utc: new Date().toISOString(),
+    terms_version_current: TERMS_VERSION,
     query: { phone: rawPhone, matched_phone_formats: variants },
     subject: {
-      profiles: masters.rows,
-      double_opt_in: optIn
-        ? {
-            opted_in_at_utc: optIn.timestamp_utc,
-            terms_version: optIn.terms_version,
-            consent_language: optIn.consent_language,
-            consent_text_shown: optIn.consent_text_snapshot,
-            ip_address: optIn.ip_address,
-            user_agent: optIn.user_agent,
-            x_forwarded_for: optIn.x_forwarded_for,
-            otp_reference_id: optIn.otp_reference_id,
-            otp_code_sha256: optIn.otp_code_hash,
-            log_row_id: optIn.id,
-          }
-        : null,
+      profiles: masters.rows.map((p) => ({ ...p, has_explicit_sms_consent: Boolean(optIn) })),
+      double_opt_in: doubleOptIn,
     },
     event_count: logs.rows.length,
     events: logs.rows,
   };
 }
-
-const VERIFIED_EVENT_TYPES = Object.values(VERIFIED_EVENT_BY_PURPOSE);
 
 // Последние подтверждённые согласия — для landing-страницы /admin/consent.
 // Джойн по phone_number ↔ masters.phone (FK нет, см. schema.sql).

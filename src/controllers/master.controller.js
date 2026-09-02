@@ -292,6 +292,7 @@ async function loginVerify(req, res) {
     meta: requestMeta(req),
     language: req.lang,
     masterId: master && master.id,
+    termsVersion: TERMS_VERSION,
   });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 

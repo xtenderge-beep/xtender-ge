@@ -76,12 +76,12 @@
       <% } %>
     </div>
 
-    <% var oi = report.subject.double_opt_in; %>
-    <% if (oi) { %>
+    <% var oi = report.subject.double_opt_in || {}; %>
+    <% if (oi.status === 'VERIFIED') { %>
       <div class="mt-4 bg-emerald-50 rounded-2xl border border-emerald-200 p-5">
-        <div class="text-xs font-extrabold text-emerald-800 uppercase mb-2">Double Opt-In — явное согласие на SMS</div>
+        <div class="text-xs font-extrabold text-emerald-800 uppercase mb-2">Double Opt-In — явное согласие на SMS подтверждено</div>
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-          <div><dt class="text-stone-500 text-xs font-bold uppercase">Дата (UTC)</dt><dd class="font-mono"><%= oi.opted_in_at_utc %></dd></div>
+          <div><dt class="text-stone-500 text-xs font-bold uppercase">Дата (UTC)</dt><dd class="font-mono"><%= oi.verified_at_utc %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">Версия оферты</dt><dd class="font-mono"><%= oi.terms_version || '—' %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">IP</dt><dd class="font-mono"><%= oi.ip_address || '—' %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">Язык</dt><dd class="font-mono"><%= oi.consent_language || '—' %></dd></div>
@@ -94,8 +94,15 @@
       </div>
     <% } else { %>
       <div class="mt-4 bg-amber-50 rounded-2xl border border-amber-200 p-4 text-sm text-amber-800">
-        По этому номеру нет строки <b>CONSENT_SMS_OTP_VERIFIED</b> — регистрация исполнителя через <code>/join</code> с этого номера не подтверждалась
-        (события ниже могут быть от заявок клиента, входа или отправленных SMS).
+        <div class="font-extrabold uppercase text-xs mb-1">Double Opt-In: <%= oi.status || 'NO_RECORD' %></div>
+        <p><%= oi.note || 'По этому номеру нет строки CONSENT_SMS_OTP_VERIFIED.' %></p>
+        <% if (oi.latest_phone_verification) { %>
+          <p class="mt-1 text-xs">
+            Последняя верификация номера: <b><%= oi.latest_phone_verification.event_type %></b>
+            · <%= oi.latest_phone_verification.at_utc %>
+            · IP <%= oi.latest_phone_verification.ip_address || '—' %>
+          </p>
+        <% } %>
       </div>
     <% } %>
 
