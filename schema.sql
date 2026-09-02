@@ -301,7 +301,7 @@ CREATE TABLE IF NOT EXISTS sms_consent_logs (
     provider_response     JSONB,
     otp_code_hash         VARCHAR(64),
     message_body_hash     VARCHAR(64),
-    -- terms_version: действующая версия оферty (src/config/legal.js) на момент события —
+    -- terms_version: действующая версия оферты (src/config/legal.js) на момент события —
     -- проставляется на всех *_OTP_VERIFIED. consent_text_snapshot заполняется только там,
     -- где у пользователя реально был текст согласия (чекбокс на /join) — для входа/заявки/
     -- отзыва он NULL by design: это верификация номера, а не момент согласия.

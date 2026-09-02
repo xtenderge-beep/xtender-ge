@@ -132,7 +132,7 @@ node dev-server.js
 - **order_dispatches** — какой категории (и размера) уже отправлена рассылка по заявке — защита от повторных SMS
 - **order_views** — клики мастеров по заявке (переход/звонок/WhatsApp) — данные для воронки
 - **order_files** — вложения к заявке (фото/PDF)
-- **sms_consent_logs** — журнал согласий на SMS (Double Opt-In) и доставок: строка на каждое подтверждение OTP (`CONSENT_SMS_OTP_VERIFIED` для `/join` + `AUTH_/ORDER_/REVIEW_SMS_OTP_VERIFIED`) с IP/User-Agent/версией оферты/текстом согласия, и строка на каждую отправленную транзакционную SMS (`SMS_OTP_SENT`, `LEAD_SMS_SENT`, `TX_SMS_SENT`). Append-only (только INSERT; на реальной Postgres закреплено триггером), без FK — переживает удаление профиля/заявки. Код SMS хранится только как SHA-256
+- **sms_consent_logs** — журнал согласий на SMS (Double Opt-In) и доставок: строка на каждое подтверждение OTP (`CONSENT_SMS_OTP_VERIFIED` для `/join` + `AUTH_/ORDER_/REVIEW_SMS_OTP_VERIFIED`) с IP/User-Agent/версией оферты/текстом согласия, и строка на каждую отправленную транзакционную SMS (`SMS_OTP_SENT`, `LEAD_SMS_SENT`, `TX_SMS_SENT`). Append-only (только INSERT; на реальной Postgres закреплено триггером), без FK — переживает удаление профиля/заявки. Код SMS хранится только как SHA-256. **Подробно: [docs/consent-and-legal.md](docs/consent-and-legal.md)**
 - **districts / master_districts** — районы (задел на будущее, сейчас не в основном флоу)
 
 ## API
@@ -155,7 +155,7 @@ node dev-server.js
 | POST | `/api/reviews` | сохраняет отзыв в очередь модерации. Принимает `{ownerToken,…}` (флоу по SMS-ссылке `/review/<owner_token>`) или `{phone,…}` (флоу из каталога, телефон должен быть verified) |
 | POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
-Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (Публичная оферта) + `/privacy` (Политика конфиденциальности) — обе `v1.2-2026-09-03`, `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`. Все — ka/ru/en с префиксом локали. Реквизиты юр. лица — из `SERVICE_REQUISITES` в `src/config/legal.js` (`entityName/idCode/legalAddress` пока `null` → «уточняется…»).
+Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (Публичная оферта) + `/privacy` (Политика конфиденциальности) — обе `v1.2-2026-09-03`, `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`. Все — ka/ru/en с префиксом локали. Реквизиты юр. лица — из `SERVICE_REQUISITES` в `src/config/legal.js` (`entityName/idCode/legalAddress` пока `null` → «уточняется…»). Как править текст оферты/политики, версии и реквизиты — **[docs/consent-and-legal.md](docs/consent-and-legal.md)**.
 
 Админка (`/admin/*`, вход по `ADMIN_PASSWORD`): обзор, специалисты, заявки, отзывы, поддержка, промокоды, менеджеры, **`/admin/consent`** — журнал согласий на SMS: поиск по номеру, карточка Double Opt-In, кнопка «Скачать JSON» (`/admin/consent/export?phone=` — тот же отчёт, что у `scripts/export-consent-log.js`). Ссылка на журнал по номеру есть и в карточке специалиста.
 
