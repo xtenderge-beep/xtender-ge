@@ -80,7 +80,7 @@ async function verifyOtp(req, res) {
     meta: requestMeta(req),
     language: req.lang,
     termsVersion: TERMS_VERSION,
-    consentText: consentSnapshot(req.lang),
+    consentText: consentSnapshot(req.lang, `${req.protocol}://${req.get('host')}`),
     strict: true,
   });
   if (!isValid) {
