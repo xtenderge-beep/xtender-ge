@@ -53,6 +53,8 @@ src/
     url.js                — getBaseUrl() — единая точка сборки base URL (https://$DOMAIN)
     phone.js              — toE164() (+995XXXXXXXXX) + phoneVariants() (все варианты записи номера для матчинга по orders.phone)
     shortId.js             — generateShortId() — общий генератор коротких ID (токены заявок и мастеров)
+    legal.js              — TERMS_VERSION + consentSnapshot(lang) — версия оферты и точный текст согласия для журнала
+    requestMeta.js        — requestMeta(req) → { ip, userAgent, xForwardedFor } для журнала согласий
   controllers/
     otp.controller.js     — POST /api/otp/send, /api/otp/verify (клиент)
     order.controller.js   — заявки, Telegram-вебхук (диспетчеризация + одобрение мастеров + /topup)
@@ -61,7 +63,8 @@ src/
     otp.service.js        — генерация/проверка кода, rate-limit через Redis (параметризовано по purpose: order/master/review)
     order.service.js      — CRUD заявок, рассылка SMS мастерам (с проверкой/списанием баланса), статистика
     master.service.js     — каталог, регистрация, одобрение, пополнение баланса
-    sms.service.js        — отправка SMS через внешний шлюз
+    sms.service.js        — отправка SMS через внешний шлюз (возвращает { ok, providerMessageId, providerResponse }, пишет строку доставки в журнал)
+    consentLog.service.js — журнал согласий на SMS (Double Opt-In) + доставок: запись при verify OTP и на каждую SMS, выгрузка для регулятора
     telegram.service.js   — сообщения модератору, инлайн-кнопки, обновление сообщения, уведомление о новой регистрации
   middleware/
     asyncHandler.js       — оборачивает async-роуты, чтобы ошибки не ронали процесс (Express 4 не делает это сам)
@@ -75,7 +78,9 @@ src/
     review.ejs               — форма отзыва по SMS-ссылке после закрытия заявки (/review/:ownerToken)
 scripts/
   seed-masters.js          — генерирует 50 демо-мастеров (тестовые данные)
+  export-consent-log.js    — выгрузка журнала согласий по номеру/мастеру в JSON (для PDPS / оператора связи)
 schema.sql                 — полная схема БД, накатывается автоматически при каждом старте (idempotent)
+schema.postgres.sql        — DDL только для реального Postgres (триггер append-only на sms_consent_logs); pg-mem не тянет, dev-server пропускает
 dev-server.js               — локальный запуск с in-memory Postgres/Redis (см. ниже)
 ```
 
@@ -94,6 +99,7 @@ node dev-server.js
 - не поддерживает коррелированные подзапросы
 - `ON CONFLICT DO NOTHING RETURNING *` возвращает существующую строку вместо пустой
 - падает при повторном прогоне DDL через `Pool.query()` на некоторых constraint'ах — поэтому `dev-server.js` выставляет `SKIP_DB_MIGRATIONS=1` и накатывает схему сам через нативный API `pg-mem`
+- не поддерживает plpgsql-функции, `DO`-блоки, триггеры, `RULE` — такой DDL живёт в отдельном `schema.postgres.sql` (накатывается только на реальной Postgres, после `schema.sql`)
 
 ## Переменные окружения
 
@@ -110,13 +116,14 @@ node dev-server.js
 | `TELEGRAM_MODERATOR_CHAT_ID` | chat_id, куда шлются заявки на модерацию |
 | `TELEGRAM_WEBHOOK_SECRET` | секрет для проверки заголовка `X-Telegram-Bot-Api-Secret-Token` на `/api/telegram/webhook`. Установлен в проде и подтверждён (без заголовка/с неверным — 401). Приложение само переустанавливает вебхук с этим секретом при каждом старте (`telegramService.setWebhook()` в `app.js`) |
 | `NODE_ENV` | `development` включает dev-режимы (SMS/Telegram не отправляются по-настоящему) |
-| `SKIP_DB_MIGRATIONS` | пропустить авто-накат `schema.sql` при старте (нужно только `dev-server.js`) |
+| `SKIP_DB_MIGRATIONS` | пропустить авто-накат `schema.sql` + `schema.postgres.sql` при старте (нужно только `dev-server.js`) |
+| `CONSENT_HASH_PEPPER` | необязательная «перчинка» к SHA-256 OTP-кода в `sms_consent_logs` — без неё 4-значный код перебирается по дампу БД за 10k хэшей. Пусто = чистый SHA-256 |
 
 Полный список с пустыми значениями — в `.env.example`.
 
 ## База данных
 
-Схема живёт в одном файле `schema.sql` и накатывается автоматически при каждом запуске (`runMigrations()` в `app.js`), включая прод — миграции идемпотентны (`CREATE TABLE IF NOT EXISTS` + отдельные `ALTER TABLE ADD COLUMN IF NOT EXISTS` для полей, добавленных позже).
+Схема живёт в `schema.sql` (+ `schema.postgres.sql` для триггеров/функций, которые не тянет pg-mem) и накатывается автоматически при каждом запуске (`runMigrations()` в `app.js`), включая прод — миграции идемпотентны (`CREATE TABLE IF NOT EXISTS` + отдельные `ALTER TABLE ADD COLUMN IF NOT EXISTS` для полей, добавленных позже).
 
 Основные таблицы:
 - **masters** — каталог исполнителей: категория, тип/размер машины, цена, телефон, активность, подписка, `balance_tetri` (баланс в тетри), `master_token` (личная ссылка), `terms_accepted_at` (момент согласия). `price_text` — поле есть в схеме (заполнено у демо-мастеров), но форма `/join` его больше не собирает
@@ -124,6 +131,7 @@ node dev-server.js
 - **order_dispatches** — какой категории (и размера) уже отправлена рассылка по заявке — защита от повторных SMS
 - **order_views** — клики мастеров по заявке (переход/звонок/WhatsApp) — данные для воронки
 - **order_files** — вложения к заявке (фото/PDF)
+- **sms_consent_logs** — журнал согласий на SMS (Double Opt-In) и доставок: строка на каждое подтверждение OTP (`CONSENT_SMS_OTP_VERIFIED` для `/join` + `AUTH_/ORDER_/REVIEW_SMS_OTP_VERIFIED`) с IP/User-Agent/версией оферты/текстом согласия, и строка на каждую отправленную транзакционную SMS (`SMS_OTP_SENT`, `LEAD_SMS_SENT`, `TX_SMS_SENT`). Append-only (только INSERT; на реальной Postgres закреплено триггером), без FK — переживает удаление профиля/заявки. Код SMS хранится только как SHA-256
 - **districts / master_districts** — районы (задел на будущее, сейчас не в основном флоу)
 
 ## API
@@ -147,6 +155,8 @@ node dev-server.js
 | POST | `/api/telegram/webhook` | приём callback/текстовых команд от модератора (диспетчеризация, одобрение мастера, `/topup`); защищён `TELEGRAM_WEBHOOK_SECRET` |
 
 Плюс серверные HTML-страницы: `/` (главная), `/join` (регистрация исполнителя), `/terms` (условия/согласие на SMS), `/master/:token` (баланс исполнителя), `/order/:token`, `/o/:ownerToken`, `/my-orders`, `/lang/:code`.
+
+Админка (`/admin/*`, вход по `ADMIN_PASSWORD`): обзор, специалисты, заявки, отзывы, поддержка, промокоды, менеджеры, **`/admin/consent`** — журнал согласий на SMS: поиск по номеру, карточка Double Opt-In, кнопка «Скачать JSON» (`/admin/consent/export?phone=` — тот же отчёт, что у `scripts/export-consent-log.js`). Ссылка на журнал по номеру есть и в карточке специалиста.
 
 ## Деплой
 

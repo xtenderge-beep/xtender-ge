@@ -29,7 +29,7 @@ async function nudgeLowBalance(master, telegramService, reason) {
       const text = reason === 'missed'
         ? `Xtender: an order in your category passed you by (low balance). Top up: ${link}`
         : `Xtender: balance low (${gel} GEL). Top up to keep getting orders: ${link}`;
-      await smsService.sendOrderNotification(master.phone, text);
+      await smsService.sendOrderNotification(master.phone, text, { masterId: master.id });
     }
   } catch (err) {
     console.error(`Failed to nudge master ${master.id} about low balance:`, err.message);
@@ -248,7 +248,11 @@ async function notifyMasters(order, category, vehicleSize) {
       }
       if (!delivered) {
         try {
-          await smsService.sendOrderNotification(master.phone, `Xtender: new order #${order.id}: ${link}`);
+          await smsService.sendOrderNotification(master.phone, `Xtender: new order #${order.id}: ${link}`, {
+            kind: 'lead',
+            masterId: master.id,
+            orderId: order.id,
+          });
           delivered = true;
         } catch (err) {
           console.error(`Failed to notify master ${master.id}:`, err.message);

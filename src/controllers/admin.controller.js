@@ -9,6 +9,7 @@ const telegramService = require('../services/telegram.service');
 const supportService = require('../services/support.service');
 const promoService = require('../services/promo.service');
 const managerService = require('../services/manager.service');
+const consentLogService = require('../services/consentLog.service');
 const { toE164 } = require('../config/phone');
 
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
@@ -293,6 +294,28 @@ async function approveReview(req, res) {
   res.redirect('/admin/reviews');
 }
 
+// Журнал согласий на SMS. Без ?phone — последние подтверждённые согласия;
+// с ?phone — все события журнала по этому номеру + карточка Double Opt-In.
+async function consentLog(req, res) {
+  const phoneQuery = (req.query.phone || '').trim();
+  const report = phoneQuery ? await consentLogService.exportForPhone(phoneQuery) : null;
+  const recent = phoneQuery ? [] : await consentLogService.listRecentConsents(150);
+  res.render('admin/consent', { phoneQuery, report, recent });
+}
+
+// Та же выгрузка, что отдаёт scripts/export-consent-log.js — скачивается файлом
+// для официального ответа регулятору (PDPS) или SMS-оператору.
+async function consentExport(req, res) {
+  const phoneQuery = (req.query.phone || '').trim();
+  if (!phoneQuery) return res.status(400).send('phone query param required');
+
+  const report = await consentLogService.exportForPhone(phoneQuery);
+  const safe = phoneQuery.replace(/[^\d]/g, '') || 'unknown';
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="sms-consent-${safe}.json"`);
+  res.send(JSON.stringify(report, null, 2));
+}
+
 async function rejectReview(req, res) {
   await reviewService.reject(parseInt(req.params.id, 10));
   res.redirect('/admin/reviews');
@@ -316,6 +339,8 @@ module.exports = {
   reviewsQueue,
   approveReview,
   rejectReview,
+  consentLog,
+  consentExport,
   supportList,
   supportThread,
   supportReply,

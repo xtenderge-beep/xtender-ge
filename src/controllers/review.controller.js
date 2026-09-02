@@ -4,6 +4,7 @@ const otpService = require('../services/otp.service');
 const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { phoneVariants } = require('../config/phone');
+const { requestMeta } = require('../config/requestMeta');
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
@@ -36,7 +37,7 @@ async function requestCode(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
   }
 
-  const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE);
+  const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE, null, { meta: requestMeta(req) });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: 'Too many requests' });
@@ -55,7 +56,10 @@ async function verifyForMaster(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
 
-  const ok = await otpService.verifyCode(phone, code, REVIEW_PURPOSE);
+  const ok = await otpService.verifyCode(phone, code, REVIEW_PURPOSE, {
+    meta: requestMeta(req),
+    language: req.lang,
+  });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
   const variants = phoneVariants(phone);

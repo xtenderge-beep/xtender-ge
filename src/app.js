@@ -95,6 +95,9 @@ async function runMigrations() {
   if (process.env.SKIP_DB_MIGRATIONS) return;
   const schema = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
   await pool.query(schema);
+  // Триггеры/функции, которые не тянет pg-mem (dev-server сюда не заходит). Идемпотентны.
+  const pgOnly = fs.readFileSync(path.join(__dirname, '..', 'schema.postgres.sql'), 'utf8');
+  await pool.query(pgOnly);
   console.log('Database schema is up to date');
 }
 

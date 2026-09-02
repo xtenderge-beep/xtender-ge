@@ -671,7 +671,11 @@ async function close(req, res) {
   reviewService.getEligibleMasters(order.id).then((masters) => {
     if (!masters.length) return null;
     const link = `${getBaseUrl()}/review/${order.owner_token}`;
-    return smsService.sendOrderNotification(order.phone, `Xtender: order #${order.id} closed. Rate the provider: ${link}`);
+    return smsService.sendOrderNotification(
+      order.phone,
+      `Xtender: order #${order.id} closed. Rate the provider: ${link}`,
+      { orderId: order.id }
+    );
   }).catch((err) => {
     console.error('Failed to send review invite SMS:', err.message);
   });

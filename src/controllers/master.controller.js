@@ -9,6 +9,8 @@ const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const { clientStrings } = require('../config/i18n');
+const { requestMeta } = require('../config/requestMeta');
+const { TERMS_VERSION, consentSnapshot } = require('../config/legal');
 const payment = require('../config/payment');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
@@ -53,7 +55,7 @@ async function sendOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
   }
 
-  const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE);
+  const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req) });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
@@ -72,7 +74,15 @@ async function verifyOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
 
-  const isValid = await otpService.verifyCode(toE164(rawPhone), code, OTP_PURPOSE);
+  // strict: запись согласия на SMS обязательна — если журнал недоступен, регистрацию
+  // считаем несостоявшейся (см. ТЗ Double Opt-In). Текст согласия снимаем на сервере.
+  const isValid = await otpService.verifyCode(toE164(rawPhone), code, OTP_PURPOSE, {
+    meta: requestMeta(req),
+    language: req.lang,
+    termsVersion: TERMS_VERSION,
+    consentText: consentSnapshot(req.lang),
+    strict: true,
+  });
   if (!isValid) {
     return res.status(400).json({ success: false, message: 'Invalid or expired code' });
   }
@@ -144,7 +154,11 @@ async function register(req, res) {
   telegramService.notifyModeratorNewMaster(master).catch((err) => {
     console.error('Failed to notify moderator about new master:', err.message);
   });
-  smsService.sendOrderNotification(phone, `Xtender: заявка на регистрацию принята. Ваш баланс: ${link}`).catch((err) => {
+  smsService.sendOrderNotification(
+    phone,
+    `Xtender: заявка на регистрацию принята. Ваш баланс: ${link}`,
+    { masterId: master.id, purpose: OTP_PURPOSE, meta: requestMeta(req) }
+  ).catch((err) => {
     console.error('Failed to send registration confirmation SMS:', err.message);
   });
 
@@ -255,7 +269,7 @@ async function loginRequestCode(req, res) {
     return res.status(404).json({ success: false, message: 'not_registered' });
   }
 
-  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE);
+  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE, null, { meta: requestMeta(req) });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: 'Too many requests' });
@@ -272,10 +286,15 @@ async function loginVerify(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
 
-  const ok = await otpService.verifyCode(phone, code, MASTER_LOGIN_PURPOSE);
+  const master = await masterService.getMasterByPhone(phone);
+
+  const ok = await otpService.verifyCode(phone, code, MASTER_LOGIN_PURPOSE, {
+    meta: requestMeta(req),
+    language: req.lang,
+    masterId: master && master.id,
+  });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
-  const master = await masterService.getMasterByPhone(phone);
   if (!master || !master.master_token) {
     return res.status(404).json({ success: false, message: 'not_registered' });
   }

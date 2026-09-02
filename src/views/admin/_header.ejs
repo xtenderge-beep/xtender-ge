@@ -24,6 +24,7 @@
                 <a href="/admin/support" class="admin-nav-link hover:text-white transition <%= active === 'support' ? 'active' : '' %>">Поддержка</a>
                 <a href="/admin/promo" class="admin-nav-link hover:text-white transition <%= active === 'promo' ? 'active' : '' %>">Промокоды</a>
                 <a href="/admin/managers" class="admin-nav-link hover:text-white transition <%= active === 'managers' ? 'active' : '' %>">Менеджеры</a>
+                <a href="/admin/consent" class="admin-nav-link hover:text-white transition <%= active === 'consent' ? 'active' : '' %>">Согласия</a>
             </nav>
             <form method="POST" action="/admin/logout">
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">

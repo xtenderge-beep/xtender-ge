@@ -264,3 +264,51 @@ CREATE TABLE IF NOT EXISTS master_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_master_reviews_master_id ON master_reviews(master_id);
 CREATE INDEX IF NOT EXISTS idx_master_reviews_is_approved ON master_reviews(is_approved);
+
+-- === Журнал согласий на SMS + доставок — Double Opt-In / аудит для PDPS и операторов (2026-09-02) ===
+--
+-- Пишется в двух точках:
+--   1. подтверждение OTP-кода (event_type CONSENT_SMS_OTP_VERIFIED для регистрации на /join,
+--      AUTH_/ORDER_/REVIEW_SMS_OTP_VERIFIED для входа, заявки клиента, отзыва) — фиксирует
+--      явное согласие с IP, User-Agent, версией оферты и точным текстом согласия у кнопки;
+--   2. каждая отправленная транзакционная SMS (SMS_OTP_SENT, LEAD_SMS_SENT, TX_SMS_SENT) —
+--      фиксирует факт и ID сообщения у шлюза, для ответа на запрос оператора связи.
+--
+-- Таблица строго append-only: приложение делает только INSERT, никогда UPDATE/DELETE.
+-- На реальном Postgres это дополнительно закреплено триггером из schema.postgres.sql
+-- (pg-mem его не тянет — dev-server запись не защищает, но и не пишет в реальную БД).
+--
+-- FK на masters/orders намеренно НЕТ: журнал обязан пережить удаление профиля или заявки
+-- (право субъекта на удаление данных vs. обязанность хранить доказательство согласия).
+-- Связь с профилем тянется джойном по phone_number ↔ masters.phone в выгрузке.
+--
+-- Сам OTP-код в открытом виде НЕ хранится — только SHA-256 (+ опциональная перчинка
+-- CONSENT_HASH_PEPPER: 4-значный код перебирается за 10k хэшей, перчинка из env делает
+-- дамп БД бесполезным без доступа к переменным окружения).
+CREATE TABLE IF NOT EXISTS sms_consent_logs (
+    id                    BIGSERIAL PRIMARY KEY,
+    event_type            VARCHAR(50) NOT NULL,
+    phone_number          VARCHAR(20) NOT NULL,
+    master_id             BIGINT,
+    order_id              BIGINT,
+    purpose               VARCHAR(30),
+    channel               VARCHAR(10) NOT NULL DEFAULT 'sms',
+    ip_address            VARCHAR(45),
+    user_agent            TEXT,
+    x_forwarded_for       TEXT,
+    otp_reference_id      VARCHAR(120),
+    provider              VARCHAR(40),
+    provider_response     JSONB,
+    otp_code_hash         VARCHAR(64),
+    message_body_hash     VARCHAR(64),
+    terms_version         VARCHAR(20),
+    consent_language      VARCHAR(5),
+    consent_text_snapshot TEXT,
+    metadata              JSONB,
+    timestamp_utc         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_phone  ON sms_consent_logs (phone_number);
+CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_master ON sms_consent_logs (master_id);
+CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_event  ON sms_consent_logs (event_type);
+CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ts     ON sms_consent_logs (timestamp_utc);
+CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ref    ON sms_consent_logs (otp_reference_id);

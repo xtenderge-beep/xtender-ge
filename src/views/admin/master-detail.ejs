@@ -17,6 +17,9 @@
         <%= master.phone %> · <%= master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
     </p>
     <p class="text-sm text-stone-600 mt-1">Рейтинг: <b><%= master.computed_rating %></b> (<%= master.review_count %> отзывов)</p>
+    <p class="text-sm mt-1">
+      <a href="/admin/consent?phone=<%= encodeURIComponent(master.phone) %>" class="font-bold text-emerald-700 hover:underline">Журнал согласий на SMS &rarr;</a>
+    </p>
     <% if (master.promo_code_used) { %>
       <p class="text-sm text-stone-600 mt-1">Пришёл по промокоду:
           <a href="/admin/promo/<%= master.promo_code_used %>" class="font-mono font-bold text-emerald-700 hover:underline"><%= master.promo_code_used %></a><% if (promoOrigin && promoOrigin.label) { %> <span class="text-stone-500">(<%= promoOrigin.label %>)</span><% } %>

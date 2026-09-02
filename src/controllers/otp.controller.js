@@ -1,6 +1,7 @@
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
 const { getBaseUrl } = require('../config/url');
+const { requestMeta } = require('../config/requestMeta');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 
@@ -22,7 +23,7 @@ async function send(req, res) {
   });
 
   const link = `${getBaseUrl()}/o/${order.owner_token}`;
-  const result = await otpService.sendCode(phone, link, 'order', order.id);
+  const result = await otpService.sendCode(phone, link, 'order', order.id, { meta: requestMeta(req) });
 
   if (!result.success) {
     if (result.reason === 'rate_limited') {
@@ -42,7 +43,10 @@ async function verify(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
 
-  const isValid = await otpService.verifyCode(phone, code);
+  const isValid = await otpService.verifyCode(phone, code, 'order', {
+    meta: requestMeta(req),
+    language: req.lang,
+  });
 
   if (!isValid) {
     return res.status(400).json({ success: false, message: 'Invalid or expired code' });
