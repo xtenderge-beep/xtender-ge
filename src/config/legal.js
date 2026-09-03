@@ -2,7 +2,10 @@ const { translate } = require('./i18n');
 const { getBaseUrl } = require('./url');
 
 // Версии юридических документов. Пишутся в sms_consent_logs при подтверждении OTP.
-// Поднимать при ЛЮБОМ изменении текста соответствующего документа (legal-content.js).
+// Поднимать при ЛЮБОМ изменении текста соответствующего ДОКУМЕНТА (legal-content.js).
+// Текст чекбоксов на /join (i18n join_terms_label/join_privacy_label) при этом
+// НЕ версионируется здесь — он сохраняется дословно в consent_text_snapshot на каждую
+// регистрацию, так что мелкие правки формулировок отслеживаются сами.
 // Формат: vMAJOR.MINOR-YYYY-MM-DD (дата вступления редакции в силу).
 const TERMS_VERSION = 'v1.2-2026-09-03';
 const PRIVACY_VERSION = 'v1.2-2026-09-03';

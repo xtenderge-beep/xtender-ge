@@ -148,6 +148,11 @@
                         class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
                 </details>
 
+                <div class="flex items-start gap-2 text-[11px] text-stone-500 leading-snug bg-stone-50 border border-stone-200 rounded-xl p-3">
+                    <i class="fa-solid fa-circle-info text-emerald-600 mt-0.5 shrink-0"></i>
+                    <span><%= t('join_payment_note') %></span>
+                </div>
+
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
