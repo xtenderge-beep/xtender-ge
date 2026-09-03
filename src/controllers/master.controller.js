@@ -15,7 +15,7 @@ const payment = require('../config/payment');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 // В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
-const LEAD_PRICE_TETRI = 30;
+const LEAD_PRICE_TETRI = 50;
 const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';

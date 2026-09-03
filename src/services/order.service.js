@@ -5,8 +5,8 @@ const masterService = require('./master.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
-const COST_PER_NOTIFICATION_TETRI = 30;
-const LOW_BALANCE_NUDGE_TETRI = 150; // ~5 лидов — ниже этого шлём разовый «пополни»
+const COST_PER_NOTIFICATION_TETRI = 50;
+const LOW_BALANCE_NUDGE_TETRI = 250; // ~5 лидов — ниже этого шлём разовый «пополни»
 const NUDGE_THROTTLE_SECONDS = 24 * 60 * 60;
 
 // Разовый (не чаще раза в сутки) пинок «пополни баланс» — в Telegram, если привязан,

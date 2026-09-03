@@ -23,7 +23,7 @@ const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 // В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
-const LEAD_PRICE_TETRI = 30;
+const LEAD_PRICE_TETRI = 50;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed']);
 const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
