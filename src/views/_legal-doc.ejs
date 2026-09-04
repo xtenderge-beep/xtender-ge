@@ -19,7 +19,8 @@
             </a>
             <div class="flex items-center gap-0.5 p-1 bg-stone-100 rounded-full border border-stone-200">
                 <% [['ka','🇬🇪','GE'],['ru','🇷🇺','RU'],['en','🇬🇧','EN']].forEach(function (lf) { %>
-                    <a href="<%= seo.alternates[lf[0]] %>" title="<%= lf[2] %>" aria-label="<%= lf[2] %>"
+                    <% /* ?lang=ka — иначе кука ru/en тут же откидывает голый URL обратно, см. public.routes.js */ %>
+                    <a href="<%= seo.alternates[lf[0]] %><%= lf[0] === 'ka' ? '?lang=ka' : '' %>" title="<%= lf[2] %>" aria-label="<%= lf[2] %>"
                        class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base font-bold leading-none transition <%= lang === lf[0] ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:bg-white/60 hover:text-stone-800 active:scale-95' %>">
                         <%= lf[1] %>
                     </a>

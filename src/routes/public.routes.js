@@ -30,8 +30,13 @@ function resolveLocale(req, res, suffix) {
 // Пришли на публичную страницу БЕЗ языкового префикса, но в куке уже выбран ru/en —
 // уводим на префиксную версию (напр. /join → /ru/join), чтобы весь путь был на одном
 // языке. Googlebot куку не шлёт → всегда видит ka на «голых» URL, SEO не страдает.
+//
+// ?lang=ka — явный клик по грузинскому флагу в переключателе (единственный язык без
+// префикса в URL, поэтому его ссылка неотличима от «просто зашёл на голый /» — без этой
+// метки кука ru/en тут же перебивала бы обратно и на ka было невозможно переключиться).
 function redirectToCookieLocale(req, res, path) {
   if (req.params.locale) return false;
+  if (req.query.lang === 'ka') return false;
   const cookieLang = normalizeLang(req.cookies.lang);
   if (cookieLang === 'ka') return false;
   const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
