@@ -168,10 +168,10 @@
                         <span><%= t('my_orders_nav') %></span>
                     </a>
 
-                    <div class="flex items-center gap-1">
+                    <div class="flex items-center gap-0.5 p-1 bg-stone-100 rounded-full border border-stone-200">
                         <% [['ka','🇬🇪','GE'],['ru','🇷🇺','RU'],['en','🇬🇧','EN']].forEach(function (f) { %>
                             <a href="<%= seo.alternates[f[0]] %>" title="<%= f[2] %>" aria-label="<%= f[2] %>"
-                               class="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-base sm:text-lg leading-none transition <%= lang === f[0] ? 'ring-2 ring-emerald-500 bg-white shadow-sm' : 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0 active:scale-95' %>">
+                               class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base font-bold leading-none transition <%= lang === f[0] ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:bg-white/60 hover:text-stone-800 active:scale-95' %>">
                                 <%= f[1] %>
                             </a>
                         <% }); %>
