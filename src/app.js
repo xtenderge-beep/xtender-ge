@@ -21,6 +21,20 @@ const app = express();
 // За прокси Railway; без этого req.ip/req.secure не отражают реального клиента —
 // важно для рейт-лимита логина в админку и для secure-флага её cookie.
 app.set('trust proxy', 1);
+app.disable('x-powered-by'); // не палим стек (Express) в заголовке ответа
+
+// Базовые security-заголовки (без полноценного helmet — лишняя зависимость ради
+// нескольких строк). Полноценный Content-Security-Policy сюда не ставим: сайт держится
+// на инлайновых <script> на каждой странице + Tailwind CDN + Google Fonts/FontAwesome
+// CDN — жёсткий CSP либо ничего не даст (пришлось бы разрешить unsafe-inline везде),
+// либо потребует отдельного рефакторинга фронтенда. HSTS не выставляем — обычно уже
+// на уровне Cloudflare перед Railway, дублирование в коде рискует разъехаться с ним.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

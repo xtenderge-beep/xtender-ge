@@ -6,15 +6,27 @@ const { v4: uuidv4 } = require('uuid');
 const UPLOAD_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf']);
+// mimetype -> расширение сохранённого файла. НЕ берём расширение из file.originalname:
+// это заголовок Content-Type многосоставной формы, который клиент выставляет сам —
+// без этой карты злоумышленник мог пройти fileFilter, заявив "Content-Type: image/jpeg",
+// но назвать файл "x.html" (или .svg) и получить исполняемый в браузере файл на
+// публичном /uploads/ (express.static отдаёт по расширению, не по тому, что было
+// заявлено при загрузке) — классический stored XSS через file upload.
+const MIME_EXT = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+};
+const ALLOWED_MIME = new Set(Object.keys(MIME_EXT));
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_FILES = 5;
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `${uuidv4()}${ext}`);
+    cb(null, `${uuidv4()}${MIME_EXT[file.mimetype] || ''}`);
   },
 });
 

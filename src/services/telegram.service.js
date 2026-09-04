@@ -210,6 +210,16 @@ async function askModerator(chatId, text) {
   return sendToChat(chatId, text, FORCE_REPLY);
 }
 
+// Оповещение о событиях безопасности /admin (вход, подозрение на перебор пароля) —
+// намеренно ТОЛЬКО в env-модератора (владелец), не всем менеджерам/модераторам из
+// таблицы managers: они видят рабочие уведомления (заявки, поддержка), но не обязаны
+// знать о попытках входа в веб-панель /admin — это другой уровень доступа.
+async function sendSecurityAlert(text) {
+  const chatId = process.env.TELEGRAM_MODERATOR_CHAT_ID;
+  if (!chatId) return;
+  return sendToChat(chatId, text);
+}
+
 async function answerCallback(callbackQueryId, text) {
   if (!isEnabled()) return;
   await axios
@@ -402,6 +412,7 @@ module.exports = {
   confirmMasterApproved,
   sendTopupReceipt,
   sendMessageToModerator,
+  sendSecurityAlert,
   askModerator,
   answerCallback,
   updateMessage,

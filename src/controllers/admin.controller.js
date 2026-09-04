@@ -16,16 +16,35 @@ const { toE164 } = require('../config/phone');
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
 const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
 
-const LOGIN_RATE_LIMIT_MAX = 10;
+const LOGIN_RATE_LIMIT_MAX = 10; // на один IP
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
+// Лимит по IP легко обходится перебором с разных адресов (ботнет/прокси-пул) — общий
+// счётчик поверх него ловит именно распределённый перебор пароля, откуда бы он ни шёл.
+const LOGIN_RATE_LIMIT_GLOBAL_MAX = 30;
+const LOGIN_ALERT_THROTTLE_SECONDS = 15 * 60; // не спамить в Telegram чаще раза в окно
+
+async function incrWithExpiry(key, windowSeconds) {
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, windowSeconds);
+  return count;
+}
 
 async function checkLoginRateLimit(ip) {
-  const key = `admin_login_limit:${ip}`;
-  const count = await redis.incr(key);
-  if (count === 1) {
-    await redis.expire(key, LOGIN_RATE_LIMIT_WINDOW_SECONDS);
+  const [ipCount, globalCount] = await Promise.all([
+    incrWithExpiry(`admin_login_limit:${ip}`, LOGIN_RATE_LIMIT_WINDOW_SECONDS),
+    incrWithExpiry('admin_login_limit:global', LOGIN_RATE_LIMIT_WINDOW_SECONDS),
+  ]);
+  const allowed = ipCount <= LOGIN_RATE_LIMIT_MAX && globalCount <= LOGIN_RATE_LIMIT_GLOBAL_MAX;
+  if (!allowed) {
+    const alreadyAlerted = await redis.get('admin_login_alert_sent');
+    if (!alreadyAlerted) {
+      await redis.set('admin_login_alert_sent', '1', 'EX', LOGIN_ALERT_THROTTLE_SECONDS);
+      telegramService
+        .sendSecurityAlert(`⚠️ /admin: превышен лимит попыток входа (IP ${ip}). Похоже на подбор пароля.`)
+        .catch(() => {});
+    }
   }
-  return count <= LOGIN_RATE_LIMIT_MAX;
+  return allowed;
 }
 
 function showLogin(req, res) {
@@ -49,6 +68,9 @@ async function login(req, res) {
     secure: process.env.NODE_ENV !== 'development',
     expires: new Date(session.expiresAt),
   });
+  telegramService
+    .sendSecurityAlert(`✅ Вход в /admin\nIP: ${req.ip}\nUA: ${(req.get('user-agent') || '—').slice(0, 150)}`)
+    .catch(() => {});
   res.redirect('/admin');
 }
 
