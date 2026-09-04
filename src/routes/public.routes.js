@@ -6,6 +6,7 @@ const legalContent = require('../config/legal-content');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
 const promoService = require('../services/promo.service');
+const settingsService = require('../services/settings.service');
 const asyncHandler = require('../middleware/asyncHandler');
 
 const LEGAL_LOCALS = {
@@ -47,7 +48,10 @@ function redirectToCookieLocale(req, res, path) {
 router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
   const locale = resolveLocale(req, res, '/');
-  const masters = await masterService.listMasters();
+  const [masters, catalogCallPriceTetri] = await Promise.all([
+    masterService.listMasters(),
+    settingsService.getCatalogCallPriceTetri(),
+  ]);
   const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
   const reviewsByMaster = new Map();
   reviews.forEach((rv) => {
@@ -55,7 +59,7 @@ router.get('/', asyncHandler(async (req, res) => {
     reviewsByMaster.get(rv.master_id).push(rv);
   });
   masters.forEach((m) => { m.reviews = reviewsByMaster.get(m.id) || []; });
-  res.render('index', { masters, clientStrings: clientStrings(locale) });
+  res.render('index', { masters, catalogCallPriceTetri, clientStrings: clientStrings(locale) });
 }));
 
 router.get('/join', asyncHandler(async (req, res) => {

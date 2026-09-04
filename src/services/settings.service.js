@@ -8,6 +8,11 @@ const pool = require('../config/db');
 const LEAD_PRICE_KEY = 'lead_price_tetri';
 const DEFAULT_LEAD_PRICE_TETRI = 50; // фолбэк, если строки в БД ещё нет
 
+// Цена за раскрытие номера в публичном каталоге (клиент звонит мастеру напрямую, минуя
+// подачу заявки) — отдельный канал монетизации от цены лида с рассылки.
+const CATALOG_CALL_PRICE_KEY = 'catalog_call_price_tetri';
+const DEFAULT_CATALOG_CALL_PRICE_TETRI = 50;
+
 async function getSetting(key, fallback = null) {
   const { rows } = await pool.query('SELECT value FROM app_settings WHERE key = $1', [key]);
   return rows[0] ? rows[0].value : fallback;
@@ -31,10 +36,23 @@ async function setLeadPriceTetri(tetri) {
   await setSetting(LEAD_PRICE_KEY, tetri);
 }
 
+async function getCatalogCallPriceTetri() {
+  const raw = await getSetting(CATALOG_CALL_PRICE_KEY);
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_CATALOG_CALL_PRICE_TETRI;
+}
+
+async function setCatalogCallPriceTetri(tetri) {
+  await setSetting(CATALOG_CALL_PRICE_KEY, tetri);
+}
+
 module.exports = {
   getSetting,
   setSetting,
   getLeadPriceTetri,
   setLeadPriceTetri,
+  getCatalogCallPriceTetri,
+  setCatalogCallPriceTetri,
   DEFAULT_LEAD_PRICE_TETRI,
+  DEFAULT_CATALOG_CALL_PRICE_TETRI,
 };

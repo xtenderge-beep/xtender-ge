@@ -50,5 +50,6 @@ router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminControl
 
 router.get('/settings', asyncHandler(adminController.settingsPage));
 router.post('/settings/lead-price', verifyCsrf, asyncHandler(adminController.updateLeadPrice));
+router.post('/settings/catalog-call-price', verifyCsrf, asyncHandler(adminController.updateCatalogCallPrice));
 
 module.exports = router;

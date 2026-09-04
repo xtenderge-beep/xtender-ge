@@ -19,6 +19,12 @@ router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));
 router.post('/masters/otp/verify', asyncHandler(masterController.verifyOtp));
 router.post('/masters/register', asyncHandler(masterController.register));
+router.post('/masters/:id/reveal-phone', asyncHandler(masterController.revealPhone));
+
+// Раскрытие номера мастера в публичном каталоге — своя OTP-«авторизация» звонящего,
+// отдельная от регистрации исполнителя (purpose 'catalog', не 'master').
+router.post('/catalog/otp/send', asyncHandler(masterController.catalogOtpSend));
+router.post('/catalog/otp/verify', asyncHandler(masterController.catalogOtpVerify));
 router.post('/master/login/request-code', asyncHandler(masterController.loginRequestCode));
 router.post('/master/login/verify', asyncHandler(masterController.loginVerify));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));

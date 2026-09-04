@@ -257,7 +257,11 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   return rows[0] || null;
 }
 
-const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url';
+// balance_tetri — только чтобы каталог мог решить, показывать ли кнопку «Показать номер»
+// (см. revealPhoneForCall). Сам номер (m.phone) сюда попадает для server-side рендера
+// каталога; JSON-ручка /api/masters (masterController.list) обязана его вычищать перед
+// отдачей клиенту — иначе платный gate на «показать номер» тривиально обходится.
+const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri';
 
 async function listMasters({ category } = {}) {
   const params = [];
@@ -271,11 +275,40 @@ async function listMasters({ category } = {}) {
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
      WHERE ${where}
-     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url
+     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri
      ORDER BY m.id`,
     params
   );
   return rows;
+}
+
+// Списание за раскрытие номера в публичном каталоге — атомарно: UPDATE с условием на
+// баланс сам по себе исключает гонку (два одновременных клика не спишут дважды при
+// недостаточном балансе), без явного SELECT ... FOR UPDATE. 0 обновлённых строк =
+// баланса не хватило / мастер уже неактивен/забанен/удалён — вызывающий код трактует
+// null как «недоступен», не как ошибку.
+//
+// ⚠️ `balance_tetri + $1` с ОТРИЦАТЕЛЬНЫМ параметром, а не `balance_tetri - $1` с
+// положительным — на pg-mem вычитание параметра (не литерала) из колонки в SET даёт
+// результат с обратным знаком (баг найден 2026-09-05: `col - $1` считается как `$1 - col`,
+// а `col - 50` — верно). Тот же идиом уже используют adjustBalance/chargeMastersForLead
+// в этом файле — держим его и здесь, а не только чтобы обойти баг pg-mem.
+async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
+  return pool.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `UPDATE masters SET balance_tetri = balance_tetri + $1
+       WHERE id = $2 AND is_active = true AND is_banned = false AND balance_tetri >= $3
+       RETURNING id, phone, balance_tetri`,
+      [-priceTetri, masterId, priceTetri]
+    );
+    const master = rows[0];
+    if (!master) return null;
+    await client.query(
+      `INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'catalog_call', $3)`,
+      [master.id, -priceTetri, callerPhone ? `Звонок из каталога: ${callerPhone}` : null]
+    );
+    return master;
+  });
 }
 
 module.exports = {
@@ -295,4 +328,5 @@ module.exports = {
   chargeMastersForLead,
   topUpBalance,
   listMasters,
+  revealPhoneForCall,
 };

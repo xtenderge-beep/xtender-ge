@@ -322,20 +322,36 @@ async function rejectReview(req, res) {
   res.redirect('/admin/reviews');
 }
 
-// Настройки приложения — сейчас только цена лида (app_settings.lead_price_tetri),
-// которую раньше можно было поменять только правкой кода и деплоем.
+// Настройки приложения: цена лида с рассылки (app_settings.lead_price_tetri) и цена
+// раскрытия номера в публичном каталоге (catalog_call_price_tetri) — раньше первая была
+// захардкожена в коде, второй канал монетизации вообще не существовал.
 async function settingsPage(req, res) {
-  const leadPriceTetri = await settingsService.getLeadPriceTetri();
-  res.render('admin/settings', { leadPriceTetri, error: req.query.error || null, saved: req.query.saved === '1' });
+  const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([
+    settingsService.getLeadPriceTetri(),
+    settingsService.getCatalogCallPriceTetri(),
+  ]);
+  res.render('admin/settings', {
+    leadPriceTetri, catalogCallPriceTetri,
+    error: req.query.error || null, saved: req.query.saved || null,
+  });
 }
 
 async function updateLeadPrice(req, res) {
   const tetri = parseInt(req.body.leadPriceTetri, 10);
   if (!Number.isInteger(tetri) || tetri <= 0 || tetri > 10000) {
-    return res.redirect('/admin/settings?error=invalid');
+    return res.redirect('/admin/settings?error=invalid_lead');
   }
   await settingsService.setLeadPriceTetri(tetri);
-  res.redirect('/admin/settings?saved=1');
+  res.redirect('/admin/settings?saved=lead');
+}
+
+async function updateCatalogCallPrice(req, res) {
+  const tetri = parseInt(req.body.catalogCallPriceTetri, 10);
+  if (!Number.isInteger(tetri) || tetri <= 0 || tetri > 10000) {
+    return res.redirect('/admin/settings?error=invalid_catalog');
+  }
+  await settingsService.setCatalogCallPriceTetri(tetri);
+  res.redirect('/admin/settings?saved=catalog');
 }
 
 module.exports = {
@@ -372,4 +388,5 @@ module.exports = {
   assignManager,
   settingsPage,
   updateLeadPrice,
+  updateCatalogCallPrice,
 };

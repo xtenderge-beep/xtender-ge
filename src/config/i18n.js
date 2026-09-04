@@ -162,6 +162,10 @@ const dictionaries = {
     catalog_verified: 'თბილისის ბაზაში',
 
     btn_call: 'დარეკვა',
+    btn_show_phone: 'ნომრის ჩვენება',
+    catalog_master_unavailable: 'დროებით მიუწვდომელია',
+    reveal_modal_title: 'ტელეფონის ნომრის ნახვა',
+    reveal_modal_hint: 'დაადასტურეთ თქვენი ნომერი SMS-კოდით — ეს იცავს შემსრულებლებს არასასურველი ზარებისგან.',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'შეკვეთების ავტომატური განაწილების სერვისი თბილისში: გადაზიდვები, მუშები, სამშენებლო ნარჩენების გატანა.',
@@ -586,6 +590,10 @@ const dictionaries = {
     catalog_verified: 'В базе Тбилиси',
 
     btn_call: 'Позвонить',
+    btn_show_phone: 'Показать номер',
+    catalog_master_unavailable: 'Временно недоступен',
+    reveal_modal_title: 'Показать номер телефона',
+    reveal_modal_hint: 'Подтвердите свой номер SMS-кодом — это защищает исполнителей от нежелательных звонков.',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'Информационный сервис рассылки заказов по Тбилиси: Перевозки, Грузчики, Вывоз строймусора.',
@@ -1010,6 +1018,10 @@ const dictionaries = {
     catalog_verified: 'In the Tbilisi database',
 
     btn_call: 'Call',
+    btn_show_phone: 'Show phone number',
+    catalog_master_unavailable: 'Temporarily unavailable',
+    reveal_modal_title: 'Show phone number',
+    reveal_modal_hint: 'Verify your number with an SMS code — this protects providers from unwanted calls.',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'Automatic order dispatch service in Tbilisi: Moving, Movers, Construction waste removal.',

@@ -6,6 +6,7 @@ const smsService = require('../services/sms.service');
 const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
 const settingsService = require('../services/settings.service');
+const crypto = require('crypto');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
@@ -29,6 +30,29 @@ const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
 const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
 const OTP_PURPOSE = 'master';
 
+// --- Раскрытие номера в публичном каталоге (клиент звонит мастеру напрямую, минуя
+// подачу заявки) — отдельная OTP-«авторизация» звонящего + платное раскрытие номера.
+const CATALOG_OTP_PURPOSE = 'catalog';
+// «Запомнить» подтверждённый телефон на устройстве — иначе пришлось бы гонять человека
+// через SMS-код на каждого мастера, которому он хочет позвонить за один визит на сайт.
+// Непрозрачный токен в Redis (не сам номер) — cookie httpOnly, JS его прочитать не может.
+const CATALOG_SESSION_COOKIE = 'catalog_verified';
+const CATALOG_SESSION_TTL_SECONDS = 24 * 60 * 60;
+const CATALOG_REVEAL_RATE_MAX = 20;
+const CATALOG_REVEAL_RATE_WINDOW_SECONDS = 3600;
+
+async function createCatalogSession(phone) {
+  const token = crypto.randomBytes(24).toString('hex');
+  await redis.set(`catalog_session:${token}`, phone, 'EX', CATALOG_SESSION_TTL_SECONDS);
+  return token;
+}
+
+async function getCatalogSessionPhone(req) {
+  const token = req.cookies[CATALOG_SESSION_COOKIE];
+  if (!token) return null;
+  return redis.get(`catalog_session:${token}`);
+}
+
 function parseCargoDimension(value) {
   const num = parseInt(value, 10);
   return Number.isFinite(num) && num > 0 ? num : null;
@@ -45,7 +69,82 @@ function buildVehicleType({ vehicleType, cargoLength, cargoWidth, cargoHeight, b
 async function list(req, res) {
   const { category } = req.query;
   const masters = await masterService.listMasters({ category });
-  return res.json({ success: true, masters });
+  // Номер и баланс — только для server-side рендера каталога (index.ejs). Эта JSON-ручка
+  // публичная и без неё платный gate «Показать номер» тривиально обходится curl'ом.
+  const safe = masters.map(({ phone, balance_tetri, ...rest }) => rest);
+  return res.json({ success: true, masters: safe });
+}
+
+async function catalogOtpSend(req, res) {
+  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
+  if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
+    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  }
+  const result = await otpService.sendCode(toE164(rawPhone), null, CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  if (!result.success) {
+    if (result.reason === 'rate_limited') {
+      return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
+    }
+    return res.status(500).json({ success: false, message: 'Failed to send code' });
+  }
+  return res.json({ success: true });
+}
+
+async function catalogOtpVerify(req, res) {
+  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
+  const { code } = req.body;
+  if (!rawPhone || !PHONE_REGEX.test(rawPhone) || !code) {
+    return res.status(400).json({ success: false, message: 'Invalid phone or code' });
+  }
+  const phone = toE164(rawPhone);
+  const ok = await otpService.verifyCode(phone, code, CATALOG_OTP_PURPOSE, { meta: requestMeta(req), language: req.lang });
+  if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+
+  const token = await createCatalogSession(phone);
+  res.cookie(CATALOG_SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: CATALOG_SESSION_TTL_SECONDS * 1000,
+  });
+  return res.json({ success: true });
+}
+
+// Платное раскрытие номера мастера из публичного каталога. Требует «запомненный»
+// подтверждённый телефон звонящего (см. catalogOtpVerify) — если его ещё нет, отдаём
+// needsVerification, а не ошибку: фронт открывает модалку с OTP и повторяет запрос.
+async function revealPhone(req, res) {
+  const masterId = parseInt(req.params.id, 10);
+  if (!Number.isInteger(masterId)) {
+    return res.status(400).json({ success: false, message: 'Invalid master id' });
+  }
+
+  const callerPhone = await getCatalogSessionPhone(req);
+  if (!callerPhone) {
+    return res.json({ success: false, needsVerification: true });
+  }
+
+  // Этот звонящий уже раскрывал номер этого мастера недавно (перезагрузил страницу,
+  // нажал ещё раз) — отдаём номер повторно, но НЕ списываем деньги второй раз.
+  const dedupeKey = `catalog_revealed:${masterId}:${callerPhone}`;
+  const alreadyRevealed = await redis.get(dedupeKey);
+  if (alreadyRevealed) {
+    return res.json({ success: true, phone: alreadyRevealed });
+  }
+
+  const key = `catalog_reveal_limit:${callerPhone}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, CATALOG_REVEAL_RATE_WINDOW_SECONDS);
+  if (count > CATALOG_REVEAL_RATE_MAX) {
+    return res.status(429).json({ success: false, message: 'Too many requests' });
+  }
+
+  const price = await settingsService.getCatalogCallPriceTetri();
+  const master = await masterService.revealPhoneForCall(masterId, price, callerPhone);
+  if (!master) {
+    return res.json({ success: false, reason: 'unavailable' });
+  }
+  await redis.set(dedupeKey, master.phone, 'EX', CATALOG_SESSION_TTL_SECONDS);
+  return res.json({ success: true, phone: master.phone });
 }
 
 async function sendOtp(req, res) {
@@ -354,4 +453,7 @@ module.exports = {
   sendSupportMessage,
   activatePromo,
   submitTopupReceipt,
+  catalogOtpSend,
+  catalogOtpVerify,
+  revealPhone,
 };

@@ -456,15 +456,16 @@
                                         </div>
                                       <% } %>
 
-                                      <div class="flex gap-2">
-                                          <a href="tel:<%= master.phone %>" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
-                                              <i class="fa-solid fa-phone text-[10px]"></i>
-                                              <span><%= t('btn_call') %></span>
-                                          </a>
-                                          <a href="https://wa.me/<%= master.phone.replace(/\D/g, '') %>" target="_blank" rel="noopener" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70">
-                                              <i class="fa-brands fa-whatsapp"></i>
-                                              <span>WhatsApp</span>
-                                          </a>
+                                      <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
+                                          <% if (master.balance_tetri >= catalogCallPriceTetri) { %>
+                                            <button type="button" class="reveal-phone-btn w-full px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                                    data-master-id="<%= master.id %>">
+                                                <i class="fa-solid fa-phone text-[10px]"></i>
+                                                <span><%= t('btn_show_phone') %></span>
+                                            </button>
+                                          <% } else { %>
+                                            <p class="text-[11px] text-stone-400 text-center py-2"><%= t('catalog_master_unavailable') %></p>
+                                          <% } %>
                                       </div>
 
                                       <div class="border-t border-stone-100 pt-3">
@@ -602,6 +603,33 @@
                     <i class="fa-solid fa-circle-check"></i>
                 </div>
                 <p class="text-sm font-semibold text-stone-700"><%= t('reviews_thanks') %></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="reveal-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
+            <button onclick="closeModal('reveal-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
+
+            <div class="space-y-1">
+                <h3 class="text-base font-bold text-stone-900"><%= t('reveal_modal_title') %></h3>
+                <p class="text-xs text-stone-500"><%= t('reveal_modal_hint') %></p>
+            </div>
+
+            <p id="reveal-modal-msg" class="hidden text-xs font-bold p-3 rounded-xl"></p>
+
+            <div id="reveal-step-phone" class="space-y-3">
+                <input id="reveal-phone" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
+                       class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
+                <button type="button" onclick="revealRequestCode()" id="reveal-phone-btn"
+                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
+            </div>
+
+            <div id="reveal-step-code" class="hidden space-y-3">
+                <input id="reveal-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
+                       class="w-full text-center tracking-[0.4em] font-mono text-lg border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
+                <button type="button" onclick="revealVerifyCode()" id="reveal-code-btn"
+                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
             </div>
         </div>
     </div>
@@ -1069,6 +1097,126 @@
                 }
             } catch (e) {
                 reviewMsg(T.js_err_send_code, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- Каталог: платное раскрытие номера (телефон -> SMS-код -> показ номера) ---
+        const revealModalMsg = document.getElementById('reveal-modal-msg');
+        let revealMasterId = null;
+
+        function revealMsg(text, isError) {
+            if (!text) { revealModalMsg.classList.add('hidden'); return; }
+            revealModalMsg.classList.remove('hidden');
+            revealModalMsg.textContent = text;
+            revealModalMsg.className = 'text-xs font-bold p-3 rounded-xl ' + (isError
+                ? 'bg-red-50 text-red-700 border border-red-200'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200');
+        }
+
+        function revealShowStep(name) {
+            document.getElementById('reveal-step-phone').classList.toggle('hidden', name !== 'phone');
+            document.getElementById('reveal-step-code').classList.toggle('hidden', name !== 'code');
+        }
+
+        function showRevealedContact(masterId, phone) {
+            const slot = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]');
+            if (!slot) return;
+            const digits = phone.replace(/\D/g, '');
+            slot.innerHTML =
+                '<div class="flex gap-2">' +
+                    '<a href="tel:' + phone + '" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">' +
+                        '<i class="fa-solid fa-phone text-[10px]"></i><span>' + phone + '</span></a>' +
+                    '<a href="https://wa.me/' + digits + '" target="_blank" rel="noopener" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70">' +
+                        '<i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>' +
+                '</div>';
+        }
+
+        function showRevealUnavailable(masterId) {
+            const slot = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]');
+            if (slot) slot.innerHTML = '<p class="text-[11px] text-stone-400 text-center py-2">' + T.catalog_master_unavailable + '</p>';
+        }
+
+        // true — обработано (показали номер или «недоступен»), false — нужна верификация телефона
+        async function attemptReveal(masterId) {
+            const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) { showRevealedContact(masterId, data.phone); return true; }
+            if (data.needsVerification) return false;
+            showRevealUnavailable(masterId);
+            return true;
+        }
+
+        document.querySelectorAll('.reveal-phone-btn').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const masterId = btn.dataset.masterId;
+                btn.disabled = true;
+                let handled = true;
+                try {
+                    handled = await attemptReveal(masterId);
+                } catch (e) {
+                    handled = false;
+                }
+                if (!handled) {
+                    btn.disabled = false;
+                    revealMasterId = masterId;
+                    document.getElementById('reveal-phone').value = '';
+                    document.getElementById('reveal-code').value = '';
+                    revealMsg('');
+                    revealShowStep('phone');
+                    openModal('reveal-modal');
+                }
+            });
+        });
+
+        async function revealRequestCode() {
+            const phone = document.getElementById('reveal-phone').value.trim();
+            if (!phone) return revealMsg(T.js_err_empty_phone, true);
+            const btn = document.getElementById('reveal-phone-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/catalog/otp/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    revealMsg(T.js_ok_code_sent, false);
+                    revealShowStep('code');
+                } else {
+                    revealMsg(data.message || T.js_err_send_code, true);
+                }
+            } catch (e) {
+                revealMsg(T.js_err_send_code, true);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function revealVerifyCode() {
+            const phone = document.getElementById('reveal-phone').value.trim();
+            const code = document.getElementById('reveal-code').value.trim();
+            if (!code) return revealMsg(T.js_err_empty_code, true);
+            const btn = document.getElementById('reveal-code-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/catalog/otp/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, code }),
+                });
+                const data = await res.json();
+                if (!data.success) return revealMsg(data.message || T.js_err_wrong_code, true);
+                const handled = await attemptReveal(revealMasterId);
+                if (handled) {
+                    closeModal('reveal-modal');
+                } else {
+                    revealMsg(T.js_err_send_code, true);
+                }
+            } catch (e) {
+                revealMsg(T.js_err_wrong_code, true);
             } finally {
                 btn.disabled = false;
             }

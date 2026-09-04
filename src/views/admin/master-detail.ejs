@@ -142,7 +142,7 @@
             <div class="flex items-center justify-between text-sm border-b border-stone-100 pb-1.5">
                 <span class="text-stone-500 font-mono text-xs"><%= new Date(h.created_at).toLocaleString('ru') %></span>
                 <span class="text-stone-600">
-                    <%= h.reason === 'topup' ? 'Пополнение' : h.reason === 'lead_charge' ? 'Списание за лид' : 'Коррекция' %>
+                    <%= h.reason === 'topup' ? 'Пополнение' : h.reason === 'lead_charge' ? 'Списание за лид' : h.reason === 'catalog_call' ? 'Показ номера в каталоге' : 'Коррекция' %>
                     <% if (h.note) { %> — <%= h.note %><% } %>
                 </span>
                 <span class="font-mono font-bold <%= h.amount_tetri >= 0 ? 'text-emerald-700' : 'text-red-600' %>">

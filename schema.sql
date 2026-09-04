@@ -177,7 +177,13 @@ CREATE TABLE IF NOT EXISTS balance_transactions (
     id SERIAL PRIMARY KEY,
     master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
     amount_tetri INTEGER NOT NULL,
-    reason VARCHAR(30) NOT NULL CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo')),
+    -- Constraint именован явно (не полагаемся на автогенерируемое имя) — иначе последующий
+    -- ALTER TABLE ... DROP CONSTRAINT balance_transactions_reason_check его не находит на
+    -- pg-mem (там имя безымянного inline CHECK не совпадает с конвенцией `<table>_<col>_check`,
+    -- в отличие от реального Postgres) — DROP молча no-op'ится, и остаются ДВА конфликтующих
+    -- CHECK одновременно: старый (без новых reason) и новый из ALTER ниже. Найдено 2026-09-05
+    -- на reason='catalog_call' — но это же наверняка ломало и reason='promo' на pg-mem раньше.
+    reason VARCHAR(30) NOT NULL CONSTRAINT balance_transactions_reason_check CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo')),
     note TEXT,
     order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -187,9 +193,11 @@ CREATE INDEX IF NOT EXISTS idx_balance_transactions_order_id ON balance_transact
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_created_at ON balance_transactions(created_at);
 
 -- reason='promo' добавлен позже — на уже созданной таблице CHECK нужно пересоздать.
+-- reason='catalog_call' (2026-09-05) — списание за раскрытие номера в публичном каталоге,
+-- отдельный от 'lead_charge' канал монетизации (см. app_settings.catalog_call_price_tetri).
 ALTER TABLE balance_transactions DROP CONSTRAINT IF EXISTS balance_transactions_reason_check;
 ALTER TABLE balance_transactions ADD CONSTRAINT balance_transactions_reason_check
-    CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo'));
+    CHECK (reason IN ('topup', 'lead_charge', 'admin_correction', 'promo', 'catalog_call'));
 
 -- Промокоды на welcome-бонус при регистрации на /join. Гасится один раз на номер
 -- (masters.promo_code_used), сумма просто падает на balance_tetri через adjustBalance
@@ -327,3 +335,6 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 INSERT INTO app_settings (key, value) VALUES ('lead_price_tetri', '50') ON CONFLICT (key) DO NOTHING;
+-- Цена за раскрытие номера в публичном каталоге (клиент, который не постит заявку, а сразу
+-- звонит мастеру из каталога) — отдельный от рассылки канал монетизации, см. HANDOFF 2026-09-05.
+INSERT INTO app_settings (key, value) VALUES ('catalog_call_price_tetri', '50') ON CONFLICT (key) DO NOTHING;

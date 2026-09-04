@@ -3,17 +3,17 @@
 <h1 class="text-xl font-black text-stone-900">Настройки</h1>
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5 max-w-md">
-    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-1">Цена лида</h2>
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-1">Цена лида (рассылка заявок)</h2>
     <p class="text-xs text-stone-500 mb-4">
         Сумма (в тетри), которая автоматически списывается с баланса исполнителя за каждое
         отправленное ему SMS/Telegram-уведомление о заявке — независимо от того, ответил он
         клиенту или нет (см. Публичную оферту, п. 1.3). 100 тетри = 1 ₾.
     </p>
 
-    <% if (error === 'invalid') { %>
+    <% if (error === 'invalid_lead') { %>
       <p class="mb-3 text-sm text-red-600 font-semibold">Некорректное значение — введите целое число тетри больше нуля.</p>
     <% } %>
-    <% if (saved) { %>
+    <% if (saved === 'lead') { %>
       <p class="mb-3 text-sm text-emerald-700 font-semibold">Сохранено. Новая цена действует со следующей рассылки.</p>
     <% } %>
 
@@ -33,6 +33,40 @@
         Меняет только цену для будущих рассылок. Уже списанное не пересчитывается, текущие
         балансы исполнителей не трогаются. Порог алерта «баланс заканчивается» (≈5 лидов)
         пересчитывается от новой цены автоматически.
+    </p>
+</div>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5 max-w-md">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-1">Цена показа номера (каталог)</h2>
+    <p class="text-xs text-stone-500 mb-4">
+        Клиент, который не подаёт заявку, а сам находит исполнителя в каталоге на главной и
+        жмёт «Показать номер», сначала подтверждает свой телефон SMS-кодом — после этого с
+        баланса исполнителя списывается эта сумма и номер показывается. Отдельный канал от
+        цены лида выше: не связан с рассылкой заявок.
+    </p>
+
+    <% if (error === 'invalid_catalog') { %>
+      <p class="mb-3 text-sm text-red-600 font-semibold">Некорректное значение — введите целое число тетри больше нуля.</p>
+    <% } %>
+    <% if (saved === 'catalog') { %>
+      <p class="mb-3 text-sm text-emerald-700 font-semibold">Сохранено. Новая цена действует со следующего показа номера.</p>
+    <% } %>
+
+    <form method="POST" action="/admin/settings/catalog-call-price" class="flex items-end gap-2">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <div class="flex-1">
+            <label class="text-xs font-bold text-stone-500">Тетри за показ номера</label>
+            <input type="number" name="catalogCallPriceTetri" min="1" max="10000" step="1" required
+                   value="<%= catalogCallPriceTetri %>"
+                   class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-emerald-500">
+        </div>
+        <span class="pb-2.5 text-sm text-stone-400 font-mono">= <%= (catalogCallPriceTetri / 100).toFixed(2) %> ₾</span>
+        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить</button>
+    </form>
+
+    <p class="mt-4 text-[11px] text-stone-400 leading-relaxed">
+        Если у исполнителя баланс меньше этой суммы, кнопка «Показать номер» на его карточке
+        в каталоге не показывается — вместо неё «Временно недоступен».
     </p>
 </div>
 
