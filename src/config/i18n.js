@@ -93,18 +93,18 @@ const dictionaries = {
     accordion_how_body: 'აღწერეთ დავალება, მონიშნეთ საჭირო სერვისი(ები) და, სურვილის შემთხვევაში, დაურთეთ ფოტო. დაადასტურეთ ტელეფონის ნომერი SMS კოდით — და თქვენი მოთხოვნა მაშინვე გაეგზავნება შესაბამის შემსრულებლებს. ისინი დაგირეკავენ პირდაპირ ფასის შეთავაზებით.',
 
     freeform_label: 'აღწერეთ, რა გჭირდებათ',
-    freeform_placeholder: 'მაგ: მინდა გავიტანო მშენებლობის ნარჩენები, მისამართი: ვაკე, ჭავჭავაძის 45. ან: მჭირდება მუშები მაცივრის ასაწევად, მისამართი: საბურთალო...',
+    freeform_placeholder: 'მაგ: ვაკიდან სამშენებლო ნაგვის გატანა ან მე-4 სართულიდან დივნის ჩამოტანა...',
     freeform_services_label: 'რომელი სერვისი გჭირდებათ?',
     photo_argument_generic: 'ფოტო ან ვიდეო დაეხმარება შემსრულებელს ზუსტი ფასის თქმაში — ასე ის ვერ გაზრდის ფასს ადგილზე.',
 
     composer_headline: 'მოგვიყევით, რა უნდა გაკეთდეს',
     composer_subtitle: 'თუ ფოტოს დაამატებთ, შემსრულებლების შემოთავაზება მეტი იქნება',
-    composer_publish: 'გამოქვეყნება',
+    composer_publish: 'შეთავაზებების მიღება',
     filter_all: 'ყველა',
     filter_all_sizes: 'ყველა ზომა',
     composer_publish_hint: 'შემსრულებლები დაგირეკავენ ფასის შეთავაზებით',
     composer_photo_btn: 'ფოტო',
-    composer_label: 'რა გჭირდებათ?',
+    composer_label: 'რა არის გასაკეთებელი?',
     composer_tag: 'განაცხადის შექმნა',
     composer_trust: 'თქვენს კონტაქტებს მხოლოდ გადამოწმებული შემსრულებლები ნახავენ',
     hero_response_badge: 'შემსრულებლები პასუხობენ ჩვეულებრივ 3–5 წუთში',
@@ -365,7 +365,7 @@ const dictionaries = {
     service_name_junk: 'ნაგვის გატანა',
 
     seo_hero_h1: 'გადაზიდვები, მუშები და ნაგვის გატანა თბილისში',
-    seo_hero_lead: 'აღწერეთ დავალება — გადამოწმებული შემსრულებლები დაგირეკავენ ფასით. უფასოდ.',
+    seo_hero_lead: 'ნუ ეძებთ თავად. დაწერეთ რა გჭირდებათ — თავისუფალი შემსრულებლები დაგირეკავენ და შემოგთავაზებენ ფასს.',
 
     how_it_works_title: 'როგორ მუშაობს',
     how_it_works_step1_title: 'აღწერეთ დავალება',
@@ -517,13 +517,13 @@ const dictionaries = {
     accordion_how_body: 'Опишите задачу, отметьте нужную услугу (или несколько) и, при желании, прикрепите фото. Подтвердите номер телефона кодом из SMS — и заявка сразу уйдёт подходящим исполнителям. Они перезвонят вам напрямую с ценой.',
 
     freeform_label: 'Опишите, что вам нужно',
-    freeform_placeholder: 'Например: хочу вывезти строительный мусор, адрес: Ваке, ул. Чавчавадзе 45. Или: нужны грузчики поднять холодильник, адрес: Сабуртало...',
+    freeform_placeholder: 'Например: вывезти строительный мусор из Ваке или спустить диван с 4 этажа...',
     freeform_services_label: 'Какая услуга вам нужна?',
     photo_argument_generic: 'Фото или видео помогут исполнителю точно назвать цену — так он не сможет завысить её на месте.',
 
     composer_headline: 'Расскажите, что нужно сделать',
     composer_subtitle: 'Если добавите фото, предложений от исполнителей будет больше',
-    composer_publish: 'Опубликовать',
+    composer_publish: 'Получить предложения',
     composer_publish_hint: 'Исполнители перезвонят с предложением цены',
     composer_photo_btn: 'Фото',
     composer_label: 'Что нужно сделать?',
@@ -788,8 +788,8 @@ const dictionaries = {
     service_name_movers: 'Грузчики',
     service_name_junk: 'Вывоз мусора',
 
-    seo_hero_h1: 'Перевозки, грузчики и вывоз мусора в Тбилиси',
-    seo_hero_lead: 'Опишите задачу — проверенные исполнители перезвонят с ценой. Бесплатно.',
+    seo_hero_h1: 'Грузоперевозки, грузчики и вывоз мусора в Тбилиси',
+    seo_hero_lead: 'Не ищите сами. Опишите задачу — свободные мастера позвонят и предложат свои цены.',
 
     how_it_works_title: 'Как это работает',
     how_it_works_step1_title: 'Опишите задачу',
@@ -941,16 +941,16 @@ const dictionaries = {
     accordion_how_body: 'Describe the task, check the service(s) you need, and optionally attach a photo. Confirm your phone number with an SMS code — your request is sent immediately to matching providers. They\'ll call you back directly with a price.',
 
     freeform_label: 'Describe what you need',
-    freeform_placeholder: 'Example: I want to remove construction waste, address: Vake, Chavchavadze St 45. Or: need movers to lift a fridge, address: Saburtalo...',
+    freeform_placeholder: 'E.g., remove construction debris from Vake or carry a sofa down from the 4th floor...',
     freeform_services_label: 'Which service do you need?',
     photo_argument_generic: 'A photo or video helps the provider quote an exact price — so they can\'t raise it on-site.',
 
     composer_headline: 'Tell us what needs to be done',
     composer_subtitle: 'Adding a photo means more offers from providers',
-    composer_publish: 'Publish',
+    composer_publish: 'Get offers',
     composer_publish_hint: 'Providers will call you back with a price',
     composer_photo_btn: 'Photo',
-    composer_label: 'What do you need?',
+    composer_label: 'What needs to be done?',
     composer_tag: 'New request',
     composer_trust: 'Only verified providers will see your contact details',
     hero_response_badge: 'Providers usually reply within 3–5 minutes',
@@ -1212,8 +1212,8 @@ const dictionaries = {
     service_name_movers: 'Movers',
     service_name_junk: 'Junk removal',
 
-    seo_hero_h1: 'Moving, Movers and Junk Removal in Tbilisi',
-    seo_hero_lead: 'Describe your task — verified providers call you back with a price. Free.',
+    seo_hero_h1: 'Freight, movers, and trash removal in Tbilisi',
+    seo_hero_lead: "Don't search yourself. Describe the task — available workers will call with their prices.",
 
     how_it_works_title: 'How it works',
     how_it_works_step1_title: 'Describe your task',
