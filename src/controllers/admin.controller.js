@@ -10,6 +10,7 @@ const supportService = require('../services/support.service');
 const promoService = require('../services/promo.service');
 const managerService = require('../services/manager.service');
 const consentLogService = require('../services/consentLog.service');
+const settingsService = require('../services/settings.service');
 const { toE164 } = require('../config/phone');
 
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
@@ -321,6 +322,22 @@ async function rejectReview(req, res) {
   res.redirect('/admin/reviews');
 }
 
+// Настройки приложения — сейчас только цена лида (app_settings.lead_price_tetri),
+// которую раньше можно было поменять только правкой кода и деплоем.
+async function settingsPage(req, res) {
+  const leadPriceTetri = await settingsService.getLeadPriceTetri();
+  res.render('admin/settings', { leadPriceTetri, error: req.query.error || null, saved: req.query.saved === '1' });
+}
+
+async function updateLeadPrice(req, res) {
+  const tetri = parseInt(req.body.leadPriceTetri, 10);
+  if (!Number.isInteger(tetri) || tetri <= 0 || tetri > 10000) {
+    return res.redirect('/admin/settings?error=invalid');
+  }
+  await settingsService.setLeadPriceTetri(tetri);
+  res.redirect('/admin/settings?saved=1');
+}
+
 module.exports = {
   showLogin,
   login,
@@ -353,4 +370,6 @@ module.exports = {
   managerUpdate,
   managerDetail,
   assignManager,
+  settingsPage,
+  updateLeadPrice,
 };

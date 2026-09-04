@@ -7,6 +7,7 @@ const smsService = require('../services/sms.service');
 const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
 const managerService = require('../services/manager.service');
+const settingsService = require('../services/settings.service');
 const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
@@ -22,8 +23,6 @@ const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
-// В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
-const LEAD_PRICE_TETRI = 50;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed']);
 const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
@@ -585,10 +584,11 @@ async function show(req, res) {
   if (masterId && !isOwner) {
     const m = await masterService.getMasterById(Number(masterId));
     if (m && !m.is_banned) {
+      const leadPriceTetri = await settingsService.getLeadPriceTetri();
       masterAccount = {
         token: m.master_token,
         balanceTetri: m.balance_tetri,
-        leadsLeft: Math.floor(m.balance_tetri / LEAD_PRICE_TETRI),
+        leadsLeft: Math.floor(m.balance_tetri / leadPriceTetri),
       };
     }
   }

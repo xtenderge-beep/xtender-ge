@@ -2,11 +2,13 @@ const pool = require('../config/db');
 const redis = require('../config/redis');
 const smsService = require('./sms.service');
 const masterService = require('./master.service');
+const settingsService = require('./settings.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
-const COST_PER_NOTIFICATION_TETRI = 50;
-const LOW_BALANCE_NUDGE_TETRI = 250; // ~5 лидов — ниже этого шлём разовый «пополни»
+// Цена лида теперь в БД (app_settings, правится в /admin/settings) — settingsService
+// её читает, тут только порог «баланс заканчивается» как множитель цены (~5 лидов).
+const LOW_BALANCE_NUDGE_LEADS = 5;
 const NUDGE_THROTTLE_SECONDS = 24 * 60 * 60;
 
 // Разовый (не чаще раза в сутки) пинок «пополни баланс» — в Telegram, если привязан,
@@ -175,6 +177,7 @@ async function closeOrder(token) {
 }
 
 async function getMasterCountsByCategory() {
+  const leadPrice = await settingsService.getLeadPriceTetri();
   const { rows } = await pool.query(
     `SELECT category, vehicle_size, COUNT(*)::int AS count
      FROM masters
@@ -187,7 +190,7 @@ async function getMasterCountsByCategory() {
      WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
        AND category = 'transport' AND is_flatbed = true`,
-    [COST_PER_NOTIFICATION_TETRI]
+    [leadPrice]
   );
   return rows;
 }
@@ -212,6 +215,9 @@ async function notifyMasters(order, category, vehicleSize) {
   // прямой require здесь замкнул бы цикл на этапе загрузки.
   const telegramService = require('./telegram.service');
 
+  const leadPrice = await settingsService.getLeadPriceTetri();
+  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
+
   // Условие по категории/размеру строим один раз — оно нужно и для «кому разослать»
   // (баланс есть), и для «кто подходил, но денег не хватило» (missed). $1 = цена лида.
   const catParams = [];
@@ -232,7 +238,7 @@ async function notifyMasters(order, category, vehicleSize) {
   const { rows: masters } = await pool.query(
     `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
      WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`,
-    [COST_PER_NOTIFICATION_TETRI, ...catParams]
+    [leadPrice, ...catParams]
   );
   const base = getBaseUrl();
 
@@ -264,7 +270,7 @@ async function notifyMasters(order, category, vehicleSize) {
 
   if (notifiedIds.length) {
     await pool.withTransaction((client) =>
-      masterService.chargeMastersForLead(notifiedIds, COST_PER_NOTIFICATION_TETRI, order.id, client)
+      masterService.chargeMastersForLead(notifiedIds, leadPrice, order.id, client)
     );
 
     // Списание уронило баланс ниже «мало» — разовый пинок «пополни».
@@ -272,10 +278,10 @@ async function notifyMasters(order, category, vehicleSize) {
       masters
         .filter((m) =>
           notifiedIds.includes(m.id) &&
-          m.balance_tetri >= LOW_BALANCE_NUDGE_TETRI &&
-          m.balance_tetri - COST_PER_NOTIFICATION_TETRI < LOW_BALANCE_NUDGE_TETRI)
+          m.balance_tetri >= lowBalanceNudgeTetri &&
+          m.balance_tetri - leadPrice < lowBalanceNudgeTetri)
         .map((m) =>
-          nudgeLowBalance({ ...m, balance_tetri: m.balance_tetri - COST_PER_NOTIFICATION_TETRI }, telegramService, 'low'))
+          nudgeLowBalance({ ...m, balance_tetri: m.balance_tetri - leadPrice }, telegramService, 'low'))
     );
   }
 
@@ -283,7 +289,7 @@ async function notifyMasters(order, category, vehicleSize) {
   const { rows: broke } = await pool.query(
     `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
      WHERE ${activeWhere} AND balance_tetri < $1${catClause}`,
-    [COST_PER_NOTIFICATION_TETRI, ...catParams]
+    [leadPrice, ...catParams]
   );
   if (broke.length) {
     const brokeIds = broke.map((m) => m.id);

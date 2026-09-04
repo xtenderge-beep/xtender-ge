@@ -48,4 +48,7 @@ router.get('/managers/:id', asyncHandler(adminController.managerDetail));
 router.post('/managers/:id/update', verifyCsrf, asyncHandler(adminController.managerUpdate));
 router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
 
+router.get('/settings', asyncHandler(adminController.settingsPage));
+router.post('/settings/lead-price', verifyCsrf, asyncHandler(adminController.updateLeadPrice));
+
 module.exports = router;

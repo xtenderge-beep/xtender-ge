@@ -316,3 +316,14 @@ CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_master ON sms_consent_logs (mast
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_event  ON sms_consent_logs (event_type);
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ts     ON sms_consent_logs (timestamp_utc);
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ref    ON sms_consent_logs (otp_reference_id);
+
+-- === Настройки приложения — ключ/значение, редактируются в /admin/settings (2026-09-05) ===
+-- Раньше цена лида была захардкожена (COST_PER_NOTIFICATION_TETRI = 50 в order.service.js).
+-- Значение читается сервисом settings.service.js с фолбэком на дефолт в коде, если строки
+-- ещё нет (на случай, если миграция накатилась, а сид — нет, или ключ ещё не создан).
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        VARCHAR(50) PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO app_settings (key, value) VALUES ('lead_price_tetri', '50') ON CONFLICT (key) DO NOTHING;

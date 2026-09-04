@@ -5,6 +5,7 @@ const telegramService = require('../services/telegram.service');
 const smsService = require('../services/sms.service');
 const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
+const settingsService = require('../services/settings.service');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
@@ -14,8 +15,6 @@ const { TERMS_VERSION, consentSnapshot, consentMeta } = require('../config/legal
 const payment = require('../config/payment');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
-// В синхроне с order.service COST_PER_NOTIFICATION_TETRI.
-const LEAD_PRICE_TETRI = 50;
 const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';
@@ -179,6 +178,7 @@ async function register(req, res) {
 // Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
 async function statusPage(req, res) {
   const strings = clientStrings(req.lang);
+  const leadPriceTetri = await settingsService.getLeadPriceTetri();
 
   // /master без токена, но устройство помнит вход — сразу в кабинет, без телефона и SMS.
   if (!req.params.token && req.cookies[MASTER_COOKIE]) {
@@ -193,7 +193,7 @@ async function statusPage(req, res) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
       master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [],
-      leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
+      leadPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
 
@@ -214,7 +214,7 @@ async function statusPage(req, res) {
 
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads, supportMessages,
-    leadPriceTetri: LEAD_PRICE_TETRI, payment, botUsername: BOT_USERNAME, clientStrings: strings,
+    leadPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }
 
