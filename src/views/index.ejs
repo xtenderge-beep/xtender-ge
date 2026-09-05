@@ -34,11 +34,10 @@
           name: 'Tbilisi',
           address: { '@type': 'PostalAddress', addressLocality: 'Tbilisi', addressCountry: 'GE' },
         },
-        makesOffer: [
-          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_transport'), areaServed: 'Tbilisi' } },
-          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_movers'), areaServed: 'Tbilisi' } },
-          { '@type': 'Offer', itemOffered: { '@type': 'Service', name: t('service_name_junk'), areaServed: 'Tbilisi' } },
-        ],
+        makesOffer: catalogGroups.map((g) => ({
+          '@type': 'Offer',
+          itemOffered: { '@type': 'Service', name: g.label, areaServed: 'Tbilisi' },
+        })),
       };
       const faqItems = [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t('faq_a' + n) }));
       const faqJsonLd = {
@@ -509,7 +508,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <% groups.forEach(function (group) { %>
                               <div class="bg-white rounded-xl border border-stone-200/90 p-3.5">
-                                  <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>"><%= group.icon %> <%= t('service_desc_' + group.key + '_title') %></span>
+                                  <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>"><%= group.icon %> <%= group.label %></span>
                                   <p class="mt-1.5 text-xs text-stone-500 leading-snug"><%= t('service_desc_' + group.key + '_body') %></p>
                               </div>
                             <% }); %>

@@ -419,12 +419,10 @@ const dictionaries = {
     how_it_works_step4_title: 'გირეკავენ ფასის შეთავაზებით',
     how_it_works_step4_desc: 'ადარებთ შეთავაზებებს და ირჩევთ. ან თავად ურეკავთ კატალოგიდან.',
 
-    service_desc_transport_title: 'გადაზიდვები',
-    service_desc_transport_body: 'მანქანები L / XL / XXL — ავეჯის, ტექნიკის და სამშენებლო მასალისთვის.',
-    service_desc_movers_title: 'მუშები',
+    service_desc_van_body: 'მანქანები S / L / XL / XXL, დახურული ან ბორტიანი — ავეჯი, ტექნიკა, სამშენებლო მასალა, ნაგვის გატანა.',
     service_desc_movers_body: 'დატვირთვა, გადმოტვირთვა და ნივთების გადატანა მანქანის გარეშე.',
-    service_desc_junk_title: 'ნაგვის გატანა',
-    service_desc_junk_body: 'სამშენებლო ნარჩენების, ძველი ავეჯის და ჭურჭლის გატანა. ფასზე შეთანხმდებით პირდაპირ.',
+    service_desc_tow_body: 'ევაკუატორი მსუბუქი და სატვირთო მანქანებისთვის — გადამტეხი პლატფორმა ან ობობა.',
+    service_desc_bucket_lift_body: 'ავტოამწე (ჟირაფი) სიმაღლეზე სამუშაოდ — რეკლამა, ხეები, ფასადი, განათება.',
 
     coverage_title: 'მომსახურების ზონა',
     coverage_body: 'ვმუშაობთ მთელი თბილისის მასშტაბით.',
@@ -885,12 +883,10 @@ const dictionaries = {
     how_it_works_step4_title: 'Вам перезванивают с ценой',
     how_it_works_step4_desc: 'Сравниваете предложения и выбираете. Или звоните из каталога сами.',
 
-    service_desc_transport_title: 'Перевозки',
-    service_desc_transport_body: 'Машины L / XL / XXL — под мебель, технику и стройматериалы.',
-    service_desc_movers_title: 'Грузчики',
+    service_desc_van_body: 'Машины S / L / XL / XXL, закрытые и бортовые — мебель, техника, стройматериалы, вывоз мусора.',
     service_desc_movers_body: 'Погрузка, разгрузка и перенос вещей без машины.',
-    service_desc_junk_title: 'Вывоз мусора',
-    service_desc_junk_body: 'Вывоз строительных отходов, старой мебели и хлама. Цена — с исполнителем напрямую.',
+    service_desc_tow_body: 'Эвакуатор для легковых и грузовых — ломаная платформа или паук.',
+    service_desc_bucket_lift_body: 'Автовышка (жираф) для работ на высоте — реклама, деревья, фасад, освещение.',
 
     coverage_title: 'Зона обслуживания',
     coverage_body: 'Работаем по всему Тбилиси.',
@@ -1351,12 +1347,10 @@ const dictionaries = {
     how_it_works_step4_title: 'You get called back with a price',
     how_it_works_step4_desc: 'Compare the offers and choose. Or call from the catalog yourself.',
 
-    service_desc_transport_title: 'Moving & transport',
-    service_desc_transport_body: 'Vehicles L / XL / XXL — for furniture, appliances and building materials.',
-    service_desc_movers_title: 'Movers',
+    service_desc_van_body: 'Vans S / L / XL / XXL, enclosed or flatbed — furniture, appliances, building materials, junk removal.',
     service_desc_movers_body: 'Loading, unloading and carrying items without a vehicle.',
-    service_desc_junk_title: 'Junk removal',
-    service_desc_junk_body: 'Construction waste, old furniture and junk removal. Price agreed directly with the provider.',
+    service_desc_tow_body: 'Tow trucks for cars and trucks — slide-back flatbed or wheel-lift.',
+    service_desc_bucket_lift_body: 'Bucket lift (aerial platform) for work at height — signage, trees, facades, lighting.',
 
     coverage_title: 'Coverage area',
     coverage_body: 'We operate across all of Tbilisi.',
