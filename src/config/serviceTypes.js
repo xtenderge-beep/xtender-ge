@@ -27,6 +27,7 @@ const SERVICE_TYPES = {
   van: {
     icon: '🚚',
     catalogGroup: true,
+    catalogColor: 'bg-amber-100 text-amber-900 border-amber-200',
     fields: [
       { key: 'size', input: 'size', options: ['S', 'L', 'XL', 'XXL'], match: 'gte', filter: true },
       {
@@ -41,6 +42,7 @@ const SERVICE_TYPES = {
   movers: {
     icon: '💪',
     catalogGroup: true,
+    catalogColor: 'bg-emerald-100 text-emerald-900 border-emerald-200',
     fields: [
       { key: 'crew_size', input: 'number', unit: 'чел.', min: 1, max: 20, match: 'gte', required: true },
     ],
@@ -49,6 +51,7 @@ const SERVICE_TYPES = {
   tow: {
     icon: '🛻',
     catalogGroup: true,
+    catalogColor: 'bg-sky-100 text-sky-900 border-sky-200',
     fields: [
       { key: 'tow_type', input: 'enum', options: ['platform', 'spider'], match: 'exact', filter: true, required: true },
       { key: 'max_tonnage', input: 'enum', options: ['3.5', '8', '20'], unit: 'т', match: 'gte', filter: true, required: true },
@@ -58,6 +61,7 @@ const SERVICE_TYPES = {
   bucket_lift: {
     icon: '🏗️',
     catalogGroup: true,
+    catalogColor: 'bg-orange-100 text-orange-900 border-orange-200',
     fields: [
       { key: 'work_height_m', input: 'number', unit: 'м', min: 8, max: 60, match: 'gte', filter: true, required: true },
       { key: 'boom_type', input: 'enum', options: ['telescopic', 'articulated'], match: 'exact', filter: true },
@@ -188,6 +192,42 @@ function configForView(t) {
   }));
 }
 
+// Группы каталога на главной — из типов с catalogGroup.
+function catalogGroupsForView(t) {
+  return SERVICE_TYPE_ORDER
+    .filter((type) => SERVICE_TYPES[type].catalogGroup)
+    .map((type) => ({
+      key: type,
+      label: t(`svc_${type}`),
+      icon: SERVICE_TYPES[type].icon,
+      color: SERVICE_TYPES[type].catalogColor || 'bg-stone-100 text-stone-900 border-stone-300',
+      anchor: `group-${type}`,
+    }));
+}
+
+// Короткие бейджи характеристик для карточки мастера в каталоге.
+function attributeBadges(type, attrs, t) {
+  const a = attrs || {};
+  const out = [];
+  for (const f of fieldsFor(type)) {
+    const v = a[f.key];
+    if (v === undefined || v === null || v === '') continue;
+    if (f.input === 'bool') {
+      if (v === true || v === 'true') out.push(t(`svc_${type}_${f.key}`));
+      continue;
+    }
+    if (f.input === 'size') { out.push(String(v)); continue; }
+    if (f.input === 'enum') {
+      const key = `svc_${type}_${f.key}_${v}`;
+      const hit = t(key);
+      out.push(hit !== key ? hit : (f.unit ? `${v} ${f.unit}` : String(v)));
+      continue;
+    }
+    if (f.input === 'number') { out.push(f.unit ? `${v} ${f.unit}` : String(v)); }
+  }
+  return out;
+}
+
 module.exports = {
   SERVICE_TYPES,
   SERVICE_TYPE_ORDER,
@@ -197,4 +237,6 @@ module.exports = {
   validateAttributes,
   legacyColumnsFor,
   configForView,
+  catalogGroupsForView,
+  attributeBadges,
 };

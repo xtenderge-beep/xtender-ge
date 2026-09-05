@@ -60,7 +60,14 @@ router.get('/', asyncHandler(async (req, res) => {
     reviewsByMaster.get(rv.master_id).push(rv);
   });
   masters.forEach((m) => { m.reviews = reviewsByMaster.get(m.id) || []; });
-  res.render('index', { masters, catalogCallPriceTetri, clientStrings: clientStrings(locale) });
+  const t = translate(locale);
+  masters.forEach((m) => { m.badges = serviceTypes.attributeBadges(m.service_type, m.attributes, t); });
+  res.render('index', {
+    masters,
+    catalogCallPriceTetri,
+    clientStrings: clientStrings(locale),
+    catalogGroups: serviceTypes.catalogGroupsForView(t),
+  });
 }));
 
 router.get('/join', asyncHandler(async (req, res) => {

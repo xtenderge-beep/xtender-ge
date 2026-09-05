@@ -314,25 +314,43 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
 // (см. revealPhoneForCall). Сам номер (m.phone) сюда попадает для server-side рендера
 // каталога; JSON-ручка /api/masters (masterController.list) обязана его вычищать перед
 // отдачей клиенту — иначе платный gate на «показать номер» тривиально обходится.
-const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri';
+const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id';
 
-async function listMasters({ category } = {}) {
-  const params = [];
-  let where = 'm.is_active = true AND m.is_banned = false';
-  if (category) {
-    params.push(category);
-    where += ` AND m.category = $${params.length}`;
-  }
+// Каталог группирует по service_type из master_services. Тип и attributes подтягиваем
+// вторым запросом и клеим в JS (а не join + GROUP BY по jsonb — pg-mem не тянет).
+// Один мастер = одна карточка: берём primary-услугу (все мигрированные/новые — primary).
+async function listMasters({ serviceType } = {}) {
   const { rows } = await pool.query(
     `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating, COUNT(r.id)::int AS review_count
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
-     WHERE ${where}
-     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri
-     ORDER BY m.id`,
-    params
+     WHERE m.is_active = true AND m.is_banned = false
+     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id
+     ORDER BY m.id`
   );
-  return rows;
+  if (!rows.length) return [];
+
+  const ids = rows.map((r) => r.id);
+  const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
+  const { rows: services } = await pool.query(
+    `SELECT master_id, service_type, attributes, is_primary FROM master_services WHERE master_id IN (${ph})`,
+    ids
+  );
+  const byMaster = new Map();
+  for (const s of services) {
+    const cur = byMaster.get(s.master_id);
+    if (!cur || (s.is_primary && !cur.is_primary)) byMaster.set(s.master_id, s);
+  }
+
+  const result = rows.map((m) => {
+    const s = byMaster.get(m.id);
+    return {
+      ...m,
+      service_type: s ? s.service_type : (m.category === 'movers' ? 'movers' : 'van'),
+      attributes: s ? s.attributes || {} : {},
+    };
+  });
+  return serviceType ? result.filter((m) => m.service_type === serviceType) : result;
 }
 
 // Списание за раскрытие номера в публичном каталоге — атомарно: UPDATE с условием на

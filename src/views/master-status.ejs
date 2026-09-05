@@ -39,9 +39,11 @@
 <%
     const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
     const categoryLabels = {
-        transport: t('catalog_group_transport'),
-        movers: t('catalog_group_movers'),
-        junk: t('catalog_group_junk'),
+        transport: t('svc_van'),
+        movers: t('svc_movers'),
+        junk: t('svc_van'),
+        tow: t('svc_tow'),
+        bucket_lift: t('svc_bucket_lift'),
     };
     function historyReason(reason) {
         if (reason === 'topup') return t('master_status_history_topup');

@@ -93,7 +93,7 @@ const dictionaries = {
     accordion_how_body: 'აღწერეთ დავალება, მონიშნეთ საჭირო სერვისი(ები) და, სურვილის შემთხვევაში, დაურთეთ ფოტო. დაადასტურეთ ტელეფონის ნომერი SMS კოდით — და თქვენი მოთხოვნა მაშინვე გაეგზავნება შესაბამის შემსრულებლებს. ისინი დაგირეკავენ პირდაპირ ფასის შეთავაზებით.',
 
     freeform_label: 'აღწერეთ, რა გჭირდებათ',
-    freeform_placeholder: 'მაგ: ვაკიდან სამშენებლო ნაგვის გატანა ან მე-4 სართულიდან დივნის ჩამოტანა...',
+    freeform_placeholder: 'მაგ: ვაკიდან ნაგვის გატანა, მე-4 სართულიდან დივნის ჩამოტანა ან ევაკუატორი ჯიპისთვის...',
     freeform_services_label: 'რომელი სერვისი გჭირდებათ?',
     photo_argument_generic: 'ფოტო ან ვიდეო დაეხმარება შემსრულებელს ზუსტი ფასის თქმაში — ასე ის ვერ გაზრდის ფასს ადგილზე.',
 
@@ -113,6 +113,8 @@ const dictionaries = {
     chip_junk: 'ნაგვის გატანა',
     chip_move: 'გადასახლება',
     chip_movers: 'მუშები',
+    chip_tow: 'ევაკუატორი',
+    chip_bucket_lift: 'ავტოამწე',
     composer_char_hint: 'თავისუფალი ტექსტი',
     mobilenav_post: 'განაცხადი',
     mobilenav_masters: 'შემსრულებლები',
@@ -404,14 +406,14 @@ const dictionaries = {
     service_name_movers: 'მუშები',
     service_name_junk: 'ნაგვის გატანა',
 
-    seo_hero_h1: 'გადაზიდვები, მუშები და ნაგვის გატანა თბილისში',
+    seo_hero_h1: 'გადაზიდვები, მუშები და სპეცტექნიკა თბილისში',
     seo_hero_lead: 'ნუ ეძებთ თავად. დაწერეთ რა გჭირდებათ — თავისუფალი შემსრულებლები დაგირეკავენ და შემოგთავაზებენ ფასს.',
 
     how_it_works_title: 'როგორ მუშაობს',
     how_it_works_step1_title: 'აღწერეთ დავალება',
     how_it_works_step1_desc: 'დაწერეთ თავისუფალი ტექსტით, დაურთეთ ფოტო.',
     how_it_works_step2_title: 'მოდერატორი ანაწილებს განაცხადს',
-    how_it_works_step2_desc: 'მოდერატორი აგზავნის მას საჭირო კატეგორიაში — გადაზიდვები, მუშები ან ნაგვის გატანა.',
+    how_it_works_step2_desc: 'მოდერატორი აგზავნის მას საჭირო კატეგორიის შემსრულებლებთან.',
     how_it_works_step3_title: 'შემსრულებლები იღებენ შეტყობინებას',
     how_it_works_step3_desc: 'შეტყობინება მიდის მხოლოდ ამ კატეგორიის შემსრულებლებთან თბილისში.',
     how_it_works_step4_title: 'გირეკავენ ფასის შეთავაზებით',
@@ -557,7 +559,7 @@ const dictionaries = {
     accordion_how_body: 'Опишите задачу, отметьте нужную услугу (или несколько) и, при желании, прикрепите фото. Подтвердите номер телефона кодом из SMS — и заявка сразу уйдёт подходящим исполнителям. Они перезвонят вам напрямую с ценой.',
 
     freeform_label: 'Опишите, что вам нужно',
-    freeform_placeholder: 'Например: вывезти строительный мусор из Ваке или спустить диван с 4 этажа...',
+    freeform_placeholder: 'Например: вывезти мусор из Ваке, спустить диван с 4 этажа или эвакуатор для внедорожника...',
     freeform_services_label: 'Какая услуга вам нужна?',
     photo_argument_generic: 'Фото или видео помогут исполнителю точно назвать цену — так он не сможет завысить её на месте.',
 
@@ -575,6 +577,8 @@ const dictionaries = {
     chip_junk: 'Вывоз мусора',
     chip_move: 'Переезд',
     chip_movers: 'Грузчики',
+    chip_tow: 'Эвакуатор',
+    chip_bucket_lift: 'Автовышка',
     filter_all: 'Все',
     filter_all_sizes: 'Все размеры',
     composer_char_hint: 'Свободный текст',
@@ -868,14 +872,14 @@ const dictionaries = {
     service_name_movers: 'Грузчики',
     service_name_junk: 'Вывоз мусора',
 
-    seo_hero_h1: 'Грузоперевозки, грузчики и вывоз мусора в Тбилиси',
+    seo_hero_h1: 'Грузоперевозки, грузчики и спецтехника в Тбилиси',
     seo_hero_lead: 'Не ищите сами. Опишите задачу — свободные мастера позвонят и предложат свои цены.',
 
     how_it_works_title: 'Как это работает',
     how_it_works_step1_title: 'Опишите задачу',
     how_it_works_step1_desc: 'Напишите свободным текстом, приложите фото.',
     how_it_works_step2_title: 'Модератор распределяет заявку',
-    how_it_works_step2_desc: 'Модератор направляет её в нужную категорию — перевозки, грузчики или вывоз мусора.',
+    how_it_works_step2_desc: 'Модератор направляет её исполнителям нужной категории.',
     how_it_works_step3_title: 'Исполнители получают уведомление',
     how_it_works_step3_desc: 'Уведомление уходит только исполнителям этой категории по Тбилиси.',
     how_it_works_step4_title: 'Вам перезванивают с ценой',
@@ -1021,7 +1025,7 @@ const dictionaries = {
     accordion_how_body: 'Describe the task, check the service(s) you need, and optionally attach a photo. Confirm your phone number with an SMS code — your request is sent immediately to matching providers. They\'ll call you back directly with a price.',
 
     freeform_label: 'Describe what you need',
-    freeform_placeholder: 'E.g., remove construction debris from Vake or carry a sofa down from the 4th floor...',
+    freeform_placeholder: 'E.g., remove trash from Vake, carry a sofa down from the 4th floor, or a tow truck for an SUV...',
     freeform_services_label: 'Which service do you need?',
     photo_argument_generic: 'A photo or video helps the provider quote an exact price — so they can\'t raise it on-site.',
 
@@ -1039,6 +1043,8 @@ const dictionaries = {
     chip_junk: 'Junk removal',
     chip_move: 'Moving',
     chip_movers: 'Movers',
+    chip_tow: 'Tow truck',
+    chip_bucket_lift: 'Bucket lift',
     filter_all: 'All',
     filter_all_sizes: 'All sizes',
     composer_char_hint: 'Free text',
@@ -1332,14 +1338,14 @@ const dictionaries = {
     service_name_movers: 'Movers',
     service_name_junk: 'Junk removal',
 
-    seo_hero_h1: 'Freight, movers, and trash removal in Tbilisi',
+    seo_hero_h1: 'Freight, movers, and special equipment in Tbilisi',
     seo_hero_lead: "Don't search yourself. Describe the task — available workers will call with their prices.",
 
     how_it_works_title: 'How it works',
     how_it_works_step1_title: 'Describe your task',
     how_it_works_step1_desc: 'Write in plain words, attach a photo.',
     how_it_works_step2_title: 'A moderator routes the request',
-    how_it_works_step2_desc: 'A moderator routes it to the right category — moving, movers or junk removal.',
+    how_it_works_step2_desc: 'A moderator routes it to providers in the right category.',
     how_it_works_step3_title: 'Providers get a notification',
     how_it_works_step3_desc: 'Only providers in that category, across Tbilisi, get notified.',
     how_it_works_step4_title: 'You get called back with a price',
