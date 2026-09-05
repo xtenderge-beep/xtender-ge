@@ -108,7 +108,7 @@ UPDATE order_dispatches SET vehicle_size = CASE vehicle_size
 
 ALTER TABLE masters DROP CONSTRAINT IF EXISTS masters_vehicle_size_check;
 ALTER TABLE masters ADD CONSTRAINT masters_vehicle_size_check
-    CHECK (vehicle_size IS NULL OR vehicle_size IN ('L', 'XL', 'XXL'));
+    CHECK (vehicle_size IS NULL OR vehicle_size IN ('S', 'L', 'XL', 'XXL'));
 
 -- NULL не считается равным NULL для UNIQUE — без этого повторный диспатч категорий без
 -- конкретного размера (грузчики/мусор/бортовые/все машины) не защищён от дублей SMS.
@@ -118,7 +118,7 @@ ALTER TABLE order_dispatches ALTER COLUMN vehicle_size SET DEFAULT '';
 ALTER TABLE order_dispatches ALTER COLUMN vehicle_size SET NOT NULL;
 ALTER TABLE order_dispatches DROP CONSTRAINT IF EXISTS order_dispatches_vehicle_size_check;
 ALTER TABLE order_dispatches ADD CONSTRAINT order_dispatches_vehicle_size_check
-    CHECK (vehicle_size IN ('', 'L', 'XL', 'XXL'));
+    CHECK (vehicle_size IN ('', 'S', 'L', 'XL', 'XXL'));
 
 -- Отдельный секретный токен владельца заявки: ссылка в SMS клиенту работает с любого
 -- устройства/браузера без привязки к куке (в отличие от куки, mastera его никогда не видят,

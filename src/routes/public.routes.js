@@ -1,5 +1,6 @@
 const express = require('express');
 const { normalizeLang, translate, clientStrings } = require('../config/i18n');
+const serviceTypes = require('../config/serviceTypes');
 const { buildSeo } = require('../config/seo');
 const { SERVICE_REQUISITES } = require('../config/legal');
 const legalContent = require('../config/legal-content');
@@ -73,7 +74,23 @@ router.get('/join', asyncHandler(async (req, res) => {
       ? { code: valid.code, amountGel: valid.amount_tetri / 100, valid: true }
       : { code: codeParam, valid: false };
   }
-  res.render('join', { clientStrings: clientStrings(locale), promo });
+
+  const t = translate(locale);
+  const nameKey = { ka: 'name_ka', ru: 'name_ru', en: 'name_en' }[locale] || 'name_ru';
+  const cities = await masterService.getActiveCities();
+  const districtsByCity = {};
+  for (const c of cities) {
+    districtsByCity[c.id] = (await masterService.getDistrictsByCity(c.id))
+      .map((d) => ({ id: d.id, name: d[nameKey] || d.name_ka }));
+  }
+
+  res.render('join', {
+    clientStrings: clientStrings(locale),
+    promo,
+    serviceConfig: serviceTypes.configForView(t),
+    cities: cities.map((c) => ({ id: c.id, name: c[nameKey] || c.name_ka })),
+    districtsByCity,
+  });
 }));
 
 // Короткая реферальная ссылка: /r/КОД → форма регистрации с подставленным промокодом.

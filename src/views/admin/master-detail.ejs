@@ -88,12 +88,15 @@
                     <option value="transport" <%= master.category === 'transport' ? 'selected' : '' %>>Машины</option>
                     <option value="movers" <%= master.category === 'movers' ? 'selected' : '' %>>Грузчики</option>
                     <option value="junk" <%= master.category === 'junk' ? 'selected' : '' %>>Вывоз мусора</option>
+                    <option value="tow" <%= master.category === 'tow' ? 'selected' : '' %>>Эвакуатор</option>
+                    <option value="bucket_lift" <%= master.category === 'bucket_lift' ? 'selected' : '' %>>Автовышка</option>
                 </select>
             </div>
             <div>
                 <label class="text-xs font-bold text-stone-500">Размер (только для машин)</label>
                 <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
                     <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Любой размер</option>
+                    <option value="S" <%= master.vehicle_size === 'S' ? 'selected' : '' %>>S</option>
                     <option value="L" <%= master.vehicle_size === 'L' ? 'selected' : '' %>>L</option>
                     <option value="XL" <%= master.vehicle_size === 'XL' ? 'selected' : '' %>>XL</option>
                     <option value="XXL" <%= master.vehicle_size === 'XXL' ? 'selected' : '' %>>XXL</option>

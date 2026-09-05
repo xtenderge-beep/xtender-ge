@@ -15,8 +15,10 @@ const consentLogService = require('../services/consentLog.service');
 const settingsService = require('../services/settings.service');
 const { toE164 } = require('../config/phone');
 
-const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk']);
-const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
+// junk оставлен для легаси-профилей; tow/bucket_lift — чтобы редактирование профиля
+// нового типа в админке не сбрасывало category (полноценная форма из конфига — Фаза 5).
+const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'tow', 'bucket_lift']);
+const ALLOWED_SIZES = new Set(['S', 'L', 'XL', 'XXL']);
 
 const LOGIN_RATE_LIMIT_MAX = 10; // на один IP
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;

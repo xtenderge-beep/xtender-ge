@@ -18,7 +18,7 @@ router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
 router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));
 router.post('/masters/otp/verify', asyncHandler(masterController.verifyOtp));
-router.post('/masters/register', asyncHandler(masterController.register));
+router.post('/masters/register', upload.single('photo'), asyncHandler(masterController.register));
 router.post('/masters/:id/reveal-phone', asyncHandler(masterController.revealPhone));
 
 // Раскрытие номера мастера в публичном каталоге — своя OTP-«авторизация» звонящего,

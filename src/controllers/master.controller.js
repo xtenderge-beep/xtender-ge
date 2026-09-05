@@ -14,6 +14,7 @@ const { clientStrings } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION, consentSnapshot, consentMeta } = require('../config/legal');
 const payment = require('../config/payment');
+const serviceTypes = require('../config/serviceTypes');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const RECEIPT_RATE_MAX = 5;
@@ -25,9 +26,6 @@ const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'xtendergebot';
 // через телефон+SMS каждый заход. 30 дней, как у остальных cookie.
 const MASTER_COOKIE = 'master_session';
 const MASTER_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-const ALLOWED_CATEGORIES = new Set(['movers', 'transport']);
-const ALLOWED_BODY_TYPES = new Set(['closed', 'flatbed']);
-const BODY_TYPE_LABELS = { closed: 'закрытый кузов', flatbed: 'борт (открытый)' };
 const OTP_PURPOSE = 'master';
 
 // --- Раскрытие номера в публичном каталоге (клиент звонит мастеру напрямую, минуя
@@ -53,17 +51,8 @@ async function getCatalogSessionPhone(req) {
   return redis.get(`catalog_session:${token}`);
 }
 
-function parseCargoDimension(value) {
-  const num = parseInt(value, 10);
-  return Number.isFinite(num) && num > 0 ? num : null;
-}
-
-function buildVehicleType({ vehicleType, cargoLength, cargoWidth, cargoHeight, bodyType }) {
-  const parts = [];
-  if (vehicleType) parts.push(vehicleType);
-  if (cargoLength && cargoWidth && cargoHeight) parts.push(`${cargoLength}×${cargoWidth}×${cargoHeight} см`);
-  if (bodyType) parts.push(BODY_TYPE_LABELS[bodyType]);
-  return parts.length ? parts.join(', ') : null;
+function isChecked(v) {
+  return v === true || v === 'true' || v === 'on' || v === '1';
 }
 
 async function list(req, res) {
@@ -197,17 +186,14 @@ async function verifyOtp(req, res) {
 }
 
 async function register(req, res) {
+  // Форма /join теперь multipart (для фото), поэтому все значения — строки, чекбоксы —
+  // 'true'/'on'/отсутствуют, districtIds — строка или массив строк.
   const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
   const name = (req.body.name || '').trim();
-  const category = req.body.category;
-  const vehicleTypeInput = (req.body.vehicleType || '').trim();
-  const cargoLength = parseCargoDimension(req.body.cargoLength);
-  const cargoWidth = parseCargoDimension(req.body.cargoWidth);
-  const cargoHeight = parseCargoDimension(req.body.cargoHeight);
-  const bodyType = req.body.bodyType || null;
   const description = (req.body.description || '').trim();
-  const termsAccepted = Boolean(req.body.termsAccepted);
-  const privacyAccepted = Boolean(req.body.privacyAccepted);
+  const serviceType = req.body.serviceType;
+  const termsAccepted = isChecked(req.body.termsAccepted);
+  const privacyAccepted = isChecked(req.body.privacyAccepted);
 
   if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
@@ -215,15 +201,28 @@ async function register(req, res) {
   if (!name) {
     return res.status(400).json({ success: false, message: 'Name is required' });
   }
-  if (!ALLOWED_CATEGORIES.has(category)) {
-    return res.status(400).json({ success: false, message: 'Invalid category' });
-  }
-  if (bodyType && !ALLOWED_BODY_TYPES.has(bodyType)) {
-    return res.status(400).json({ success: false, message: 'Invalid body type' });
+  if (!serviceTypes.isKnownType(serviceType)) {
+    return res.status(400).json({ success: false, message: 'Invalid service type' });
   }
   if (!termsAccepted || !privacyAccepted) {
     return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
   }
+
+  const { attributes, errors: attrErrors } = serviceTypes.validateAttributes(serviceType, req.body);
+  if (attrErrors.length) {
+    return res.status(400).json({ success: false, message: 'Заполните обязательные поля услуги', fieldErrors: attrErrors });
+  }
+
+  const cities = await masterService.getActiveCities();
+  const cityId = Number(req.body.cityId) || null;
+  if (!cities.some((c) => c.id === cityId)) {
+    return res.status(400).json({ success: false, message: 'Выберите город' });
+  }
+  const cityDistricts = await masterService.getDistrictsByCity(cityId);
+  const validDistrictIds = new Set(cityDistricts.map((d) => d.id));
+  let districtIds = req.body.districtIds || req.body['districtIds[]'] || [];
+  if (!Array.isArray(districtIds)) districtIds = [districtIds];
+  districtIds = [...new Set(districtIds.map(Number).filter((id) => validDistrictIds.has(id)))];
 
   const phone = toE164(rawPhone);
   const verified = await otpService.isPhoneVerified(phone, OTP_PURPOSE);
@@ -234,13 +233,13 @@ async function register(req, res) {
   const master = await masterService.registerMaster({
     name,
     phone,
-    category,
-    vehicleType: category === 'transport'
-      ? buildVehicleType({ vehicleType: vehicleTypeInput, cargoLength, cargoWidth, cargoHeight, bodyType })
-      : null,
-    vehicleSize: null,
-    priceText: null,
     description,
+    serviceType,
+    attributes,
+    vehicleTypeText: (req.body.vehicleType || '').trim() || null,
+    cityId,
+    districtIds,
+    photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
   });
   await otpService.clearVerified(phone, OTP_PURPOSE);
 

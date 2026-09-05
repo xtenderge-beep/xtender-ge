@@ -29,7 +29,10 @@ const SERVICE_TYPES = {
     catalogGroup: true,
     fields: [
       { key: 'size', input: 'size', options: ['S', 'L', 'XL', 'XXL'], match: 'gte', filter: true },
-      { key: 'body', input: 'enum', options: ['closed', 'flatbed'], match: 'exact', filter: true, required: true },
+      {
+        key: 'body', input: 'enum', options: ['closed', 'flatbed'], match: 'exact', filter: true, required: true,
+        optionIcons: { closed: 'fa-truck', flatbed: 'fa-truck-pickup' },
+      },
       { key: 'tail_lift', input: 'bool', match: 'flag', filter: true },
       { key: 'with_helpers', input: 'bool', match: 'flag', filter: true },
     ],
@@ -94,10 +97,104 @@ function fieldsFor(type) {
   return (SERVICE_TYPES[type] && SERVICE_TYPES[type].fields) || [];
 }
 
+// Проверяет и нормализует сырой ввод формы под конфиг типа. Возвращает
+// { attributes, errors }. attributes — только валидные значения (для master_services);
+// errors — список ключей полей с проблемами (для показа на форме).
+// input:'size' — особый: читает cargo_length/width/height_cm и выводит тир через deriveVanSize.
+function validateAttributes(type, raw = {}) {
+  const attributes = {};
+  const errors = [];
+  for (const f of fieldsFor(type)) {
+    if (f.input === 'size') {
+      const size = deriveVanSize(raw.cargo_length_cm, raw.cargo_width_cm, raw.cargo_height_cm);
+      if (size) {
+        attributes[f.key] = size;
+        attributes.cargo_length_cm = Number(raw.cargo_length_cm) || null;
+        attributes.cargo_width_cm = Number(raw.cargo_width_cm) || null;
+        attributes.cargo_height_cm = Number(raw.cargo_height_cm) || null;
+      } else if (f.required) {
+        errors.push(f.key);
+      }
+      continue;
+    }
+
+    const val = raw[f.key];
+    const missing = val === undefined || val === null || val === '';
+
+    if (f.input === 'bool') {
+      attributes[f.key] = val === true || val === 'true' || val === 'on' || val === '1';
+      continue;
+    }
+    if (missing) {
+      if (f.required) errors.push(f.key);
+      continue;
+    }
+    if (f.input === 'enum') {
+      if (!f.options.includes(String(val))) { errors.push(f.key); continue; }
+      attributes[f.key] = String(val);
+    } else if (f.input === 'number') {
+      const n = Number(val);
+      if (!Number.isFinite(n) || (f.min != null && n < f.min) || (f.max != null && n > f.max)) {
+        errors.push(f.key); continue;
+      }
+      attributes[f.key] = n;
+    }
+  }
+  return { attributes, errors };
+}
+
+// Старые колонки masters — держим в синхроне, пока каталог/рассылка не переехали на
+// master_services (Фазы 3–4). Для tow/bucket_lift эквивалента нет — пишем сам тип в
+// category (старый каталог его просто игнорирует, старая рассылка не имеет кнопки).
+function legacyColumnsFor(type, attributes = {}) {
+  if (type === 'movers') return { category: 'movers', vehicle_size: null, is_flatbed: false };
+  if (type === 'van') {
+    return {
+      category: 'transport',
+      vehicle_size: attributes.size || null,
+      is_flatbed: attributes.body === 'flatbed',
+    };
+  }
+  return { category: type, vehicle_size: null, is_flatbed: false };
+}
+
+// Разворачивает конфиг в структуру для рендера формы: подписи из i18n, варианты enum
+// с подписями. t — функция из require('./i18n').translate(lang).
+function configForView(t) {
+  return SERVICE_TYPE_ORDER.map((type) => ({
+    type,
+    label: t(`svc_${type}`),
+    icon: SERVICE_TYPES[type].icon,
+    fields: fieldsFor(type).map((f) => ({
+      key: f.key,
+      input: f.input,
+      unit: f.unit || null,
+      min: f.min != null ? f.min : null,
+      max: f.max != null ? f.max : null,
+      required: Boolean(f.required),
+      label: t(`svc_${type}_${f.key}`),
+      options: f.input === 'enum'
+        ? (f.options || []).map((v) => {
+            const key = `svc_${type}_${f.key}_${v}`;
+            const hit = t(key);
+            return {
+              value: v,
+              label: hit !== key ? hit : (f.unit ? `${v} ${f.unit}` : v),
+              icon: (f.optionIcons && f.optionIcons[v]) || null,
+            };
+          })
+        : (f.options || []).map((v) => ({ value: v, label: v, icon: null })),
+    })),
+  }));
+}
+
 module.exports = {
   SERVICE_TYPES,
   SERVICE_TYPE_ORDER,
   deriveVanSize,
   isKnownType,
   fieldsFor,
+  validateAttributes,
+  legacyColumnsFor,
+  configForView,
 };

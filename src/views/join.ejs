@@ -44,8 +44,8 @@
     </script>
     <style>
         .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .cat-btn.active { background: #059669; color: #fff; border-color: #059669; }
-        .body-btn.active { background: #059669; color: #fff; border-color: #059669; }
+        .svc-btn.active, .opt-btn.active { background: #059669; color: #fff; border-color: #059669; }
+        .district-btn.active { background: #059669; color: #fff; border-color: #059669; }
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
     </style>
@@ -89,42 +89,91 @@
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_category_label') %></label>
-                    <div class="grid grid-cols-1 gap-2" id="categoryBar">
-                        <button type="button" data-cat="movers" onclick="selectCategory('movers')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_movers') %></button>
-                        <button type="button" data-cat="transport" onclick="selectCategory('transport')" class="cat-btn px-3.5 py-3 rounded-xl text-sm font-bold text-left transition border bg-white text-stone-600 border-stone-200"><%= t('join_category_transport') %></button>
+                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_service_type_label') %></label>
+                    <div class="grid grid-cols-2 gap-2" id="serviceTypeBar">
+                        <% serviceConfig.forEach(function (svc) { %>
+                            <button type="button" data-svc="<%= svc.type %>" onclick="selectServiceType('<%= svc.type %>')"
+                                class="svc-btn flex flex-col items-center gap-1 px-3 py-3 rounded-xl text-xs font-bold transition border bg-white text-stone-600 border-stone-200">
+                                <span class="text-xl leading-none"><%= svc.icon %></span>
+                                <span class="text-center leading-tight"><%= svc.label %></span>
+                            </button>
+                        <% }); %>
                     </div>
                 </div>
 
-                <div id="vehicleFields" class="hidden space-y-3">
+                <% serviceConfig.forEach(function (svc) { %>
+                <div class="svc-fields hidden space-y-3" data-svc-fields="<%= svc.type %>">
+                    <% if (svc.type === 'van') { %>
+                        <div>
+                            <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_vehicle_details_label') %></label>
+                            <input type="text" data-field="vehicleType" placeholder="<%= t('join_vehicle_type_placeholder_transport') %>"
+                                class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                        </div>
+                    <% } %>
+                    <% svc.fields.forEach(function (f) { %>
+                        <% if (f.input === 'size') { %>
+                            <div>
+                                <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_cargo_dims_label') %></label>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <input type="number" min="0" data-field="cargo_length_cm" oninput="updateSizeBadge()" placeholder="<%= t('join_cargo_length_placeholder') %>"
+                                        class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                                    <input type="number" min="0" data-field="cargo_width_cm" oninput="updateSizeBadge()" placeholder="<%= t('join_cargo_width_placeholder') %>"
+                                        class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                                    <input type="number" min="0" data-field="cargo_height_cm" oninput="updateSizeBadge()" placeholder="<%= t('join_cargo_height_placeholder') %>"
+                                        class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                                </div>
+                                <p id="sizeBadge" class="mt-1.5 text-xs font-bold text-stone-500"><%= t('join_size_auto_empty') %></p>
+                            </div>
+                        <% } else if (f.input === 'enum') { %>
+                            <div>
+                                <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= f.label %></label>
+                                <div class="grid grid-cols-2 gap-2" data-enum="<%= f.key %>">
+                                    <% f.options.forEach(function (o) { %>
+                                        <button type="button" data-val="<%= o.value %>" onclick="selectEnum(this)"
+                                            class="opt-btn flex flex-col items-center justify-center gap-1 px-3 py-2.5 rounded-xl text-xs font-bold text-center leading-tight transition border bg-white text-stone-600 border-stone-200">
+                                            <% if (o.icon) { %><i class="fa-solid <%= o.icon %> text-lg"></i><% } %>
+                                            <span><%= o.label %></span>
+                                        </button>
+                                    <% }); %>
+                                </div>
+                            </div>
+                        <% } else if (f.input === 'number') { %>
+                            <div>
+                                <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= f.label %><%= f.unit ? ', ' + f.unit : '' %></label>
+                                <input type="number" data-field="<%= f.key %>" <%= f.min != null ? 'min=' + f.min : '' %> <%= f.max != null ? 'max=' + f.max : '' %>
+                                    class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                            </div>
+                        <% } else if (f.input === 'bool') { %>
+                            <label class="flex items-center gap-2.5 text-sm font-bold text-stone-700 cursor-pointer bg-stone-50 border border-stone-200 rounded-xl px-3 py-3">
+                                <input type="checkbox" data-field="<%= f.key %>" class="w-4 h-4 accent-emerald-600 shrink-0">
+                                <span><%= f.label %></span>
+                            </label>
+                        <% } %>
+                    <% }); %>
+                </div>
+                <% }); %>
+
+                <div id="locationFields" class="hidden space-y-3">
+                    <% if (cities.length > 1) { %>
+                        <div>
+                            <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_city_label') %></label>
+                            <select id="cityInput" onchange="renderDistricts()"
+                                class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
+                                <% cities.forEach(function (c) { %><option value="<%= c.id %>"><%= c.name %></option><% }); %>
+                            </select>
+                        </div>
+                    <% } else if (cities.length === 1) { %>
+                        <input type="hidden" id="cityInput" value="<%= cities[0].id %>">
+                    <% } %>
                     <div>
-                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_vehicle_type_label') %></label>
-                        <input type="text" id="vehicleTypeInput" placeholder="<%= t('join_vehicle_type_placeholder_transport') %>"
-                            class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
+                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_districts_label') %></label>
+                        <p class="text-[11px] text-stone-400 mb-1.5"><%= t('join_districts_hint') %></p>
+                        <div id="districtBar" class="flex flex-wrap gap-1.5"></div>
                     </div>
                     <div>
-                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_cargo_label') %></label>
-                        <div class="grid grid-cols-3 gap-2">
-                            <input type="number" min="0" id="cargoLengthInput" placeholder="<%= t('join_cargo_length_placeholder') %>"
-                                class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
-                            <input type="number" min="0" id="cargoWidthInput" placeholder="<%= t('join_cargo_width_placeholder') %>"
-                                class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
-                            <input type="number" min="0" id="cargoHeightInput" placeholder="<%= t('join_cargo_height_placeholder') %>"
-                                class="w-full px-3 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-medium text-stone-900 bg-white">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_body_type_label') %></label>
-                        <div class="grid grid-cols-2 gap-2" id="bodyTypeBar">
-                            <button type="button" data-body="closed" onclick="selectBodyType('closed')" class="body-btn flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-xs font-bold transition border bg-white text-stone-600 border-stone-200">
-                                <i class="fa-solid fa-truck text-xl"></i>
-                                <span><%= t('join_body_type_closed') %></span>
-                            </button>
-                            <button type="button" data-body="flatbed" onclick="selectBodyType('flatbed')" class="body-btn flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl text-xs font-bold transition border bg-white text-stone-600 border-stone-200">
-                                <i class="fa-solid fa-truck-pickup text-xl"></i>
-                                <span><%= t('join_body_type_flatbed') %></span>
-                            </button>
-                        </div>
+                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_photo_label') %></label>
+                        <input type="file" id="photoInput" accept="image/*"
+                            class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-stone-100 file:text-stone-700">
                     </div>
                 </div>
 
@@ -210,23 +259,93 @@
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
+        const DISTRICTS_BY_CITY = <%- JSON.stringify(districtsByCity) %>;
 
-        let selectedCategory = null;
-        let selectedBodyType = null;
+        let selectedServiceType = null;
+        const selectedDistricts = new Set();
 
-        const catBtns = document.querySelectorAll('.cat-btn');
-        const bodyBtns = document.querySelectorAll('.body-btn');
-        const vehicleFields = document.getElementById('vehicleFields');
+        const svcBtns = document.querySelectorAll('.svc-btn');
+        const locationFields = document.getElementById('locationFields');
 
-        function selectCategory(cat) {
-            selectedCategory = cat;
-            catBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.cat === cat));
-            vehicleFields.classList.toggle('hidden', cat !== 'transport');
+        function selectServiceType(type) {
+            selectedServiceType = type;
+            svcBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.svc === type));
+            document.querySelectorAll('.svc-fields').forEach((el) => {
+                el.classList.toggle('hidden', el.dataset.svcFields !== type);
+            });
+            locationFields.classList.remove('hidden');
+            updateSizeBadge();
         }
 
-        function selectBodyType(bodyType) {
-            selectedBodyType = selectedBodyType === bodyType ? null : bodyType;
-            bodyBtns.forEach((btn) => btn.classList.toggle('active', btn.dataset.body === selectedBodyType));
+        function selectEnum(btn) {
+            const group = btn.closest('[data-enum]');
+            const active = btn.classList.contains('active');
+            group.querySelectorAll('.opt-btn').forEach((b) => b.classList.remove('active'));
+            if (!active) btn.classList.add('active');
+        }
+
+        function deriveVanSize(l, w, h) {
+            l = Number(l) || 0; w = Number(w) || 0; h = Number(h) || 0;
+            if (!l || !w || !h) return null;
+            const v = (l * w * h) / 1e6;
+            if (v >= 17 || l >= 450) return 'XXL';
+            if (v >= 12 || l >= 400) return 'XL';
+            if (v >= 4) return 'L';
+            return 'S';
+        }
+
+        function visibleFields() {
+            const block = document.querySelector('.svc-fields:not(.hidden)');
+            return block ? block : null;
+        }
+
+        function updateSizeBadge() {
+            const badge = document.getElementById('sizeBadge');
+            if (!badge) return;
+            const block = visibleFields();
+            if (!block) return;
+            const g = (k) => (block.querySelector('[data-field="' + k + '"]') || {}).value;
+            const size = deriveVanSize(g('cargo_length_cm'), g('cargo_width_cm'), g('cargo_height_cm'));
+            badge.textContent = size ? (T.join_size_auto + ': ' + size) : T.join_size_auto_empty;
+            badge.classList.toggle('text-emerald-700', Boolean(size));
+            badge.classList.toggle('text-stone-500', !size);
+        }
+
+        function renderDistricts() {
+            const cityEl = document.getElementById('cityInput');
+            const cityId = cityEl ? cityEl.value : null;
+            const bar = document.getElementById('districtBar');
+            selectedDistricts.clear();
+            bar.innerHTML = '';
+            (DISTRICTS_BY_CITY[cityId] || []).forEach((d) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'district-btn px-3 py-1.5 rounded-lg text-xs font-bold transition border bg-white text-stone-600 border-stone-200';
+                b.textContent = d.name;
+                b.onclick = () => {
+                    if (selectedDistricts.has(d.id)) { selectedDistricts.delete(d.id); b.classList.remove('active'); }
+                    else { selectedDistricts.add(d.id); b.classList.add('active'); }
+                };
+                bar.appendChild(b);
+            });
+        }
+        renderDistricts();
+
+        function collectAttributes() {
+            const block = visibleFields();
+            const attrs = {};
+            if (!block) return attrs;
+            block.querySelectorAll('[data-field]').forEach((el) => {
+                const k = el.dataset.field;
+                if (k === 'vehicleType') return;
+                if (el.type === 'checkbox') attrs[k] = el.checked;
+                else if (el.value !== '') attrs[k] = el.value.trim();
+            });
+            block.querySelectorAll('[data-enum]').forEach((g) => {
+                const active = g.querySelector('.opt-btn.active');
+                if (active) attrs[g.dataset.enum] = active.dataset.val;
+            });
+            return attrs;
         }
 
         function showMsg(text, isError) {
@@ -241,14 +360,15 @@
         }
 
         function collectPayload() {
+            const cityEl = document.getElementById('cityInput');
+            const vehTypeEl = document.querySelector('.svc-fields:not(.hidden) [data-field="vehicleType"]');
             return {
                 name: document.getElementById('nameInput').value.trim(),
-                category: selectedCategory,
-                vehicleType: document.getElementById('vehicleTypeInput').value.trim(),
-                cargoLength: document.getElementById('cargoLengthInput').value.trim(),
-                cargoWidth: document.getElementById('cargoWidthInput').value.trim(),
-                cargoHeight: document.getElementById('cargoHeightInput').value.trim(),
-                bodyType: selectedBodyType,
+                serviceType: selectedServiceType,
+                attributes: collectAttributes(),
+                vehicleType: vehTypeEl ? vehTypeEl.value.trim() : '',
+                cityId: cityEl ? cityEl.value : '',
+                districtIds: [...selectedDistricts],
                 description: document.getElementById('descriptionInput').value.trim(),
                 phone: document.getElementById('phoneInput').value.trim(),
                 promoCode: document.getElementById('promoInput').value.trim(),
@@ -261,7 +381,8 @@
             const payload = collectPayload();
 
             if (!payload.name) return showMsg(T.join_err_name_required, true);
-            if (!payload.category) return showMsg(T.join_err_category_required, true);
+            if (!payload.serviceType) return showMsg(T.join_err_service_required, true);
+            if (!payload.cityId) return showMsg(T.join_err_city_required, true);
             if (!payload.phone) return showMsg(T.js_err_empty_phone, true);
             if (!payload.termsAccepted) return showMsg(T.join_err_terms_required, true);
             if (!payload.privacyAccepted) return showMsg(T.join_err_privacy_required, true);
@@ -303,11 +424,22 @@
             let data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_wrong_code, true);
 
-            res = await fetch('/api/masters/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            const fd = new FormData();
+            fd.append('name', payload.name);
+            fd.append('serviceType', payload.serviceType);
+            fd.append('vehicleType', payload.vehicleType);
+            fd.append('cityId', payload.cityId);
+            fd.append('description', payload.description);
+            fd.append('phone', payload.phone);
+            fd.append('promoCode', payload.promoCode);
+            fd.append('termsAccepted', String(payload.termsAccepted));
+            fd.append('privacyAccepted', String(payload.privacyAccepted));
+            payload.districtIds.forEach((id) => fd.append('districtIds', id));
+            Object.entries(payload.attributes).forEach(([k, v]) => fd.append(k, String(v)));
+            const photo = document.getElementById('photoInput').files[0];
+            if (photo) fd.append('photo', photo);
+
+            res = await fetch('/api/masters/register', { method: 'POST', body: fd });
             data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
 

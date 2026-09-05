@@ -1,27 +1,80 @@
 const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
+const { legacyColumnsFor } = require('../config/serviceTypes');
 
 const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating';
 
-async function registerMaster({ name, phone, category, vehicleType, vehicleSize, priceText, description }) {
+// Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
+//   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
+//                          (category/vehicle_size/is_flatbed — пока их читают каталог/рассылка)
+//   master_services      — одна строка типа услуги с attributes (JSONB)
+//   master_districts     — районы, где исполнитель берёт заказы (полная замена)
+// Всё в одной транзакции. ON CONFLICT (phone) — повторная регистрация обновляет профиль
+// и строку услуги того же типа (is_active снова false → снова на модерацию).
+async function registerMaster({
+  name, phone, description, serviceType, attributes = {},
+  vehicleTypeText = null, cityId = null, districtIds = [], photoUrl = null,
+}) {
   const masterToken = generateShortId();
+  const legacy = legacyColumnsFor(serviceType, attributes);
+  const vehicleType = serviceType === 'van' ? (vehicleTypeText || null) : null;
+
+  return pool.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO masters (name, phone, description, category, vehicle_type, vehicle_size, is_flatbed,
+                            city_id, avatar_url, is_active, balance_tetri, master_token, terms_accepted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, 0, $10, NOW())
+       ON CONFLICT (phone) DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         category = EXCLUDED.category,
+         vehicle_type = EXCLUDED.vehicle_type,
+         vehicle_size = EXCLUDED.vehicle_size,
+         is_flatbed = EXCLUDED.is_flatbed,
+         city_id = EXCLUDED.city_id,
+         avatar_url = COALESCE(EXCLUDED.avatar_url, masters.avatar_url),
+         is_active = false,
+         master_token = COALESCE(masters.master_token, EXCLUDED.master_token),
+         terms_accepted_at = NOW()
+       RETURNING *`,
+      [name, phone, description || null, legacy.category, vehicleType, legacy.vehicle_size,
+       legacy.is_flatbed, cityId || null, photoUrl || null, masterToken]
+    );
+    const master = rows[0];
+
+    await client.query(
+      `INSERT INTO master_services (master_id, service_type, attributes, is_primary)
+       VALUES ($1, $2, $3::jsonb, true)
+       ON CONFLICT (master_id, service_type) DO UPDATE SET attributes = EXCLUDED.attributes`,
+      [master.id, serviceType, JSON.stringify(attributes || {})]
+    );
+
+    await client.query(`DELETE FROM master_districts WHERE master_id = $1`, [master.id]);
+    for (const did of districtIds || []) {
+      if (!Number.isFinite(Number(did))) continue;
+      await client.query(
+        `INSERT INTO master_districts (master_id, district_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [master.id, Number(did)]
+      );
+    }
+    return master;
+  });
+}
+
+async function getActiveCities() {
   const { rows } = await pool.query(
-    `INSERT INTO masters (name, phone, category, vehicle_type, vehicle_size, price_text, description, is_active, balance_tetri, master_token, terms_accepted_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, false, 0, $8, NOW())
-     ON CONFLICT (phone) DO UPDATE SET
-       name = EXCLUDED.name,
-       category = EXCLUDED.category,
-       vehicle_type = EXCLUDED.vehicle_type,
-       vehicle_size = EXCLUDED.vehicle_size,
-       price_text = EXCLUDED.price_text,
-       description = EXCLUDED.description,
-       is_active = false,
-       master_token = COALESCE(masters.master_token, EXCLUDED.master_token),
-       terms_accepted_at = NOW()
-     RETURNING *`,
-    [name, phone, category, vehicleType || null, vehicleSize || null, priceText || null, description || null, masterToken]
+    `SELECT id, slug, name_ka, name_ru, name_en FROM cities WHERE is_active = true ORDER BY sort_order`
   );
-  return rows[0];
+  return rows;
+}
+
+async function getDistrictsByCity(cityId) {
+  const { rows } = await pool.query(
+    `SELECT id, slug, name AS name_ka, name_ru, name_en FROM districts
+     WHERE city_id = $1 ORDER BY sort_order, id`,
+    [cityId]
+  );
+  return rows;
 }
 
 async function getMasterByToken(token) {
@@ -313,6 +366,8 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
 
 module.exports = {
   registerMaster,
+  getActiveCities,
+  getDistrictsByCity,
   getMasterByToken,
   getMasterById,
   getMasterByTelegramId,
