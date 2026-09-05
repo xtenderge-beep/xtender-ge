@@ -1,5 +1,7 @@
 const redis = require('../config/redis');
 const adminAuth = require('../config/adminAuth');
+const otpService = require('../services/otp.service');
+const { requestMeta } = require('../config/requestMeta');
 const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
@@ -47,10 +49,34 @@ async function checkLoginRateLimit(ip) {
   return allowed;
 }
 
+const ADMIN_OTP_PURPOSE = 'admin';
+// Окно то же, что у pending-куки (10 мин) — после истечения кода всё равно придётся
+// начинать заново с пароля, отдельный TTL только запутал бы.
+const ADMIN_2FA_ATTEMPT_MAX = 8;
+const ADMIN_2FA_ATTEMPT_WINDOW_SECONDS = 10 * 60;
+
+const cookieOpts = (expiresAt) => ({
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV !== 'development',
+  expires: new Date(expiresAt),
+});
+
 function showLogin(req, res) {
   res.render('admin/login', { error: null });
 }
 
+function issueAdminSession(req, res, viaText) {
+  const session = adminAuth.createSessionValue();
+  res.cookie(adminAuth.SESSION_COOKIE, session.cookieValue, cookieOpts(session.expiresAt));
+  telegramService
+    .sendSecurityAlert(`✅ Вход в /admin (${viaText})\nIP: ${req.ip}\nUA: ${(req.get('user-agent') || '—').slice(0, 150)}`)
+    .catch(() => {});
+}
+
+// Пароль подтверждён. Если SMS-2FA не включена (нет ADMIN_PHONE) — прежнее поведение,
+// сессия выдаётся сразу. Если включена — либо это уже доверенное устройство (пропускаем
+// код), либо шлём SMS и показываем экран ввода кода вместо кабинета.
 async function login(req, res) {
   const allowed = await checkLoginRateLimit(req.ip);
   if (!allowed) {
@@ -61,17 +87,78 @@ async function login(req, res) {
     return res.status(401).render('admin/login', { error: 'Неверный пароль' });
   }
 
-  const session = adminAuth.createSessionValue();
-  res.cookie(adminAuth.SESSION_COOKIE, session.cookieValue, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV !== 'development',
-    expires: new Date(session.expiresAt),
-  });
-  telegramService
-    .sendSecurityAlert(`✅ Вход в /admin\nIP: ${req.ip}\nUA: ${(req.get('user-agent') || '—').slice(0, 150)}`)
-    .catch(() => {});
+  if (!adminAuth.is2faEnabled()) {
+    issueAdminSession(req, res, 'пароль');
+    return res.redirect('/admin');
+  }
+
+  if (adminAuth.verifyTrustedDevice(req.cookies[adminAuth.TRUSTED_DEVICE_COOKIE])) {
+    issueAdminSession(req, res, 'пароль, доверенное устройство');
+    return res.redirect('/admin');
+  }
+
+  const phone = toE164(process.env.ADMIN_PHONE);
+  const sent = await otpService.sendCode(phone, null, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  if (!sent.success) {
+    return res.status(500).render('admin/login', { error: 'Не удалось отправить SMS-код. Попробуйте позже.' });
+  }
+
+  const pending = adminAuth.createPending2fa();
+  res.cookie(adminAuth.PENDING_2FA_COOKIE, pending.cookieValue, cookieOpts(pending.expiresAt));
+  res.render('admin/verify-2fa', { error: null, resent: false });
+}
+
+// Код из SMS ИЛИ резервный код из ADMIN_2FA_RECOVERY_CODE — любой из двух подходит,
+// вводятся в одно и то же поле. Резервным кодом доверенное устройство НЕ создаём: раз
+// его использовали, значит обычный путь (телефон) был недоступен, и мы не знаем,
+// свой ли это компьютер — безопаснее спросить код ещё раз в следующий вход тоже.
+async function verify2fa(req, res) {
+  const pending = adminAuth.verifyPending2fa(req.cookies[adminAuth.PENDING_2FA_COOKIE]);
+  if (!pending) {
+    return res.redirect('/admin/login');
+  }
+
+  const attempts = await incrWithExpiry(`admin_2fa_attempts:${pending.nonce}`, ADMIN_2FA_ATTEMPT_WINDOW_SECONDS);
+  if (attempts > ADMIN_2FA_ATTEMPT_MAX) {
+    res.clearCookie(adminAuth.PENDING_2FA_COOKIE);
+    telegramService.sendSecurityAlert(`⚠️ /admin: превышен лимит попыток ввода 2FA-кода (IP ${req.ip}).`).catch(() => {});
+    return res.status(429).render('admin/login', { error: 'Слишком много неверных попыток. Войдите заново.' });
+  }
+
+  const code = (req.body.code || '').trim();
+  const phone = toE164(process.env.ADMIN_PHONE);
+  // recordConsent: false — это аутентификация владельца, а не согласие на SMS-рассылку,
+  // не нужно писать строку в sms_consent_logs.
+  const otpOk = Boolean(code) && (await otpService.verifyCode(phone, code, ADMIN_OTP_PURPOSE, { recordConsent: false }));
+  const recoveryOk = !otpOk && adminAuth.verifyRecoveryCode(code);
+
+  if (!otpOk && !recoveryOk) {
+    return res.status(401).render('admin/verify-2fa', { error: 'Неверный код', resent: false });
+  }
+
+  res.clearCookie(adminAuth.PENDING_2FA_COOKIE);
+  if (otpOk) {
+    const trusted = adminAuth.createTrustedDevice();
+    res.cookie(adminAuth.TRUSTED_DEVICE_COOKIE, trusted.cookieValue, cookieOpts(trusted.expiresAt));
+  } else {
+    telegramService
+      .sendSecurityAlert(`⚠️ Вход в /admin через РЕЗЕРВНЫЙ код, не SMS. Если это не ты — срочно смени ADMIN_2FA_RECOVERY_CODE и ADMIN_PASSWORD в Railway.\nIP: ${req.ip}`)
+      .catch(() => {});
+  }
+  issueAdminSession(req, res, otpOk ? 'SMS-код' : 'резервный код');
   res.redirect('/admin');
+}
+
+async function resend2fa(req, res) {
+  const pending = adminAuth.verifyPending2fa(req.cookies[adminAuth.PENDING_2FA_COOKIE]);
+  if (!pending) return res.redirect('/admin/login');
+
+  const phone = toE164(process.env.ADMIN_PHONE);
+  const sent = await otpService.sendCode(phone, null, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  if (!sent.success) {
+    return res.render('admin/verify-2fa', { error: 'Не удалось отправить код повторно. Подождите немного.', resent: false });
+  }
+  res.render('admin/verify-2fa', { error: null, resent: true });
 }
 
 function logout(req, res) {
@@ -379,6 +466,8 @@ async function updateCatalogCallPrice(req, res) {
 module.exports = {
   showLogin,
   login,
+  verify2fa,
+  resend2fa,
   logout,
   overview,
   mastersList,

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full bg-stone-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="robots" content="noindex, nofollow">
+    <title>xtender.ge — Код подтверждения</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="font-sans bg-stone-100 min-h-screen flex items-center justify-center">
+
+    <form method="POST" action="/admin/verify-2fa" class="bg-white rounded-2xl shadow-xl border border-stone-200 p-8 w-full max-w-sm space-y-4">
+        <h1 class="text-xl font-black text-stone-900">Код из SMS</h1>
+        <p class="text-sm text-stone-500">Отправили код на номер владельца. Введите его ниже, чтобы войти.</p>
+
+        <% if (error) { %>
+          <p class="text-sm text-red-600 font-semibold bg-red-50 border border-red-200 rounded-lg px-3 py-2"><%= error %></p>
+        <% } %>
+        <% if (resent) { %>
+          <p class="text-sm text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">Код отправлен повторно.</p>
+        <% } %>
+
+        <div>
+            <label class="text-xs font-bold text-stone-500 uppercase tracking-wide">Код подтверждения</label>
+            <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus
+                class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2.5 outline-none focus:border-emerald-500 tracking-widest text-lg">
+        </div>
+
+        <button type="submit" class="w-full py-2.5 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl transition">
+            Подтвердить
+        </button>
+    </form>
+
+    <form method="POST" action="/admin/verify-2fa/resend" class="fixed bottom-6 text-center w-full">
+        <button type="submit" class="text-sm text-stone-500 hover:text-stone-800 underline underline-offset-2">
+            Отправить код ещё раз
+        </button>
+    </form>
+
+</body>
+</html>

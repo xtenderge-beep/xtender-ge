@@ -7,6 +7,8 @@ const router = express.Router();
 
 router.get('/login', adminController.showLogin);
 router.post('/login', asyncHandler(adminController.login));
+router.post('/verify-2fa', asyncHandler(adminController.verify2fa));
+router.post('/verify-2fa/resend', asyncHandler(adminController.resend2fa));
 
 router.use(requireAdmin);
 
