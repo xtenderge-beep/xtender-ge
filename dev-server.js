@@ -65,7 +65,26 @@ async function seedMasters() {
       [name, phone, template.category, vehicleType, vehicleSize, template.price, template.desc, isFlatbed, isSubscribed, subscriptionUntil]
     );
   }
-  console.log('Seeded 50 demo masters');
+  // На проде миграция master_services/city_id из schema.sql отрабатывает по уже
+  // существующим мастерам. Здесь сид идёт ПОСЛЕ schema.sql, поэтому те же два шага
+  // прогоняем вручную — иначе у демо-мастеров не будет строк услуг и города.
+  await fakePool.query(
+    `INSERT INTO master_services (master_id, service_type, attributes)
+     SELECT id,
+            CASE WHEN category = 'movers' THEN 'movers' ELSE 'van' END,
+            (CASE
+               WHEN category = 'movers' THEN '{}'
+               ELSE '{"size":' || COALESCE('"' || vehicle_size || '"', 'null')
+                    || ',"body":"' || CASE WHEN is_flatbed OR category = 'junk' THEN 'flatbed' ELSE 'closed' END || '"}'
+             END)::jsonb
+     FROM masters
+     WHERE category IS NOT NULL
+     ON CONFLICT (master_id, service_type) DO NOTHING`
+  );
+  await fakePool.query(
+    `UPDATE masters SET city_id = (SELECT id FROM cities WHERE slug = 'tbilisi') WHERE city_id IS NULL`
+  );
+  console.log('Seeded 50 demo masters (+ master_services, city_id)');
 }
 
 seedMasters().then(() => {

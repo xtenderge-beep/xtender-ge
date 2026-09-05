@@ -338,3 +338,86 @@ INSERT INTO app_settings (key, value) VALUES ('lead_price_tetri', '50') ON CONFL
 -- Цена за раскрытие номера в публичном каталоге (клиент, который не постит заявку, а сразу
 -- звонит мастеру из каталога) — отдельный от рассылки канал монетизации, см. HANDOFF 2026-09-05.
 INSERT INTO app_settings (key, value) VALUES ('catalog_call_price_tetri', '50') ON CONFLICT (key) DO NOTHING;
+
+-- === Города, районы, типы услуг исполнителя — конфиг-движок (2026-09-06) ===
+-- См. src/config/serviceTypes.js (структура типов + правила матчинга) и HANDOFF.md
+-- (фазовый план). Фаза 1: только схема + миграция, ничего из этого пока не читается.
+
+-- Города. Пока активен только Тбилиси; остальные заведены заранее, включаются флагом.
+CREATE TABLE IF NOT EXISTS cities (
+    id         SERIAL PRIMARY KEY,
+    slug       VARCHAR(50) NOT NULL UNIQUE,
+    name_ka    VARCHAR(100) NOT NULL,
+    name_ru    VARCHAR(100) NOT NULL,
+    name_en    VARCHAR(100) NOT NULL,
+    is_active  BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INTEGER NOT NULL DEFAULT 100
+);
+INSERT INTO cities (slug, name_ka, name_ru, name_en, is_active, sort_order) VALUES
+    ('tbilisi', 'თბილისი', 'Тбилиси', 'Tbilisi', TRUE, 1),
+    ('batumi',  'ბათუმი',  'Батуми',  'Batumi',  FALSE, 2),
+    ('kutaisi', 'ქუთაისი', 'Кутаиси', 'Kutaisi', FALSE, 3),
+    ('rustavi', 'რუსთავი', 'Рустави', 'Rustavi', FALSE, 4)
+ON CONFLICT (slug) DO NOTHING;
+
+-- Районы. Таблица districts уже была (id, name UNIQUE) — name трактуем как грузинский.
+-- Привязка к городу + локализованные названия + slug для стабильных ссылок в фильтрах.
+ALTER TABLE districts ADD COLUMN IF NOT EXISTS city_id    INTEGER;
+ALTER TABLE districts ADD COLUMN IF NOT EXISTS name_ru    VARCHAR(255);
+ALTER TABLE districts ADD COLUMN IF NOT EXISTS name_en    VARCHAR(255);
+ALTER TABLE districts ADD COLUMN IF NOT EXISTS slug       VARCHAR(60);
+ALTER TABLE districts ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 100;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_districts_slug ON districts(slug);
+
+-- 10 официальных районов Тбилиси. city_id проставляется отдельным UPDATE ниже (INSERT ...
+-- SELECT с CROSS JOIN на pg-mem капризен) — сид идемпотентен по name (UNIQUE).
+INSERT INTO districts (name, name_ru, name_en, slug, sort_order) VALUES
+    ('ვაკე',        'Ваке',         'Vake',        'vake',        1),
+    ('საბურთალო',   'Сабуртало',    'Saburtalo',   'saburtalo',   2),
+    ('მთაწმინდა',   'Мтацминда',    'Mtatsminda',  'mtatsminda',  3),
+    ('ძველი თბილისი','Старый город', 'Old Tbilisi', 'old-tbilisi', 4),
+    ('ისანი',       'Исани',        'Isani',       'isani',       5),
+    ('სამგორი',     'Самгори',      'Samgori',     'samgori',     6),
+    ('ჩუღურეთი',    'Чугурети',     'Chughureti',  'chughureti',  7),
+    ('დიდუბე',      'Дидубе',       'Didube',      'didube',      8),
+    ('ნაძალადევი',  'Надзаладеви',  'Nadzaladevi', 'nadzaladevi', 9),
+    ('გლდანი',      'Глдани',       'Gldani',      'gldani',      10)
+ON CONFLICT (name) DO NOTHING;
+UPDATE districts SET city_id = (SELECT id FROM cities WHERE slug = 'tbilisi') WHERE city_id IS NULL;
+
+-- Услуги исполнителя. Один мастер = N услуг (у манипуляторщика часто ещё грузоперевозки).
+-- attributes — специфичные для типа характеристики (размер/кузов/тоннаж/высота стрелы…),
+-- ключи и правила матчинга описаны в src/config/serviceTypes.js. Фильтрация по attributes
+-- делается в JS на маленькой выборке (pg-mem не тянет JSONB-операторы, см. HANDOFF).
+CREATE TABLE IF NOT EXISTS master_services (
+    id           SERIAL PRIMARY KEY,
+    master_id    INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    service_type VARCHAR(40) NOT NULL,
+    attributes   JSONB NOT NULL DEFAULT '{}',
+    is_primary   BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (master_id, service_type)
+);
+CREATE INDEX IF NOT EXISTS idx_master_services_master_id ON master_services(master_id);
+CREATE INDEX IF NOT EXISTS idx_master_services_type      ON master_services(service_type);
+
+-- Город исполнителя и заявки (Фаза 4 начнёт использовать в матчинге).
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS city_id INTEGER;
+ALTER TABLE orders  ADD COLUMN IF NOT EXISTS city_id INTEGER;
+
+-- Миграция существующих мастеров в master_services: transport/junk → 'van', movers → 'movers'.
+-- vehicle_size / is_flatbed переезжают в attributes. junk принудительно flatbed (это и была
+-- «вывоз мусора» = борт). JSON собирается конкатенацией строк — jsonb_build_object на pg-mem
+-- нет. Идемпотентно через ON CONFLICT (master_id, service_type).
+INSERT INTO master_services (master_id, service_type, attributes)
+SELECT id,
+       CASE WHEN category = 'movers' THEN 'movers' ELSE 'van' END,
+       (CASE
+          WHEN category = 'movers' THEN '{}'
+          ELSE '{"size":' || COALESCE('"' || vehicle_size || '"', 'null')
+               || ',"body":"' || CASE WHEN is_flatbed OR category = 'junk' THEN 'flatbed' ELSE 'closed' END || '"}'
+        END)::jsonb
+FROM masters
+WHERE category IS NOT NULL
+ON CONFLICT (master_id, service_type) DO NOTHING;
+UPDATE masters SET city_id = (SELECT id FROM cities WHERE slug = 'tbilisi') WHERE city_id IS NULL;
