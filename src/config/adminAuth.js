@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 const SESSION_COOKIE = 'admin_session';
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 часа
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 дней
 
 // --- SMS-2FA (опционально — включается наличием ADMIN_PHONE) ---
 const PENDING_2FA_COOKIE = 'admin_2fa_pending';
