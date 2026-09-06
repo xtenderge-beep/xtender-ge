@@ -685,9 +685,11 @@ async function showByOwnerToken(req, res) {
   const files = await orderService.getOrderFiles(order.id);
   const funnel = await orderService.getOrderFunnelStats(order.id);
 
-  // Заказчик видит свою заявку на языке, на котором он её писал (source_lang),
-  // а не на дефолтном ka — куки языка у него может не быть (пришёл из SMS).
-  const ownerLang = ['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang;
+  // Заказчик без явно выбранного языка (нет куки — пришёл из SMS) видит свою заявку на
+  // языке, на котором её писал (source_lang). Если флажок в шапке нажимал — уважаем выбор.
+  const ownerLang = req.cookies.lang
+    ? req.lang
+    : (['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang);
   res.locals.lang = ownerLang;
   res.locals.t = translate(ownerLang);
 
