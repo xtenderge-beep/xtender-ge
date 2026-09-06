@@ -82,9 +82,31 @@
           </div>
         <% } %>
 
+        <%
+          const trs = order.description_translations || {};
+          const translatedText = (order.source_lang && order.source_lang !== lang) ? trs[lang] : null;
+          const isTranslated = Boolean(translatedText);
+        %>
         <div>
-          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1"><%= t('label_request') %></div>
-          <div class="text-sm text-slate-800 leading-relaxed"><%= order.description %></div>
+          <div class="flex items-center gap-2 mb-1">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider"><%= t('label_request') %></div>
+            <% if (isTranslated) { %>
+              <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">🌐 <%= t('order_translated') %></span>
+            <% } %>
+            <button type="button" id="copyOrigBtn" class="ml-auto shrink-0 text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1 transition">
+              <i class="fa-regular fa-copy"></i><span id="copyOrigLabel"><%= t('order_copy') %></span>
+            </button>
+          </div>
+          <div class="text-sm text-slate-800 leading-relaxed whitespace-pre-line"><%= isTranslated ? translatedText : order.description %></div>
+          <% if (isTranslated) { %>
+            <details class="mt-2 group">
+              <summary class="cursor-pointer text-[11px] font-bold text-slate-500 hover:text-slate-800 list-none flex items-center gap-1 select-none">
+                <i class="fa-solid fa-chevron-right text-[8px] transition group-open:rotate-90"></i><%= t('order_show_original') %>
+              </summary>
+              <div class="mt-1.5 text-sm text-slate-500 leading-relaxed whitespace-pre-line border-l-2 border-slate-200 pl-3"><%= order.description %></div>
+            </details>
+          <% } %>
+          <textarea id="origSource" class="hidden" readonly><%= order.description %></textarea>
         </div>
 
         <% if (files && files.length) { %>
@@ -130,10 +152,15 @@
             <a id="callBtn" href="tel:<%= order.phone %>" class="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
               <i class="fa-solid fa-phone"></i><span><%= t('btn_call') %></span>
             </a>
-            <a id="whatsappBtn" href="https://wa.me/<%= order.phone.replace(/\D/g, '') %>" target="_blank" rel="noopener" class="flex-1 py-3.5 rounded-2xl bg-[#25d366] hover:brightness-95 text-white font-black text-sm shadow-lg transition flex items-center justify-center gap-2">
+            <a id="whatsappBtn" href="https://wa.me/<%= order.phone.replace(/\D/g, '') %>?text=<%= encodeURIComponent(whatsappText) %>" target="_blank" rel="noopener" class="flex-1 py-3.5 rounded-2xl bg-[#25d366] hover:brightness-95 text-white font-black text-sm shadow-lg transition flex items-center justify-center gap-2">
               <i class="fa-brands fa-whatsapp"></i><span><%= t('btn_whatsapp') %></span>
             </a>
           </div>
+          <% if (order.source_lang && order.source_lang !== lang) { %>
+            <p class="mt-2 text-[11px] text-slate-400 flex items-start gap-1.5">
+              <i class="fa-brands fa-whatsapp text-emerald-500 mt-0.5 shrink-0"></i><span><%= t('order_lang_hint') %></span>
+            </p>
+          <% } %>
         <% } %>
 
         <div id="msg" class="hidden p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold"></div>
@@ -163,6 +190,26 @@
         }
 
         if (masterId) logEvent('view');
+
+        const copyOrigBtn = document.getElementById('copyOrigBtn');
+        if (copyOrigBtn) {
+          copyOrigBtn.addEventListener('click', async () => {
+            const text = document.getElementById('origSource').value;
+            try {
+              await navigator.clipboard.writeText(text);
+            } catch (e) {
+              const ta = document.getElementById('origSource');
+              ta.classList.remove('hidden'); ta.select();
+              document.execCommand('copy');
+              ta.classList.add('hidden');
+            }
+            const label = document.getElementById('copyOrigLabel');
+            const prev = label.textContent;
+            label.textContent = T.order_copied || 'Скопировано';
+            copyOrigBtn.classList.add('text-emerald-600');
+            setTimeout(() => { label.textContent = prev; copyOrigBtn.classList.remove('text-emerald-600'); }, 1800);
+          });
+        }
 
         const callBtn = document.getElementById('callBtn');
         const whatsappBtn = document.getElementById('whatsappBtn');

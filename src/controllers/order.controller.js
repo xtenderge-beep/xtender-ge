@@ -8,10 +8,18 @@ const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
 const managerService = require('../services/manager.service');
 const settingsService = require('../services/settings.service');
+const translationService = require('../services/translation.service');
 const redis = require('../config/redis');
-const { clientStrings } = require('../config/i18n');
+const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
+
+// Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
+// (он сам писал заявку) + текст заявки в оригинале. Уходит в wa.me/<номер>?text=...
+function buildWhatsappText(order) {
+  const lang = order.source_lang || 'ru';
+  return translate(lang)('order_wa_template').replace('{text}', order.description || '');
+}
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 // /promo КОД 5 [100] [метка]  — код, сумма GEL, необяз. лимит, необяз. метка (агент/канал)
@@ -83,14 +91,30 @@ async function create(req, res) {
   });
   rememberOrderToken(req, res, order.token);
 
-  telegramService
-    .notifyModerator(order)
-    .then((messageId) => {
-      if (messageId) return orderService.setModerationMessageId(order.id, messageId);
-    })
-    .catch((err) => {
+  // Перевод текста заявки + уведомление модератора — в фоне, ответ клиенту не ждёт.
+  // Перевод с общим таймаутом 7с; сбой/таймаут → заявка и рассылка идут с оригиналом.
+  // Модератору сообщение уходит уже с переводом (если успел).
+  (async () => {
+    let enriched = order;
+    try {
+      const tr = await Promise.race([
+        translationService.translateOrder(order.description),
+        new Promise((resolve) => setTimeout(() => resolve(null), 7000)),
+      ]);
+      if (tr) {
+        await orderService.saveTranslations(order.id, tr.sourceLang, tr.translations);
+        enriched = { ...order, source_lang: tr.sourceLang, description_translations: tr.translations };
+      }
+    } catch (err) {
+      console.error('translateOrder failed:', err.message);
+    }
+    try {
+      const messageId = await telegramService.notifyModerator(enriched);
+      if (messageId) await orderService.setModerationMessageId(order.id, messageId);
+    } catch (err) {
       console.error('Failed to notify moderator:', err.message);
-    });
+    }
+  })();
 
   return res.json({ success: true, token: order.token, id: order.id });
 }
@@ -600,6 +624,7 @@ async function show(req, res) {
     masterId,
     funnel,
     masterAccount,
+    whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(req.lang),
   });
 }
@@ -637,6 +662,7 @@ async function showByOwnerToken(req, res) {
     masterId: null,
     funnel,
     masterAccount: null,
+    whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(req.lang),
   });
 }

@@ -67,6 +67,13 @@ async function setModerationMessageId(orderId, messageId) {
   await pool.query('UPDATE orders SET moderation_message_id = $1 WHERE id = $2', [messageId, orderId]);
 }
 
+async function saveTranslations(orderId, sourceLang, translations) {
+  await pool.query(
+    `UPDATE orders SET source_lang = $1, description_translations = $2::jsonb WHERE id = $3`,
+    [sourceLang, JSON.stringify(translations || {}), orderId]
+  );
+}
+
 // Сообщения о заявке во всех чатах модераторов — чтобы updateMessage правил воронку
 // у каждого. [{ chatId, messageId }]. Плейсхолдеры вручную (не ANY/UNNEST — pg-mem).
 async function recordModerationMessages(orderId, entries) {
@@ -350,6 +357,7 @@ module.exports = {
   getOrderDispatches,
   markFirstDispatch,
   setModerationMessageId,
+  saveTranslations,
   recordModerationMessages,
   getModerationMessages,
   closeOrder,

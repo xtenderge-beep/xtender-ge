@@ -86,6 +86,16 @@ async function buildKeyboardWithCounts(token) {
   return { inline_keyboard: rows };
 }
 
+// Модератору показываем русский перевод (если заявка не на русском) + строку оригинала.
+// Перевод может не успеть/не быть — тогда просто оригинал.
+function moderatorDescription(order) {
+  const trs = order.description_translations || {};
+  if (order.source_lang && order.source_lang !== 'ru' && trs.ru) {
+    return `${trs.ru}\n\n🔤 оригинал (${order.source_lang}): ${order.description}`;
+  }
+  return order.description;
+}
+
 async function notifyModerator(order) {
   if (!isEnabled()) {
     console.log(`[TELEGRAM DEV MODE] order ${order.token} pending moderation: ${order.description}`);
@@ -96,7 +106,7 @@ async function notifyModerator(order) {
   const text = [
     '🆕 Новая заявка на модерацию',
     '',
-    order.description,
+    moderatorDescription(order),
     '',
     `📍 ${order.district_name || '—'}`,
     `📞 ${order.phone}`,
@@ -333,7 +343,7 @@ function buildMessageText(order, dispatchLines, funnel) {
   const lines = [
     header,
     '',
-    order.description,
+    moderatorDescription(order),
     '',
     `📍 ${order.district_name || '—'}`,
     `📞 ${order.phone}`,

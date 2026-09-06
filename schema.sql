@@ -135,6 +135,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_owner_token ON orders(owner_token);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS first_dispatched_at TIMESTAMPTZ;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS closed_at TIMESTAMPTZ;
 
+-- Машинный перевод текста заявки (translation.service.js). description не трогаем — это
+-- ровно то, что напечатал заказчик. source_lang определяется по алфавиту (ka/ru/en).
+-- description_translations — {<lang>: "перевод", ...} только для языков ≠ source_lang.
+-- Пусто = перевод не сделан (нет ключа / таймаут / сбой) — везде показывается оригинал.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS description_translations JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source_lang VARCHAR(2);
+
 -- Баланс исполнителя в тетри (1 GEL = 100 тетри) — списывается за каждое SMS-уведомление
 -- о заявке (см. COST_PER_NOTIFICATION_TETRI в order.service.js). Самостоятельная регистрация
 -- через /join создаёт мастера с is_active = false — до подтверждения модератором в Telegram
