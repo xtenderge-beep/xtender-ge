@@ -32,8 +32,10 @@ const ADMIN_FLOW_TTL_SECONDS = 300;
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
-const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed']);
-const ALLOWED_SIZES = new Set(['L', 'XL', 'XXL']);
+// transport/movers/junk/flatbed — старые; tow/bucket_lift — спецтехника (у мастеров
+// masters.category = сам тип, см. serviceTypes.legacyColumnsFor). Кнопки — telegram.service.
+const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed', 'tow', 'bucket_lift']);
+const ALLOWED_SIZES = new Set(['S', 'L', 'XL', 'XXL']);
 const MY_ORDERS_COOKIE = 'my_orders';
 const MY_ORDERS_MAX = 20;
 

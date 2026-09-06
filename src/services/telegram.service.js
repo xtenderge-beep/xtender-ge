@@ -4,14 +4,16 @@ const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
 
 const API_BASE = 'https://api.telegram.org/bot';
-const SIZE_LABELS = { L: 'L', XL: 'XL', XXL: 'XXL' };
-const SIZE_SPECS = { L: '180×180×380', XL: '200×190×400', XXL: '200×200×500' };
-const SIZE_ORDER = ['L', 'XL', 'XXL'];
+const SIZE_LABELS = { S: 'S', L: 'L', XL: 'XL', XXL: 'XXL' };
+const SIZE_SPECS = { S: 'легковая / каблук', L: '180×180×380', XL: '200×190×400', XXL: '200×200×500' };
+const SIZE_ORDER = ['S', 'L', 'XL', 'XXL'];
 const CATEGORY_LABELS = {
-  transport: '🚚 Машины',
+  transport: '🚚 Перевозки',
   movers: '💪 Грузчики',
   junk: '🧹 Вывоз мусора',
   flatbed: '🚛 Бортовые / стройматериалы',
+  tow: '🛻 Эвакуатор',
+  bucket_lift: '🏗️ Автовышка',
 };
 
 const ADMIN_MENU_KEYBOARD = {
@@ -62,15 +64,23 @@ async function buildKeyboardWithCounts(token) {
   const junkCount = total('junk');
   const transportCount = total('transport');
   const flatbedCount = total('flatbed');
+  const towCount = total('tow');
+  const bucketLiftCount = total('bucket_lift');
 
   const rows = [
-    [{ text: `🚚 Машины — все размеры (${transportCount})`, callback_data: `cat:${token}:transport` }],
+    [{ text: `🚚 Перевозки — все размеры (${transportCount})`, callback_data: `cat:${token}:transport` }],
     [
-      { text: `🧹 Вывоз мусора (${junkCount})`, callback_data: `cat:${token}:junk` },
       { text: `🚛 Бортовые (${flatbedCount})`, callback_data: `cat:${token}:flatbed` },
+      { text: `💪 Грузчики (${moversCount})`, callback_data: `cat:${token}:movers` },
     ],
-    [{ text: `💪 Грузчики (${moversCount})`, callback_data: `cat:${token}:movers` }],
+    [
+      { text: `🛻 Эвакуатор (${towCount})`, callback_data: `cat:${token}:tow` },
+      { text: `🏗️ Автовышка (${bucketLiftCount})`, callback_data: `cat:${token}:bucket_lift` },
+    ],
   ];
+  // Легаси-профили с category='junk' (саморегистрацией туда не попасть) — кнопка только
+  // если такие ещё есть; новые «вывоз мусора» = «Бортовые».
+  if (junkCount) rows.push([{ text: `🧹 Вывоз мусора (${junkCount})`, callback_data: `cat:${token}:junk` }]);
 
   if (transportSizes.length) {
     transportSizes.forEach((row) => {
