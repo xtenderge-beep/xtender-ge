@@ -1,5 +1,6 @@
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
+const managerService = require('../services/manager.service');
 const { getBaseUrl } = require('../config/url');
 const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION } = require('../config/legal');
@@ -17,11 +18,27 @@ async function send(req, res) {
     return res.status(400).json({ success: false, message: 'Description is required' });
   }
 
+  // Пришёл по ссылке менеджера — привязываем заявку к нему.
+  let managerId = null;
+  let inviteToken = null;
+  const cookieInvite = req.cookies && req.cookies.order_invite;
+  if (cookieInvite) {
+    const invite = await managerService.getClientInvite(cookieInvite);
+    if (invite) {
+      managerId = invite.manager_id;
+      inviteToken = invite.token;
+    }
+  }
+
   const order = await orderService.createPendingOrder({
     phone,
     description,
     districtName: districtName || '',
+    managerId,
   });
+  if (inviteToken) {
+    managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});
+  }
 
   const link = `${getBaseUrl()}/o/${order.owner_token}`;
   const result = await otpService.sendCode(phone, link, 'order', order.id, { meta: requestMeta(req) });

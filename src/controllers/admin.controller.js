@@ -384,8 +384,24 @@ async function managerDetail(req, res) {
   const id = parseInt(req.params.id, 10);
   const manager = await managerService.getById(id);
   if (!manager) return res.status(404).send('Менеджер не найден');
-  const stats = await managerService.getStats(id);
-  res.render('admin/manager-detail', { manager, stats, baseUrl: baseUrl(req) });
+  const [stats, clientFunnel] = await Promise.all([
+    managerService.getStats(id),
+    managerService.getClientFunnel(id),
+  ]);
+  res.render('admin/manager-detail', {
+    manager, stats, clientFunnel, baseUrl: baseUrl(req),
+    newInviteLink: req.query.link || null,
+  });
+}
+
+async function managerClientLink(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const phone = (req.body.phone || '').replace(/\s+/g, '');
+  if (!/^\+?\d{9,15}$/.test(phone)) {
+    return res.redirect(`/admin/managers/${id}?error=phone`);
+  }
+  const token = await managerService.createClientInvite(id, phone);
+  res.redirect(`/admin/managers/${id}?link=${encodeURIComponent(`${baseUrl(req)}/z/${token}`)}`);
 }
 
 async function assignManager(req, res) {
@@ -498,6 +514,7 @@ module.exports = {
   managerCreate,
   managerUpdate,
   managerDetail,
+  managerClientLink,
   assignManager,
   settingsPage,
   updateLeadPrice,

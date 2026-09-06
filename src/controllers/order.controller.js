@@ -118,7 +118,12 @@ async function create(req, res) {
     }
   })();
 
-  return res.json({ success: true, token: order.token, id: order.id });
+  return res.json({
+    success: true,
+    token: order.token,
+    id: order.id,
+    ownerLink: `/o/${order.owner_token}`,
+  });
 }
 
 function adminFlowKey(chatId) {
@@ -394,7 +399,11 @@ async function handleContactShared(message) {
   if (manager) {
     const linked = await managerService.linkTelegram(manager.id, message.from.id);
     const lines = [`✅ Готово, ${linked.name}! Вы менеджер xtender.`, ''];
-    lines.push('/ref 5 Имя — ссылка для регистрации исполнителя (бонус 5 GEL)', '/mystats — сколько вы привели');
+    lines.push(
+      '/ref 5 Имя — ссылка для регистрации исполнителя (бонус 5 GEL)',
+      '/link +995… — ссылка для заказчика (телефон позвонившего клиента)',
+      '/mystats — ваша статистика и воронка'
+    );
     if (linked.is_moderator) lines.push('', 'Вы также модератор — заявки на модерацию будут приходить сюда.');
     await telegramService.sendToChat(message.chat.id, lines.join('\n'), { remove_keyboard: true });
     return;
@@ -420,9 +429,27 @@ async function handleManagerCommand(message, manager) {
 
   if (text === '/mystats') {
     const s = await managerService.getStats(manager.id);
+    const f = await managerService.getClientFunnel(manager.id);
     await telegramService.sendToChat(
       chatId,
-      `Ваши исполнители: ${s.total}\nАктивных: ${s.active}\nВыдано бонусов: ${(s.bonusPaidTetri / 100).toFixed(2)} ₾`
+      `Ваши исполнители: ${s.total}\nАктивных: ${s.active}\nВыдано бонусов: ${(s.bonusPaidTetri / 100).toFixed(2)} ₾\n\n` +
+        `Клиентские ссылки: ${f.linksSent}\nОткрыли: ${f.linksOpened}\nЗаявок: ${f.ordersCreated}\n` +
+        `Разослано: ${f.ordersDispatched}\nСвязались: ${f.ordersContacted}\nЗакрыто: ${f.ordersClosed}`
+    );
+    return;
+  }
+
+  if (text === '/link' || text.startsWith('/link ')) {
+    const raw = text.slice('/link'.length).trim().replace(/\s+/g, '');
+    if (!/^\+?\d{9,15}$/.test(raw)) {
+      await telegramService.sendToChat(chatId, 'Формат: /link +995XXXXXXXXX\nТелефон позвонившего клиента. В ответ — ссылка, которую отправляете ему.');
+      return;
+    }
+    const token = await managerService.createClientInvite(manager.id, raw);
+    await telegramService.sendToChat(
+      chatId,
+      `🔗 Ссылка для клиента ${toE164(raw)}:\n${getBaseUrl()}/z/${token}\n\n` +
+        `Отправьте её клиенту. Он опишет задачу — телефон уже подставлен. Заявка привяжется к вам, воронка — в /mystats.`
     );
     return;
   }
@@ -454,7 +481,7 @@ async function handleManagerCommand(message, manager) {
     return;
   }
 
-  await telegramService.sendToChat(chatId, `${manager.name}, команды: /ref 5 Имя · /mystats`);
+  await telegramService.sendToChat(chatId, `${manager.name}, команды: /ref 5 Имя · /link +995… · /mystats`);
 }
 
 // Обычный текст боту от привязанного исполнителя — это вопрос в поддержку.
@@ -506,7 +533,8 @@ async function telegramWebhook(req, res) {
       const isEnvModerator = String((message.chat || {}).id) === String(process.env.TELEGRAM_MODERATOR_CHAT_ID);
       const manager = fromId ? await managerService.getByTelegramId(fromId) : null;
       const isModerator = isEnvModerator || (manager && manager.is_moderator && manager.is_active);
-      const isManagerCmd = manager && manager.is_active && (text === '/mystats' || text === '/ref' || text.startsWith('/ref '));
+      const isManagerCmd = manager && manager.is_active &&
+    (text === '/mystats' || text === '/ref' || text.startsWith('/ref ') || text === '/link' || text.startsWith('/link '));
 
       if (message.contact) {
         await handleContactShared(message);

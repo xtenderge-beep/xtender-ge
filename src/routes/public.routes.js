@@ -5,6 +5,7 @@ const { buildSeo } = require('../config/seo');
 const { SERVICE_REQUISITES } = require('../config/legal');
 const legalContent = require('../config/legal-content');
 const masterService = require('../services/master.service');
+const managerService = require('../services/manager.service');
 const reviewService = require('../services/review.service');
 const promoService = require('../services/promo.service');
 const settingsService = require('../services/settings.service');
@@ -62,12 +63,37 @@ router.get('/', asyncHandler(async (req, res) => {
   masters.forEach((m) => { m.reviews = reviewsByMaster.get(m.id) || []; });
   const t = translate(locale);
   masters.forEach((m) => { m.badges = serviceTypes.attributeBadges(m.service_type, m.attributes, t); });
+
+  // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
+  let prefillPhone = '';
+  const inviteToken = req.cookies.order_invite;
+  if (inviteToken) {
+    const invite = await managerService.getClientInvite(inviteToken);
+    if (invite) prefillPhone = invite.phone;
+  }
+
   res.render('index', {
     masters,
     catalogCallPriceTetri,
+    prefillPhone,
     clientStrings: clientStrings(locale),
     catalogGroups: serviceTypes.catalogGroupsForView(t),
   });
+}));
+
+// Персональная ссылка менеджера для заказчика. Ставим куку с токеном приглашения,
+// отмечаем открытие, отправляем на форму заявки.
+router.get('/z/:token', asyncHandler(async (req, res) => {
+  const invite = await managerService.getClientInvite(req.params.token);
+  if (!invite) return res.redirect('/');
+  await managerService.markInviteOpened(invite.token);
+  res.cookie('order_invite', invite.token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+  const locale = req.cookies.lang && ['ru', 'en'].includes(req.cookies.lang) ? '/' + req.cookies.lang : '';
+  res.redirect(`${locale}/#post-section`);
 }));
 
 router.get('/join', asyncHandler(async (req, res) => {

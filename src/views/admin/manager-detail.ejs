@@ -25,6 +25,27 @@
     </div>
 </div>
 
+<h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Заявки клиентов (по ссылкам менеджера)</h2>
+<div class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Ссылок</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.linksSent %></p></div>
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Открыли</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.linksOpened %></p></div>
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Заявок</p><p class="text-xl font-black text-emerald-700"><%= clientFunnel.ordersCreated %></p></div>
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Разослано</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.ordersDispatched %></p></div>
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Связались</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.ordersContacted %></p></div>
+        <div><p class="text-[11px] font-bold text-stone-400 uppercase">Закрыто</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.ordersClosed %></p></div>
+    </div>
+    <form method="POST" action="/admin/managers/<%= manager.id %>/client-link" class="mt-4 flex gap-2 flex-wrap">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="tel" name="phone" placeholder="+995 5XX XX XX XX" required
+            class="flex-1 min-w-[200px] border border-stone-300 rounded-xl px-3 py-2 text-sm">
+        <button class="px-4 py-2 rounded-xl bg-stone-900 text-white text-sm font-bold">Сгенерировать ссылку</button>
+    </form>
+    <% if (typeof newInviteLink !== 'undefined' && newInviteLink) { %>
+        <div class="mt-2 text-sm font-mono bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 break-all"><%= newInviteLink %></div>
+    <% } %>
+</div>
+
 <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Его исполнители</h2>
 <% if (!stats.providers.length) { %>
   <p class="text-sm text-stone-500">Пока никого не привёл.</p>

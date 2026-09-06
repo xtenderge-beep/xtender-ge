@@ -126,13 +126,34 @@ async function notifyModerator(order) {
   ].join('\n');
   const keyboard = await buildKeyboardWithCounts(order.token);
 
+  // Фото к заявке — публичные URL, Telegram сам их подтянет (как чеки на пополнение).
+  const files = await orderService.getOrderFiles(order.id).catch(() => []);
+  const photos = files.filter((f) => f.mime_type && f.mime_type.startsWith('image/')).slice(0, 10);
+  const docs = files.filter((f) => !photos.includes(f));
+
+  const chatIds = await getModeratorChatIds();
   const sent = [];
-  for (const chatId of await getModeratorChatIds()) {
+  for (const chatId of chatIds) {
     try {
       const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text, reply_markup: keyboard });
       sent.push({ chatId, messageId: data.result.message_id });
     } catch (err) {
       console.error(`notifyModerator -> ${chatId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
+    }
+    try {
+      if (photos.length === 1) {
+        await axios.post(apiUrl('sendPhoto'), { chat_id: chatId, photo: base + photos[0].file_path, caption: `📎 Фото к заявке #${order.id}` });
+      } else if (photos.length > 1) {
+        await axios.post(apiUrl('sendMediaGroup'), {
+          chat_id: chatId,
+          media: photos.map((p, i) => ({ type: 'photo', media: base + p.file_path, ...(i === 0 ? { caption: `📎 Фото к заявке #${order.id}` } : {}) })),
+        });
+      }
+      for (const d of docs) {
+        await axios.post(apiUrl('sendDocument'), { chat_id: chatId, document: base + d.file_path, caption: `📎 ${d.original_name}` });
+      }
+    } catch (err) {
+      console.error(`notifyModerator photos -> ${chatId}:`, err.response ? JSON.stringify(err.response.data) : err.message);
     }
   }
   if (sent.length) await orderService.recordModerationMessages(order.id, sent);

@@ -48,6 +48,7 @@ router.get('/managers', asyncHandler(adminController.managersList));
 router.post('/managers', verifyCsrf, asyncHandler(adminController.managerCreate));
 router.get('/managers/:id', asyncHandler(adminController.managerDetail));
 router.post('/managers/:id/update', verifyCsrf, asyncHandler(adminController.managerUpdate));
+router.post('/managers/:id/client-link', verifyCsrf, asyncHandler(adminController.managerClientLink));
 router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
 
 router.get('/settings', asyncHandler(adminController.settingsPage));

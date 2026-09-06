@@ -243,6 +243,22 @@ CREATE TABLE IF NOT EXISTS managers (
 ALTER TABLE promo_codes ADD COLUMN IF NOT EXISTS manager_id INTEGER;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS manager_id INTEGER;
 
+-- Персональные ссылки менеджера для ЗАКАЗЧИКА (не исполнителя). Менеджер вбивает телефон
+-- позвонившего клиента (`/link +995...` в боте или форма в /admin/managers/:id), получает
+-- /z/<token>, отправляет клиенту. Клиент открывает → телефон подставлен, заявка привяжется
+-- к менеджеру. order_id заполняется, когда клиент реально создал заявку — по этому полю
+-- строится воронка менеджера в админке.
+CREATE TABLE IF NOT EXISTS client_invites (
+    token      VARCHAR(20) PRIMARY KEY,
+    manager_id INTEGER NOT NULL,
+    phone      VARCHAR(50) NOT NULL,
+    order_id   INTEGER,
+    opened_at  TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_client_invites_manager ON client_invites(manager_id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS manager_id INTEGER;
+
 -- Одна заявка → сообщение каждому активному модератору. Для правки воронки на месте
 -- у всех разом (updateMessage перебирает эти строки).
 CREATE TABLE IF NOT EXISTS order_moderation_messages (

@@ -135,14 +135,15 @@ async function setMasterBanned(id, banned, reason) {
 async function listOrdersAdmin() {
   const { rows } = await pool.query(
     `SELECT o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
-            o.first_dispatched_at, o.closed_at,
+            o.first_dispatched_at, o.closed_at, o.manager_id, mgr.name AS manager_name,
             COUNT(*) FILTER (WHERE ov.event_type = 'view')::int AS view_count,
             COUNT(*) FILTER (WHERE ov.event_type = 'call')::int AS call_count,
             COUNT(*) FILTER (WHERE ov.event_type = 'whatsapp')::int AS whatsapp_count
      FROM orders o
      LEFT JOIN order_views ov ON ov.order_id = o.id
+     LEFT JOIN managers mgr ON mgr.id = o.manager_id
      GROUP BY o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
-              o.first_dispatched_at, o.closed_at
+              o.first_dispatched_at, o.closed_at, o.manager_id, mgr.name
      ORDER BY o.created_at DESC`
   );
   return rows;

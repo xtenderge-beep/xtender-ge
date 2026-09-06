@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { toE164 } = require('../config/phone');
+const { generateShortId } = require('../config/shortId');
 
 const FIELDS = 'id, name, phone, telegram_id, telegram_linked_at, is_moderator, is_active, created_at';
 
@@ -111,6 +112,70 @@ async function assignProvider(masterId, managerId) {
   await pool.query(`UPDATE masters SET manager_id = $1 WHERE id = $2`, [managerId || null, masterId]);
 }
 
+// --- Персональные ссылки менеджера для заказчиков ---
+
+async function createClientInvite(managerId, phone) {
+  const token = generateShortId();
+  await pool.query(
+    `INSERT INTO client_invites (token, manager_id, phone) VALUES ($1, $2, $3)`,
+    [token, managerId, toE164(phone)]
+  );
+  return token;
+}
+
+async function getClientInvite(token) {
+  const { rows } = await pool.query(`SELECT * FROM client_invites WHERE token = $1`, [token]);
+  return rows[0] || null;
+}
+
+async function markInviteOpened(token) {
+  await pool.query(
+    `UPDATE client_invites SET opened_at = COALESCE(opened_at, NOW()) WHERE token = $1`,
+    [token]
+  );
+}
+
+async function linkInviteToOrder(token, orderId) {
+  await pool.query(
+    `UPDATE client_invites SET order_id = $1 WHERE token = $2 AND order_id IS NULL`,
+    [orderId, token]
+  );
+}
+
+// Воронка по заявкам клиентов, пришедшим по ссылкам менеджера. Без коррелированных
+// подзапросов (pg-mem): считаем в JS по двум плоским выборкам.
+async function getClientFunnel(managerId) {
+  const { rows: invites } = await pool.query(
+    `SELECT token, order_id, opened_at FROM client_invites WHERE manager_id = $1`,
+    [managerId]
+  );
+  const orderIds = invites.map((i) => i.order_id).filter(Boolean);
+  let orders = [];
+  if (orderIds.length) {
+    const ph = orderIds.map((_, i) => `$${i + 1}`).join(', ');
+    const { rows } = await pool.query(
+      `SELECT o.id, o.status, o.first_dispatched_at,
+              COALESCE(ev.contacted, 0)::int AS contacted
+       FROM orders o
+       LEFT JOIN (
+         SELECT order_id, COUNT(*) AS contacted FROM order_views
+         WHERE event_type IN ('call', 'whatsapp') GROUP BY order_id
+       ) ev ON ev.order_id = o.id
+       WHERE o.id IN (${ph})`,
+      orderIds
+    );
+    orders = rows;
+  }
+  return {
+    linksSent: invites.length,
+    linksOpened: invites.filter((i) => i.opened_at).length,
+    ordersCreated: orderIds.length,
+    ordersDispatched: orders.filter((o) => o.first_dispatched_at).length,
+    ordersContacted: orders.filter((o) => o.contacted > 0).length,
+    ordersClosed: orders.filter((o) => o.status === 'closed').length,
+  };
+}
+
 module.exports = {
   create,
   list,
@@ -124,4 +189,9 @@ module.exports = {
   getProviders,
   getStats,
   assignProvider,
+  createClientInvite,
+  getClientInvite,
+  markInviteOpened,
+  linkInviteToOrder,
+  getClientFunnel,
 };

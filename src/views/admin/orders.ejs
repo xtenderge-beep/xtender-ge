@@ -16,6 +16,7 @@
           <p class="text-xs text-stone-500 mt-1.5">
               Категории: <%= (o.target_categories || []).join(', ') || '—' %>
               · 👀 <%= o.view_count %> · 📞 <%= o.call_count %> · 💬 <%= o.whatsapp_count %>
+              <% if (o.manager_name) { %> · <span class="font-bold text-stone-600">менеджер: <%= o.manager_name %></span><% } %>
           </p>
       </a>
     <% }); %>
