@@ -3,3 +3,5 @@ node_modules/
 public/uploads/*
 !public/uploads/.gitkeep
 HANDOFF.md
+_*.js
+_bench/
