@@ -685,6 +685,12 @@ async function showByOwnerToken(req, res) {
   const files = await orderService.getOrderFiles(order.id);
   const funnel = await orderService.getOrderFunnelStats(order.id);
 
+  // Заказчик видит свою заявку на языке, на котором он её писал (source_lang),
+  // а не на дефолтном ka — куки языка у него может не быть (пришёл из SMS).
+  const ownerLang = ['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang;
+  res.locals.lang = ownerLang;
+  res.locals.t = translate(ownerLang);
+
   return res.render('order', {
     order,
     files,
@@ -693,7 +699,7 @@ async function showByOwnerToken(req, res) {
     funnel,
     masterAccount: null,
     whatsappText: buildWhatsappText(order),
-    clientStrings: clientStrings(req.lang),
+    clientStrings: clientStrings(ownerLang),
   });
 }
 
