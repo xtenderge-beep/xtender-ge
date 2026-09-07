@@ -5,6 +5,7 @@
   "main": "src/app.js",
   "scripts": {
     "build:css": "tailwindcss -i ./src/styles/input.css -o ./public/css/app.css --minify",
+    "build:fa": "node scripts/build-fa.js",
     "build": "npm run build:css",
     "start": "node src/app.js",
     "dev": "npm run build:css && nodemon src/app.js",
@@ -23,9 +24,11 @@
     "uuid": "^11.0.3"
   },
   "devDependencies": {
+    "@fortawesome/fontawesome-free": "^6.5.1",
     "ioredis-mock": "^8.13.1",
     "nodemon": "^3.1.7",
     "pg-mem": "^3.0.14",
+    "subset-font": "^2.7.0",
     "tailwindcss": "^3.4.19"
   }
 }

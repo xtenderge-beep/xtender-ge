@@ -1,0 +1,41 @@
+/* Font Awesome 6.5.1 — subset for xtender.ge, built by scripts/build-fa.js */
+.fa,.fa-brands,.fa-regular,.fa-solid,.fab,.far,.fas{-moz-osx-font-smoothing:grayscale;-webkit-font-smoothing:antialiased;display:var(--fa-display,inline-block);font-style:normal;font-variant:normal;line-height:1;text-rendering:auto}.fa,.fa-regular,.fa-solid,.far,.fas{font-family:"Font Awesome 6 Free"}.fa,.fa-solid,.fas{font-weight:900}.fa-regular,.far{font-weight:400}.fa-brands,.fab{font-family:"Font Awesome 6 Brands";font-weight:400}:is(.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands)::before{-webkit-font-smoothing:antialiased;display:inline-block;text-rendering:auto}
+@font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:900;font-display:block;src:url(/fa/fa-solid.woff2) format("woff2")}
+@font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:400;font-display:block;src:url(/fa/fa-regular.woff2) format("woff2")}
+@font-face{font-family:"Font Awesome 6 Brands";font-style:normal;font-weight:400;font-display:block;src:url(/fa/fa-brands.woff2) format("woff2")}
+.fa-address-book:before{content:"\f2b9"}
+.fa-arrow-left:before{content:"\f060"}
+.fa-arrow-right:before{content:"\f061"}
+.fa-bolt:before{content:"\f0e7"}
+.fa-briefcase:before{content:"\f0b1"}
+.fa-building-columns:before{content:"\f19c"}
+.fa-check:before{content:"\f00c"}
+.fa-chevron-down:before{content:"\f078"}
+.fa-circle-check:before{content:"\f058"}
+.fa-circle-info:before{content:"\f05a"}
+.fa-clock:before{content:"\f017"}
+.fa-eye:before{content:"\f06e"}
+.fa-gift:before{content:"\f06b"}
+.fa-headset:before{content:"\f590"}
+.fa-helmet-safety:before{content:"\f807"}
+.fa-key:before{content:"\f084"}
+.fa-list-check:before{content:"\f0ae"}
+.fa-lock:before{content:"\f023"}
+.fa-mobile-screen:before{content:"\f3cf"}
+.fa-paper-plane:before{content:"\f1d8"}
+.fa-paperclip:before{content:"\f0c6"}
+.fa-pen:before{content:"\f304"}
+.fa-phone:before{content:"\f095"}
+.fa-right-to-bracket:before{content:"\f2f6"}
+.fa-shield-halved:before{content:"\f3ed"}
+.fa-square-plus:before{content:"\f0fe"}
+.fa-star:before{content:"\f005"}
+.fa-tag:before{content:"\f02b"}
+.fa-trash-can:before{content:"\f2ed"}
+.fa-triangle-exclamation:before{content:"\f071"}
+.fa-truck:before{content:"\f0d1"}
+.fa-truck-pickup:before{content:"\f63c"}
+.fa-copy:before{content:"\f0c5"}
+.fa-image:before{content:"\f03e"}
+.fa-telegram:before{content:"\f2c6"}
+.fa-whatsapp:before{content:"\f232"}
