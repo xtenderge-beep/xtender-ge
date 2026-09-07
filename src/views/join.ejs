@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="<%= lang %>" class="h-full bg-stone-50">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <title><%= t('join_page_title') %></title>
-    <meta name="description" content="<%= t('meta_description_join') %>">
+    <%- include('partials/head', {
+      title: t('join_page_title'),
+      metaDescription: t('meta_description_join'),
+    }) %>
 
     <link rel="canonical" href="<%= seo.canonical %>">
     <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
@@ -22,33 +21,6 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="<%= t('join_page_title') %>">
     <meta name="twitter:description" content="<%= t('meta_description_join') %>">
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'],
-                        mono: ['IBM Plex Mono', 'Noto Sans Georgian', 'ui-monospace', 'monospace'],
-                    },
-                    colors: { brand: { DEFAULT: '#059669' } },
-                }
-            }
-        }
-    </script>
-    <style>
-        .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-        .svc-btn.active, .opt-btn.active { background: #059669; color: #fff; border-color: #059669; }
-        .district-btn.active { background: #059669; color: #fff; border-color: #059669; }
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
-    </style>
 </head>
 <body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
@@ -58,15 +30,7 @@
                 <a href="/" class="flex items-center gap-2">
                     <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
                 </a>
-                <div class="flex items-center gap-0.5 p-1 bg-stone-100 rounded-full border border-stone-200">
-                    <% [['ka','🇬🇪','GE'],['ru','🇷🇺','RU'],['en','🇬🇧','EN']].forEach(function (lf) { %>
-                        <% /* ?lang=ka — иначе кука ru/en тут же откидывает голый '/join' обратно, см. public.routes.js */ %>
-                        <a href="<%= seo.alternates[lf[0]] %><%= lf[0] === 'ka' ? '?lang=ka' : '' %>" title="<%= lf[2] %>" aria-label="<%= lf[2] %>"
-                           class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base font-bold leading-none transition <%= lang === lf[0] ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:bg-white/60 hover:text-stone-800 active:scale-95' %>">
-                            <%= lf[1] %>
-                        </a>
-                    <% }); %>
-                </div>
+                <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
             </div>
         </div>
     </header>
@@ -172,8 +136,12 @@
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_photo_label') %></label>
-                        <input type="file" id="photoInput" accept="image/*"
-                            class="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-stone-100 file:text-stone-700">
+                        <label for="photoInput" class="flex items-center gap-2.5 cursor-pointer bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl px-3 py-3 text-sm font-bold text-stone-700 transition active:scale-[0.99]">
+                            <i class="fa-regular fa-image text-emerald-600 shrink-0"></i>
+                            <span id="photoName" class="truncate"><%= t('join_photo_btn') %></span>
+                        </label>
+                        <input type="file" id="photoInput" accept="image/*" class="hidden">
+                        <img id="photoPreview" alt="" class="hidden mt-2 w-20 h-20 object-cover rounded-xl border border-stone-200">
                     </div>
                 </div>
 
@@ -330,6 +298,22 @@
             });
         }
         renderDistricts();
+
+        const photoInput = document.getElementById('photoInput');
+        const photoName = document.getElementById('photoName');
+        const photoPreview = document.getElementById('photoPreview');
+        if (photoInput) {
+            photoInput.addEventListener('change', () => {
+                const file = photoInput.files[0];
+                photoName.textContent = file ? file.name : T.join_photo_btn;
+                if (file && file.type.startsWith('image/')) {
+                    photoPreview.src = URL.createObjectURL(file);
+                    photoPreview.classList.remove('hidden');
+                } else {
+                    photoPreview.classList.add('hidden');
+                }
+            });
+        }
 
         function collectAttributes() {
             const block = visibleFields();

@@ -9,6 +9,17 @@ const { newDb } = require('pg-mem');
 const fs = require('fs');
 const path = require('path');
 
+// Собираем public/css/app.css из src/styles/input.css — то же, что делает
+// `npm run build:css` (и Railway на деплое). Без этого превью открывается без стилей.
+try {
+  require('child_process').execSync(
+    'npx tailwindcss -i ./src/styles/input.css -o ./public/css/app.css --minify',
+    { cwd: __dirname, stdio: 'inherit' }
+  );
+} catch (err) {
+  console.error('Tailwind build failed (страница будет без стилей):', err.message);
+}
+
 const Module = require('module');
 const originalResolve = Module._resolveFilename;
 Module._resolveFilename = function (request, ...args) {

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="<%= lang %>" class="h-full bg-stone-50 scroll-smooth">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <title><%= t('site_title_index') %></title>
-    <meta name="description" content="<%= t('meta_description_index') %>">
+    <%- include('partials/head', {
+      title: t('site_title_index'),
+      metaDescription: t('meta_description_index'),
+      viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
+    }) %>
 
     <link rel="canonical" href="<%= seo.canonical %>">
     <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
@@ -52,91 +52,6 @@
     %>
     <script type="application/ld+json"><%- JSON.stringify(orgJsonLd) %></script>
     <script type="application/ld+json"><%- JSON.stringify(faqJsonLd) %></script>
-
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'Noto Sans Georgian', 'sans-serif'],
-                        mono: ['IBM Plex Mono', 'Noto Sans Georgian', 'ui-monospace', 'monospace'],
-                    },
-                    colors: {
-                        brand: {
-                            500: '#22c55e',
-                            600: '#16a34a',
-                            700: '#15803d',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
-    <style>
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f5f5f4; }
-        ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
-        .lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
-
-        .dispatch-grid {
-            background-image: radial-gradient(circle, rgba(28,25,23,0.07) 1px, transparent 1px);
-            background-size: 22px 22px;
-        }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-        .fade-in-up { animation: fadeInUp .45s cubic-bezier(0.16, 1, 0.3, 1) both; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        details > summary { list-style: none; }
-        details > summary::-webkit-details-marker { display: none; }
-
-        /* Compose mode: on mobile, focusing the task field opens a full-screen
-           composer (Facebook-style) — top bar with back + Publish, the field
-           fills the rest, Photo sits on a bottom bar above the keyboard. */
-        .compose-topbar { display: none; }
-        @media (max-width: 639px) {
-            body.compose-active { overflow: hidden; }
-            body.compose-active header,
-            body.compose-active #mobileNav,
-            body.compose-active #seo-hero,
-            body.compose-active .composer-toprow,
-            body.compose-active .composer-chips,
-            body.compose-active .composer-trust-line,
-            body.compose-active .composer-trust-badges { display: none !important; }
-
-            body.compose-active #post-section {
-                position: fixed; inset: 0; z-index: 50; margin: 0; background: #fff;
-                animation: none; transform: none;
-            }
-            body.compose-active .composer-card {
-                height: 100%; display: flex; flex-direction: column;
-                border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
-            }
-            body.compose-active #detailsStep {
-                flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0;
-            }
-            body.compose-active .compose-topbar { display: flex; }
-            body.compose-active .composer-inputbox,
-            body.compose-active .composer-inputbox:focus-within {
-                flex: 1; min-height: 0; border: 0; border-radius: 0;
-                box-shadow: none; margin: 0; padding: 14px 16px;
-            }
-            body.compose-active .composer-textarea {
-                flex: 1; min-height: 0; height: 100%; overflow-y: auto;
-            }
-            body.compose-active .composer-actionbar {
-                margin: 0; padding: 10px 16px; border-top: 1px solid #e7e5e4;
-            }
-            body.compose-active .composer-inline-publish { display: none; }
-            body.compose-active #attachmentsPreview { padding: 0 16px 8px; }
-        }
-    </style>
 </head>
 <body class="font-sans text-stone-800 bg-stone-50 dispatch-grid flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
@@ -167,15 +82,7 @@
                         <span><%= t('my_orders_nav') %></span>
                     </a>
 
-                    <div class="flex items-center gap-0.5 p-1 bg-stone-100 rounded-full border border-stone-200">
-                        <% [['ka','🇬🇪','GE'],['ru','🇷🇺','RU'],['en','🇬🇧','EN']].forEach(function (f) { %>
-                            <% /* ?lang=ka — иначе кука ru/en тут же откидывает голый '/' обратно, см. public.routes.js */ %>
-                            <a href="<%= seo.alternates[f[0]] %><%= f[0] === 'ka' ? '?lang=ka' : '' %>" title="<%= f[2] %>" aria-label="<%= f[2] %>"
-                               class="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full text-sm sm:text-base font-bold leading-none transition <%= lang === f[0] ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:bg-white/60 hover:text-stone-800 active:scale-95' %>">
-                                <%= f[1] %>
-                            </a>
-                        <% }); %>
-                    </div>
+                    <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
 
                     <a href="/master" class="px-3 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
                         <i class="fa-solid fa-helmet-safety text-amber-400"></i>
@@ -419,11 +326,7 @@
                                                     <i class="fa-solid fa-chevron-down text-[8px] text-stone-400 transition review-chevron"></i>
                                                 </button>
                                               <% } else { %>
-                                                <div class="mt-1 flex items-center gap-1.5 text-xs">
-                                                    <span class="tracking-tight text-stone-300 text-[13px]">★★★★★</span>
-                                                    <span class="font-bold text-stone-400">5.0</span>
-                                                    <span class="text-stone-400"><%= t('reviews_none') %></span>
-                                                </div>
+                                                <div class="mt-1 text-xs text-stone-400"><%= t('reviews_none') %></div>
                                               <% } %>
                                           </div>
 
@@ -928,7 +831,7 @@
 
         function showLiveOrder(token, id) {
             activeOrderToken = token;
-            document.getElementById('live-order-id').textContent = '#' + (id != null ? id : token.slice(0, 8));
+            document.getElementById('live-order-id').textContent = '#' + token.slice(0, 6).toUpperCase();
             const liveSection = document.getElementById('tender-live-section');
             liveSection.classList.remove('hidden');
             liveSection.scrollIntoView({ behavior: 'smooth' });

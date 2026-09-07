@@ -1,0 +1,19 @@
+<%
+  // Единый переключатель языка (пилюля GE / RU / EN).
+  // На страницах с префиксом локали (/, /join, /ru/...) передаём alternates
+  // (seo.alternates) — ссылки ведут на локализованный URL. На остальных
+  // (/order, /master, /o, ...) alternates не передаём — работает /lang/:code
+  // (ставит куку + редирект на Referer).
+  const _langs = [['ka', 'GE'], ['ru', 'RU'], ['en', 'EN']];
+  const _hasAlt = typeof alternates !== 'undefined' && alternates;
+%>
+<div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
+  <% _langs.forEach(function (lf) { %>
+    <%
+      // ?lang=ka — иначе кука ru/en тут же откидывает голый '/' обратно (public.routes.js)
+      const _href = _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0]);
+    %>
+    <a href="<%= _href %>" aria-label="<%= lf[1] %>"
+       class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === lf[0] ? 'active' : 'hover:bg-white/50' %>"><%= lf[1] %></a>
+  <% }); %>
+</div>

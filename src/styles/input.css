@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================================
+   Кастомные стили, раньше жившие в <style> на каждой странице по отдельности.
+   Здесь один раз — собирается в public/css/app.css (npm run build:css).
+   ========================================================================= */
+
+/* ---- Полосы прокрутки ---- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #f5f5f4; }
+::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 4px; }
+
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* ---- <details> без стандартного маркера ---- */
+details > summary { list-style: none; }
+details > summary::-webkit-details-marker { display: none; }
+
+/* ---- Переключатель языка ---- */
+.lang-btn.active { background: #fff; color: #1c1917; font-weight: 800; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+
+/* ---- Главная: фон-сетка + анимация появления ---- */
+.dispatch-grid {
+  background-image: radial-gradient(circle, rgba(28, 25, 23, 0.07) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.fade-in-up { animation: fadeInUp .45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ---- Формы: кнопки-переключатели (тип услуги, вариант, район) ---- */
+.svc-btn.active, .opt-btn.active, .district-btn.active { background: #059669; color: #fff; border-color: #059669; }
+
+/* ---- Кабинет исполнителя: вкладки ---- */
+.tab-btn.active { color: #1c1917; border-bottom-color: #059669; }
+
+/* ---- Отзывы: звёзды ---- */
+.star-btn { color: #d6d3d1; transition: color 0.15s; }
+.star-btn.selected, .star-btn.hovered { color: #f59e0b; }
+
+/* ---- Режим фокуса на мобильном (полноэкранный композер, стиль Facebook) ---- */
+.compose-topbar { display: none; }
+@media (max-width: 639px) {
+  body.compose-active { overflow: hidden; }
+  body.compose-active header,
+  body.compose-active #mobileNav,
+  body.compose-active #seo-hero,
+  body.compose-active .composer-toprow,
+  body.compose-active .composer-chips,
+  body.compose-active .composer-trust-line,
+  body.compose-active .composer-trust-badges { display: none !important; }
+
+  body.compose-active #post-section {
+    position: fixed; inset: 0; z-index: 50; margin: 0; background: #fff;
+    animation: none; transform: none;
+  }
+  body.compose-active .composer-card {
+    height: 100%; display: flex; flex-direction: column;
+    border: 0; border-radius: 0; box-shadow: none; overflow: hidden;
+  }
+  body.compose-active #detailsStep {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0;
+  }
+  body.compose-active .compose-topbar { display: flex; }
+  body.compose-active .composer-inputbox,
+  body.compose-active .composer-inputbox:focus-within {
+    flex: 1; min-height: 0; border: 0; border-radius: 0;
+    box-shadow: none; margin: 0; padding: 14px 16px;
+  }
+  body.compose-active .composer-textarea {
+    flex: 1; min-height: 0; height: 100%; overflow-y: auto;
+  }
+  body.compose-active .composer-actionbar {
+    margin: 0; padding: 10px 16px; border-top: 1px solid #e7e5e4;
+  }
+  body.compose-active .composer-inline-publish { display: none; }
+  body.compose-active #attachmentsPreview { padding: 0 16px 8px; }
+}

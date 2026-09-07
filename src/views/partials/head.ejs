@@ -1,0 +1,28 @@
+<%
+  // Общий <head> для всех публичных страниц.
+  // Параметры (все опциональны, кроме title):
+  //   title           — <title>
+  //   metaDescription — meta description
+  //   noindex         — true → meta robots noindex,nofollow
+  //   viewport        — переопределить viewport (у главной — interactive-widget)
+  // SEO-специфику (canonical, hreflang, og:, twitter:, JSON-LD) страница добавляет сама.
+  const _viewport = typeof viewport !== 'undefined' && viewport
+    ? viewport
+    : 'width=device-width, initial-scale=1.0';
+%>
+<meta charset="UTF-8">
+<meta name="viewport" content="<%= _viewport %>">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title><%= title %></title>
+<% if (typeof metaDescription !== 'undefined' && metaDescription) { %>
+<meta name="description" content="<%= metaDescription %>">
+<% } %>
+<% if (typeof noindex !== 'undefined' && noindex) { %>
+<meta name="robots" content="noindex, nofollow">
+<% } %>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Georgian:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="/css/app.css">
