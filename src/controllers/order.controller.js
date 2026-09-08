@@ -9,6 +9,7 @@ const supportService = require('../services/support.service');
 const managerService = require('../services/manager.service');
 const settingsService = require('../services/settings.service');
 const translationService = require('../services/translation.service');
+const catalogSession = require('../services/catalogSession.service');
 const redis = require('../config/redis');
 const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
@@ -92,6 +93,9 @@ async function create(req, res) {
     maxAge: COOKIE_MAX_AGE_MS,
   });
   rememberOrderToken(req, res, order.token);
+  // Телефон только что подтверждён по SMS ради заявки — этого достаточно и для
+  // платного показа номера в каталоге: не гоняем клиента через SMS повторно.
+  await catalogSession.issue(res, toE164(phone));
 
   // Перевод текста заявки + уведомление модератора — в фоне, ответ клиенту не ждёт.
   // Перевод с общим таймаутом 7с; сбой/таймаут → заявка и рассылка идут с оригиналом.

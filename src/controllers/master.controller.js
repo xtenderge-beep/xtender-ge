@@ -6,7 +6,7 @@ const smsService = require('../services/sms.service');
 const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
 const settingsService = require('../services/settings.service');
-const crypto = require('crypto');
+const catalogSession = require('../services/catalogSession.service');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
@@ -30,26 +30,11 @@ const OTP_PURPOSE = 'master';
 
 // --- Раскрытие номера в публичном каталоге (клиент звонит мастеру напрямую, минуя
 // подачу заявки) — отдельная OTP-«авторизация» звонящего + платное раскрытие номера.
+// «Запомненная» сессия звонящего (cookie catalog_verified) — в catalogSession.service,
+// т.к. её теперь ставит и order.controller после подтверждения телефона на заявке.
 const CATALOG_OTP_PURPOSE = 'catalog';
-// «Запомнить» подтверждённый телефон на устройстве — иначе пришлось бы гонять человека
-// через SMS-код на каждого мастера, которому он хочет позвонить за один визит на сайт.
-// Непрозрачный токен в Redis (не сам номер) — cookie httpOnly, JS его прочитать не может.
-const CATALOG_SESSION_COOKIE = 'catalog_verified';
-const CATALOG_SESSION_TTL_SECONDS = 24 * 60 * 60;
 const CATALOG_REVEAL_RATE_MAX = 20;
 const CATALOG_REVEAL_RATE_WINDOW_SECONDS = 3600;
-
-async function createCatalogSession(phone) {
-  const token = crypto.randomBytes(24).toString('hex');
-  await redis.set(`catalog_session:${token}`, phone, 'EX', CATALOG_SESSION_TTL_SECONDS);
-  return token;
-}
-
-async function getCatalogSessionPhone(req) {
-  const token = req.cookies[CATALOG_SESSION_COOKIE];
-  if (!token) return null;
-  return redis.get(`catalog_session:${token}`);
-}
 
 function isChecked(v) {
   return v === true || v === 'true' || v === 'on' || v === '1';
@@ -89,12 +74,7 @@ async function catalogOtpVerify(req, res) {
   const ok = await otpService.verifyCode(phone, code, CATALOG_OTP_PURPOSE, { meta: requestMeta(req), language: req.lang });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 
-  const token = await createCatalogSession(phone);
-  res.cookie(CATALOG_SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: CATALOG_SESSION_TTL_SECONDS * 1000,
-  });
+  await catalogSession.issue(res, phone);
   return res.json({ success: true });
 }
 
@@ -107,7 +87,7 @@ async function revealPhone(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid master id' });
   }
 
-  const callerPhone = await getCatalogSessionPhone(req);
+  const callerPhone = await catalogSession.getPhone(req);
   if (!callerPhone) {
     return res.json({ success: false, needsVerification: true });
   }
@@ -132,7 +112,7 @@ async function revealPhone(req, res) {
   if (!master) {
     return res.json({ success: false, reason: 'unavailable' });
   }
-  await redis.set(dedupeKey, master.phone, 'EX', CATALOG_SESSION_TTL_SECONDS);
+  await redis.set(dedupeKey, master.phone, 'EX', catalogSession.TTL_SECONDS);
   return res.json({ success: true, phone: master.phone });
 }
 
