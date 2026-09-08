@@ -372,11 +372,20 @@
 
                                       <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
                                           <% if (master.balance_tetri >= catalogCallPriceTetri) { %>
-                                            <button type="button" class="reveal-phone-btn w-full px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
-                                                    data-master-id="<%= master.id %>">
-                                                <i class="fa-solid fa-phone text-[10px]"></i>
-                                                <span><%= t('btn_show_phone') %></span>
-                                            </button>
+                                            <div class="flex items-center justify-center gap-1.5 text-stone-400 text-xs font-mono mb-2">
+                                                <i class="fa-solid fa-lock text-[9px]"></i>
+                                                <span>+995&nbsp;5&middot;&middot;&nbsp;&middot;&middot;&middot;&nbsp;&middot;&middot;&middot;</span>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button type="button" class="reveal-contact-btn flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                                                        data-master-id="<%= master.id %>" data-action="call">
+                                                    <i class="fa-solid fa-phone text-[10px]"></i><span><%= t('btn_call') %></span>
+                                                </button>
+                                                <button type="button" class="reveal-contact-btn flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70"
+                                                        data-master-id="<%= master.id %>" data-action="whatsapp">
+                                                    <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
+                                                </button>
+                                            </div>
                                           <% } else { %>
                                             <p class="text-[11px] text-stone-400 text-center py-2"><%= t('catalog_master_unavailable') %></p>
                                           <% } %>
@@ -1053,29 +1062,53 @@
             if (slot) slot.innerHTML = '<p class="text-[11px] text-stone-400 text-center py-2">' + T.catalog_master_unavailable + '</p>';
         }
 
-        // true — обработано (показали номер или «недоступен»), false — нужна верификация телефона
+        // Открываем через клик по <a> (а не location.href) — так браузер отдаёт
+        // tel:/wa.me системному обработчику и не «роняет» текущую страницу.
+        function performContactAction(action, phone) {
+            if (!phone) return;
+            const a = document.createElement('a');
+            if (action === 'whatsapp') {
+                a.href = 'https://wa.me/' + phone.replace(/\D/g, '');
+                a.target = '_blank';
+                a.rel = 'noopener';
+            } else {
+                a.href = 'tel:' + phone;
+            }
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        // { handled, phone } — handled:false = нужна верификация телефона (открыть модалку)
         async function attemptReveal(masterId) {
             const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST' });
             const data = await res.json();
-            if (data.success) { showRevealedContact(masterId, data.phone); return true; }
-            if (data.needsVerification) return false;
+            if (data.success) { showRevealedContact(masterId, data.phone); return { handled: true, phone: data.phone }; }
+            if (data.needsVerification) return { handled: false, phone: null };
             showRevealUnavailable(masterId);
-            return true;
+            return { handled: true, phone: null };
         }
 
-        document.querySelectorAll('.reveal-phone-btn').forEach((btn) => {
+        let revealPendingAction = null;
+
+        document.querySelectorAll('.reveal-contact-btn').forEach((btn) => {
             btn.addEventListener('click', async () => {
                 const masterId = btn.dataset.masterId;
-                btn.disabled = true;
-                let handled = true;
+                const action = btn.dataset.action;
+                const slot = btn.closest('.reveal-contact-slot');
+                slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = true; });
+                let res;
                 try {
-                    handled = await attemptReveal(masterId);
+                    res = await attemptReveal(masterId);
                 } catch (e) {
-                    handled = false;
+                    res = { handled: false, phone: null };
                 }
-                if (!handled) {
-                    btn.disabled = false;
+                if (res.handled) {
+                    performContactAction(action, res.phone);
+                } else {
+                    slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = false; });
                     revealMasterId = masterId;
+                    revealPendingAction = action;
                     document.getElementById('reveal-phone').value = '';
                     document.getElementById('reveal-code').value = '';
                     revealMsg('');
@@ -1124,9 +1157,11 @@
                 });
                 const data = await res.json();
                 if (!data.success) return revealMsg(data.message || T.js_err_wrong_code, true);
-                const handled = await attemptReveal(revealMasterId);
-                if (handled) {
+                const rev = await attemptReveal(revealMasterId);
+                if (rev.handled) {
                     closeModal('reveal-modal');
+                    performContactAction(revealPendingAction, rev.phone);
+                    revealPendingAction = null;
                 } else {
                     revealMsg(T.js_err_send_code, true);
                 }
