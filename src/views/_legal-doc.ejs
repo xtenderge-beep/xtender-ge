@@ -60,6 +60,7 @@
                     <%- reqRow(RL.legalAddress, reqVal(requisites.legalAddress)) %>
                     <%- reqRow(RL.email, requisites.email) %>
                     <%- reqRow(RL.website, requisites.website) %>
+                    <% if (requisites.vatStatus) { %><%- reqRow(RL.vatStatus, reqVal(requisites.vatStatus)) %><% } %>
                     <% if (requisites.bankAccount) { %>
                         <%- reqRow(RL.bankName, requisites.bankName) %>
                         <%- reqRow(RL.bankAccount, requisites.bankAccount) %>

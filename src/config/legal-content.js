@@ -21,6 +21,7 @@ const REQUISITE_LABELS = {
     legalAddress: 'იურიდიული მისამართი',
     email: 'ელექტრონული ფოსტა',
     website: 'ვებ-საიტი',
+    vatStatus: 'დღგ-ის სტატუსი',
     bankName: 'ბანკი',
     bankAccount: 'ანგარიშის ნომერი (IBAN)',
     bankSwift: 'SWIFT / BIC',
@@ -31,6 +32,7 @@ const REQUISITE_LABELS = {
     legalAddress: 'Юридический адрес',
     email: 'Электронная почта',
     website: 'Веб-сайт',
+    vatStatus: 'Статус НДС',
     bankName: 'Банк',
     bankAccount: 'Номер счёта (IBAN)',
     bankSwift: 'SWIFT / BIC',
@@ -41,6 +43,7 @@ const REQUISITE_LABELS = {
     legalAddress: 'Legal Address',
     email: 'E-mail',
     website: 'Website',
+    vatStatus: 'VAT status',
     bankName: 'Bank',
     bankAccount: 'Account number (IBAN)',
     bankSwift: 'SWIFT / BIC',
@@ -59,7 +62,7 @@ const LABELS = {
   en: { updated: 'Last updated', version: 'Version', tab_terms: 'Terms of Service', tab_privacy: 'Privacy Policy' },
 };
 
-// ─────────────────────────── ОФЕРТА / TERMS (v1.4) ───────────────────────────
+// ─────────────────────────── ОФЕРТА / TERMS (v1.5) ───────────────────────────
 
 const terms = {
   version: TERMS_VERSION,
@@ -198,7 +201,7 @@ const terms = {
   },
 };
 
-// ──────────────── ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ / PRIVACY (v1.3) ────────────────
+// ──────────────── ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ / PRIVACY (v1.4) ────────────────
 
 const privacy = {
   version: PRIVACY_VERSION,

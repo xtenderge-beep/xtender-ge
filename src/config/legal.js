@@ -7,8 +7,8 @@ const { getBaseUrl } = require('./url');
 // НЕ версионируется здесь — он сохраняется дословно в consent_text_snapshot на каждую
 // регистрацию, так что мелкие правки формулировок отслеживаются сами.
 // Формат: vMAJOR.MINOR-YYYY-MM-DD (дата вступления редакции в силу).
-const TERMS_VERSION = 'v1.4-2026-09-09';
-const PRIVACY_VERSION = 'v1.3-2026-09-09';
+const TERMS_VERSION = 'v1.5-2026-09-09';
+const PRIVACY_VERSION = 'v1.4-2026-09-09';
 
 // Реквизиты оператора / юридического лица. ЕДИНСТВЕННОЕ место — страницы /terms и
 // /privacy берут отсюда (рендер в _legal-doc.ejs). Значение поля — либо строка (одно
@@ -28,6 +28,11 @@ const SERVICE_REQUISITES = {
   },
   email: 'support@xtender.ge',
   website: 'https://xtender.ge',
+  vatStatus: {
+    ka: 'დღგ-ს გადამხდელი არ არის; ტარიფები მითითებულია დღგ-ს გარეშე',
+    ru: 'Не плательщик НДС; тарифы указаны без НДС',
+    en: 'Not a VAT payer; tariffs are stated exclusive of VAT',
+  },
   // Банковские реквизиты для пополнения баланса исполнителя — одинаковы на всех языках.
   bankName: 'Bank of Georgia (საქართველოს ბანკი)',
   bankAccount: 'GE95BG0000000613339218',
