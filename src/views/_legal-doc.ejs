@@ -3,6 +3,8 @@
   const blocks = doc.body[lang] || doc.body.ru;
   const RL = reqLabels[lang] || reqLabels.ru;
   const L = labels[lang] || labels.ru;
+  // Значение реквизита — строка или { ka, ru, en }.
+  function reqVal(v) { return v && typeof v === 'object' ? (v[lang] || v.ru) : v; }
   function reqRow(label, value) {
 %>
   <div class="flex flex-col sm:flex-row sm:gap-3 py-1.5 border-b border-stone-100 last:border-0">
@@ -53,11 +55,16 @@
                 </ul>
             <% } else if (b.requisites) { %>
                 <dl class="mt-3">
-                    <%- reqRow(RL.entityName, requisites.entityName) %>
-                    <%- reqRow(RL.idCode, requisites.idCode) %>
-                    <%- reqRow(RL.legalAddress, requisites.legalAddress) %>
+                    <%- reqRow(RL.entityName, reqVal(requisites.entityName)) %>
+                    <%- reqRow(RL.idCode, reqVal(requisites.idCode)) %>
+                    <%- reqRow(RL.legalAddress, reqVal(requisites.legalAddress)) %>
                     <%- reqRow(RL.email, requisites.email) %>
                     <%- reqRow(RL.website, requisites.website) %>
+                    <% if (requisites.bankAccount) { %>
+                        <%- reqRow(RL.bankName, requisites.bankName) %>
+                        <%- reqRow(RL.bankAccount, requisites.bankAccount) %>
+                        <%- reqRow(RL.bankSwift, requisites.bankSwift) %>
+                    <% } %>
                 </dl>
             <% } %>
         <% }); %>

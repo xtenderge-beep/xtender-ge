@@ -7,19 +7,31 @@ const { getBaseUrl } = require('./url');
 // НЕ версионируется здесь — он сохраняется дословно в consent_text_snapshot на каждую
 // регистрацию, так что мелкие правки формулировок отслеживаются сами.
 // Формат: vMAJOR.MINOR-YYYY-MM-DD (дата вступления редакции в силу).
-const TERMS_VERSION = 'v1.3-2026-09-05';
-const PRIVACY_VERSION = 'v1.2-2026-09-03';
+const TERMS_VERSION = 'v1.4-2026-09-09';
+const PRIVACY_VERSION = 'v1.3-2026-09-09';
 
 // Реквизиты оператора / юридического лица. ЕДИНСТВЕННОЕ место — страницы /terms и
-// /privacy берут отсюда. Заполнить, когда пришлют данные реальной компании; пустые
-// поля на странице показываются как «уточняется…» (REQUISITE_PENDING в legal-content.js).
-// email и website известны сразу, остальное ждём.
+// /privacy берут отсюда (рендер в _legal-doc.ejs). Значение поля — либо строка (одно
+// на все языки), либо { ka, ru, en }. Пустое поле показывается как «уточняется…»
+// (REQUISITE_PENDING в legal-content.js).
 const SERVICE_REQUISITES = {
-  entityName: null,    // 'შპს "…"' / 'ООО "…"' / 'LLC "…"'
-  idCode: null,        // 9-значный ИНН или 11-значный личный номер
-  legalAddress: null,  // 'საქართველო, ქ. თბილისი, …'
+  entityName: {
+    ka: 'ინდ. მეწარმე არტურ ბეჯანიან',
+    ru: 'ИП Артур Беджанян',
+    en: 'Individual Entrepreneur Artur Bejanyan',
+  },
+  idCode: '304829194', // 9-значный идент. код ИП (реестр NAPR)
+  legalAddress: {
+    ka: 'საქართველო, ქ. თბილისი, კრწანისის რაიონი, ნინო და ილია ნაკაშიძეების ქუჩა N1 (ყოფ. ავლევი), ბინა N3, შენობა N3',
+    ru: 'Грузия, г. Тбилиси, Крцанисский район, ул. Нино и Илии Накашидзе N1 (быв. Авлеви), кв. N3, здание N3',
+    en: 'Georgia, Tbilisi, Krtsanisi district, Nino and Ilia Nakashidze St. N1 (former Avlevi), Apt. N3, Building N3',
+  },
   email: 'support@xtender.ge',
   website: 'https://xtender.ge',
+  // Банковские реквизиты для пополнения баланса исполнителя — одинаковы на всех языках.
+  bankName: 'Bank of Georgia (საქართველოს ბანკი)',
+  bankAccount: 'GE95BG0000000613339218',
+  bankSwift: 'BAGAGE22',
 };
 
 function normBase(baseUrl) {

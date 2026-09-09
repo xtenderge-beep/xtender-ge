@@ -21,6 +21,9 @@ const REQUISITE_LABELS = {
     legalAddress: 'იურიდიული მისამართი',
     email: 'ელექტრონული ფოსტა',
     website: 'ვებ-საიტი',
+    bankName: 'ბანკი',
+    bankAccount: 'ანგარიშის ნომერი (IBAN)',
+    bankSwift: 'SWIFT / BIC',
   },
   ru: {
     entityName: 'Наименование организации / ФИО ИП',
@@ -28,6 +31,9 @@ const REQUISITE_LABELS = {
     legalAddress: 'Юридический адрес',
     email: 'Электронная почта',
     website: 'Веб-сайт',
+    bankName: 'Банк',
+    bankAccount: 'Номер счёта (IBAN)',
+    bankSwift: 'SWIFT / BIC',
   },
   en: {
     entityName: 'Legal Entity Name / Individual Entrepreneur',
@@ -35,6 +41,9 @@ const REQUISITE_LABELS = {
     legalAddress: 'Legal Address',
     email: 'E-mail',
     website: 'Website',
+    bankName: 'Bank',
+    bankAccount: 'Account number (IBAN)',
+    bankSwift: 'SWIFT / BIC',
   },
 };
 
@@ -50,11 +59,11 @@ const LABELS = {
   en: { updated: 'Last updated', version: 'Version', tab_terms: 'Terms of Service', tab_privacy: 'Privacy Policy' },
 };
 
-// ─────────────────────────── ОФЕРТА / TERMS (v1.3) ───────────────────────────
+// ─────────────────────────── ОФЕРТА / TERMS (v1.4) ───────────────────────────
 
 const terms = {
   version: TERMS_VERSION,
-  updated: { ka: '2026 წლის 5 სექტემბერი', ru: '5 сентября 2026 г.', en: 'September 5, 2026' },
+  updated: { ka: '2026 წლის 9 სექტემბერი', ru: '9 сентября 2026 г.', en: 'September 9, 2026' },
   body: {
     ka: [
       { h: '1.1. ზოგადი დებულებები' },
@@ -189,11 +198,11 @@ const terms = {
   },
 };
 
-// ──────────────── ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ / PRIVACY (v1.2) ────────────────
+// ──────────────── ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ / PRIVACY (v1.3) ────────────────
 
 const privacy = {
   version: PRIVACY_VERSION,
-  updated: { ka: '2026 წლის 3 სექტემბერი', ru: '3 сентября 2026 г.', en: 'September 3, 2026' },
+  updated: { ka: '2026 წლის 9 სექტემბერი', ru: '9 сентября 2026 г.', en: 'September 9, 2026' },
   body: {
     ka: [
       { h: '2.1. ზოგადი დებულებები' },
