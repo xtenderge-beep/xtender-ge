@@ -39,7 +39,7 @@
           itemOffered: { '@type': 'Service', name: g.label, areaServed: 'Tbilisi' },
         })),
       };
-      const faqItems = [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t('faq_a' + n) }));
+      const faqItems = [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t(n === 2 ? 'home_faq_response' : 'faq_a' + n) }));
       const faqJsonLd = {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
@@ -53,66 +53,40 @@
     <script type="application/ld+json"><%- JSON.stringify(orgJsonLd) %></script>
     <script type="application/ld+json"><%- JSON.stringify(faqJsonLd) %></script>
 </head>
-<body class="font-sans text-stone-800 bg-stone-50 dispatch-grid flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+<body class="home-page font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
-    <a href="/join" class="block bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border-b border-amber-200 text-amber-950 text-center text-[13px] sm:text-sm font-black tracking-wide py-2 transition">
-        <i class="fa-solid fa-briefcase text-[11px] mr-1.5"></i><%= t('jobs_strip') %><i class="fa-solid fa-arrow-right text-[10px] ml-1.5"></i>
-    </a>
 
-    <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
-        <div class="h-[3px] bg-emerald-600"></div>
-        <div class="max-w-5xl mx-auto px-4 sm:px-6">
-            <div class="flex items-center justify-between h-14 sm:h-16 gap-3">
-
-                <div class="flex items-center gap-7 min-w-0">
-                    <a href="/" class="flex items-center shrink-0">
-                        <span class="text-xl sm:text-2xl font-black tracking-tight text-stone-900">
-                            xtender<span class="text-emerald-600">.ge</span>
-                        </span>
-                    </a>
-                    <nav class="hidden lg:flex items-center gap-6 text-sm font-semibold text-stone-500">
-                        <a href="#masters-section" class="whitespace-nowrap hover:text-stone-900 transition"><%= t('catalog_title') %></a>
-                        <a href="#how-it-works" class="whitespace-nowrap hover:text-stone-900 transition"><%= t('how_it_works_title') %></a>
-                    </nav>
-                </div>
-
-                <div class="flex items-center gap-3 sm:gap-4 shrink-0">
-                    <a href="/my-orders" class="hidden sm:flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-stone-500 hover:text-stone-900 transition">
-                        <i class="fa-solid fa-list-check text-[11px]"></i>
-                        <span><%= t('my_orders_nav') %></span>
-                    </a>
-
-                    <span class="hidden sm:block w-px h-5 bg-stone-200"></span>
-
-                    <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
-
-                    <a href="/master" class="px-3 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 active:scale-95 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm whitespace-nowrap">
-                        <i class="fa-solid fa-helmet-safety text-amber-400"></i>
-                        <span><%= isRememberedProvider ? t('nav_my_cabinet') : t('nav_provider_work') %></span>
-                    </a>
-                </div>
-            </div>
+    <% const homePrefix = lang === 'ka' ? '' : '/' + lang; %>
+    <a class="home-skip" href="#freeformInput"><%= t('home_skip') %></a>
+    <header class="home-header">
+      <div class="home-header-inner">
+        <a href="<%= homePrefix || '/' %>" class="home-brand" aria-label="Xtender">xtender<span>.ge</span></a>
+        <nav class="home-desktop-nav" aria-label="<%= t('how_it_works_title') %>">
+          <a href="#how-it-works"><%= t('how_it_works_title') %></a>
+          <a href="#masters-section"><%= t('catalog_title') %></a>
+        </nav>
+        <div class="home-header-actions">
+          <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
+          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_label') %></span></a>
         </div>
+      </div>
     </header>
-
     <main class="flex-grow">
-
-        <div class="max-w-4xl mx-auto px-4 pt-6 sm:pt-12 pb-28 sm:pb-16">
-
-                    <section id="seo-hero" class="mb-5 sm:mb-8 fade-in-up">
-                        <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-stone-900 leading-[1.15]"><%= t('seo_hero_h1') %></h1>
-                        <p class="text-sm sm:text-base leading-snug text-stone-500 mt-2 sm:mt-3 max-w-xl"><%= t('seo_hero_lead') %></p>
-                        <p class="mt-3 inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-700">
-                            <span class="relative flex h-2 w-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                            </span>
-                            <%= t('hero_response_badge') %>
-                        </p>
-                    </section>
-
-                    <section id="post-section" class="fade-in-up scroll-mt-20">
-                        <div class="composer-card bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
+      <div class="home-shell">
+        <div class="home-hero-layout">
+          <section id="seo-hero" class="home-intro">
+            <p class="home-eyebrow"><span class="home-eyebrow-line" aria-hidden="true"></span><%= t('home_eyebrow') %></p>
+            <h1><%= t('home_title') %><span><%= t('home_title_accent') %></span></h1>
+            <p class="home-lead"><%= t('home_lead') %></p>
+            <ul class="home-benefits">
+              <% ['home_free', 'home_direct', 'home_choice'].forEach(function (key) { %>
+              <li><span class="home-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span><%= t(key) %></li>
+              <% }); %>
+            </ul>
+            <a href="#masters-section" class="home-text-link"><%= t('catalog_choice_label') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+          </section>
+                    <section id="post-section" class="home-request scroll-mt-20" aria-labelledby="home-form-title">
+                        <div class="composer-card">
 
                             <div id="detailsStep" class="p-3.5 sm:p-5">
                                 <input type="hidden" id="description">
@@ -122,14 +96,15 @@
                                         <i class="fa-solid fa-arrow-left text-base"></i>
                                     </button>
                                     <span class="flex-1 font-extrabold text-stone-900 text-sm"><%= t('composer_tag') %></span>
-                                    <button type="button" onclick="submitFreeform()" class="px-3 py-1.5 rounded-lg text-emerald-600 font-extrabold text-sm uppercase tracking-wide hover:bg-emerald-50 active:scale-95 transition shrink-0"><%= t('composer_publish') %></button>
+                                    <button type="button" onclick="submitFreeform()" class="px-3 py-1.5 rounded-lg text-emerald-600 font-extrabold text-sm uppercase tracking-wide hover:bg-emerald-50 active:scale-95 transition shrink-0"><%= t('home_next') %></button>
                                 </div>
 
-                                <div class="composer-toprow flex items-center justify-between gap-2">
-                                    <span class="text-[11px] font-bold uppercase tracking-wider text-stone-500"><%= t('composer_label') %></span>
-                                    <span class="text-[11px] font-medium text-emerald-700 whitespace-nowrap"><%= t('composer_step') %></span>
-                                </div>
 
+                                <div class="composer-toprow">
+                                  <span class="home-form-overline"><%= t('composer_step') %></span>
+                                  <h2 id="home-form-title"><label for="freeformInput"><%= t('home_form_title') %></label></h2>
+                                  <p id="home-description-hint"><%= t('home_form_hint') %></p>
+                                </div>
                                 <div class="composer-chips flex flex-wrap gap-1.5 pb-0.5 mt-2.5 no-scrollbar sm:flex-nowrap sm:overflow-x-auto">
                                     <%
                                       const composerChips = [
@@ -142,13 +117,13 @@
                                     %>
                                     <% composerChips.forEach(function (chip) { %>
                                       <button type="button" data-chip="<%= chip.label %>" class="composer-chip shrink-0 px-3 py-1.5 bg-stone-100 hover:bg-emerald-50 hover:text-emerald-700 rounded-full text-xs font-semibold text-stone-700 whitespace-nowrap transition active:scale-95">
-                                          <%= chip.emoji %> <%= chip.label %>
+                                          <span aria-hidden="true"><%= chip.emoji %></span> <%= chip.label %>
                                       </button>
                                     <% }); %>
                                 </div>
 
                                 <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
-                                    <textarea id="freeformInput" rows="3" placeholder="<%= t('freeform_placeholder') %>"
+                                    <textarea id="freeformInput" rows="5" aria-describedby="home-description-hint" placeholder="<%= t('freeform_placeholder') %>"
                                         class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"></textarea>
 
                                     <div id="attachmentsPreview" class="hidden flex-wrap gap-1.5 pt-2"></div>
@@ -161,23 +136,23 @@
                                         <input type="file" id="attachments" multiple accept="image/*" class="hidden">
 
                                         <button type="button" onclick="submitFreeform()" class="composer-inline-publish inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-600/30 transition">
-                                            <span><%= t('composer_publish') %></span>
+                                            <span><%= t('home_submit') %></span>
                                             <i class="fa-solid fa-arrow-right text-[11px]"></i>
                                         </button>
                                     </div>
                                 </div>
 
-                                <p class="composer-trust-line mt-2 text-[11px] text-stone-500 text-center"><i class="fa-solid fa-lock text-[9px] mr-1"></i><%= t('composer_trust') %></p>
+                                <p class="composer-trust-line mt-2 text-[11px] text-stone-500 text-center"><i class="fa-solid fa-lock text-[9px] mr-1"></i><%= t('home_contact_note') %></p>
                             </div>
 
-                            <div id="phoneStep" class="p-5 sm:p-6 hidden">
+                            <div id="phoneStep" class="p-5 sm:p-6 hidden"><p class="home-phone-hint"><%= t('home_phone_hint') %></p>
                                 <label for="phone" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                                     <i class="fa-solid fa-phone text-emerald-600 mr-1"></i><%= t('form_phone_label') %>
                                 </label>
-                                <input type="tel" id="phone" placeholder="<%= t('form_phone_placeholder') %>"
+                                <input type="tel" id="phone" autocomplete="tel" inputmode="tel" placeholder="<%= t('form_phone_placeholder') %>"
                                     value="<%= typeof prefillPhone !== 'undefined' ? prefillPhone : '' %>"
                                     class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-base font-bold text-stone-900 bg-white">
-                                <button onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                <button id="sendOtpButton" type="button" onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-shield-halved"></i>
                                     <span><%= t('otp_send') %></span>
                                 </button>
@@ -188,26 +163,19 @@
                                 <label for="code" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                                     <i class="fa-solid fa-key text-emerald-600 mr-1"></i><%= t('otp_label') %>
                                 </label>
-                                <input type="text" id="code" maxlength="4" inputmode="numeric"
+                                <input type="text" id="code" maxlength="4" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4}"
                                     class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none font-mono text-lg font-black tracking-[0.3em] text-center text-stone-900 bg-white">
-                                <button onclick="verifyOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                <button id="verifyOtpButton" type="button" onclick="verifyOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check"></i>
                                     <span><%= t('otp_verify') %></span>
                                 </button>
                             </div>
 
-                            <div id="formMsg" class="hidden text-xs font-bold mx-3.5 sm:mx-5 mb-3.5 sm:mb-5 p-3 rounded-xl"></div>
+                            <div id="formMsg" role="status" aria-live="polite" class="hidden text-xs font-bold mx-3.5 sm:mx-5 mb-3.5 sm:mb-5 p-3 rounded-xl"></div>
                         </div>
 
-                        <div class="composer-trust-badges grid grid-cols-2 gap-2 mt-2.5">
-                            <div class="flex items-center gap-2 rounded-xl bg-white border border-stone-200 px-3 py-2 text-[11px] font-semibold text-stone-600">
-                                <i class="fa-solid fa-bolt text-emerald-600 shrink-0"></i><span><%= t('trust_badge_speed') %></span>
-                            </div>
-                            <div class="flex items-center gap-2 rounded-xl bg-white border border-stone-200 px-3 py-2 text-[11px] font-semibold text-stone-600">
-                                <i class="fa-solid fa-shield-halved text-emerald-600 shrink-0"></i><span><%= t('trust_badge_spam') %></span>
-                            </div>
-                        </div>
                     </section>
+        </div>
 
                     <section id="tender-live-section" class="hidden mt-6">
                         <div class="bg-stone-900 text-white rounded-2xl p-5 sm:p-6 shadow-xl border border-stone-700 space-y-4">
@@ -244,7 +212,17 @@
                         </div>
                     </section>
 
-                    <section id="masters-section" class="mt-10 space-y-5 scroll-mt-24">
+
+        <section id="how-it-works" class="home-how" aria-labelledby="home-how-title">
+          <div class="home-section-heading"><p class="home-eyebrow"><%= t('how_it_works_title') %></p><h2 id="home-how-title"><%= t('home_how_title') %></h2></div>
+          <div class="home-steps">
+            <% [1, 2, 3].forEach(function (n) { %>
+            <article class="home-step"><span class="home-step-number" aria-hidden="true">0<%= n %></span><div><h3><%= t('home_step' + n + '_title') %></h3><p><%= t('home_step' + n + '_body') %></p></div></article>
+            <% }); %>
+          </div>
+        </section>
+
+                    <section id="masters-section" class="home-catalog space-y-5 scroll-mt-24">
 
                         <div class="border-b border-stone-200 pb-4">
                             <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 mb-1"><%= t('catalog_choice_label') %></p>
@@ -252,16 +230,8 @@
                                 <i class="fa-solid fa-address-book text-emerald-600"></i>
                                 <span><%= t('catalog_title') %></span>
                             </h2>
-                            <p class="text-xs text-stone-500 mt-1"><%= t('catalog_hint') %></p>
+                            <p class="text-xs text-stone-500 mt-1"><%= t('home_catalog_hint') %></p>
                         </div>
-
-                        <a href="/master" class="group flex items-center justify-between gap-3 bg-stone-900 hover:bg-stone-800 text-white rounded-2xl px-4 py-3.5 transition active:scale-[0.98] shadow-sm">
-                            <span class="flex items-center gap-2.5 min-w-0">
-                                <i class="fa-solid fa-helmet-safety text-amber-400 text-lg shrink-0"></i>
-                                <span class="text-xs sm:text-sm font-semibold text-stone-200 leading-snug"><%= t('become_provider_cta') %></span>
-                            </span>
-                            <span class="shrink-0 px-3 py-2 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 text-white text-xs font-black transition whitespace-nowrap"><%= isRememberedProvider ? t('nav_my_cabinet') : t('nav_provider_work') %></span>
-                        </a>
 
                         <%
                           const groups = catalogGroups;
@@ -306,13 +276,13 @@
                                 <span><%= group.label %></span>
                                 <span class="text-[11px] font-bold text-stone-500"><%= groupMasters.length %></span>
                             </h3>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
                                   <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
 
                                       <% const ratingStars = Math.round(Number(master.rating) || 0); %>
 
-                                      <div class="flex items-start justify-between gap-3">
+                                      <div class="home-master-heading flex items-start justify-between gap-3"><span class="home-avatar" aria-hidden="true"><%= Array.from(master.name.trim())[0] %></span>
                                           <div class="flex-1 min-w-0">
                                               <div class="flex items-center gap-2 flex-wrap">
                                                   <h3 class="font-extrabold text-stone-900 text-sm sm:text-base"><%= master.name %></h3>
@@ -407,21 +377,8 @@
 
                     </section>
 
-                    <section id="how-it-works" class="mt-12 scroll-mt-24">
-                        <h2 class="text-xl font-extrabold text-stone-900"><%= t('how_it_works_title') %></h2>
-                        <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <% [1, 2, 3, 4].forEach(function (n) { %>
-                              <div class="bg-white rounded-2xl border border-stone-200/90 p-4">
-                                  <div class="w-7 h-7 rounded-lg bg-emerald-600 text-white text-xs font-black flex items-center justify-center"><%= n %></div>
-                                  <h3 class="mt-2 text-sm font-extrabold text-stone-900"><%= t('how_it_works_step' + n + '_title') %></h3>
-                                  <p class="mt-1 text-xs text-stone-600 leading-snug"><%= t('how_it_works_step' + n + '_desc') %></p>
-                              </div>
-                            <% }); %>
-                        </div>
-                    </section>
-
-                    <section id="service-categories" class="mt-10">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <section id="service-categories" class="home-services"><h2><%= t('home_services_title') %></h2>
+                        <div class="home-services-grid">
                             <% groups.forEach(function (group) { %>
                               <div class="bg-white rounded-xl border border-stone-200/90 p-3.5">
                                   <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>"><%= group.icon %> <%= group.label %></span>
@@ -431,8 +388,14 @@
                         </div>
                     </section>
 
-                    <section id="faq" class="mt-10">
-                        <h2 class="text-xl font-extrabold text-stone-900 mb-3"><%= t('faq_title') %></h2>
+
+        <section class="home-provider-panel" aria-labelledby="home-provider-title">
+          <div class="home-provider-symbol" aria-hidden="true"><i class="fa-solid fa-briefcase"></i></div>
+          <div class="home-provider-copy"><p class="home-eyebrow"><%= t('home_providers_label') %></p><h2 id="home-provider-title"><%= t('home_providers_title') %></h2><p><%= t('home_providers_body') %></p></div>
+          <a class="home-provider-cta" href="<%= isRememberedProvider ? '/master' : homePrefix + '/join' %>"><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_cta') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+        </section>
+<section id="faq" class="home-faq"><div class="home-faq-heading"><p class="home-eyebrow">FAQ</p>
+                        <h2 class="text-xl font-extrabold text-stone-900 mb-3"><%= t('faq_title') %></h2><p><%= t('home_faq_intro') %></p></div>
                         <div class="divide-y divide-stone-200 border border-stone-200 rounded-2xl bg-white overflow-hidden">
                             <% [1, 2, 3, 4, 5].forEach(function (n) { %>
                               <details class="group" <%= n === 1 ? 'open' : '' %>>
@@ -440,7 +403,7 @@
                                       <span><%= t('faq_q' + n) %></span>
                                       <i class="fa-solid fa-chevron-down text-[11px] text-stone-400 transition group-open:rotate-180 shrink-0"></i>
                                   </summary>
-                                  <p class="px-4 pb-4 -mt-1 text-xs text-stone-600 leading-relaxed"><%= t('faq_a' + n) %></p>
+                                  <p class="px-4 pb-4 -mt-1 text-xs text-stone-600 leading-relaxed"><%= t(n === 2 ? 'home_faq_response' : 'faq_a' + n) %></p>
                               </details>
                             <% }); %>
                         </div>
@@ -465,7 +428,7 @@
         </a>
     </nav>
 
-    <footer class="bg-stone-900 text-stone-400 pt-8 pb-24 sm:py-8 border-t border-stone-800 text-xs">
+    <footer class="home-footer bg-stone-900 text-stone-400 pt-8 pb-24 sm:py-8 border-t border-stone-800 text-xs">
         <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
                 <span class="text-base font-black text-white">xtender<span class="text-emerald-500">.ge</span></span>
@@ -483,12 +446,12 @@
         </div>
     </footer>
 
-    <div id="review-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
+    <div id="review-modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
-            <button onclick="closeModal('review-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
+            <button type="button" aria-label="<%= t('otp_back') %>" onclick="closeModal('review-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
 
             <div class="space-y-1">
-                <h3 class="text-base font-bold text-stone-900"><%= t('reviews_modal_title') %></h3>
+                <h3 id="review-modal-title" class="text-base font-bold text-stone-900"><%= t('reviews_modal_title') %></h3>
                 <p id="review-modal-master" class="text-sm font-extrabold text-emerald-700"></p>
             </div>
 
@@ -496,14 +459,14 @@
 
             <div id="review-step-phone" class="space-y-3">
                 <p class="text-xs text-stone-500"><%= t('reviews_phone_hint') %></p>
-                <input id="review-phone" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
+                <input id="review-phone" aria-label="<%= t('form_phone_label') %>" autocomplete="tel" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
                        class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="reviewRequestCode()" id="review-phone-btn"
                         class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
             </div>
 
             <div id="review-step-code" class="hidden space-y-3">
-                <input id="review-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
+                <input id="review-code" aria-label="<%= t('otp_label') %>" autocomplete="one-time-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
                        class="w-full text-center tracking-[0.4em] font-mono text-lg border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="reviewVerifyCode()" id="review-code-btn"
                         class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
@@ -513,10 +476,10 @@
                 <p class="text-xs font-bold text-stone-500 uppercase tracking-wide"><%= t('review_rating_label') %></p>
                 <div id="review-stars" class="flex gap-1.5 text-3xl text-stone-300">
                     <% [1,2,3,4,5].forEach(function (n) { %>
-                      <button type="button" class="review-star transition hover:text-amber-400" data-star="<%= n %>"><i class="fa-solid fa-star"></i></button>
+                      <button type="button" class="review-star transition hover:text-amber-400" data-star="<%= n %>" aria-label="<%= n %> / 5" aria-pressed="false"><i class="fa-solid fa-star"></i></button>
                     <% }); %>
                 </div>
-                <textarea id="review-comment" rows="3" placeholder="<%= t('review_comment_placeholder') %>"
+                <textarea id="review-comment" aria-label="<%= t('review_comment_placeholder') %>" rows="3" placeholder="<%= t('review_comment_placeholder') %>"
                           class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 resize-none"></textarea>
                 <button type="button" onclick="reviewSubmit()" id="review-submit-btn"
                         class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition"><%= t('review_submit_btn') %></button>
@@ -531,26 +494,26 @@
         </div>
     </div>
 
-    <div id="reveal-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
+    <div id="reveal-modal" role="dialog" aria-modal="true" aria-labelledby="reveal-modal-title" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
-            <button onclick="closeModal('reveal-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
+            <button type="button" aria-label="<%= t('otp_back') %>" onclick="closeModal('reveal-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
 
             <div class="space-y-1">
-                <h3 class="text-base font-bold text-stone-900"><%= t('reveal_modal_title') %></h3>
+                <h3 id="reveal-modal-title" class="text-base font-bold text-stone-900"><%= t('reveal_modal_title') %></h3>
                 <p class="text-xs text-stone-500"><%= t('reveal_modal_hint') %></p>
             </div>
 
             <p id="reveal-modal-msg" class="hidden text-xs font-bold p-3 rounded-xl"></p>
 
             <div id="reveal-step-phone" class="space-y-3">
-                <input id="reveal-phone" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
+                <input id="reveal-phone" aria-label="<%= t('form_phone_label') %>" autocomplete="tel" type="tel" inputmode="tel" placeholder="+995 5XX XX XX XX"
                        class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="revealRequestCode()" id="reveal-phone-btn"
                         class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
             </div>
 
             <div id="reveal-step-code" class="hidden space-y-3">
-                <input id="reveal-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
+                <input id="reveal-code" aria-label="<%= t('otp_label') %>" autocomplete="one-time-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
                        class="w-full text-center tracking-[0.4em] font-mono text-lg border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="revealVerifyCode()" id="reveal-code-btn"
                         class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
@@ -597,6 +560,7 @@
         const sizeFilterBar = document.getElementById('sizeFilterBar');
 
         function styleFilterBtn(btn, active) {
+            btn.setAttribute('aria-pressed', String(active));
             btn.classList.toggle('bg-emerald-600', active);
             btn.classList.toggle('text-white', active);
             btn.classList.toggle('border-emerald-600', active);
@@ -705,6 +669,7 @@
             detailsStep.classList.add('hidden');
             phoneStep.classList.remove('hidden');
             if (window.innerWidth < 640) composePostSection.scrollIntoView({ block: 'start' });
+            phoneInput.focus({ preventScroll: true });
         }
 
         function goToDetailsStep() {
@@ -712,6 +677,7 @@
             phoneStep.classList.add('hidden');
             otpStep.classList.add('hidden');
             detailsStep.classList.remove('hidden');
+            document.getElementById('freeformInput').focus({ preventScroll: true });
         }
 
         // --- Режим фокуса (compose mode): на мобильном тап в поле задачи
@@ -787,56 +753,63 @@
 
         let pendingOrderToken = null;
 
-        async function sendOtp() {
-            const phone = phoneInput.value.trim();
-            if (!phone) return showMsg(T.js_err_empty_phone, true);
 
-            const description = descriptionInput.value.trim();
-            const res = await fetch('/api/otp/send', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, description }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                pendingOrderToken = data.token;
-                showMsg(T.js_ok_code_sent, false);
-                phoneStep.classList.add('hidden');
-                otpStep.classList.remove('hidden');
-            } else {
-                showMsg(data.message || T.js_err_send_code, true);
+        let requestActionPending = false;
+        async function runRequestAction(buttonId, action) {
+            if (requestActionPending) return;
+            requestActionPending = true;
+            const button = document.getElementById(buttonId);
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+            try { await action(); }
+            catch (error) { showMsg(T.js_err_send_code, true); }
+            finally {
+                requestActionPending = false;
+                button.disabled = false;
+                button.removeAttribute('aria-busy');
             }
         }
-
+        async function sendOtp() {
+            const phone = phoneInput.value.trim();
+            if (!phone) { showMsg(T.js_err_empty_phone, true); phoneInput.focus(); return; }
+            await runRequestAction('sendOtpButton', async () => {
+                const description = descriptionInput.value.trim();
+                const res = await fetch('/api/otp/send', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, description }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                    pendingOrderToken = data.token;
+                    showMsg(T.js_ok_code_sent, false);
+                    phoneStep.classList.add('hidden');
+                    otpStep.classList.remove('hidden');
+                    codeInput.focus({ preventScroll: true });
+                } else { showMsg(data.message || T.js_err_send_code, true); }
+            });
+        }
         async function verifyOtp() {
             const phone = phoneInput.value.trim();
             const code = codeInput.value.trim();
-            if (!code) return showMsg(T.js_err_empty_code, true);
-
-            let res = await fetch('/api/otp/verify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, code }),
+            if (!code) { showMsg(T.js_err_empty_code, true); codeInput.focus(); return; }
+            await runRequestAction('verifyOtpButton', async () => {
+                let res = await fetch('/api/otp/verify', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone, code }),
+                });
+                let data = await res.json();
+                if (!data.success) { showMsg(data.message || T.js_err_wrong_code, true); return; }
+                const formData = new FormData();
+                formData.append('phone', phone);
+                formData.append('token', pendingOrderToken);
+                Array.from(document.getElementById('attachments').files).forEach((file) => formData.append('files', file));
+                res = await fetch('/api/orders', { method: 'POST', body: formData });
+                data = await res.json();
+                if (data.success) {
+                    if (data.ownerLink) { window.location.href = data.ownerLink; return; }
+                    showLiveOrder(data.token, data.id);
+                } else { showMsg(data.message || T.js_err_create_order, true); }
             });
-            let data = await res.json();
-            if (!data.success) {
-                return showMsg(data.message || T.js_err_wrong_code, true);
-            }
-
-            const formData = new FormData();
-            formData.append('phone', phone);
-            formData.append('token', pendingOrderToken);
-
-            Array.from(document.getElementById('attachments').files).forEach((file) => formData.append('files', file));
-
-            res = await fetch('/api/orders', { method: 'POST', body: formData });
-            data = await res.json();
-            if (data.success) {
-                if (data.ownerLink) { window.location.href = data.ownerLink; return; }
-                showLiveOrder(data.token, data.id);
-            } else {
-                showMsg(data.message || T.js_err_create_order, true);
-            }
         }
 
         let activeOrderToken = null;
@@ -868,20 +841,42 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function openModal(id) {
-            document.getElementById(id).classList.remove('hidden');
-            document.getElementById(id).classList.add('flex');
-        }
 
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-            document.getElementById(id).classList.remove('flex');
+        let modalReturnFocus = null;
+        let activeModal = null;
+        function openModal(id) {
+            modalReturnFocus = document.activeElement;
+            activeModal = document.getElementById(id);
+            activeModal.classList.remove('hidden');
+            activeModal.classList.add('flex');
+            document.body.classList.add('home-modal-open');
+            const input = Array.from(activeModal.querySelectorAll('input')).find((el) => el.getClientRects().length);
+            (input || activeModal).focus();
         }
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.classList.remove('home-modal-open');
+            activeModal = null;
+            if (modalReturnFocus && modalReturnFocus.isConnected) modalReturnFocus.focus();
+        }
+        document.addEventListener('keydown', (event) => {
+            if (!activeModal) return;
+            if (event.key === 'Escape') { event.preventDefault(); closeModal(activeModal.id); return; }
+            if (event.key !== 'Tab') return;
+            const items = Array.from(activeModal.querySelectorAll('button, a[href], input, textarea, [tabindex="0"]')).filter((el) => !el.disabled && el.getClientRects().length);
+            const first = items[0], last = items[items.length - 1];
+            if (!first) { event.preventDefault(); activeModal.focus(); return; }
+            if (event.shiftKey && (document.activeElement === first || !activeModal.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && (document.activeElement === last || !activeModal.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+        });
 
         function showToast(text) {
             const toast = document.createElement('div');
             toast.className = 'fixed top-5 left-1/2 -translate-x-1/2 z-[70] bg-stone-900 text-white px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl border border-stone-700 flex items-center gap-2';
-            toast.innerHTML = '<span>' + text + '</span>';
+            toast.setAttribute('role', 'status');
+            toast.textContent = text;
             document.body.appendChild(toast);
             setTimeout(() => toast.remove(), 3200);
         }
@@ -944,7 +939,7 @@
         document.querySelectorAll('.review-star').forEach((s) => {
             s.addEventListener('mouseenter', () => paintReviewStars(Number(s.dataset.star)));
             s.addEventListener('mouseleave', () => paintReviewStars(reviewRating));
-            s.addEventListener('click', () => { reviewRating = Number(s.dataset.star); paintReviewStars(reviewRating); });
+            s.addEventListener('click', () => { reviewRating = Number(s.dataset.star); paintReviewStars(reviewRating); document.querySelectorAll('.review-star').forEach((star) => star.setAttribute('aria-pressed', String(Number(star.dataset.star) === reviewRating))); });
         });
 
         async function reviewRequestCode() {
@@ -1173,6 +1168,7 @@
             }
         }
 
+        applyFilters();
         resetWizard();
     </script>
 </body>
