@@ -106,6 +106,7 @@ const dictionaries = {
     composer_photo_btn: 'ფოტო',
     composer_label: 'რა არის გასაკეთებელი?',
     composer_tag: 'განაცხადის შექმნა',
+    composer_step: 'ნაბიჯი 1 / 2',
     composer_trust: 'თქვენს კონტაქტებს მხოლოდ გადამოწმებული შემსრულებლები ნახავენ',
     hero_response_badge: 'შემსრულებლები პასუხობენ ჩვეულებრივ 3–5 წუთში',
     trust_badge_speed: 'გამოხმაურება 3–5 წუთში',
@@ -160,7 +161,8 @@ const dictionaries = {
 
     filter_all: 'ყველა',
     catalog_title: 'ყველა შემსრულებელი',
-    catalog_hint: 'დარეკეთ ან მისწერეთ WhatsApp-ში პირდაპირ.',
+    catalog_choice_label: 'ან თავად აირჩიეთ',
+    catalog_hint: 'ჯერ დაათვალიერეთ პროფილი, შემდეგ კი საჭიროების შემთხვევაში დაუკავშირდით პირდაპირ.',
     catalog_verified: 'თბილისის ბაზაში',
 
     btn_call: 'დარეკვა',
@@ -575,6 +577,7 @@ const dictionaries = {
     composer_photo_btn: 'Фото',
     composer_label: 'Что нужно сделать?',
     composer_tag: 'Создание заявки',
+    composer_step: 'Шаг 1 из 2',
     composer_trust: 'Ваши контакты увидят только проверенные исполнители',
     hero_response_badge: 'Отклики исполнителей — обычно за 3–5 минут',
     trust_badge_speed: 'Отклик за 3–5 мин',
@@ -631,7 +634,8 @@ const dictionaries = {
 
     filter_all: 'Все',
     catalog_title: 'Все специалисты',
-    catalog_hint: 'Позвоните или напишите в WhatsApp напрямую.',
+    catalog_choice_label: 'Или выберите сами',
+    catalog_hint: 'Сначала посмотрите профиль, а затем при необходимости свяжитесь напрямую.',
     catalog_verified: 'В базе Тбилиси',
 
     btn_call: 'Позвонить',
@@ -1046,6 +1050,7 @@ const dictionaries = {
     composer_photo_btn: 'Photo',
     composer_label: 'What needs to be done?',
     composer_tag: 'New request',
+    composer_step: 'Step 1 of 2',
     composer_trust: 'Only verified providers will see your contact details',
     hero_response_badge: 'Providers usually reply within 3–5 minutes',
     trust_badge_speed: 'Replies in 3–5 min',
@@ -1102,7 +1107,8 @@ const dictionaries = {
 
     filter_all: 'All',
     catalog_title: 'All specialists',
-    catalog_hint: 'Call or message on WhatsApp directly.',
+    catalog_choice_label: 'Or choose yourself',
+    catalog_hint: 'Review the profile first, then contact the provider directly if you prefer.',
     catalog_verified: 'In the Tbilisi database',
 
     btn_call: 'Call',

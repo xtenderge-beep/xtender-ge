@@ -24,7 +24,7 @@ details > summary::-webkit-details-marker { display: none; }
 
 /* ---- Главная: фон-сетка + анимация появления ---- */
 .dispatch-grid {
-  background-image: radial-gradient(circle, rgba(28, 25, 23, 0.07) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(28, 25, 23, 0.045) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
