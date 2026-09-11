@@ -3,7 +3,7 @@
   // На страницах с префиксом локали (/, /join, /ru/...) передаём alternates
   // (seo.alternates) — ссылки ведут на локализованный URL. На остальных
   // (/order, /master, /o, ...) alternates не передаём — работает /lang/:code
-  // (ставит куку + редирект на Referer).
+  // (ставит куку и возвращает на явно переданную локальную страницу).
   const _langs = [['ka', 'GE'], ['ru', 'RU'], ['en', 'EN']];
   const _hasAlt = typeof alternates !== 'undefined' && alternates;
 %>
@@ -11,9 +11,10 @@
   <% _langs.forEach(function (lf) { %>
     <%
       // ?lang=ka — иначе кука ru/en тут же откидывает голый '/' обратно (public.routes.js)
-      const _href = _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0]);
+      const _href = _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0] + '?next=' + encodeURIComponent(typeof currentPath === 'string' ? currentPath : '/'));
     %>
     <a href="<%= _href %>" aria-label="<%= lf[1] %>"
+       <% if (!_hasAlt) { %>onclick="const destination = new URL(this.href); destination.searchParams.set('next', location.pathname + location.search + location.hash); this.href = destination.pathname + destination.search;"<% } %>
        class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === lf[0] ? 'active' : 'hover:bg-white/50' %>"><%= lf[1] %></a>
   <% }); %>
 </div>

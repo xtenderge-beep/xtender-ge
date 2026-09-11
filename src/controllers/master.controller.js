@@ -1,3 +1,4 @@
+const masterSession = require('../services/masterSession.service');
 const consentService = require('../services/consent.service');
 const topupService = require('../services/topup.service');
 const receiptService = require('../services/receipt.service');
@@ -24,11 +25,8 @@ const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'xtendergebot';
-// «Запомнить на устройстве»: httpOnly-cookie с master_token. Та же модель, что у
-// owner_token заявки и cookie my_orders клиента — не сессия, просто чтобы не гонять
-// через телефон+SMS каждый заход. 30 дней, как у остальных cookie.
-const MASTER_COOKIE = 'master_session';
-const MASTER_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+// Revocable device session; the cookie contains an opaque random ID.
+const MASTER_COOKIE = masterSession.COOKIE;
 const OTP_PURPOSE = 'master';
 
 // --- Раскрытие номера в публичном каталоге (клиент звонит мастеру напрямую, минуя
@@ -251,41 +249,27 @@ async function register(req, res) {
     console.error('Failed to send registration confirmation SMS:', err.message);
   });
 
+  await masterSession.start(req, res, master.master_token);
   return res.json({ success: true, link, promoBonusGel, welcomeBonusGel: master.welcomeBonusTetri / 100 });
 }
 
-// Личный кабинет исполнителя — /master/<master_token>. Ссылка постоянная, приходит
-// в SMS после регистрации; на неё же ведёт плашка со страницы каждого лида.
-// Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
+// Cabinet access requires a revocable device session established by SMS verification.
 async function statusPage(req, res) {
+  masterSession.noStore(res);
+  const sessionToken = await masterSession.token(req);
+  const master = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
+  if (master && req.params.token && req.params.token !== sessionToken) return res.redirect('/master');
   const strings = clientStrings(req.lang);
+  if (!master) {
+    res.clearCookie(MASTER_COOKIE, { path: '/' });
+    return res.render('master-status', {
+      master: null, badToken: Boolean(req.params.token), reviews: [], activity: null, history: [], leads: [], supportMessages: [], receipts: [], topups: [],
+      leadPriceTetri: 0, catalogCallPriceTetri: 0, payment: null, botUsername: BOT_USERNAME, clientStrings: strings,
+    });
+  }
   const payment = await topupService.getDetails();
   const catalogCallPriceTetri = await settingsService.getCatalogCallPriceTetri();
   const leadPriceTetri = await settingsService.getLeadPriceTetri();
-
-  // /master без токена, но устройство помнит вход — сразу в кабинет, без телефона и SMS.
-  if (!req.params.token && req.cookies[MASTER_COOKIE]) {
-    const remembered = await masterService.getMasterByToken(req.cookies[MASTER_COOKIE]);
-    if (remembered) return res.redirect(`/master/${remembered.master_token}`);
-    res.clearCookie(MASTER_COOKIE); // токен протух — забываем
-  }
-
-  const master = req.params.token ? await masterService.getMasterByToken(req.params.token) : null;
-
-  if (!master) {
-    const badToken = Boolean(req.params.token);
-    return res.status(badToken ? 404 : 200).render('master-status', {
-      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [], receipts: [], topups: [],
-      leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
-    });
-  }
-
-  // Открыл кабинет по токену (SMS-ссылка, после входа, закладка) — запоминаем устройство.
-  res.cookie(MASTER_COOKIE, master.master_token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    maxAge: MASTER_COOKIE_MAX_AGE_MS,
-  });
 
   const [reviews, activity, history, leads, supportMessages, receipts, topups] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
@@ -345,10 +329,12 @@ async function sendSupportMessage(req, res) {
   return res.json({ success: true });
 }
 
-// «Выйти» из кабинета на общем устройстве — чистим cookie запоминания.
-function logout(req, res) {
-  res.clearCookie(MASTER_COOKIE);
-  res.redirect('/');
+// Revoke only this device, including copies of its old cookie.
+async function logout(req, res) {
+  masterSession.noStore(res);
+  await masterSession.revoke(req);
+  res.clearCookie(MASTER_COOKIE, { path: '/' });
+  res.redirect('/master');
 }
 
 // Вход в кабинет по телефону: код отправляем только если на номер есть профиль.
@@ -395,7 +381,8 @@ async function loginVerify(req, res) {
   }
 
   await otpService.clearVerified(phone, MASTER_LOGIN_PURPOSE);
-  return res.json({ success: true, link: `/master/${master.master_token}` });
+  await masterSession.start(req, res, master.master_token);
+  return res.json({ success: true, link: '/master' });
 }
 
 // Исполнитель прикрепляет чек о банковском переводе — файл уходит модератору в

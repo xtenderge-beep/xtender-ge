@@ -27,7 +27,7 @@
 
     <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm sticky top-0 z-20">
         <div class="max-w-3xl mx-auto px-4">
-            <div class="flex items-center justify-between h-16 gap-3">
+            <div class="flex items-center justify-between gap-3" style="min-height:64px;flex-wrap:wrap;padding:8px 0">
                 <a href="/" class="flex items-center gap-2 shrink-0">
                     <%- include('partials/brand') %>
                 </a>
@@ -36,6 +36,11 @@
                         <span class="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg whitespace-nowrap">
                             <%= (master.balance_tetri / 100).toFixed(2) %> ₾
                         </span>
+                    <% } %>
+                    <% if (master) { %>
+                    <form method="POST" action="/master/logout" data-logout>
+                        <button type="submit" class="text-sm font-bold border border-stone-200 rounded-lg px-3 py-2"><%= t('master_logout') %></button>
+                    </form>
                     <% } %>
                     <%- include('partials/lang-switch') %>
                 </div>
@@ -382,7 +387,7 @@
                     </div>
                 </div>
 
-                <a href="/master/logout" class="block text-center text-xs font-bold text-stone-400 hover:text-red-600 transition py-2"><%= t('master_logout') %></a>
+                <form method="POST" action="/master/logout" data-logout><button type="submit" class="text-sm font-bold py-2"><%= t('master_logout') %></button></form>
             </section>
 
             <button type="button" id="supportFab"
@@ -468,6 +473,7 @@
                 panes.forEach(function (p) { p.classList.toggle('hidden', p.getAttribute('data-tab') !== name); });
                 btns.forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab-btn') === name); });
                 try { localStorage.setItem(STORE_KEY, name); } catch (e) {}
+                history.replaceState(null, '', location.pathname + location.search + '#' + name);
             }
 
             btns.forEach(function (b) {
@@ -477,9 +483,13 @@
                 });
             });
 
-            var saved = null;
-            try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
-            activate(['leads','balance','reviews','profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : saved || 'leads');
+            activate(location.hash.slice(1) || 'leads');
+            window.addEventListener('pageshow', function (event) { if (event.persisted) location.reload(); });
+            document.querySelectorAll('[data-logout]').forEach(function (form) {
+                form.addEventListener('submit', function () {
+                    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+                });
+            });
 
             document.querySelectorAll('[data-tab-jump]').forEach(function (el) {
                 el.addEventListener('click', function (e) {

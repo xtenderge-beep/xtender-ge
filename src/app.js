@@ -48,6 +48,7 @@ app.set('views', path.join(__dirname, 'views'));
 app.use((req, res, next) => {
   req.lang = normalizeLang(req.cookies.lang);
   res.locals.lang = req.lang;
+  res.locals.currentPath = req.originalUrl;
   res.locals.t = translate(req.lang);
   // Только для подписи кнопки в шапке: «Кабинет» если устройство помнит вход
   // исполнителя, иначе «Работа». Наличие cookie — подсказка, не гарантия (протухший
@@ -60,12 +61,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/lang/:code', (req, res) => {
-  const lang = normalizeLang(req.params.code);
-  res.cookie('lang', lang, { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
-  const back = req.get('Referer') || '/';
-  res.redirect(back);
-});
+app.get('/lang/:code', require('./controllers/language.controller').change);
 
 app.use('/', publicRoutes);
 app.use('/:locale(ru|en)', publicRoutes);
@@ -75,7 +71,9 @@ app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
 
 app.get('/master', asyncHandler(masterController.statusPage));
-app.get('/master/logout', masterController.logout);
+app.get('/master/logout', asyncHandler(masterController.logout));
+app.post('/master/logout', asyncHandler(masterController.logout));
+app.use('/master/:token', asyncHandler(require('./services/masterSession.service').requireSession));
 app.get('/master/:token/topups/:id/:format(pdf)', asyncHandler(require('./controllers/topup.controller').show));
 app.get('/master/:token/topups/:id', asyncHandler(require('./controllers/topup.controller').show));
 app.get('/master/:token', asyncHandler(masterController.statusPage));

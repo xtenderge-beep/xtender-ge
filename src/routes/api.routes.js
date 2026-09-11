@@ -27,6 +27,7 @@ router.post('/catalog/otp/send', asyncHandler(masterController.catalogOtpSend));
 router.post('/catalog/otp/verify', asyncHandler(masterController.catalogOtpVerify));
 router.post('/master/login/request-code', asyncHandler(masterController.loginRequestCode));
 router.post('/master/login/verify', asyncHandler(masterController.loginVerify));
+router.use('/master/:token', asyncHandler(require('../services/masterSession.service').requireSession));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
