@@ -80,6 +80,23 @@ async function getOverviewStats() {
   };
 }
 
+// Произвольный срез дат для «Обзора» — admin.controller задаёт границы по выбору
+// администратора (по умолчанию последние 7 дней). `to` — исключающая верхняя граница
+// (полночь ПОСЛЕ выбранного дня), чтобы выбранный день попадал в срез целиком.
+async function getStatsForRange(from, to) {
+  const [orders, channels] = await Promise.all([
+    pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE created_at >= $1 AND created_at < $2`, [from, to]),
+    pool.query(
+      `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
+       FROM balance_transactions
+       WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= $1 AND created_at < $2
+       GROUP BY reason`,
+      [from, to]
+    ),
+  ]);
+  return { ordersCount: orders.rows[0].count, channelStats: mapChannelRows(channels.rows) };
+}
+
 // Время реакции считается через balance_transactions (reason='lead_charge'): каждая такая
 // строка фиксирует "мастер X был уведомлён о заявке Y в момент T" (это единственное место,
 // где такая связь вообще хранится — order_dispatches знает только категорию, не мастеров).
@@ -222,6 +239,7 @@ async function getOrderDetailAdmin(token) {
 
 module.exports = {
   getOverviewStats,
+  getStatsForRange,
   getResponseStats,
   listMastersAdmin,
   getMasterDetail,

@@ -171,11 +171,42 @@ function logout(req, res) {
   res.redirect('/admin/login');
 }
 
+// YYYY-MM-DD из <input type="date"> — локальная полночь, не UTC (иначе часовой пояс
+// сервера сдвигает выбранный день на соседний).
+function parseDateParam(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+function toDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
 async function overview(req, res) {
   const stats = await adminService.getOverviewStats();
   const orders = await adminService.listOrdersAdmin();
   const receiptCount = await pool.query("SELECT COUNT(*)::int AS count FROM topup_receipts WHERE status IN ('received','reviewing')");
-  res.render('admin/overview', { stats, waitingOrders: orders.filter(o=>o.status !== 'closed' && !o.first_dispatched_at).length, waitingReceipts: receiptCount.rows[0].count });
+
+  const today = new Date(new Date().setHours(0, 0, 0, 0));
+  const defaultFrom = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000); // 7 дней включительно с сегодня
+  const rangeFrom = parseDateParam(req.query.from) || defaultFrom;
+  const rangeToInclusive = parseDateParam(req.query.to) || today;
+  const rangeToExclusive = new Date(rangeToInclusive.getTime() + 24 * 60 * 60 * 1000);
+  const rangeInvalid = rangeFrom >= rangeToExclusive;
+  const rangeStats = rangeInvalid
+    ? { ordersCount: 0, channelStats: { lead: { count: 0, gel: 0 }, catalog: { count: 0, gel: 0 } } }
+    : await adminService.getStatsForRange(rangeFrom, rangeToExclusive);
+
+  res.render('admin/overview', {
+    stats,
+    waitingOrders: orders.filter(o=>o.status !== 'closed' && !o.first_dispatched_at).length,
+    waitingReceipts: receiptCount.rows[0].count,
+    rangeStats,
+    rangeInvalid,
+    rangeFromValue: toDateInputValue(rangeFrom),
+    rangeToValue: toDateInputValue(rangeToInclusive),
+  });
 }
 
 async function mastersList(req, res) {
