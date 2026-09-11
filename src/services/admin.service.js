@@ -3,9 +3,27 @@ const supportService = require('./support.service');
 
 const settingsService = require('./settings.service');
 
+// Списания за лид (рассылка) и за показ номера (каталог) — два разных канала
+// монетизации, история баланса не различает их иначе как по reason. COALESCE(SUM(...))
+// нужен, чтобы канал без событий за период не пропадал из результата молча.
+function emptyChannelTotals() {
+  return { lead: { count: 0, gel: 0 }, catalog: { count: 0, gel: 0 } };
+}
+function mapChannelRows(rows) {
+  const totals = emptyChannelTotals();
+  rows.forEach((row) => {
+    const key = row.reason === 'catalog_call' ? 'catalog' : 'lead';
+    totals[key] = { count: Number(row.count), gel: Number(row.tetri) / 100 };
+  });
+  return totals;
+}
+
 async function getOverviewStats() {
   const lowBalanceThreshold = await settingsService.getLeadPriceTetri();
-  const [statusCounts, balanceSum, lowBalanceCount, ordersToday, ordersWeek, pendingReviews, responseStats, telegramCount, supportOpenCount] =
+  const [
+    statusCounts, balanceSum, lowBalanceCount, ordersToday, ordersWeek, pendingReviews,
+    responseStats, telegramCount, supportOpenCount, channelsToday, channelsWeek,
+  ] =
     await Promise.all([
       pool.query(
         `SELECT
@@ -30,6 +48,19 @@ async function getOverviewStats() {
         `SELECT COUNT(*)::int AS count FROM masters WHERE is_banned = false AND is_active = true AND telegram_id IS NOT NULL`
       ),
       supportService.countOpenThreads(),
+      pool.query(
+        `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
+         FROM balance_transactions
+         WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= $1
+         GROUP BY reason`,
+        [new Date(new Date().setHours(0, 0, 0, 0))]
+      ),
+      pool.query(
+        `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
+         FROM balance_transactions
+         WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY reason`
+      ),
     ]);
 
   return {
@@ -44,6 +75,8 @@ async function getOverviewStats() {
     mastersWithTelegram: telegramCount.rows[0].count,
     supportOpenCount,
     responseStats,
+    channelStatsToday: mapChannelRows(channelsToday.rows),
+    channelStatsWeek: mapChannelRows(channelsWeek.rows),
   };
 }
 

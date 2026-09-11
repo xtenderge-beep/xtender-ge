@@ -50,6 +50,30 @@
     </a>
 </div>
 
+<h2 class="text-lg font-bold mb-3 mt-6">Списания по каналам</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Лид (рассылка заявок)</p>
+        <p class="text-2xl font-black text-stone-900 mt-1">
+            <%= stats.channelStatsToday.lead.gel.toFixed(2) %> ₾
+            <span class="text-xs font-semibold text-stone-500">сегодня · <%= stats.channelStatsToday.lead.count %> списаний</span>
+        </p>
+        <p class="text-sm text-stone-600 mt-1">
+            <%= stats.channelStatsWeek.lead.gel.toFixed(2) %> ₾ за неделю · <%= stats.channelStatsWeek.lead.count %> списаний
+        </p>
+    </div>
+    <div class="bg-white rounded-2xl border border-stone-200 p-4">
+        <p class="text-xs font-bold text-stone-500 uppercase">Каталог (показ номера)</p>
+        <p class="text-2xl font-black text-stone-900 mt-1">
+            <%= stats.channelStatsToday.catalog.gel.toFixed(2) %> ₾
+            <span class="text-xs font-semibold text-stone-500">сегодня · <%= stats.channelStatsToday.catalog.count %> списаний</span>
+        </p>
+        <p class="text-sm text-stone-600 mt-1">
+            <%= stats.channelStatsWeek.catalog.gel.toFixed(2) %> ₾ за неделю · <%= stats.channelStatsWeek.catalog.count %> списаний
+        </p>
+    </div>
+</div>
+
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-4">
     <p class="text-xs font-bold text-stone-500 uppercase">Время до открытия заявки или нажатия контакта</p>
     <% if (stats.responseStats.avgSeconds === null) { %>
