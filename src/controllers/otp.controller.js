@@ -1,3 +1,4 @@
+const consentService = require('../services/consent.service');
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
 const managerService = require('../services/manager.service');
@@ -17,6 +18,9 @@ async function send(req, res) {
   if (!description || !description.trim()) {
     return res.status(400).json({ success: false, message: 'Description is required' });
   }
+
+  const acceptance = consentService.acceptedRequest(req, 'client');
+  if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
 
   // Пришёл по ссылке менеджера — привязываем заявку к нему.
   let managerId = null;
@@ -41,7 +45,7 @@ async function send(req, res) {
   }
 
   const link = `${getBaseUrl()}/o/${order.owner_token}`;
-  const result = await otpService.sendCode(phone, link, 'order', order.id, { meta: requestMeta(req) });
+  const result = await otpService.sendCode(phone, link, 'order', order.id, { meta: requestMeta(req), consent: acceptance.consent });
 
   if (!result.success) {
     if (result.reason === 'rate_limited') {
@@ -50,7 +54,7 @@ async function send(req, res) {
     return res.status(500).json({ success: false, message: 'Failed to send code' });
   }
 
-  return res.json({ success: true, message: 'Code sent', token: order.token });
+  return res.json({ success: true, message: 'Code sent', token: order.token, challengeId: result.challengeId });
 }
 
 async function verify(req, res) {
@@ -65,6 +69,7 @@ async function verify(req, res) {
     meta: requestMeta(req),
     language: req.lang,
     termsVersion: TERMS_VERSION,
+    challengeId: req.body.challengeId, strict: true,
   });
 
   if (!isValid) {

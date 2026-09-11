@@ -8,7 +8,7 @@ function validate(category, size) {
 async function preview(token, category, size) {
   validate(category, size);
   const order = await orderService.getOrderByToken(token);
-  if (!order || order.status === 'closed') throw new Error('Заявка закрыта или не найдена');
+  if (!order || ['closed', 'unverified'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
   const price = await settingsService.getLeadPriceTetri();
   const recipients = await orderService.getDispatchRecipients(category, size, price);
   const previous = await pool.query(`SELECT id FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);

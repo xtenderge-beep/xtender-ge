@@ -18,6 +18,11 @@ CREATE TRIGGER trg_sms_consent_logs_append_only
     BEFORE UPDATE OR DELETE ON sms_consent_logs
     FOR EACH ROW EXECUTE PROCEDURE sms_consent_logs_block_mutation();
 
+DROP TRIGGER IF EXISTS trg_sms_consent_logs_no_truncate ON sms_consent_logs;
+CREATE TRIGGER trg_sms_consent_logs_no_truncate
+    BEFORE TRUNCATE ON sms_consent_logs
+    FOR EACH STATEMENT EXECUTE PROCEDURE sms_consent_logs_block_mutation();
+
 -- Persistent receipt review, independent of balance crediting (Telegram/admin).
 CREATE TABLE IF NOT EXISTS topup_receipts (
  id SERIAL PRIMARY KEY,

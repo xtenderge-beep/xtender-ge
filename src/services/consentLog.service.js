@@ -26,11 +26,10 @@ const VERIFIED_EVENT_BY_PURPOSE = {
   order: 'ORDER_SMS_OTP_VERIFIED',
   review: 'REVIEW_SMS_OTP_VERIFIED',
 };
-const VERIFIED_EVENT_TYPES = Object.values(VERIFIED_EVENT_BY_PURPOSE);
+const VERIFIED_EVENT_TYPES = [...Object.values(VERIFIED_EVENT_BY_PURPOSE), 'CLIENT_CONSENT_OTP_VERIFIED'];
 
-// `channel` не пишем — колонка сама дефолтится в 'sms' (явный NULL перебил бы DEFAULT).
 const COLUMNS = [
-  'event_type', 'phone_number', 'master_id', 'order_id', 'purpose',
+  'event_type', 'phone_number', 'master_id', 'order_id', 'purpose', 'channel',
   'ip_address', 'user_agent', 'x_forwarded_for', 'otp_reference_id', 'provider',
   'provider_response', 'otp_code_hash', 'message_body_hash', 'terms_version',
   'consent_language', 'consent_text_snapshot', 'metadata',
@@ -40,6 +39,7 @@ const JSON_COLUMNS = new Set(['provider_response', 'metadata']);
 async function insertRow(values, client = pool) {
   const params = COLUMNS.map((col) => {
     const v = values[col];
+    if (col === 'channel') return v || 'sms';
     if (v === undefined || v === null) return null;
     // JSONB-колонки: всегда сериализуем, в т.ч. строки — шлюз может вернуть голый текст
     // ("OK 12345"), а не JSON; JSON.stringify оборачивает его в валидный JSON-литерал.
@@ -88,7 +88,7 @@ async function recordConsentVerified({ phone, purpose, submittedCode, masterId =
   termsVersion = null, language = null, consentText = null, metadata = null,
   providerMessageId = null, providerResponse = null, meta = {} }) {
   return insertRow({
-    event_type: VERIFIED_EVENT_BY_PURPOSE[purpose] || 'SMS_OTP_VERIFIED',
+    event_type: purpose === 'order' && consentText ? 'CLIENT_CONSENT_OTP_VERIFIED' : VERIFIED_EVENT_BY_PURPOSE[purpose] || 'SMS_OTP_VERIFIED',
     phone_number: phone,
     master_id: masterId,
     order_id: orderId,
@@ -105,6 +105,21 @@ async function recordConsentVerified({ phone, purpose, submittedCode, masterId =
     consent_text_snapshot: consentText,
     metadata,
   });
+}
+
+// Transactional audit: the business change and its evidence either both commit or both roll back.
+async function recordAction({ eventType, phone, masterId = null, orderId = null, metadata = {}, meta = {} }, client = pool) {
+  return insertRow({ event_type: eventType, channel: 'web', phone_number: phone, master_id: masterId, order_id: orderId,
+    ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata }, client);
+}
+
+async function applyConsent(grant, role, subjectId, phone, meta, client) {
+  // A grant cannot register two profiles or publish two different orders, even with concurrent requests.
+  await client.query('INSERT INTO consent_uses (consent_log_id, subject_role, subject_id) VALUES ($1, $2, $3)',
+    [grant.consentLogId, role, subjectId]);
+  return recordAction({ eventType: role === 'client' ? 'ORDER_PUBLISHED' : 'MASTER_REGISTERED', phone,
+    orderId: role === 'client' ? subjectId : null, masterId: role === 'provider' ? subjectId : null,
+    metadata: { consent_log_id: grant.consentLogId, snapshot_digest: grant.snapshot.digest }, meta }, client);
 }
 
 // --- Точка 2: прочие транзакционные SMS (лид-уведомления, подтверждения, пинки) ---
@@ -157,7 +172,7 @@ async function exportForPhone(rawPhone) {
     ),
   ]);
 
-  const optIn = logs.rows.find((r) => r.event_type === 'CONSENT_SMS_OTP_VERIFIED') || null;
+  const optIn = [...logs.rows].reverse().find((r) => r.event_type === 'CONSENT_SMS_OTP_VERIFIED') || null;
   const verifiedEvents = logs.rows.filter((r) => VERIFIED_EVENT_TYPES.includes(r.event_type));
   const latestVerified = verifiedEvents.length ? verifiedEvents[verifiedEvents.length - 1] : null;
 
@@ -191,7 +206,7 @@ async function exportForPhone(rawPhone) {
         ? 'Профиль на этот номер есть, но записи CONSENT_SMS_OTP_VERIFIED нет: профиль заведён '
           + 'до внедрения журнала согласий (2026-09-03) либо иным каналом. Явное согласие по '
           + 'этому номеру документально не зафиксировано — при необходимости провести повторное согласие через /join.'
-        : 'По этому номеру нет ни профиля, ни событий журнала.',
+        : 'Согласие исполнителя по этому номеру не найдено. Согласия клиента и действия с заявками показаны отдельно.',
       latest_phone_verification: latestVerified && {
         event_type: latestVerified.event_type,
         at_utc: latestVerified.timestamp_utc,
@@ -213,6 +228,7 @@ async function exportForPhone(rawPhone) {
     },
     event_count: logs.rows.length,
     events: logs.rows,
+    client_consents: logs.rows.filter(r => r.event_type === 'CLIENT_CONSENT_OTP_VERIFIED'),
   };
 }
 
@@ -245,6 +261,8 @@ async function exportForMaster(masterId) {
 }
 
 module.exports = {
+  recordAction,
+  applyConsent,
   recordOtpSent,
   recordConsentVerified,
   recordSmsDelivery,

@@ -141,6 +141,12 @@
             <%= t('order_pending_review_notice') %>
           </div>
         <% } else if (isOwner) { %>
+          <p class="mb-3 text-sm text-stone-600"><%= t('consent_closing') %></p>
+          <label for="closingReason" class="block mb-2 text-sm"><%= t('consent_reason') %></label>
+          <select id="closingReason" class="w-full mb-3 p-3 rounded-xl border border-stone-300">
+            <option value="found_provider"><%= t('consent_found') %></option>
+            <option value="no_longer_needed"><%= t('consent_inactive') %></option>
+          </select>
           <button id="closeBtn" class="w-full py-3.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-black text-sm shadow-lg shadow-red-600/20 transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-trash-can"></i>
             <span><%= t('btn_close_order') %></span>
@@ -228,7 +234,7 @@
         const closeBtn = document.getElementById('closeBtn');
         if (closeBtn) {
           closeBtn.addEventListener('click', async () => {
-            const res = await fetch('/api/orders/' + token + '/close', { method: 'POST' });
+            const res = await fetch('/api/orders/' + token + '/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: document.getElementById('closingReason').value }) });
             const data = await res.json();
             if (data.success) {
               window.location.reload();

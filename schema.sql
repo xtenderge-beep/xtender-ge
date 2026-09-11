@@ -348,6 +348,14 @@ CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_event  ON sms_consent_logs (even
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ts     ON sms_consent_logs (timestamp_utc);
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ref    ON sms_consent_logs (otp_reference_id);
 
+-- One-time application of an OTP consent to its business operation.
+CREATE TABLE IF NOT EXISTS consent_uses (
+    consent_log_id BIGINT PRIMARY KEY,
+    subject_role VARCHAR(20) NOT NULL,
+    subject_id BIGINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- === Настройки приложения — ключ/значение, редактируются в /admin/settings (2026-09-05) ===
 -- Раньше цена лида была захардкожена (COST_PER_NOTIFICATION_TETRI = 50 в order.service.js).
 -- Значение читается сервисом settings.service.js с фолбэком на дефолт в коде, если строки

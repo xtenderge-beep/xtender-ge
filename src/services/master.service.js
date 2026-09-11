@@ -1,3 +1,4 @@
+const consentLog = require('./consentLog.service');
 const settingsService = require('./settings.service');
 const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
@@ -15,6 +16,7 @@ const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_tex
 async function registerMaster({
   name, phone, description, serviceType, attributes = {},
   vehicleTypeText = null, cityId = null, districtIds = [], photoUrl = null,
+  consentGrant = null, requestMeta = {},
 }) {
   const masterToken = generateShortId();
   const legacy = legacyColumnsFor(serviceType, attributes);
@@ -75,6 +77,7 @@ async function registerMaster({
         [master.id, Number(did)]
       );
     }
+    if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client);
     return master;
   });
 }

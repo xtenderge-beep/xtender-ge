@@ -177,9 +177,10 @@
                 </details>
 
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
+                <% consent.notices.forEach(notice => { %><p class="text-xs text-stone-600 leading-relaxed"><%= notice %></p><% }) %>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
-                    <span><%= t('join_terms_label') %> <a href="<%= legalPrefix %>/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
+                    <span><%= consent.termsLabel %> <a href="<%= legalPrefix %>/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
                 </label>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="privacyCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
@@ -364,6 +365,10 @@
             };
         }
 
+        let consentChallenge = null;
+        let consentVerified = false;
+        const consentLanguage = <%- JSON.stringify(consent.language) %>;
+        const consentDigest = <%- JSON.stringify(consent.digest) %>;
         async function sendOtp() {
             const payload = collectPayload();
 
@@ -377,10 +382,11 @@
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: payload.phone }),
+                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
             });
             const data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
+            consentChallenge = data.challengeId; consentVerified = false;
 
             showMsg('');
             document.getElementById('detailsStep').classList.add('hidden');
@@ -398,18 +404,22 @@
             const code = document.getElementById('codeInput').value.trim();
             if (!code) return showMsg(T.js_err_empty_code, true);
 
-            let res = await fetch('/api/masters/otp/verify', {
+            let res, data;
+            if (!consentVerified) {
+            res = await fetch('/api/masters/otp/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     phone: payload.phone,
-                    code,
+                    code, challengeId: consentChallenge,
                     termsAccepted: payload.termsAccepted,
                     privacyAccepted: payload.privacyAccepted,
                 }),
             });
-            let data = await res.json();
+            data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_wrong_code, true);
+            consentVerified = true;
+            }
 
             const fd = new FormData();
             fd.append('name', payload.name);
@@ -418,6 +428,7 @@
             fd.append('cityId', payload.cityId);
             fd.append('description', payload.description);
             fd.append('phone', payload.phone);
+            fd.append('challengeId', consentChallenge);
             fd.append('promoCode', payload.promoCode);
             fd.append('termsAccepted', String(payload.termsAccepted));
             fd.append('privacyAccepted', String(payload.privacyAccepted));

@@ -1,3 +1,4 @@
+const consentLog = require('./consentLog.service');
 const pool = require('../config/db');
 const redis = require('../config/redis');
 const smsService = require('./sms.service');
@@ -54,13 +55,19 @@ async function getOrderByOwnerToken(ownerToken) {
   return rows[0] || null;
 }
 
-async function activateOrder(token, phone) {
-  const { rows } = await pool.query(
-    `UPDATE orders SET status = 'pending_review'
-     WHERE token = $1 AND phone = $2 AND status = 'unverified' RETURNING *`,
-    [token, phone]
-  );
-  return rows[0] || null;
+async function activateOrder(token, phone, grant, meta = {}) {
+  if (!grant) return null;
+  return pool.withTransaction(async client => {
+    const { rows } = await client.query(
+      "UPDATE orders SET status = 'pending_review' WHERE token = $1 AND phone = $2 AND id = $3 AND status = 'unverified' RETURNING *",
+      [token, phone, grant.orderId]);
+    const order = rows[0];
+    if (!order) return null;
+    await consentLog.applyConsent(grant, 'client', order.id, phone, meta, client);
+    await consentLog.recordAction({ eventType: 'ORDER_DETAILS_RECORDED', phone, orderId: order.id,
+      metadata: { description: order.description, district_name: order.district_name }, meta }, client);
+    return order;
+  });
 }
 
 async function setModerationMessageId(orderId, messageId) {
@@ -174,13 +181,18 @@ async function markFirstDispatch(token) {
   return Boolean(rows[0]);
 }
 
-async function closeOrder(token) {
-  const { rows } = await pool.query(
-    `UPDATE orders SET status = 'closed', closed_at = NOW()
-     WHERE token = $1 AND status != 'closed' RETURNING *`,
-    [token]
-  );
-  return rows[0] || null;
+async function closeOrder(token, { actor = 'admin', reason = 'admin_closed', meta = {} } = {}) {
+  return pool.withTransaction(async client => {
+    const { rows } = await client.query(
+      "UPDATE orders SET status = 'closed', closed_at = NOW() WHERE token = $1 AND status != 'closed' RETURNING *", [token]);
+    const order = rows[0];
+    if (!order) return null;
+    await consentLog.recordAction({ eventType: 'ORDER_CLOSED', phone: order.phone, orderId: order.id,
+      metadata: { actor, reason, stops_future_contact_sharing: true }, meta }, client);
+    if (actor === 'client') await consentLog.recordAction({ eventType: 'CONTACT_SHARING_WITHDRAWN', phone: order.phone,
+      orderId: order.id, metadata: { actor, reason, scope: 'this_order' }, meta }, client);
+    return order;
+  });
 }
 
 async function getMasterCountsByCategory() {
@@ -244,6 +256,9 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice) {
  return rows;
 }
 async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
+  if (!order || ['closed', 'unverified'].includes(order.status)) return 0;
+  const current = await getOrderByToken(order.token);
+  if (!current || ['closed', 'unverified'].includes(current.status)) return 0;
  const telegramService = require('./telegram.service');
  const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
@@ -254,6 +269,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const notifiedIds = [];
   await Promise.all(
     masters.map(async (master) => {
+      const live = await getOrderByToken(order.token);
+      if (!live || live.status === 'closed') return;
       const link = `${base}/order/${order.token}?master=${master.id}`;
 
       // Привязан Telegram → шлём в бот; при сбое откатываемся на SMS, чтобы лид не пропал.

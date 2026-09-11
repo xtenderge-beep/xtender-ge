@@ -1,3 +1,4 @@
+const { requestMeta } = require('../config/requestMeta');
 const orderService = require('../services/order.service');
 const otpService = require('../services/otp.service');
 const telegramService = require('../services/telegram.service');
@@ -75,19 +76,20 @@ async function create(req, res) {
     return res.status(400).json({ success: false, message: 'Order token is required' });
   }
 
-  const verified = await otpService.isPhoneVerified(phone);
+  const verified = await otpService.getConsentGrant(phone, 'order', req.body.challengeId);
   if (!verified) {
     return res.status(400).json({ success: false, message: 'Phone not verified' });
   }
 
-  const order = await orderService.activateOrder(token, phone);
+  const order = await orderService.activateOrder(token, phone, verified, requestMeta(req));
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });
   }
-  await otpService.clearVerified(phone);
+  await otpService.clearConsentGrant(phone, 'order', req.body.challengeId);
   await orderService.attachFiles(order.id, req.files);
 
-  res.cookie(ownerCookieName(order.token), '1', {
+  res.cookie(ownerCookieName(order.token), order.owner_token, {
+    secure: req.secure,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: COOKIE_MAX_AGE_MS,
@@ -626,7 +628,7 @@ async function show(req, res) {
     });
   }
 
-  const isOwner = req.cookies[ownerCookieName(token)] === '1';
+  const isOwner = req.cookies[ownerCookieName(token)] === order.owner_token;
   const masterId = req.query.master || null;
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
@@ -674,7 +676,8 @@ async function showByOwnerToken(req, res) {
     });
   }
 
-  res.cookie(ownerCookieName(order.token), '1', {
+  res.cookie(ownerCookieName(order.token), order.owner_token, {
+    secure: req.secure,
     httpOnly: true,
     sameSite: 'lax',
     maxAge: COOKIE_MAX_AGE_MS,
@@ -715,13 +718,17 @@ async function myOrders(req, res) {
 
 async function close(req, res) {
   const { token } = req.params;
-  const isOwner = req.cookies[ownerCookieName(token)] === '1';
+  const existing = await orderService.getOrderByToken(token);
+  const isOwner = existing && req.cookies[ownerCookieName(token)] === existing.owner_token;
 
   if (!isOwner) {
     return res.status(403).json({ success: false, message: 'Not allowed' });
   }
 
-  const order = await orderService.closeOrder(token);
+  const reason = req.body.reason || 'no_longer_needed';
+  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: 'Invalid closing reason' });
+  if (existing.status === 'closed') return res.json({ success: true, message: 'Order already closed' });
+  const order = await orderService.closeOrder(token, { actor: 'client', reason, meta: requestMeta(req) });
 
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });

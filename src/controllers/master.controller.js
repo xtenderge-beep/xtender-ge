@@ -1,3 +1,4 @@
+const consentService = require('../services/consent.service');
 const topupService = require('../services/topup.service');
 const receiptService = require('../services/receipt.service');
 const masterService = require('../services/master.service');
@@ -14,7 +15,7 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const { clientStrings } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
-const { TERMS_VERSION, consentSnapshot, consentMeta } = require('../config/legal');
+const { TERMS_VERSION } = require('../config/legal');
 const payment = require('../config/payment');
 const serviceTypes = require('../config/serviceTypes');
 
@@ -124,7 +125,9 @@ async function sendOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone number' });
   }
 
-  const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req) });
+  const acceptance = consentService.acceptedRequest(req, 'provider');
+  if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
+  const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
@@ -132,14 +135,14 @@ async function sendOtp(req, res) {
     return res.status(500).json({ success: false, message: 'Failed to send code' });
   }
 
-  return res.json({ success: true, message: 'Code sent' });
+  return res.json({ success: true, message: 'Code sent', challengeId: result.challengeId });
 }
 
 async function verifyOtp(req, res) {
   const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
   const { code } = req.body;
-  const termsAccepted = Boolean(req.body.termsAccepted);
-  const privacyAccepted = Boolean(req.body.privacyAccepted);
+  const termsAccepted = req.body.termsAccepted === true;
+  const privacyAccepted = req.body.privacyAccepted === true;
 
   if (!rawPhone || !PHONE_REGEX.test(rawPhone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
@@ -149,16 +152,13 @@ async function verifyOtp(req, res) {
     return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
   }
 
-  // strict: запись согласия обязательна — если журнал недоступен, регистрацию считаем
-  // несостоявшейся (Double Opt-In). Текст обоих согласий + версии снимаем на сервере.
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  // The OTP service uses the immutable snapshot captured when this challenge was sent.
   const isValid = await otpService.verifyCode(toE164(rawPhone), code, OTP_PURPOSE, {
     meta: requestMeta(req),
     language: req.lang,
     termsVersion: TERMS_VERSION,
-    consentText: consentSnapshot(req.lang, baseUrl),
-    metadata: { ...consentMeta(req.lang, baseUrl), terms_accepted: true, privacy_accepted: true },
     strict: true,
+    challengeId: req.body.challengeId,
   });
   if (!isValid) {
     return res.status(400).json({ success: false, message: 'Invalid or expired code' });
@@ -207,7 +207,7 @@ async function register(req, res) {
   districtIds = [...new Set(districtIds.map(Number).filter((id) => validDistrictIds.has(id)))];
 
   const phone = toE164(rawPhone);
-  const verified = await otpService.isPhoneVerified(phone, OTP_PURPOSE);
+  const verified = await otpService.getConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
   if (!verified) {
     return res.status(400).json({ success: false, message: 'Phone not verified' });
   }
@@ -222,8 +222,9 @@ async function register(req, res) {
     cityId,
     districtIds,
     photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
+    consentGrant: verified, requestMeta: requestMeta(req),
   });
-  await otpService.clearVerified(phone, OTP_PURPOSE);
+  await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
 
   // Промокод: welcome-бонус на баланс. Ошибка/невалидный код не ломает регистрацию.
   let promoBonusGel = 0;

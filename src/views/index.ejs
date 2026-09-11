@@ -152,7 +152,12 @@
                                 <input type="tel" id="phone" autocomplete="tel" inputmode="tel" placeholder="<%= t('form_phone_placeholder') %>"
                                     value="<%= typeof prefillPhone !== 'undefined' ? prefillPhone : '' %>"
                                     class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-base font-bold text-stone-900 bg-white">
-                                <button id="sendOtpButton" type="button" onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                <div class="mt-4 space-y-3 text-xs text-stone-600 leading-relaxed">
+  <% consent.notices.forEach(notice => { %><p><%= notice %></p><% }) %>
+  <label class="flex items-start gap-2"><input id="clientTerms" type="checkbox" class="mt-1 shrink-0"><span><%= consent.termsLabel %> <a href="<%= consent.terms_url %>" target="_blank" rel="noopener" class="underline"><%= t('join_terms_link') %></a></span></label>
+  <label class="flex items-start gap-2"><input id="clientSharing" type="checkbox" class="mt-1 shrink-0"><span><%= consent.privacyLabel %> <a href="<%= consent.privacy_url %>" target="_blank" rel="noopener" class="underline"><%= t('join_privacy_link') %></a></span></label>
+</div>
+<button id="sendOtpButton" type="button" onclick="sendOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-shield-halved"></i>
                                     <span><%= t('otp_send') %></span>
                                 </button>
@@ -769,18 +774,24 @@
                 button.removeAttribute('aria-busy');
             }
         }
+        let consentChallenge = null;
+        let consentVerified = false;
+        const consentLanguage = <%- JSON.stringify(consent.language) %>;
+        const consentDigest = <%- JSON.stringify(consent.digest) %>;
         async function sendOtp() {
+            if (!document.getElementById('clientTerms').checked || !document.getElementById('clientSharing').checked) return showMsg(T.consent_required, true);
             const phone = phoneInput.value.trim();
             if (!phone) { showMsg(T.js_err_empty_phone, true); phoneInput.focus(); return; }
             await runRequestAction('sendOtpButton', async () => {
                 const description = descriptionInput.value.trim();
                 const res = await fetch('/api/otp/send', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, description }),
+                    body: JSON.stringify({ phone, description, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest }),
                 });
                 const data = await res.json();
                 if (data.success) {
                     pendingOrderToken = data.token;
+                    consentChallenge = data.challengeId; consentVerified = false;
                     showMsg(T.js_ok_code_sent, false);
                     phoneStep.classList.add('hidden');
                     otpStep.classList.remove('hidden');
@@ -793,15 +804,20 @@
             const code = codeInput.value.trim();
             if (!code) { showMsg(T.js_err_empty_code, true); codeInput.focus(); return; }
             await runRequestAction('verifyOtpButton', async () => {
-                let res = await fetch('/api/otp/verify', {
+                let res, data;
+                if (!consentVerified) {
+                res = await fetch('/api/otp/verify', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, code }),
+                    body: JSON.stringify({ phone, code, challengeId: consentChallenge }),
                 });
-                let data = await res.json();
+                data = await res.json();
                 if (!data.success) { showMsg(data.message || T.js_err_wrong_code, true); return; }
+                consentVerified = true;
+                }
                 const formData = new FormData();
                 formData.append('phone', phone);
                 formData.append('token', pendingOrderToken);
+                formData.append('challengeId', consentChallenge);
                 Array.from(document.getElementById('attachments').files).forEach((file) => formData.append('files', file));
                 res = await fetch('/api/orders', { method: 'POST', body: formData });
                 data = await res.json();
@@ -834,7 +850,9 @@
 
         async function closeActiveOrder() {
             if (!activeOrderToken) return;
-            await fetch('/api/orders/' + activeOrderToken + '/close', { method: 'POST' });
+            const response = await fetch('/api/orders/' + activeOrderToken + '/close', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: 'no_longer_needed' }) });
+            const result = await response.json();
+            if (!result.success) { showMsg(result.message || T.js_err_close_order, true); return; }
             document.getElementById('tender-live-section').classList.add('hidden');
             activeOrderToken = null;
             showToast(T.js_deleted_toast);

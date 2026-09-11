@@ -66,7 +66,7 @@ const LABELS = {
 
 const terms = {
   version: TERMS_VERSION,
-  updated: { ka: '2026 წლის 9 სექტემბერი', ru: '9 сентября 2026 г.', en: 'September 9, 2026' },
+  updated: { ka: '2026 წლის 12 სექტემბერი', ru: '12 сентября 2026 г.', en: 'September 12, 2026' },
   body: {
     ka: [
       { h: '1.1. ზოგადი დებულებები' },
@@ -205,7 +205,7 @@ const terms = {
 
 const privacy = {
   version: PRIVACY_VERSION,
-  updated: { ka: '2026 წლის 9 სექტემბერი', ru: '9 сентября 2026 г.', en: 'September 9, 2026' },
+  updated: { ka: '2026 წლის 12 სექტემბერი', ru: '12 сентября 2026 г.', en: 'September 12, 2026' },
   body: {
     ka: [
       { h: '2.1. ზოგადი დებულებები' },
@@ -299,5 +299,49 @@ const privacy = {
     ],
   },
 };
+
+
+// Explicit consent and request lifecycle, effective 12 September 2026.
+const consentCopy = require('./consent-copy');
+const consentDetails = {
+  ru: {
+    acceptance: '1.1.2. Условия принимаются явным подтверждением после ознакомления с ними при регистрации или публикации заявки. Вход по SMS сам по себе не означает принятия новых условий.',
+    otp: '1.1.4. SMS-код подтверждает доступ к номеру телефона. Сервис сохраняет связь подтверждения с показанными условиями и действием пользователя. Пользователь должен защищать доступ к своему телефону и личным ссылкам.',
+    heading: '1.8. Роль платформы и актуальность заявки',
+    prices: 'Индивидуально согласованные с исполнителем цены и правила оплаты имеют приоритет перед общими тарифами. Принятие общих условий платформы само по себе не подтверждает согласование конкретной индивидуальной цены.',
+    sharing: 'Получатели данных: подходящие исполнители — номер клиента и сведения о его заявке для связи по этой заявке; поставщики хостинга, SMS и подключённых средств связи — в объёме, необходимом для работы сервиса; уполномоченные государственные органы — по закону.',
+    audit: 'Сохраняются текст и версия принятых условий, факт подтверждения номера, дата, технические сведения и действия с заявкой. Срок хранения определяется целью обработки, действующими обязательствами и необходимостью предъявления или защиты правовых требований. После отпадения этих оснований данные подлежат удалению или обезличиванию. Закрытие заявки прекращает новые передачи контактов по ней, но не отменяет законность предыдущей обработки и не означает немедленного удаления обязательных доказательств.',
+  },
+  en: {
+    acceptance: '1.1.2. Terms are accepted by an explicit confirmation after reviewing them during registration or request publication. SMS login alone does not constitute acceptance of new terms.',
+    otp: '1.1.4. An SMS code confirms access to a phone number. The service records the link between that confirmation, the displayed terms and the user action. Users must protect access to their phones and private links.',
+    heading: '1.8. Platform role and keeping requests current',
+    prices: 'Prices and payment rules individually agreed with a provider take precedence over general tariffs. Accepting the general platform terms does not itself establish acceptance of a specific individual price.',
+    sharing: 'Data recipients: suitable providers receive the customer phone number and request details to contact the customer about that request; hosting, SMS and connected communication providers receive data necessary to operate the service; authorised public authorities receive data as required by law.',
+    audit: 'The accepted terms and their version, phone verification, date, technical information and request actions are recorded. Retention depends on the processing purpose, applicable obligations and the need to establish or defend legal claims. Data must be deleted or anonymised when those grounds no longer apply. Closing a request stops new contact sharing for it, but does not invalidate earlier lawful processing or immediately delete evidence that must be retained.',
+  },
+  ka: {
+    acceptance: '1.1.2. პირობების მიღება ხდება მათი გაცნობის შემდეგ აშკარა დადასტურებით, რეგისტრაციის ან განაცხადის გამოქვეყნებისას. მხოლოდ SMS-ით შესვლა არ ნიშნავს ახალი პირობების მიღებას.',
+    otp: '1.1.4. SMS-კოდი ადასტურებს ტელეფონის ნომერზე წვდომას. სერვისი ინახავს ამ დადასტურების კავშირს ნაჩვენებ პირობებთან და მომხმარებლის მოქმედებასთან. მომხმარებელმა უნდა დაიცვას ტელეფონსა და პირად ბმულებზე წვდომა.',
+    heading: '1.8. პლატფორმის როლი და განაცხადის აქტუალურობა',
+    prices: 'შემსრულებელთან ინდივიდუალურად შეთანხმებულ ფასებსა და გადახდის წესებს უპირატესობა აქვთ ზოგად ტარიფებთან შედარებით. პლატფორმის ზოგადი პირობების მიღება თავისთავად არ ადასტურებს კონკრეტული ინდივიდუალური ფასის შეთანხმებას.',
+    sharing: 'მონაცემთა მიმღებები: შესაბამისი შემსრულებლები იღებენ დამკვეთის ნომერსა და განაცხადის მონაცემებს ამ განაცხადზე დასაკავშირებლად; ჰოსტინგის, SMS-ისა და დაკავშირებული საკომუნიკაციო სერვისების მომწოდებლები იღებენ სერვისის მუშაობისთვის საჭირო მონაცემებს; უფლებამოსილი სახელმწიფო ორგანოები — კანონით გათვალისწინებულ შემთხვევებში.',
+    audit: 'ინახება მიღებული პირობების ტექსტი და ვერსია, ნომრის დადასტურების ფაქტი, თარიღი, ტექნიკური ინფორმაცია და განაცხადთან დაკავშირებული მოქმედებები. შენახვის ვადა განისაზღვრება დამუშავების მიზნით, მოქმედი ვალდებულებებითა და სამართლებრივი მოთხოვნების წარდგენის ან დაცვის საჭიროებით. ამ საფუძვლების ამოწურვის შემდეგ მონაცემები უნდა წაიშალოს ან დეპერსონალიზდეს. განაცხადის დახურვა აჩერებს მის ფარგლებში კონტაქტების ახალ გადაცემას, მაგრამ არ აუქმებს წინა კანონიერი დამუშავების შედეგებს და არ ნიშნავს შესანახი მტკიცებულებების დაუყოვნებლივ წაშლას.',
+  },
+};
+for (const lang of ['ka', 'ru', 'en']) {
+  const extra = consentDetails[lang];
+  const copy = consentCopy[lang];
+  for (const block of terms.body[lang]) {
+    if (block.p && block.p.startsWith('1.1.2.')) block.p = extra.acceptance;
+    if (block.p && block.p.startsWith('1.1.4.')) block.p = extra.otp;
+  }
+  terms.body[lang].push({ h: extra.heading }, { p: copy.platform }, { p: copy.provider }, { p: extra.prices }, { p: copy.closing }, { p: copy.providerClosing });
+  // Replace the former recipients paragraph, which omitted request recipients and hosting.
+  const privacyBlocks = privacy.body[lang];
+  const sharingHeading = privacyBlocks.findIndex(block => block.h && block.h.startsWith('2.6.'));
+  privacyBlocks[sharingHeading + 1] = { p: extra.sharing };
+  privacyBlocks.push({ p: copy.clientSharing }, { p: copy.withdrawal }, { p: extra.audit });
+}
 
 module.exports = { terms, privacy, REQUISITE_LABELS, REQUISITE_PENDING, LABELS };

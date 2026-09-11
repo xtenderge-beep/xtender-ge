@@ -1,3 +1,4 @@
+const consentService = require('../services/consent.service');
 const express = require('express');
 const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const serviceTypes = require('../config/serviceTypes');
@@ -73,6 +74,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   res.render('index', {
+    consent: consentService.bundle('client', locale),
     masters,
     catalogCallPriceTetri,
     prefillPhone,
@@ -120,6 +122,7 @@ router.get('/join', asyncHandler(async (req, res) => {
   const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
   res.render('join', {
+    consent: consentService.bundle('provider', locale),
     welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
     clientStrings: clientStrings(locale),
     promo,

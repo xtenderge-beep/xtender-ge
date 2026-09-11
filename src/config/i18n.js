@@ -1531,6 +1531,10 @@ function translate(lang) {
   return (key) => dict[key] || key;
 }
 
+const consentCopy = require('./consent-copy');
+for (const [lang, entries] of Object.entries(consentCopy)) {
+  Object.assign(dictionaries[lang], Object.fromEntries(Object.entries(entries).map(([key, value]) => ['consent_' + key, value])));
+}
 function clientStrings(lang) {
   return dictionaries[normalizeLang(lang)];
 }

@@ -4,4 +4,5 @@
   <h3><%= t('guide_template_title') %></h3><p><%= t('guide_template_hint') %></p>
   <% [['ru','Русский'],['ka','ქართული'],['en','English']].forEach(([locale,label])=>{ %><details><summary><%= label %></summary><blockquote lang="<%= locale %>"><%= t('guide_message_'+locale) %></blockquote></details><% }) %>
   <p><%= t('guide_billing') %></p>
+  <p><%= t('consent_providerClosing') %></p>
 </details>

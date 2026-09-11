@@ -289,7 +289,7 @@ async function orderDetail(req, res) {
 // а не подтверждение клиента, что работа сделана.
 async function closeOrder(req, res) {
   const { token } = req.params;
-  const order = await orderService.closeOrder(token);
+  const order = await orderService.closeOrder(token, { actor: 'admin', reason: 'admin_closed', meta: require('../config/requestMeta').requestMeta(req) });
   if (!order) return res.status(404).send('Заявка не найдена');
 
   telegramService.updateMessage(order).catch((err) => {
