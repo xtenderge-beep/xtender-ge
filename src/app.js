@@ -76,6 +76,8 @@ app.get('/my-orders', asyncHandler(orderController.myOrders));
 
 app.get('/master', asyncHandler(masterController.statusPage));
 app.get('/master/logout', masterController.logout);
+app.get('/master/:token/topups/:id/:format(pdf)', asyncHandler(require('./controllers/topup.controller').show));
+app.get('/master/:token/topups/:id', asyncHandler(require('./controllers/topup.controller').show));
 app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));

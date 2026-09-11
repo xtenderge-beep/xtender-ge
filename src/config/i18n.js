@@ -408,7 +408,7 @@ const dictionaries = {
     topup_method_app_text: 'გადარიცხვები → გადარიცხვა IBAN-ზე → ჩასვით ანგარიში → შეიყვანეთ თანხა → კომენტარში მიუთითეთ თქვენი ნომერი → დაადასტურეთ.',
     topup_method_other_title: 'სხვა ბანკიდან ან ფილიალში',
     topup_method_other_text: 'მიუთითეთ ანგარიში და მიმღები, დანიშნულებაში — თქვენი ტელეფონის ნომერი.',
-    topup_receipt_note: 'გადახდის შემდეგ დაურთეთ ჩეკი (ფოტო ან PDF) და გააგზავნეთ. მოდერატორი შეამოწმებს და შეავსებს ბალანსს — ჩვეულებრივ რამდენიმე საათში.',
+    topup_receipt_note: 'გადახდის შემდეგ დაურთეთ ჩეკი (ფოტო ან PDF) და გააგზავნეთ. მოდერატორი შეამოწმებს და შეავსებს ბალანსს.',
     topup_receipt_choose: 'ჩეკის მიბმა',
     topup_receipt_send: 'ჩეკის გაგზავნა',
     topup_receipt_sent: 'ჩეკი გაიგზავნა. ბალანსს შემოწმების შემდეგ შევავსებთ.',
@@ -912,7 +912,7 @@ const dictionaries = {
     topup_method_app_text: 'Переводы → перевод на счёт по IBAN → вставьте счёт → введите сумму → в комментарии укажите свой номер телефона → подтвердите.',
     topup_method_other_title: 'Из другого банка или в отделении',
     topup_method_other_text: 'Назовите счёт и получателя, в назначении платежа укажите свой номер телефона.',
-    topup_receipt_note: 'После оплаты прикрепите чек (фото или PDF) и отправьте. Модератор проверит и пополнит баланс — обычно в течение нескольких часов.',
+    topup_receipt_note: 'После оплаты прикрепите чек (фото или PDF) и отправьте. Модератор проверит и пополнит баланс.',
     topup_receipt_choose: 'Прикрепить чек',
     topup_receipt_send: 'Отправить чек',
     topup_receipt_sent: 'Чек отправлен. Баланс пополним после проверки.',
@@ -1416,7 +1416,7 @@ const dictionaries = {
     topup_method_app_text: 'Transfers → transfer to an IBAN → paste the account → enter the amount → put your phone number in the comment → confirm.',
     topup_method_other_title: 'From another bank or at a branch',
     topup_method_other_text: 'Give the account and recipient; in the payment reference put your phone number.',
-    topup_receipt_note: 'After paying, attach the receipt (photo or PDF) and send it. The moderator will check it and top up your balance — usually within a few hours.',
+    topup_receipt_note: 'After paying, attach the receipt (photo or PDF) and send it. The moderator will check it and top up your balance.',
     topup_receipt_choose: 'Attach receipt',
     topup_receipt_send: 'Send receipt',
     topup_receipt_sent: "Receipt sent. We'll top up your balance after review.",
@@ -1515,6 +1515,8 @@ const dictionaries = {
   },
 };
 
+const topupCopy = require('./topup-copy');
+for (const locale of LANGS) Object.assign(dictionaries[locale], topupCopy[locale]);
 const guideCopy = require('./provider-guide-copy');
 for (const locale of LANGS) Object.assign(dictionaries[locale], guideCopy[locale]);
 const providerCopy = require('./provider-copy');

@@ -1,3 +1,4 @@
+const topupService = require('../services/topup.service');
 const receiptService = require('../services/receipt.service');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
@@ -257,6 +258,7 @@ async function register(req, res) {
 // Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
 async function statusPage(req, res) {
   const strings = clientStrings(req.lang);
+  const payment = await topupService.getDetails();
   const catalogCallPriceTetri = await settingsService.getCatalogCallPriceTetri();
   const leadPriceTetri = await settingsService.getLeadPriceTetri();
 
@@ -272,7 +274,7 @@ async function statusPage(req, res) {
   if (!master) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
-      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [], receipts: [],
+      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [], receipts: [], topups: [],
       leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
@@ -284,17 +286,18 @@ async function statusPage(req, res) {
     maxAge: MASTER_COOKIE_MAX_AGE_MS,
   });
 
-  const [reviews, activity, history, leads, supportMessages, receipts] = await Promise.all([
+  const [reviews, activity, history, leads, supportMessages, receipts, topups] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
     masterService.getMasterActivity(master.id),
     masterService.getMasterBalanceHistory(master.id),
     masterService.getMasterLeads(master.id),
     supportService.listForMaster(master.id),
     receiptService.listForMaster(master.id),
+    topupService.list(master.id),
   ]);
 
   res.render('master-status', {
-    master, badToken: false, reviews, activity, history, leads, supportMessages, receipts,
+    master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
     leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }
@@ -417,7 +420,12 @@ async function submitTopupReceipt(req, res) {
   }
 
   const fileUrl = `${getBaseUrl()}/uploads/${req.file.filename}`;
-  await receiptService.create(master.id, req.file.filename);
+  try {
+    await receiptService.create(master.id, req.file.filename, req.body.topupId ? Number(req.body.topupId) : null);
+  } catch (error) {
+    await require('fs').promises.unlink(req.file.path).catch(()=>{});
+    return res.status(400).json({success:false, message:res.locals.t('pay_error')});
+  }
   telegramService.sendTopupReceipt(master, fileUrl, req.file.mimetype.startsWith('image/')).catch(err => console.error('Receipt saved; moderator notification failed:', err.message));
 
   return res.json({ success: true });

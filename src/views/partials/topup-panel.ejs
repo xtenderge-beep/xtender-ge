@@ -1,0 +1,13 @@
+<section class="provider-pricing">
+<h2><%= t('pay_new') %></h2><p><%= t('pay_range') %></p>
+<form id="topupCreate" class="payment-form">
+<label for="topupAmount"><%= t('pay_amount') %></label><div class="payment-presets"><% [5,10,20,50].forEach(amount=>{ %><button type="button" data-amount="<%= amount %>"><%= amount %> ₾</button><% }) %></div>
+<input id="topupAmount" name="amount" type="number" min="5" max="1000" step="0.01" value="10" required inputmode="decimal">
+<button class="provider-primary" type="submit"><%= t('pay_create') %></button><p role="alert" id="topupCreateMessage"></p></form>
+</section>
+<section class="provider-receipts"><h2><%= t('pay_history') %></h2>
+<% if(!topups.length) { %><p><%= t('pay_empty') %></p><% } %>
+<% topups.forEach(item=>{ %><a class="payment-history-row" href="/master/<%= master.master_token %>/topups/<%= item.id %>"><div><strong><%= item.reference %></strong><p><%= new Date(item.created_at).toLocaleDateString(lang) %></p></div><div><strong><%= (item.amount_tetri/100).toFixed(2) %> ₾</strong><p><%= t('pay_'+item.status) %> →</p></div></a><% }) %></section>
+<script>
+(()=>{const form=document.getElementById('topupCreate'),amount=document.getElementById('topupAmount'),msg=document.getElementById('topupCreateMessage');const key=crypto.randomUUID();document.querySelectorAll('[data-amount]').forEach(b=>b.addEventListener('click',()=>{amount.value=b.dataset.amount;}));form.addEventListener('submit',async e=>{e.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;msg.textContent='';try{const response=await fetch('/api/master/<%= master.master_token %>/topups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:amount.value,requestKey:key})});const data=await response.json();if(!response.ok)throw Error(data.message||<%- JSON.stringify(t('pay_error')) %>);location.href=data.url;}catch(error){msg.textContent=error.message;button.disabled=false;}});})();
+</script>

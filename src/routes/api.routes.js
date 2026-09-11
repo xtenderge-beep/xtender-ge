@@ -30,6 +30,7 @@ router.post('/master/login/verify', asyncHandler(masterController.loginVerify));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
+router.post('/master/:token/topups', asyncHandler(require('../controllers/topup.controller').create));
 router.post('/master/:token/topup-receipt', upload.single('receipt'), asyncHandler(masterController.submitTopupReceipt));
 
 router.post('/telegram/webhook', asyncHandler(orderController.telegramWebhook));

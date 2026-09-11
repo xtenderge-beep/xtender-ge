@@ -60,7 +60,7 @@
     <a class="home-skip" href="#freeformInput"><%= t('home_skip') %></a>
     <header class="home-header">
       <div class="home-header-inner">
-        <a href="<%= homePrefix || '/' %>" class="home-brand" aria-label="Xtender">xtender<span>.ge</span></a>
+        <a href="<%= homePrefix || '/' %>" class="home-brand" aria-label="Xtender"><%- include('partials/brand') %></a>
         <nav class="home-desktop-nav" aria-label="<%= t('how_it_works_title') %>">
           <a href="#how-it-works"><%= t('how_it_works_title') %></a>
           <a href="#masters-section"><%= t('catalog_title') %></a>
@@ -431,7 +431,7 @@
     <footer class="home-footer bg-stone-900 text-stone-400 pt-8 pb-24 sm:py-8 border-t border-stone-800 text-xs">
         <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
-                <span class="text-base font-black text-white">xtender<span class="text-emerald-500">.ge</span></span>
+                <span class="brand-inverse"><%- include('partials/brand') %></span>
                 <p class="text-stone-500 text-[11px]"><%= t('footer_desc') %></p>
             </div>
             <div class="flex flex-col sm:items-end gap-1.5">

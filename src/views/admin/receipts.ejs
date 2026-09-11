@@ -4,7 +4,7 @@
 <% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-3"><%= error %></p><% } %>
 <% if (!receipts.length) { %><p class="p-6 mt-4 bg-white rounded-xl">Пока нет загруженных чеков. Здесь будут появляться новые обращения.</p><% } %>
 <% receipts.forEach(r=>{ %><article class="admin-receipt">
-<h2>Чек #<%= r.id %> · <a class="text-emerald-700 underline" href="/admin/masters/<%= r.master_id %>"><%= r.name %></a></h2>
+<% if(r.reference) { %><p><strong>Пополнение <%= r.reference %> · <%= (r.requested_tetri/100).toFixed(2) %> ₾</strong></p><p>Назначение: Xtender balance <%= r.reference %> / provider <%= r.master_id %></p><% } %><h2>Чек #<%= r.id %> · <a class="text-emerald-700 underline" href="/admin/masters/<%= r.master_id %>"><%= r.name %></a></h2>
 <p><%= r.phone %> · <%= new Date(r.created_at).toLocaleString('ru') %> · <strong><%= {received:'Получен', reviewing:'На проверке', credited:'Зачислен', rejected:'Нужно уточнение'}[r.status] %></strong></p>
 <a class="text-emerald-700 underline text-sm" href="/uploads/<%= encodeURIComponent(r.filename) %>" target="_blank" rel="noopener">Открыть файл чека ↗</a>
 <% if(r.status === 'credited') { %><p>Подтверждено <%= (r.credited_tetri/100).toFixed(2) %> ₾ · операция #<%= r.balance_transaction_id %></p><% } else { %>

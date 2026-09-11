@@ -1,7 +1,10 @@
+<% if(receipts.some(r=>!r.topup_id)) { %>
 <section class="provider-receipts">
-  <h2><%= t('provider_receipts') %></h2><p><%= t('provider_receipt_hint') %></p>
-  <% if (!receipts.length) { %><p class="provider-empty"><%= t('provider_receipts_empty') %></p><% } %>
-  <% receipts.forEach(function (receipt) { %>
+  <h2><%= t('pay_legacy') %></h2><p><%= t('provider_receipt_hint') %></p>
+  <% if (!receipts.filter(r=>!r.topup_id).length) { %><p class="provider-empty"><%= t('provider_receipts_empty') %></p><% } %>
+  <% receipts.filter(r=>!r.topup_id).forEach(function (receipt) { %>
   <article class="provider-receipt-row"><div><strong>#<%= receipt.id %></strong><span><%= new Date(receipt.created_at).toLocaleDateString(reviewLocale) %></span><% if (receipt.note) { %><p><%= receipt.note %></p><% } %></div><div><b class="provider-status <%= receipt.status === 'credited' ? 'ready' : 'pending' %>"><%= t('receipt_' + receipt.status) %></b><% if (receipt.credited_tetri) { %><span>+<%= (receipt.credited_tetri / 100).toFixed(2) %> ₾</span><% } %></div></article>
   <% }); %>
 </section>
+
+<% } %>

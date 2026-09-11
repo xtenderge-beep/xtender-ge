@@ -57,6 +57,7 @@ router.post('/managers/:id/client-link', verifyCsrf, asyncHandler(adminControlle
 router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
 
 router.post('/settings/welcome-bonus', verifyCsrf, asyncHandler(adminController.updateWelcomeBonus));
+router.post('/settings/payment-details', verifyCsrf, asyncHandler(adminController.updatePaymentDetails));
 router.get('/settings', asyncHandler(adminController.settingsPage));
 router.post('/settings/lead-price', verifyCsrf, asyncHandler(adminController.updateLeadPrice));
 router.post('/settings/catalog-call-price', verifyCsrf, asyncHandler(adminController.updateCatalogCallPrice));

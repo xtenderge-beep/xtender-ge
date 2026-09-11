@@ -1,3 +1,4 @@
+const topupService = require('../services/topup.service');
 const dispatchService = require('../services/dispatch.service');
 const receiptService = require('../services/receipt.service');
 const redis = require('../config/redis');
@@ -466,7 +467,9 @@ async function settingsPage(req, res) {
     settingsService.getCatalogCallPriceTetri(),
     settingsService.getWelcomeBonusTetri(),
   ]);
+  const paymentDetails = await topupService.getDetails();
   res.render('admin/settings', {
+    paymentDetails,
     leadPriceTetri, catalogCallPriceTetri, welcomeBonusTetri,
     error: req.query.error || null, saved: req.query.saved || null,
   });
@@ -520,7 +523,12 @@ async function updateWelcomeBonus(req, res) {
   await settingsService.setWelcomeBonusTetri(tetri);
   res.redirect('/admin/settings?saved=welcome');
 }
+async function updatePaymentDetails(req,res) {
+  try { await topupService.saveDetails(req.body); } catch(error) { return res.redirect('/admin/settings?error=payment'); }
+  res.redirect('/admin/settings?saved=payment');
+}
 module.exports = {
+  updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
   receiptsList, receiptReview,

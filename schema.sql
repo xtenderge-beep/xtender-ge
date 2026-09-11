@@ -459,3 +459,23 @@ CREATE TABLE IF NOT EXISTS topup_receipts (
  CHECK ((status = 'credited' AND balance_transaction_id IS NOT NULL AND credited_tetri > 0) OR (status <> 'credited' AND balance_transaction_id IS NULL AND credited_tetri IS NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_topup_receipts_master ON topup_receipts(master_id, created_at);
+
+CREATE TABLE IF NOT EXISTS topup_requests (
+ id SERIAL PRIMARY KEY,
+ master_id INTEGER NOT NULL REFERENCES masters(id),
+ amount_tetri INTEGER NOT NULL CHECK (amount_tetri >= 500 AND amount_tetri <= 100000),
+ reference VARCHAR(20) NOT NULL UNIQUE,
+ request_key VARCHAR(36) NOT NULL,
+ recipient JSONB NOT NULL,
+ payer_name TEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'awaiting' CHECK(status IN ('awaiting','received','reviewing','credited','rejected')),
+ credited_tetri INTEGER,
+ balance_transaction_id INTEGER UNIQUE REFERENCES balance_transactions(id),
+ note TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ UNIQUE(master_id,request_key)
+);
+CREATE INDEX IF NOT EXISTS idx_topup_requests_master ON topup_requests(master_id,created_at);
+ALTER TABLE topup_receipts ADD COLUMN IF NOT EXISTS topup_id INTEGER REFERENCES topup_requests(id);
+CREATE INDEX IF NOT EXISTS idx_topup_receipts_request ON topup_receipts(topup_id);
