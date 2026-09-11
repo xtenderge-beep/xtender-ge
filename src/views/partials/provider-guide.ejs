@@ -1,0 +1,7 @@
+<details class="provider-guide">
+  <summary><%= t('guide_title') %></summary>
+  <ol><% ['guide_receive','guide_translate','guide_contact','guide_agree','guide_result'].forEach(key=>{ %><li><%= t(key) %></li><% }) %></ol>
+  <h3><%= t('guide_template_title') %></h3><p><%= t('guide_template_hint') %></p>
+  <% [['ru','Русский'],['ka','ქართული'],['en','English']].forEach(([locale,label])=>{ %><details><summary><%= label %></summary><blockquote lang="<%= locale %>"><%= t('guide_message_'+locale) %></blockquote></details><% }) %>
+  <p><%= t('guide_billing') %></p>
+</details>

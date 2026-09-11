@@ -22,10 +22,10 @@
     <meta name="twitter:title" content="<%= t('join_page_title') %>">
     <meta name="twitter:description" content="<%= t('meta_description_join') %>">
 </head>
-<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+<body class="provider-page provider-join font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
     <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
-        <div class="max-w-xl mx-auto px-4">
+        <div class="max-w-4xl mx-auto px-4">
             <div class="flex items-center justify-between h-16">
                 <a href="/" class="flex items-center gap-2">
                     <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
@@ -35,20 +35,22 @@
         </div>
     </header>
 
-    <main class="max-w-xl mx-auto px-4 py-8">
-        <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('join_headline') %></h1>
-        <p class="text-sm text-stone-500 mt-1"><%= t('join_subtitle') %></p>
+    <main class="max-w-4xl mx-auto px-4 py-8">
+        <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('provider_intro') %></h1>
+        <p class="text-sm text-stone-500 mt-1"><%= t('provider_intro_body') %></p>
         <a href="/master" class="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-bold transition">
             <i class="fa-solid fa-right-to-bracket text-emerald-600"></i><%= t('master_login_title') %>
         </a>
 
-        <div class="mt-6 bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
+        <ol class="provider-steps"><% ['provider_step1','provider_step2','provider_step3','provider_step4'].forEach((key,i)=>{ %><li><span><%= i+1 %></span><%= t(key) %></li><% }) %></ol>
+        <div class="provider-join-grid"><aside><% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
+        <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
-            <div id="detailsStep" class="p-5 sm:p-6 space-y-4">
+            <div id="detailsStep" class="p-5 sm:p-6 space-y-4"><h2 class="provider-section-title"><%= t('provider_services_section') %></h2><p class="provider-help"><%= t('provider_registration_hint') %></p>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_name_label') %></label>
-                    <input type="text" id="nameInput" placeholder="<%= t('join_name_placeholder') %>"
+                    <label for="nameInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_name_label') %></label>
+                    <input type="text" id="nameInput" autocomplete="name" placeholder="<%= t('join_name_placeholder') %>"
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
@@ -131,7 +133,7 @@
                     <% } %>
                     <div>
                         <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_districts_label') %></label>
-                        <p class="text-[11px] text-stone-400 mb-1.5"><%= t('join_districts_hint') %></p>
+                        <p class="text-[11px] text-stone-400 mb-1.5"><%= t('provider_districts_note') %></p>
                         <div id="districtBar" class="flex flex-wrap gap-1.5"></div>
                     </div>
                     <div>
@@ -146,14 +148,14 @@
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_description_label') %></label>
-                    <textarea id="descriptionInput" rows="3" placeholder="<%= t('join_description_placeholder') %>"
+                    <label for="descriptionInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_description_label') %></label>
+                    <textarea id="descriptionInput" rows="3" placeholder="<%= t('provider_description_example') %>"
                         class="w-full text-sm font-medium outline-none transition text-stone-800 resize-none placeholder:text-stone-400 bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
                 </div>
 
                 <div>
-                    <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_phone_label') %></label>
-                    <input type="tel" id="phoneInput" placeholder="<%= t('form_phone_placeholder') %>"
+                    <label for="phoneInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_phone_label') %></label>
+                    <input type="tel" id="phoneInput" autocomplete="tel" inputmode="tel" placeholder="<%= t('form_phone_placeholder') %>"
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
@@ -210,6 +212,7 @@
                 <h2 class="text-lg font-black text-stone-900"><%= t('join_success_title') %></h2>
                 <p class="text-sm text-stone-500"><%= t('join_success_desc') %></p>
 
+                <p id="welcomeBonusMsg" class="hidden provider-welcome"></p>
                 <p id="promoBonusMsg" class="hidden text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3"></p>
 
                 <div class="bg-stone-900 text-white p-4 rounded-2xl text-left space-y-2 text-xs">
@@ -221,9 +224,9 @@
                 <a id="statusLink" href="#" class="block w-full py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs break-all"></a>
             </div>
 
-            <div id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
+            <div role="alert" aria-live="polite" id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
         </div>
-    </main>
+    </div></main>
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
@@ -433,7 +436,12 @@
             if (data.link) {
                 const statusLink = document.getElementById('statusLink');
                 statusLink.href = data.link;
-                statusLink.textContent = data.link;
+                statusLink.textContent = T.provider_start_cabinet;
+            }
+            if (data.welcomeBonusGel > 0) {
+                const welcome = document.getElementById('welcomeBonusMsg');
+                welcome.textContent = T.welcome_credited.replace('{amount}', data.welcomeBonusGel.toFixed(2));
+                welcome.classList.remove('hidden');
             }
             if (data.promoBonusGel && data.promoBonusGel > 0) {
                 const pb = document.getElementById('promoBonusMsg');

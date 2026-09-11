@@ -2,7 +2,12 @@
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Обзор</h1>
 
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+<h2 class="text-lg font-bold mb-3">Требуют внимания</h2><div class="admin-queue">
+<a href="/admin/orders?status=waiting"><strong><%= waitingOrders %></strong><span>Заявок без рассылки →</span></a>
+<a href="/admin/masters?status=pending"><strong><%= stats.mastersPending %></strong><span>Профилей на проверке →</span></a>
+<a href="/admin/receipts"><strong><%= waitingReceipts %></strong><span>Чеков на проверке →</span></a>
+<a href="/admin/support"><strong><%= stats.supportOpenCount %></strong><span>Вопросов без ответа →</span></a></div>
+<h2 class="text-lg font-bold mb-3">Состояние платформы</h2><div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
     <div class="bg-white rounded-2xl border border-stone-200 p-4">
         <p class="text-xs font-bold text-stone-500 uppercase">Активны</p>
         <p class="text-2xl font-black text-stone-900 mt-1"><%= stats.mastersActive %></p>
@@ -46,13 +51,13 @@
 </div>
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-4">
-    <p class="text-xs font-bold text-stone-500 uppercase">Среднее время реакции мастеров</p>
+    <p class="text-xs font-bold text-stone-500 uppercase">Время до открытия заявки или нажатия контакта</p>
     <% if (stats.responseStats.avgSeconds === null) { %>
       <p class="text-sm text-stone-500 mt-1">Пока нет данных</p>
     <% } else { %>
       <p class="text-lg font-black text-stone-900 mt-1">
         <%= Math.round(stats.responseStats.avgSeconds / 60) %> мин
-        <span class="text-xs font-semibold text-stone-500">(ответили <%= stats.responseStats.respondedCount %> из <%= stats.responseStats.totalCount %> уведомлений)</span>
+        <span class="text-xs font-semibold text-stone-500">(открыли или нажали контакт <%= stats.responseStats.respondedCount %> из <%= stats.responseStats.totalCount %> уведомлений)</span>
       </p>
     <% } %>
 </div>

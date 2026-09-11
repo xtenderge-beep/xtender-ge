@@ -1,25 +1,26 @@
 <%- include('./_header', { active: 'orders' }) %>
 
-<h1 class="text-2xl font-black text-stone-900 mb-5">Заявки (<%= orders.length %>)</h1>
+<h1 class="text-2xl font-black text-stone-900 mb-5">Заявки (<%= total %>)</h1>
 
-<div class="space-y-2">
+<form method="GET" class="admin-filter"><input name="q" aria-label="Поиск заявки" value="<%= q %>" placeholder="Номер, описание, менеджер"><select name="status" aria-label="Статус заявки"><% [['','Все статусы'],['waiting','Ожидают рассылки'],['active','В работе'],['closed','Закрыты']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===status?'selected':'' %>><%= label %></option><% }) %></select><button>Найти</button><a href="/admin/orders">Сбросить</a></form>
+<% if(!orders.length) { %><p class="p-6 bg-white rounded-xl">По этим условиям заявок нет.</p><% } %><div class="space-y-2">
     <% orders.forEach(function (o) { %>
       <a href="/admin/orders/<%= o.token %>" class="block bg-white rounded-2xl border border-stone-200 p-4 hover:border-emerald-300 transition">
           <div class="flex items-center justify-between flex-wrap gap-2">
               <span class="font-mono text-xs text-stone-500"><%= new Date(o.created_at).toLocaleString('ru') %></span>
               <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
                   <%= o.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
-                  <%= o.status %>
+                  <%= o.status === 'closed' ? 'Закрыта' : o.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
               </span>
           </div>
-          <p class="text-sm text-stone-800 mt-1.5 line-clamp-2"><%= o.description %></p>
+          <% if(o.status !== 'closed' && !o.first_dispatched_at) { %><p class="text-xs text-amber-700 mt-2">Ожидает <%= Math.max(0,Math.floor((Date.now()-new Date(o.created_at))/60000)) %> мин</p><% } %><p class="text-sm text-stone-800 mt-1.5 line-clamp-2"><%= o.description %></p>
           <p class="text-xs text-stone-500 mt-1.5">
-              Категории: <%= (o.target_categories || []).join(', ') || '—' %>
-              · 👀 <%= o.view_count %> · 📞 <%= o.call_count %> · 💬 <%= o.whatsapp_count %>
+              Категории: <%= (Array.isArray(o.target_categories) ? o.target_categories : []).join(', ') || '—' %>
+              · Просмотров: <%= o.view_count %> · Нажатий звонка: <%= o.call_count %> · WhatsApp: <%= o.whatsapp_count %>
               <% if (o.manager_name) { %> · <span class="font-bold text-stone-600">менеджер: <%= o.manager_name %></span><% } %>
           </p>
       </a>
     <% }); %>
 </div>
 
-<%- include('./_footer') %>
+<nav class="flex gap-4 mt-5" aria-label="Страницы"><% if(page>1) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&page=<%= page-1 %>">← Назад</a><% } %><span>Страница <%= page %></span><% if(page*30<total) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&page=<%= page+1 %>">Далее →</a><% } %></nav><%- include('./_footer') %>

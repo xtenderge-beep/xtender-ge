@@ -17,3 +17,18 @@ DROP TRIGGER IF EXISTS trg_sms_consent_logs_append_only ON sms_consent_logs;
 CREATE TRIGGER trg_sms_consent_logs_append_only
     BEFORE UPDATE OR DELETE ON sms_consent_logs
     FOR EACH ROW EXECUTE PROCEDURE sms_consent_logs_block_mutation();
+
+-- Persistent receipt review, independent of balance crediting (Telegram/admin).
+CREATE TABLE IF NOT EXISTS topup_receipts (
+ id SERIAL PRIMARY KEY,
+ master_id INTEGER NOT NULL REFERENCES masters(id),
+ filename TEXT NOT NULL,
+ status VARCHAR(20) NOT NULL DEFAULT 'received' CHECK (status IN ('received','reviewing','credited','rejected')),
+ balance_transaction_id INTEGER UNIQUE REFERENCES balance_transactions(id),
+ credited_tetri INTEGER,
+ note TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ reviewed_at TIMESTAMPTZ,
+ CHECK ((status = 'credited' AND balance_transaction_id IS NOT NULL AND credited_tetri > 0) OR (status <> 'credited' AND balance_transaction_id IS NULL AND credited_tetri IS NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_topup_receipts_master ON topup_receipts(master_id, created_at);

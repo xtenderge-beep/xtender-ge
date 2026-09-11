@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict');const fs=require('fs');const {newDb}=require('pg-mem');
+const db=newDb();db.public.none(fs.readFileSync(require('path').join(__dirname,'../schema.sql'),'utf8'));const {Pool}=db.adapters.createPg();const pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+const settings=require('../src/services/settings.service');const masters=require('../src/services/master.service');
+const args=phone=>({phone,name:'Welcome test',description:'Test',serviceType:'movers',attributes:{},districtIds:[]});
+(async()=>{
+ assert.equal(await settings.getWelcomeBonusTetri(),0);
+ await settings.setWelcomeBonusTetri(750);
+ const first=await masters.registerMaster(args('+995500000100'));assert.equal(first.balance_tetri,750);assert.equal(first.welcomeBonusTetri,750);
+ const again=await masters.registerMaster(args('+995500000100'));assert.equal(again.balance_tetri,750);assert.equal(again.welcomeBonusTetri,0);
+ assert.equal((await pool.query("SELECT * FROM balance_transactions WHERE note='WELCOME_AUTO'")).rows.length,1);
+ await settings.setWelcomeBonusTetri(1234);
+ const next=await masters.registerMaster(args('+995500000101'));assert.equal(next.balance_tetri,1234);
+ assert.equal((await masters.registerMaster(args('+995500000100'))).balance_tetri,750);
+ await settings.setWelcomeBonusTetri(0);
+ assert.equal((await masters.registerMaster(args('+995500000102'))).balance_tetri,0);
+ await settings.setWelcomeBonusTetri(500);
+ assert.equal((await masters.registerMaster(args('+995500000102'))).welcomeBonusTetri,0);
+ const promo=require('../src/services/promo.service');await promo.createCode({code:'TEST',amountTetri:200});await promo.apply(first.id,'TEST');
+ assert.equal((await masters.registerMaster(args('+995500000100'))).balance_tetri,950);
+ for(const value of [-1,0.5,Infinity,100001]) await assert.rejects(()=>settings.setWelcomeBonusTetri(value));
+ const query=pool.query.bind(pool);pool.query=async(sql,...rest)=>{if(sql.includes('INSERT INTO balance_transactions'))throw Error('ledger unavailable');return query(sql,...rest);};
+ await assert.rejects(()=>masters.registerMaster(args('+995500000103')));
+ pool.query=query;
+ assert.equal((await pool.query('SELECT id FROM masters WHERE phone=$1',['+995500000103'])).rows.length,0);
+ console.log('PASS: new registration credit and ledger; repeat and existing phone; changed and disabled amount; separate promo; invalid amounts; registration rollback on ledger failure.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -590,23 +590,18 @@ async function telegramWebhook(req, res) {
       return res.sendStatus(200);
     }
 
-    const isNewDispatch = await orderService.recordDispatch(order.id, category, vehicleSize);
-    if (!isNewDispatch) {
-      await telegramService.answerCallback(callback.id, 'Уже отправлено этой категории');
-      return res.sendStatus(200);
+    try {
+      const plan = await require('../services/dispatch.service').preview(token, category, vehicleSize);
+      if (plan.alreadySent || !plan.count) {
+        await telegramService.answerCallback(callback.id, plan.alreadySent ? 'Рассылка этой группе уже запускалась' : 'Нет получателей с достаточным балансом');
+        return res.sendStatus(200);
+      }
+      await telegramService.answerCallback(callback.id, 'Запускаем рассылку…');
+      const result = await require('../services/dispatch.service').dispatch(token, category, vehicleSize);
+      console.log('Dispatch completed:', token, result.count);
+    } catch (err) {
+      console.error('Dispatch rejected or incomplete:', err.message);
     }
-
-    await orderService.markFirstDispatch(token);
-
-    const updatedOrder = await orderService.addTargetCategories(token, [category]);
-    await telegramService.answerCallback(callback.id, 'Разослано исполнителям');
-
-    const masterCount = await orderService.notifyMasters(updatedOrder, category, vehicleSize);
-    console.log(`Dispatched order ${token} to ${masterCount} masters (${category}${vehicleSize ? ':' + vehicleSize : ''})`);
-
-    telegramService.updateMessage(updatedOrder).catch((err) => {
-      console.error('Failed to update Telegram message:', err.message);
-    });
 
     return res.sendStatus(200);
   } catch (err) {

@@ -1515,6 +1515,11 @@ const dictionaries = {
   },
 };
 
+const guideCopy = require('./provider-guide-copy');
+for (const locale of LANGS) Object.assign(dictionaries[locale], guideCopy[locale]);
+const providerCopy = require('./provider-copy');
+for (const locale of LANGS) Object.assign(dictionaries[locale], providerCopy[locale]);
+
 function normalizeLang(lang) {
   return LANGS.includes(lang) ? lang : DEFAULT_LANG;
 }

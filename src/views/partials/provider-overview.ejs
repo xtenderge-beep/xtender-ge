@@ -1,0 +1,10 @@
+<%
+const receivingState = master.is_banned || master.is_subscribed === false || (master.subscription_until && new Date(master.subscription_until) <= new Date())
+  ? 'disabled' : !master.is_active ? 'pending' : master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
+%>
+<section class="provider-overview" data-account-state="<%= receivingState %>">
+  <div class="provider-overview-top"><span class="provider-status <%= receivingState %>"><%= t('provider_' + receivingState) %></span><span class="provider-channel"><%= t('provider_channel') %>: <strong><%= master.telegram_id ? 'Telegram' : 'SMS' %></strong></span></div>
+  <p class="provider-state-hint"><%= t('provider_' + receivingState + '_hint') %></p>
+  <div class="provider-balance-row"><div><span><%= t('provider_balance') %></span><strong><%= (master.balance_tetri / 100).toFixed(2) %> <small>₾</small></strong></div><a href="#balance" data-tab-jump="balance" class="provider-primary"><%= t('provider_balance_action') %></a></div>
+  <div class="provider-overview-footer"><span><%= t('provider_lead_price') %>: <b><%= (leadPriceTetri / 100).toFixed(2) %> ₾</b></span><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
+</section>

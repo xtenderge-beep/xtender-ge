@@ -1,0 +1,8 @@
+<section class="provider-pricing" aria-label="<%= t('provider_prices') %>">
+  <h2><%= t('provider_prices') %></h2>
+  <div class="provider-price-grid">
+    <div><span><%= t('provider_lead_price') %></span><strong><%= (leadPriceTetri / 100).toFixed(2) %> ₾</strong><small><%= t('provider_per_event') %></small></div>
+    <div><span><%= t('provider_contact_price') %></span><strong><%= (catalogCallPriceTetri / 100).toFixed(2) %> ₾</strong><small><%= t('provider_per_event') %></small></div>
+  </div>
+  <p><%= t('provider_billing_note') %></p><p class="provider-price-secondary"><%= t('provider_catalog_note') %></p>
+</section>

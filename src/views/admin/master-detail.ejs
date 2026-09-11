@@ -149,7 +149,7 @@
                     <% if (h.note) { %> — <%= h.note %><% } %>
                 </span>
                 <span class="font-mono font-bold <%= h.amount_tetri >= 0 ? 'text-emerald-700' : 'text-red-600' %>">
-                    <%= h.amount_tetri >= 0 ? '+' : '' %><%= (h.amount_tetri / 100).toFixed(2) %> ₾
+                    <span class="text-xs text-stone-400">#<%= h.id %></span> <%= h.amount_tetri >= 0 ? '+' : '' %> <%= (h.amount_tetri / 100).toFixed(2) %> ₾
                 </span>
             </div>
           <% }); %>

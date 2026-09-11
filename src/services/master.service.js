@@ -1,3 +1,4 @@
+const settingsService = require('./settings.service');
 const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
@@ -20,6 +21,16 @@ async function registerMaster({
   const vehicleType = serviceType === 'van' ? (vehicleTypeText || null) : null;
 
   return pool.withTransaction(async (client) => {
+    const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
+    const inserted = await client.query(`INSERT INTO masters (name, phone, description, category, vehicle_type, vehicle_size, is_flatbed,
+                            city_id, avatar_url, is_active, balance_tetri, master_token, terms_accepted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $11, $10, NOW())
+       ON CONFLICT (phone) DO NOTHING RETURNING *`,
+      [name, phone, description || null, legacy.category, vehicleType, legacy.vehicle_size,
+       legacy.is_flatbed, cityId || null, photoUrl || null, masterToken, welcomeBonusTetri]);
+    let master = inserted.rows.find(row => row.master_token === masterToken);
+    const isNew = Boolean(master);
+    if (!master) {
     const { rows } = await client.query(
       `INSERT INTO masters (name, phone, description, category, vehicle_type, vehicle_size, is_flatbed,
                             city_id, avatar_url, is_active, balance_tetri, master_token, terms_accepted_at)
@@ -40,7 +51,14 @@ async function registerMaster({
       [name, phone, description || null, legacy.category, vehicleType, legacy.vehicle_size,
        legacy.is_flatbed, cityId || null, photoUrl || null, masterToken]
     );
-    const master = rows[0];
+    master = rows[0];
+    }
+    // The unique phone constraint selects exactly one first registration, even
+    // under concurrent retries. Profile, balance and ledger commit together.
+    if (isNew && welcomeBonusTetri > 0) {
+      await client.query("INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'promo', 'WELCOME_AUTO')", [master.id, welcomeBonusTetri]);
+    }
+    master.welcomeBonusTetri = isNew ? welcomeBonusTetri : 0;
 
     await client.query(
       `INSERT INTO master_services (master_id, service_type, attributes, is_primary)

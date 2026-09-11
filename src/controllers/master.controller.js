@@ -1,3 +1,4 @@
+const receiptService = require('../services/receipt.service');
 const masterService = require('../services/master.service');
 const reviewService = require('../services/review.service');
 const otpService = require('../services/otp.service');
@@ -248,7 +249,7 @@ async function register(req, res) {
     console.error('Failed to send registration confirmation SMS:', err.message);
   });
 
-  return res.json({ success: true, link, promoBonusGel });
+  return res.json({ success: true, link, promoBonusGel, welcomeBonusGel: master.welcomeBonusTetri / 100 });
 }
 
 // Личный кабинет исполнителя — /master/<master_token>. Ссылка постоянная, приходит
@@ -256,6 +257,7 @@ async function register(req, res) {
 // Без токена (/master) или с невалидным — та же вьюха показывает вход по телефону.
 async function statusPage(req, res) {
   const strings = clientStrings(req.lang);
+  const catalogCallPriceTetri = await settingsService.getCatalogCallPriceTetri();
   const leadPriceTetri = await settingsService.getLeadPriceTetri();
 
   // /master без токена, но устройство помнит вход — сразу в кабинет, без телефона и SMS.
@@ -270,8 +272,8 @@ async function statusPage(req, res) {
   if (!master) {
     const badToken = Boolean(req.params.token);
     return res.status(badToken ? 404 : 200).render('master-status', {
-      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [],
-      leadPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
+      master: null, badToken, reviews: [], activity: null, history: [], leads: [], supportMessages: [], receipts: [],
+      leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
     });
   }
 
@@ -282,17 +284,18 @@ async function statusPage(req, res) {
     maxAge: MASTER_COOKIE_MAX_AGE_MS,
   });
 
-  const [reviews, activity, history, leads, supportMessages] = await Promise.all([
+  const [reviews, activity, history, leads, supportMessages, receipts] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
     masterService.getMasterActivity(master.id),
     masterService.getMasterBalanceHistory(master.id),
     masterService.getMasterLeads(master.id),
     supportService.listForMaster(master.id),
+    receiptService.listForMaster(master.id),
   ]);
 
   res.render('master-status', {
-    master, badToken: false, reviews, activity, history, leads, supportMessages,
-    leadPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
+    master, badToken: false, reviews, activity, history, leads, supportMessages, receipts,
+    leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }
 
@@ -414,7 +417,8 @@ async function submitTopupReceipt(req, res) {
   }
 
   const fileUrl = `${getBaseUrl()}/uploads/${req.file.filename}`;
-  await telegramService.sendTopupReceipt(master, fileUrl, req.file.mimetype.startsWith('image/'));
+  await receiptService.create(master.id, req.file.filename);
+  telegramService.sendTopupReceipt(master, fileUrl, req.file.mimetype.startsWith('image/')).catch(err => console.error('Receipt saved; moderator notification failed:', err.message));
 
   return res.json({ success: true });
 }

@@ -1,22 +1,23 @@
 const pool = require('../config/db');
 const supportService = require('./support.service');
 
-const LOW_BALANCE_THRESHOLD_TETRI = 60; // меньше чем на 2 лида по текущей цене
+const settingsService = require('./settings.service');
 
 async function getOverviewStats() {
+  const lowBalanceThreshold = await settingsService.getLeadPriceTetri();
   const [statusCounts, balanceSum, lowBalanceCount, ordersToday, ordersWeek, pendingReviews, responseStats, telegramCount, supportOpenCount] =
     await Promise.all([
       pool.query(
         `SELECT
-           COUNT(*) FILTER (WHERE is_banned = true) AS banned,
-           COUNT(*) FILTER (WHERE is_banned = false AND is_active = true) AS active,
-           COUNT(*) FILTER (WHERE is_banned = false AND is_active = false) AS pending
+           COALESCE(SUM(CASE WHEN is_banned = true THEN 1 ELSE 0 END), 0) AS banned,
+           COALESCE(SUM(CASE WHEN is_banned = false AND is_active = true THEN 1 ELSE 0 END), 0) AS active,
+           COALESCE(SUM(CASE WHEN is_banned = false AND is_active = false THEN 1 ELSE 0 END), 0) AS pending
          FROM masters`
       ),
       pool.query(`SELECT COALESCE(SUM(balance_tetri), 0) AS total FROM masters WHERE is_banned = false`),
       pool.query(
         `SELECT COUNT(*)::int AS count FROM masters WHERE is_banned = false AND is_active = true AND balance_tetri < $1`,
-        [LOW_BALANCE_THRESHOLD_TETRI]
+        [lowBalanceThreshold]
       ),
       // date_trunc() не поддерживается pg-mem (локальная разработка) — считаем полночь в JS.
       pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE created_at >= $1`, [

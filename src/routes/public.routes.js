@@ -117,7 +117,10 @@ router.get('/join', asyncHandler(async (req, res) => {
       .map((d) => ({ id: d.id, name: d[nameKey] || d.name_ka }));
   }
 
+  const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
+  const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
   res.render('join', {
+    welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
     clientStrings: clientStrings(locale),
     promo,
     serviceConfig: serviceTypes.configForView(t),

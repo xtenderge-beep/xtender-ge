@@ -217,14 +217,7 @@ async function getOrderFunnelStats(orderId) {
   return stats;
 }
 
-async function notifyMasters(order, category, vehicleSize) {
-  // Ленивый require — telegram.service требует этот модуль на верхнем уровне,
-  // прямой require здесь замкнул бы цикл на этапе загрузки.
-  const telegramService = require('./telegram.service');
-
-  const leadPrice = await settingsService.getLeadPriceTetri();
-  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
-
+function dispatchFilter(category, vehicleSize) {
   // Условие по категории/размеру строим один раз — оно нужно и для «кому разослать»
   // (баланс есть), и для «кто подходил, но денег не хватило» (missed). $1 = цена лида.
   const catParams = [];
@@ -242,11 +235,20 @@ async function notifyMasters(order, category, vehicleSize) {
   const activeWhere = `is_active = true AND is_subscribed = true AND is_banned = false
                        AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
-  const { rows: masters } = await pool.query(
-    `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
-     WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`,
-    [leadPrice, ...catParams]
-  );
+
+ return { activeWhere, catParams, catClause };
+}
+async function getDispatchRecipients(category, vehicleSize, leadPrice) {
+ const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
+ const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ return rows;
+}
+async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
+ const telegramService = require('./telegram.service');
+ const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
+ const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
+ const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
+ const masters = await getDispatchRecipients(category, vehicleSize, leadPrice);
   const base = getBaseUrl();
 
   const notifiedIds = [];
@@ -299,16 +301,18 @@ async function notifyMasters(order, category, vehicleSize) {
     [leadPrice, ...catParams]
   );
   if (broke.length) {
-    const brokeIds = broke.map((m) => m.id);
+    const missed = broke.filter(m => !notifiedIds.includes(m.id));
+    const brokeIds = missed.map((m) => m.id);
+    if (!brokeIds.length) return notifiedIds.length;
     await pool.query(
       `UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1
        WHERE id IN (${brokeIds.map((_, i) => `$${i + 1}`).join(', ')})`,
       brokeIds
     );
-    await Promise.all(broke.map((m) => nudgeLowBalance(m, telegramService, 'missed')));
+    await Promise.all(missed.map((m) => nudgeLowBalance(m, telegramService, 'missed')));
   }
 
-  return masters.length;
+  return notifiedIds.length;
 }
 
 async function attachFiles(orderId, files) {
@@ -347,6 +351,7 @@ async function logView(orderId, masterId, eventType) {
 }
 
 module.exports = {
+  getDispatchRecipients,
   createPendingOrder,
   activateOrder,
   getOrderByToken,

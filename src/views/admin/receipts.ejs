@@ -1,0 +1,17 @@
+<%- include('./_header', { active: 'receipts' }) %>
+<h1 class="text-2xl font-black">Проверка пополнений</h1>
+<p class="text-sm text-stone-600 mt-3">Проверьте перевод в банке. Если деньги ещё не зачислены, пополните баланс привычным способом. Затем свяжите чек с номером операции из истории исполнителя. Эта форма только отмечает проверку и не меняет баланс.</p>
+<% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-3"><%= error %></p><% } %>
+<% if (!receipts.length) { %><p class="p-6 mt-4 bg-white rounded-xl">Пока нет загруженных чеков. Здесь будут появляться новые обращения.</p><% } %>
+<% receipts.forEach(r=>{ %><article class="admin-receipt">
+<h2>Чек #<%= r.id %> · <a class="text-emerald-700 underline" href="/admin/masters/<%= r.master_id %>"><%= r.name %></a></h2>
+<p><%= r.phone %> · <%= new Date(r.created_at).toLocaleString('ru') %> · <strong><%= {received:'Получен', reviewing:'На проверке', credited:'Зачислен', rejected:'Нужно уточнение'}[r.status] %></strong></p>
+<a class="text-emerald-700 underline text-sm" href="/uploads/<%= encodeURIComponent(r.filename) %>" target="_blank" rel="noopener">Открыть файл чека ↗</a>
+<% if(r.status === 'credited') { %><p>Подтверждено <%= (r.credited_tetri/100).toFixed(2) %> ₾ · операция #<%= r.balance_transaction_id %></p><% } else { %>
+<form class="admin-filter" method="POST" action="/admin/receipts/<%= r.id %>">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<label>Статус<select name="status" aria-label="Статус чека"><option value="reviewing">На проверке</option><option value="credited">Зачислен</option><option value="rejected">Нужно уточнение</option></select></label>
+<label>Номер операции<input name="transactionId" type="number" min="1" placeholder="Из истории баланса"></label>
+<label>Сообщение исполнителю<input name="note" maxlength="500" value="<%= r.note || '' %>" placeholder="Причина или уточнение"></label>
+<button type="submit">Сохранить проверку</button></form><% } %></article><% }) %>
+<%- include('./_footer') %>

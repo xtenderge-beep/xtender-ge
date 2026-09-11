@@ -3,7 +3,7 @@
 <head>
     <%- include('partials/head', { title: t('master_status_page_title'), noindex: true }) %>
 </head>
-<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+<body class="provider-page provider-cabinet font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
 <%
     const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
@@ -14,15 +14,19 @@
         tow: t('svc_tow'),
         bucket_lift: t('svc_bucket_lift'),
     };
-    function historyReason(reason) {
+    function historyReason(reason, note) {
+        if (reason === 'promo' && note === 'WELCOME_AUTO') return t('welcome_history');
         if (reason === 'topup') return t('master_status_history_topup');
         if (reason === 'lead_charge') return t('master_status_history_lead');
-        return t('master_status_history_correction');
+        if (reason === 'catalog_call') return t('provider_history_catalog');
+        if (reason === 'promo') return t('provider_history_promo');
+        if (reason === 'admin_correction') return t('master_status_history_correction');
+        return t('provider_history_other');
     }
 %>
 
     <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm sticky top-0 z-20">
-        <div class="max-w-xl mx-auto px-4">
+        <div class="max-w-3xl mx-auto px-4">
             <div class="flex items-center justify-between h-16 gap-3">
                 <a href="/" class="flex items-center gap-2 shrink-0">
                     <span class="text-xl font-black tracking-tight text-stone-900">xtender<span class="text-emerald-600">.ge</span></span>
@@ -39,7 +43,7 @@
         </div>
     </header>
 
-    <main class="max-w-xl mx-auto px-4 py-8 space-y-4">
+    <main class="max-w-3xl mx-auto px-4 py-8 space-y-4">
         <% if (!master) { %>
             <h1 class="text-xl font-black tracking-tight text-stone-900"><%= t('master_hub_title') %></h1>
 
@@ -107,8 +111,7 @@
                         <%= categoryLabels[master.category] || master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
                     </p>
                 </div>
-                <span class="shrink-0 inline-flex items-center whitespace-nowrap px-2.5 py-1 rounded-full text-[11px] font-bold <%= statusBadge.cls %>"><%= statusBadge.text %></span>
-            </div>
+                            </div>
 
             <% if (master.is_banned) { %>
                 <div class="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800 font-medium">
@@ -120,6 +123,8 @@
                 </div>
             <% } %>
 
+            <%- include('partials/provider-overview') %>
+            <%- include('partials/provider-guide') %>
             <nav class="sticky top-16 z-10 bg-stone-50/95 backdrop-blur-md border-b border-stone-200">
                 <div class="flex gap-1 overflow-x-auto no-scrollbar">
                     <% tabs.forEach(function (tb) { %>
@@ -191,6 +196,9 @@
             </section>
 
             <section data-tab="balance" class="hidden space-y-4">
+                <%- include('partials/provider-pricing') %>
+                <%- include('partials/provider-receipts', { reviewLocale }) %>
+                <p class="provider-help"><%= t('provider_limits_note') %></p>
                 <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 <%= statusColor %> overflow-hidden">
                     <div class="p-5 sm:p-6 space-y-4">
                         <div class="bg-stone-900 text-white p-4 rounded-2xl space-y-1.5">
@@ -204,7 +212,7 @@
                         </div>
 
                         <% if (!master.is_banned) { %>
-                            <details class="topup-box group rounded-2xl border border-stone-200 bg-stone-50 overflow-hidden" <%= master.is_active ? '' : 'open' %>>
+                            <details class="topup-box group rounded-2xl border border-stone-200 bg-stone-50 overflow-hidden" <%= master.balance_tetri >= leadPriceTetri ? '' : 'open' %>>
                                 <summary class="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer text-sm font-bold text-stone-800">
                                     <span class="flex items-center gap-2"><i class="fa-solid fa-building-columns text-emerald-600"></i><%= t('topup_title') %></span>
                                     <i class="fa-solid fa-chevron-down text-[10px] text-stone-400 transition group-open:rotate-180"></i>
@@ -290,7 +298,7 @@
                             <% history.forEach(function (h) { %>
                                 <div class="flex items-center justify-between gap-3 py-2 text-sm">
                                     <div class="min-w-0">
-                                        <div class="text-stone-700"><%= historyReason(h.reason) %><% if (h.note) { %> <span class="text-stone-400">— <%= h.note %></span><% } %></div>
+                                        <div class="text-stone-700"><%= historyReason(h.reason, h.note) %><% if (h.note && h.note !== 'WELCOME_AUTO') { %> <span class="text-stone-400">— <%= h.note %></span><% } %></div>
                                         <div class="text-[10px] text-stone-400 font-mono"><%= new Date(h.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></div>
                                     </div>
                                     <span class="font-mono font-bold shrink-0 <%= h.amount_tetri >= 0 ? 'text-emerald-700' : 'text-red-600' %>">
@@ -530,7 +538,7 @@
 
             var saved = null;
             try { saved = localStorage.getItem(STORE_KEY); } catch (e) {}
-            activate(saved || 'leads');
+            activate(['leads','balance','reviews','profile'].includes(location.hash.slice(1)) ? location.hash.slice(1) : saved || 'leads');
 
             document.querySelectorAll('[data-tab-jump]').forEach(function (el) {
                 el.addEventListener('click', function (e) {
@@ -721,6 +729,8 @@
                         if (d.success) {
                             msg.className = 'text-xs font-bold text-emerald-700';
                             msg.textContent = SENT;
+                            location.hash = "balance";
+                            setTimeout(function(){ location.reload(); },900);
                             form.reset();
                             nameEl.textContent = CHOOSE;
                         } else {

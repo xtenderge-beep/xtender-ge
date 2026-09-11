@@ -7,7 +7,7 @@
         <h1 class="text-lg font-black text-stone-900">Заявка #<%= order.id %></h1>
         <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
             <%= order.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
-            <%= order.status %>
+            <%= order.status === 'closed' ? 'Закрыта' : order.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
         </span>
     </div>
     <p class="text-sm text-stone-800 mt-3"><%= order.description %></p>
@@ -26,9 +26,10 @@
     <% } %>
 </div>
 
+<% if(order.status !== 'closed') { %><section class="admin-dispatch"><h2>Отправить заявку исполнителям</h2><p>Выберите группу. На следующем шаге — число получателей и стоимость перед отправкой.</p><form class="admin-filter" method="GET" action="/admin/orders/<%= order.token %>/dispatch"><select name="category" aria-label="Группа исполнителей"><% Object.entries(groups).forEach(([value,label])=>{ %><option value="<%= value %>"><%= label %></option><% }) %></select><select name="size" aria-label="Размер транспорта"><option value="">Все размеры</option><% ['S','L','XL','XXL'].forEach(size=>{ %><option><%= size %></option><% }) %></select><button>Рассчитать рассылку</button></form><p class="text-xs">Размер применяется только к перевозкам. Для остальных групп выберите «Все размеры».</p></section><% } %>
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Воронка</h2>
-    <p class="text-sm text-stone-700">👀 Просмотров: <%= order.funnel.view %> · 📞 Звонков: <%= order.funnel.call %> · 💬 WhatsApp: <%= order.funnel.whatsapp %></p>
+    <p class="text-sm text-stone-700">👀 Просмотров: <%= order.funnel.view %> · Нажатий «Позвонить»: <%= order.funnel.call %> · Нажатий WhatsApp: <%= order.funnel.whatsapp %></p>
 </div>
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">

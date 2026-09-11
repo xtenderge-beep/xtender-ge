@@ -24,7 +24,12 @@ router.post('/masters/:id/ban', verifyCsrf, asyncHandler(adminController.banMast
 router.post('/masters/:id/unban', verifyCsrf, asyncHandler(adminController.unbanMaster));
 router.post('/masters/:id/balance-correction', verifyCsrf, asyncHandler(adminController.correctBalance));
 
+router.get('/receipts', asyncHandler(adminController.receiptsList));
+router.post('/receipts/:id', verifyCsrf, asyncHandler(adminController.receiptReview));
+
 router.get('/orders', asyncHandler(adminController.ordersList));
+router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));
+router.post('/orders/:token/dispatch', verifyCsrf, asyncHandler(adminController.dispatchOrder));
 router.get('/orders/:token', asyncHandler(adminController.orderDetail));
 router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
 
@@ -51,6 +56,7 @@ router.post('/managers/:id/update', verifyCsrf, asyncHandler(adminController.man
 router.post('/managers/:id/client-link', verifyCsrf, asyncHandler(adminController.managerClientLink));
 router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
 
+router.post('/settings/welcome-bonus', verifyCsrf, asyncHandler(adminController.updateWelcomeBonus));
 router.get('/settings', asyncHandler(adminController.settingsPage));
 router.post('/settings/lead-price', verifyCsrf, asyncHandler(adminController.updateLeadPrice));
 router.post('/settings/catalog-call-price', verifyCsrf, asyncHandler(adminController.updateCatalogCallPrice));

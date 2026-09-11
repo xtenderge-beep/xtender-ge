@@ -1,3 +1,5 @@
+const dispatchService = require('../services/dispatch.service');
+const receiptService = require('../services/receipt.service');
 const redis = require('../config/redis');
 const adminAuth = require('../config/adminAuth');
 const otpService = require('../services/otp.service');
@@ -170,12 +172,14 @@ function logout(req, res) {
 
 async function overview(req, res) {
   const stats = await adminService.getOverviewStats();
-  res.render('admin/overview', { stats });
+  const orders = await adminService.listOrdersAdmin();
+  const receiptCount = await pool.query("SELECT COUNT(*)::int AS count FROM topup_receipts WHERE status IN ('received','reviewing')");
+  res.render('admin/overview', { stats, waitingOrders: orders.filter(o=>o.status !== 'closed' && !o.first_dispatched_at).length, waitingReceipts: receiptCount.rows[0].count });
 }
 
 async function mastersList(req, res) {
   const masters = await adminService.listMastersAdmin();
-  res.render('admin/masters', { masters });
+  res.render('admin/masters', { masters: req.query.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters });
 }
 
 async function masterDetail(req, res) {
@@ -266,13 +270,17 @@ async function correctBalance(req, res) {
 
 async function ordersList(req, res) {
   const orders = await adminService.listOrdersAdmin();
-  res.render('admin/orders', { orders });
+  const q = String(req.query.q || '').trim().slice(0,100);
+  const status = ['waiting','active','closed'].includes(req.query.status) ? req.query.status : '';
+  const filtered = orders.filter(o=>(!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (status === 'closed' ? o.status === 'closed' : status === 'waiting' ? o.status !== 'closed' && !o.first_dispatched_at : o.status !== 'closed' && o.first_dispatched_at)));
+  const page = Math.min(Math.max(1, Math.ceil(filtered.length/30)), Math.max(1, parseInt(req.query.page,10)||1));
+  res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, page, total: filtered.length });
 }
 
 async function orderDetail(req, res) {
   const order = await adminService.getOrderDetailAdmin(req.params.token);
   if (!order) return res.status(404).send('Заявка не найдена');
-  res.render('admin/order-detail', { order });
+  res.render('admin/order-detail', { order, groups: dispatchService.groups });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -453,12 +461,13 @@ async function rejectReview(req, res) {
 // раскрытия номера в публичном каталоге (catalog_call_price_tetri) — раньше первая была
 // захардкожена в коде, второй канал монетизации вообще не существовал.
 async function settingsPage(req, res) {
-  const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([
+  const [leadPriceTetri, catalogCallPriceTetri, welcomeBonusTetri] = await Promise.all([
     settingsService.getLeadPriceTetri(),
     settingsService.getCatalogCallPriceTetri(),
+    settingsService.getWelcomeBonusTetri(),
   ]);
   res.render('admin/settings', {
-    leadPriceTetri, catalogCallPriceTetri,
+    leadPriceTetri, catalogCallPriceTetri, welcomeBonusTetri,
     error: req.query.error || null, saved: req.query.saved || null,
   });
 }
@@ -481,7 +490,40 @@ async function updateCatalogCallPrice(req, res) {
   res.redirect('/admin/settings?saved=catalog');
 }
 
+async function receiptsList(req, res) {
+  res.render('admin/receipts', { receipts: await receiptService.list(), error: null });
+}
+async function receiptReview(req, res) {
+  try {
+    await receiptService.review(Number(req.params.id), req.body.status, Number(req.body.transactionId), String(req.body.note || '').trim().slice(0, 500));
+    res.redirect('/admin/receipts');
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptService.list(), error: error.message });
+  }
+}
+async function dispatchPreview(req,res) {
+  let plan=null, error=null;
+  try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || ''); } catch(err) { error=err.message; }
+  res.status(error ? 400 : 200).render('admin/dispatch',{token:req.params.token,plan,error,result:null,groups:dispatchService.groups});
+}
+async function dispatchOrder(req,res) {
+  let result=null,error=null;
+  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count}); } catch(err) { error=err.message; }
+  res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:dispatchService.groups});
+}
+async function updateWelcomeBonus(req, res) {
+  const raw = String(req.body.welcomeBonusGel || '').trim();
+  const tetri = Math.round(Number(raw) * 100);
+  if (!/^\d+(?:\.\d{1,2})?$/.test(raw) || !Number.isSafeInteger(tetri) || tetri < 0 || tetri > 100000) {
+    return res.redirect('/admin/settings?error=invalid_welcome');
+  }
+  await settingsService.setWelcomeBonusTetri(tetri);
+  res.redirect('/admin/settings?saved=welcome');
+}
 module.exports = {
+  updateWelcomeBonus,
+  dispatchPreview, dispatchOrder,
+  receiptsList, receiptReview,
   showLogin,
   login,
   verify2fa,

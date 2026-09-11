@@ -46,7 +46,16 @@ async function setCatalogCallPriceTetri(tetri) {
   await setSetting(CATALOG_CALL_PRICE_KEY, tetri);
 }
 
+async function getWelcomeBonusTetri() {
+  const value = Number(await getSetting('welcome_bonus_tetri', '0'));
+  return Number.isSafeInteger(value) && value >= 0 && value <= 100000 ? value : 0;
+}
+async function setWelcomeBonusTetri(tetri) {
+  if (!Number.isSafeInteger(tetri) || tetri < 0 || tetri > 100000) throw new Error('Invalid welcome bonus');
+  await setSetting('welcome_bonus_tetri', tetri);
+}
 module.exports = {
+  getWelcomeBonusTetri, setWelcomeBonusTetri,
   getSetting,
   setSetting,
   getLeadPriceTetri,

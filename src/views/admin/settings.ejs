@@ -70,4 +70,11 @@
     </p>
 </div>
 
+<section class="provider-welcome mt-4 max-w-md">
+<h2>Приветственный баланс</h2><p>Подарок каждому новому исполнителю после регистрации с подтверждённым номером. Начисляется автоматически, без ввода промокода.</p>
+<% if(error === 'invalid_welcome') { %><p role="alert">Введите сумму от 0 до 1000 ₾, максимум два знака после точки.</p><% } %>
+<% if(saved === 'welcome') { %><p role="status">Сохранено. Сумма действует для новых регистраций.</p><% } %>
+<form method="POST" action="/admin/settings/welcome-bonus" class="admin-filter">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>"><label for="welcomeBonusGel">Подарок, ₾</label><input id="welcomeBonusGel" type="number" name="welcomeBonusGel" value="<%= (welcomeBonusTetri/100).toFixed(2) %>" min="0" max="1000" step="0.01" required><button>Сохранить</button></form>
+<p>0 — отключить. Повторная регистрация существующего номера не даёт новый подарок. Изменение суммы не пересчитывает прежние начисления. Отдельный промокод может начисляться дополнительно.</p><p>Бонус доступен для оплаты услуг платформы. Получение заявок начинается после одобрения профиля и при достаточном балансе. В истории операция отмечена WELCOME_AUTO.</p></section>
 <%- include('./_footer') %>
