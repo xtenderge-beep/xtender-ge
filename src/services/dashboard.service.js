@@ -91,11 +91,11 @@ function buildDashboard({ orders, masters, finances, queues, window, leadPrice, 
 
 async function getPeople(window, now, leadPrice) {
   const [people, managers, activity, ledger] = await Promise.all([
-    pool.query(`SELECT m.id, m.name, m.phone, m.category, m.vehicle_size, m.manager_id, m.promo_code_used,
+    pool.query(`SELECT m.id, m.name, m.phone, m.category, m.vehicle_size, m.manager_id, m.referral_manager_id, m.promo_code_used,
       m.is_active, m.is_banned, m.is_subscribed, m.subscription_until, m.balance_tetri, m.created_at,
-      mgr.name AS manager_name, pc.manager_id AS source_manager_id, source.name AS source_manager_name
+      mgr.name AS manager_name, COALESCE(m.referral_manager_id, pc.manager_id) AS source_manager_id, source.name AS source_manager_name
       FROM masters m LEFT JOIN managers mgr ON mgr.id = m.manager_id
-      LEFT JOIN promo_codes pc ON pc.code = m.promo_code_used LEFT JOIN managers source ON source.id = pc.manager_id ORDER BY m.id DESC`),
+      LEFT JOIN promo_codes pc ON pc.code = m.promo_code_used LEFT JOIN managers source ON source.id = COALESCE(m.referral_manager_id, pc.manager_id) ORDER BY m.id DESC`),
     pool.query('SELECT id, name, is_active FROM managers ORDER BY id'),
     pool.query(`SELECT b.master_id, b.order_id, b.sent_at,
       MIN(CASE WHEN v.event_type = 'view' THEN v.viewed_at END) AS opened_at,

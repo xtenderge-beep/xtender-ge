@@ -101,6 +101,12 @@ router.get('/z/:token', asyncHandler(async (req, res) => {
 router.get('/join', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '/join')) return;
   const locale = resolveLocale(req, res, '/join');
+  const partner = require('../services/partner.service');
+  const incomingRef = typeof req.query.ref === 'string' ? req.query.ref : '';
+  if (incomingRef && await partner.findReferrer(incomingRef, null)) {
+    const existing = await partner.findReferrer(req.cookies.partner_ref, null);
+    if (!existing) res.cookie('partner_ref', incomingRef, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 30 * 24 * 3600000, path: '/' });
+  }
   const codeParam = (req.query.promo || '').trim().toUpperCase().slice(0, 40);
   let promo = null;
   if (codeParam) {

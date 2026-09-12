@@ -50,6 +50,12 @@ router.post('/promo', verifyCsrf, asyncHandler(adminController.promoCreate));
 router.get('/promo/:code', asyncHandler(adminController.promoDetail));
 router.post('/promo/:id/toggle', verifyCsrf, asyncHandler(adminController.promoToggle));
 
+router.get('/partner-payouts', asyncHandler(require('../controllers/partner.controller').show));
+router.post('/managers/:id/partner-link', verifyCsrf, asyncHandler(require('../controllers/partner.controller').createLink));
+router.post('/managers/:id/partner-rate', verifyCsrf, asyncHandler(require('../controllers/partner.controller').setRate));
+router.post('/managers/:id/partner-bind', verifyCsrf, asyncHandler(require('../controllers/partner.controller').bind));
+router.post('/managers/:id/partner-payment', verifyCsrf, asyncHandler(require('../controllers/partner.controller').pay));
+router.post('/managers/:id/partner-payment/:paymentId/void', verifyCsrf, asyncHandler(require('../controllers/partner.controller').voidPayment));
 router.get('/managers', asyncHandler(adminController.managersList));
 router.post('/managers', verifyCsrf, asyncHandler(adminController.managerCreate));
 router.get('/managers/:id', asyncHandler(adminController.managerDetail));

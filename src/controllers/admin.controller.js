@@ -201,8 +201,9 @@ async function masterDetail(req, res) {
   const promoOrigin = master.promo_code_used ? await promoService.getCode(master.promo_code_used) : null;
   const managers = await managerService.list();
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
+  const partnerReferrer = master.referral_manager_id ? await require('../services/partner.service').getManager(master.referral_manager_id) : null;
   res.render('admin/master-detail', {
-    master, history, responseStats, promoOrigin, managers, currentManager, error: req.query.error || null,
+    master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
 
@@ -422,7 +423,9 @@ async function managerDetail(req, res) {
     managerService.getStats(id),
     managerService.getClientFunnel(id),
   ]);
+  const partner = await require('../services/partner.service').getManager(id);
   res.render('admin/manager-detail', {
+    partner,
     manager, stats, clientFunnel, baseUrl: baseUrl(req),
     newInviteLink: req.query.link || null,
   });

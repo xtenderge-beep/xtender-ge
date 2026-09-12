@@ -16,7 +16,7 @@ const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_tex
 async function registerMaster({
   name, phone, description, serviceType, attributes = {},
   vehicleTypeText = null, cityId = null, districtIds = [], photoUrl = null,
-  consentGrant = null, requestMeta = {},
+  consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null,
 }) {
   const masterToken = generateShortId();
   const legacy = legacyColumnsFor(serviceType, attributes);
@@ -60,6 +60,7 @@ async function registerMaster({
     if (isNew && welcomeBonusTetri > 0) {
       await client.query("INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'promo', 'WELCOME_AUTO')", [master.id, welcomeBonusTetri]);
     }
+    await require('./partner.service').bindNew(master, isNew, referralToken, referralPromoCode, client);
     master.welcomeBonusTetri = isNew ? welcomeBonusTetri : 0;
 
     await client.query(
@@ -265,7 +266,9 @@ async function getMasterByPhone(phone) {
 // balance_transactions в той же транзакции, чтобы история никогда не разошлась
 // с реальным balance_tetri. Передавайте client из pool.withTransaction(...),
 // когда вызов идёт не изолированно (см. chargeMastersForLead, topUpBalance).
-async function adjustBalance({ masterId, phone, amountTetri, reason, orderId = null, note = null }, client = pool) {
+async function adjustBalance({ masterId, phone, amountTetri, reason, orderId = null, note = null }, client = null) {
+  if (reason === 'topup' && !client) return pool.withTransaction(tx => adjustBalance({ masterId, phone, amountTetri, reason, orderId, note }, tx));
+  client = client || pool;
   if (!masterId && !phone) throw new Error('adjustBalance requires masterId or phone');
   const idColumn = masterId ? 'id' : 'phone'; // литерал, не пользовательский ввод
   // Пополнение обнуляет счётчик пропущенных из-за баланса рассылок (см. notifyMasters).
@@ -276,10 +279,11 @@ async function adjustBalance({ masterId, phone, amountTetri, reason, orderId = n
   );
   const master = rows[0];
   if (!master) return null;
-  await client.query(
-    `INSERT INTO balance_transactions (master_id, amount_tetri, reason, order_id, note) VALUES ($1, $2, $3, $4, $5)`,
+  const ledger = await client.query(
+    `INSERT INTO balance_transactions (master_id, amount_tetri, reason, order_id, note) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
     [master.id, amountTetri, reason, orderId, note]
   );
+  await require('./partner.service').accrue(ledger.rows[0], master, client);
   return master;
 }
 

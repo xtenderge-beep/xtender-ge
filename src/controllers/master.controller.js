@@ -221,6 +221,7 @@ async function register(req, res) {
     districtIds,
     photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
     consentGrant: verified, requestMeta: requestMeta(req),
+    referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,
   });
   await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
 

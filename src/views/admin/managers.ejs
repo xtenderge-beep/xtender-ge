@@ -1,6 +1,6 @@
 <%- include('./_header', { active: 'managers' }) %>
 
-<h1 class="text-2xl font-black text-stone-900 mb-5">Менеджеры</h1>
+<h1 class="text-2xl font-black text-stone-900 mb-5">Менеджеры</h1><p class="mb-4 text-sm">Реферальная ссылка и ставка комиссии — в карточке менеджера. <a href="/admin/partner-payouts" class="text-emerald-700 underline">Начисления и выплаты по месяцам →</a></p>
 
 <% if (error) { %>
   <p class="text-sm font-bold text-red-600 bg-red-50 border border-red-200 rounded-xl p-3 mb-4">Укажите имя и корректный телефон.</p>
@@ -40,7 +40,7 @@
               <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
               <% if (m.is_moderator) { %><span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 ml-2">модератор</span><% } %>
               <% if (!m.telegram_id) { %><span class="text-[10px] font-bold text-amber-700 ml-2">не привязан</span><% } %>
-              <div class="text-xs text-stone-500 mt-0.5">Привёл исполнителей: <a href="/admin/managers/<%= m.id %>" class="font-bold hover:underline"><%= m.provider_count %></a></div>
+              <div class="text-xs text-stone-500 mt-0.5">На сопровождении: <a href="/admin/managers/<%= m.id %>" class="font-bold hover:underline"><%= m.provider_count %></a></div>
           </div>
           <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">

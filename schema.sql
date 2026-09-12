@@ -495,3 +495,41 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_version INTEGER NOT NULL DE
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_balance_transactions_created ON balance_transactions(created_at);
+
+-- Partner program: future cash topups only. Original referrer is separate from account manager.
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS commission_bps INTEGER NOT NULL DEFAULT 2500 CHECK (commission_bps BETWEEN 0 AND 10000);
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS referral_token VARCHAR(36);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_referral_token ON managers(referral_token);
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS referral_manager_id INTEGER REFERENCES managers(id);
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS referral_bound_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_masters_referral_manager ON masters(referral_manager_id);
+CREATE TABLE IF NOT EXISTS manager_commissions (
+ id SERIAL PRIMARY KEY,
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ master_id INTEGER NOT NULL REFERENCES masters(id),
+ transaction_id INTEGER NOT NULL UNIQUE REFERENCES balance_transactions(id),
+ base_tetri INTEGER NOT NULL CHECK (base_tetri > 0),
+ rate_bps INTEGER NOT NULL CHECK (rate_bps BETWEEN 0 AND 10000),
+ amount_tetri INTEGER NOT NULL CHECK (amount_tetri >= 0),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_manager_commissions_month ON manager_commissions(manager_id,created_at);
+CREATE TABLE IF NOT EXISTS manager_payouts (
+ id SERIAL PRIMARY KEY,
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ commission_month VARCHAR(7) NOT NULL,
+ amount_tetri INTEGER NOT NULL CHECK (amount_tetri > 0),
+ reference VARCHAR(300) NOT NULL,
+ request_key VARCHAR(36) NOT NULL UNIQUE,
+ paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ voided_at TIMESTAMPTZ,
+ void_reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_manager_payouts_month ON manager_payouts(manager_id,commission_month);
+CREATE TABLE IF NOT EXISTS partner_audit (
+ id SERIAL PRIMARY KEY,
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ action VARCHAR(50) NOT NULL,
+ detail JSONB NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

@@ -1,0 +1,77 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),crypto=require('crypto');
+const {newDb}=require('pg-mem');
+process.env.NODE_ENV='development';process.env.ADMIN_PASSWORD='test-only';process.env.ADMIN_SESSION_SECRET='test-secret';
+const db=newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg();const pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+require.cache[require.resolve('../src/config/redis')]={exports:new (require('ioredis-mock'))()};
+const partners=require('../src/services/partner.service'),masters=require('../src/services/master.service');
+const managerService=require('../src/services/manager.service');
+const signup=(phone,referralToken)=>({phone,name:'Partner provider',description:'Test',serviceType:'movers',attributes:{},districtIds:[],referralToken});
+(async()=>{
+ const a=await managerService.create({name:'Alice',phone:'+995500001001'}),b=await managerService.create({name:'Bob',phone:'+995500001002'});
+ assert.equal((await partners.getManager(a.id)).commission_bps,2500);
+ const token=await partners.createLink(a.id);assert.equal(await partners.createLink(a.id),token);
+ const secondToken=await partners.createLink(b.id);
+ const first=await masters.registerMaster(signup('+995500001003',token));
+ let saved=(await pool.query('SELECT * FROM masters WHERE id=$1',[first.id])).rows[0];assert.equal(saved.referral_manager_id,a.id);
+ await masters.registerMaster(signup(first.phone,secondToken));
+ assert.equal((await pool.query('SELECT * FROM masters WHERE id=$1',[first.id])).rows[0].referral_manager_id,a.id);
+ await masters.topUpBalance(first.phone,10000);
+ await masters.topUpBalance(first.phone,10000);
+ let report=await partners.report();let row=report.rows.find(m=>m.id===a.id);assert.equal(row.earned,5000);assert.equal(row.base,20000);assert.equal(row.count,2);
+ await partners.setRate(a.id,'12.50');await masters.topUpBalance(first.phone,10000);
+ report=await partners.report();row=report.rows.find(m=>m.id===a.id);assert.equal(row.earned,6250);assert.equal(row.commissions.filter(c=>c.rate_bps===2500).length,2);
+ await managerService.assignProvider(first.id,b.id);await masters.topUpBalance(first.phone,100);
+ report=await partners.report();assert.equal(report.rows.find(m=>m.id===a.id).earned,6263);assert.equal(report.rows.find(m=>m.id===b.id).earned,0);
+ await pool.withTransaction(tx=>masters.adjustBalance({masterId:first.id,amountTetri:500,reason:'promo'},tx));
+ await pool.withTransaction(tx=>masters.adjustBalance({masterId:first.id,amountTetri:500,reason:'admin_correction'},tx));
+ assert.equal((await partners.report()).rows.find(m=>m.id===a.id).earned,6263);
+ const tx=(await pool.query("SELECT * FROM balance_transactions WHERE reason='topup' ORDER BY id LIMIT 1")).rows[0];
+ await pool.withTransaction(client=>partners.accrue(tx,saved,client));assert.equal((await partners.report()).rows.find(m=>m.id===a.id).count,4);
+ await partners.setRate(a.id,'0');await masters.topUpBalance(first.phone,1000);assert.equal((await partners.report()).rows.find(m=>m.id===a.id).earned,6263);
+ for(const bad of ['-1','100.01','NaN','1.234'])await assert.rejects(()=>partners.setRate(a.id,bad));
+ const month=partners.monthBounds().month,key=crypto.randomUUID();
+ const paid=await partners.recordPayment(a.id,month,'20','Bank ref 123',key);assert.equal(paid.amount_tetri,2000);
+ assert.equal((await partners.recordPayment(a.id,month,'20','Bank ref 123',key)).id,paid.id);
+ await assert.rejects(()=>partners.recordPayment(a.id,month,'21','Bank ref 123',key));
+ await assert.rejects(()=>partners.recordPayment(a.id,month,'1000','Bank ref 456',crypto.randomUUID()));
+ row=(await partners.report()).rows.find(m=>m.id===a.id);assert.equal(row.paid,2000);assert.equal(row.due,4263);
+ await partners.voidPayment(a.id,paid.id,'Wrong bank transfer entry');assert.equal((await partners.report()).rows.find(m=>m.id===a.id).due,6263);
+ await assert.rejects(()=>partners.voidPayment(a.id,paid.id,'Repeated cancellation'));
+ const existing=await masters.registerMaster(signup('+995500001004',null));await masters.topUpBalance(existing.phone,10000);
+ await partners.bindExisting(a.id,existing.id,'Confirmed previous recruitment');await assert.rejects(()=>partners.bindExisting(b.id,existing.id,'Cannot change referrer'));
+ await partners.setRate(a.id,25);await masters.topUpBalance(existing.phone,10000);
+ assert.equal((await partners.report()).rows.find(m=>m.id===a.id).earned,8763);
+ // Failure to persist commission must roll back the cash topup and its ledger.
+ const before=(await pool.query('SELECT balance_tetri FROM masters WHERE id=$1',[existing.id])).rows[0].balance_tetri;
+ const query=pool.query.bind(pool);pool.query=async(sql,...args)=>{if(sql.includes('INSERT INTO manager_commissions'))throw Error('ledger offline');return query(sql,...args);};
+ await assert.rejects(()=>masters.topUpBalance(existing.phone,10000));pool.query=query;
+ assert.equal((await pool.query('SELECT balance_tetri FROM masters WHERE id=$1',[existing.id])).rows[0].balance_tetri,before);
+ assert.equal((await partners.report()).rows.find(m=>m.id===a.id).earned,8763);
+ // Historical month boundaries, unpaid carry and monthly allocation.
+ const oldMonth='2025-12';
+ await pool.query("UPDATE manager_commissions SET created_at='2025-12-31T19:59:59Z' WHERE transaction_id=$1",[tx.id]);
+ assert.equal((await partners.report(oldMonth)).rows.find(m=>m.id===a.id).earned,2500);
+ assert.equal((await partners.report()).rows.find(m=>m.id===a.id).previousDue,2500);
+ await partners.recordPayment(a.id,oldMonth,'10','Old month bank ref',crypto.randomUUID());assert.equal((await partners.report()).rows.find(m=>m.id===a.id).previousDue,1500);
+ assert.throws(()=>partners.monthBounds('2026-13'));
+ const express=require('express'),app=express();app.set('views',path.join(__dirname,'../src/views'));app.set('view engine','ejs');app.use(express.json());app.use(express.urlencoded({extended:false}));app.use(require('cookie-parser')());
+ app.use((req,res,next)=>{req.lang='ru';res.locals.lang='ru';res.locals.t=require('../src/config/i18n').translate('ru');res.locals.currentPath=req.path;next();});
+ app.use('/admin',require('../src/routes/admin.routes'));app.use('/:locale(ru|en)',require('../src/routes/public.routes'));app.use('/',require('../src/routes/public.routes'));app.use((err,req,res,next)=>{console.error(err);res.status(500).send('test failure');});
+ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+ try {
+  const base='http://127.0.0.1:'+server.address().port,auth=require('../src/config/adminAuth').createSessionValue(),cookie='admin_session='+auth.cookieValue;
+  assert.equal((await fetch(base+'/admin/partner-payouts',{redirect:'manual'})).status,302);
+  const joinResponse=await fetch(base+'/join?ref='+token);assert.equal(joinResponse.status,200);assert.ok(joinResponse.headers.get('set-cookie').includes('partner_ref='+token));assert.ok(joinResponse.headers.get('set-cookie').includes('HttpOnly'));
+  const localized=await fetch(base+'/ru/join?ref='+secondToken,{headers:{cookie:'partner_ref='+token}});assert.equal(localized.status,200);assert.ok(!(localized.headers.get('set-cookie')||'').includes('partner_ref='+secondToken));
+  const invalid=await fetch(base+'/join?ref=bad');assert.equal(invalid.status,200);assert.ok(!(invalid.headers.get('set-cookie')||'').includes('partner_ref='));
+  for(const route of ['/admin/partner-payouts','/admin/partner-payouts?manager='+a.id,'/admin/managers/'+a.id]){const res=await fetch(base+route,{headers:{cookie}});assert.equal(res.status,200);const html=await res.text();assert.ok(!html.includes('NaN'));for(const script of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))new(require('vm').Script)(script[1]);
+    if(process.env.PARTNER_ARTIFACTS){const out=path.resolve(process.env.PARTNER_ARTIFACTS);fs.mkdirSync(out,{recursive:true});const css=fs.readFileSync(path.resolve(__dirname,'../../../../public/css/app.css'),'utf8');const file=route.includes('?')?'detail':route.includes('/managers/')?'settings':'summary';fs.writeFileSync(path.join(out,file+'.html'),html.replace('<link rel="stylesheet" href="/css/app.css">','<style>'+css+'</style>'));}
+  }
+  assert.equal((await fetch(base+'/admin/managers/'+a.id+'/partner-rate',{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify({percent:20})})).status,403);
+  const rateResult=await fetch(base+'/admin/managers/'+a.id+'/partner-rate',{method:'POST',headers:{cookie,'Content-Type':'application/json'},body:JSON.stringify({_csrf:auth.csrfToken,percent:20}),redirect:'manual'});assert.equal(rateResult.status,302);assert.equal((await partners.getManager(a.id)).commission_bps,2000);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+ console.log('PASS partners: 25% default; immutable referrer; repeat topups; historical rates and rounding; zero/invalid rates; bonus exclusion; idempotency; partial/void payments; overpayment guard; month carry; existing-provider future-only binding; transactional rollback; admin HTTP/CSRF and EJS.');
+})().catch(error=>{console.error(error);process.exitCode=1;});
