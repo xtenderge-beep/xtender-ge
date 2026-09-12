@@ -42,7 +42,7 @@
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-100 text-stone-500 text-xs font-bold">
               <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span><%= t('status_closed') %>
             </span>
-          <% } else if (order.status === 'pending_review') { %>
+          <% } else if (order.status === 'needs_revision') { %><span class="text-xs font-bold text-amber-700"><%= revisionCopy.title %></span><% } else if (order.status === 'pending_review') { %>
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold">
               <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><%= t('status_pending_review') %>
             </span>
@@ -103,7 +103,7 @@
           <textarea id="origSource" class="hidden" readonly><%= order.description %></textarea>
         </div>
         <script>
-          window.__reqTexts = <%- JSON.stringify(reqTexts) %>;
+          window.__reqTexts = <%- JSON.stringify(reqTexts).replace(/</g, '\\u003c') %>;
           window.__reqSrc = <%- JSON.stringify(src || null) %>;
         </script>
 
@@ -124,6 +124,7 @@
           </div>
         <% } %>
 
+        <%- include('partials/order-revision') %>
         <% if (isOwner && funnel) { %>
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-stone-500">
             <span class="flex items-center gap-1.5"><i class="fa-solid fa-eye text-emerald-600"></i><%= funnel.view %> <%= t('my_orders_views_label') %></span>
@@ -136,7 +137,7 @@
           <div class="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-sm text-stone-600 font-medium">
             <%= isOwner ? t('order_closed_notice') : t('order_closed_notice_late') %>
           </div>
-        <% } else if ((order.status === 'pending_review' || order.status === 'unverified') && !isOwner) { %>
+        <% } else if ((order.status === 'pending_review' || order.status === 'unverified' || order.status === 'needs_revision') && !isOwner) { %>
           <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
             <%= t('order_pending_review_notice') %>
           </div>

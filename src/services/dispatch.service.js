@@ -8,7 +8,7 @@ function validate(category, size) {
 async function preview(token, category, size) {
   validate(category, size);
   const order = await orderService.getOrderByToken(token);
-  if (!order || ['closed', 'unverified'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
+  if (!order || !['pending_review', 'new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
   const price = await settingsService.getLeadPriceTetri();
   const recipients = await orderService.getDispatchRecipients(category, size, price);
   const previous = await pool.query(`SELECT id FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
@@ -17,10 +17,11 @@ async function preview(token, category, size) {
 async function dispatch(token, category, size, expected = null) {
   const plan = await preview(token, category, size);
   if (expected && (Number(expected.price) !== plan.price || Number(expected.count) !== plan.count)) throw new Error('Состав группы или тариф изменился. Обновите предварительный расчёт.');
+  if (expected && Number(expected.revision) !== Number(plan.order.revision_version || 0)) throw new Error('Заявка изменена. Обновите предварительный расчёт.');
   if (plan.alreadySent) throw new Error('Рассылка этой группе уже запускалась. Проверьте историю списаний.');
   if (!plan.count) throw new Error('Нет исполнителей с активным профилем и достаточным балансом');
   // Database uniqueness is shared by Telegram and the admin form, including concurrent clicks.
-  if (!await orderService.recordDispatch(plan.order.id, category, size || null)) throw new Error('Рассылка этой группе уже запускалась');
+  if (!await orderService.recordDispatch(plan.order.id, category, size || null, plan.order.revision_version || 0)) throw new Error('Рассылка этой группе уже запускалась');
   await orderService.markFirstDispatch(token);
   const order = await orderService.addTargetCategories(token, [category]);
   const count = await orderService.notifyMasters(order, category, size || null, plan.price);

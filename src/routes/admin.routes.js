@@ -31,6 +31,7 @@ router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));
 router.post('/orders/:token/dispatch', verifyCsrf, asyncHandler(adminController.dispatchOrder));
 router.get('/orders/:token', asyncHandler(adminController.orderDetail));
+router.post('/orders/:token/request-revision', verifyCsrf, asyncHandler(adminController.requestOrderRevision));
 router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
 
 router.get('/reviews', asyncHandler(adminController.reviewsQueue));

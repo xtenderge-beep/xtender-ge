@@ -577,7 +577,10 @@ async function telegramWebhook(req, res) {
       return res.sendStatus(200);
     }
 
-    const [, token, categoryRaw, sizeRaw] = callback.data.split(':');
+    const callbackChat = String(callback.message?.chat?.id || '');
+    const allowedModerator = callbackChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
+    if (!allowedModerator) { await telegramService.answerCallback(callback.id, 'Нет доступа'); return res.sendStatus(200); }
+    const [, token, categoryRaw, sizeRaw, revisionRaw] = callback.data.split(':');
     const category = ALLOWED_CATEGORIES.has(categoryRaw) ? categoryRaw : null;
     const vehicleSize = sizeRaw && ALLOWED_SIZES.has(sizeRaw) ? sizeRaw : null;
 
@@ -587,7 +590,7 @@ async function telegramWebhook(req, res) {
     }
 
     const order = await orderService.getOrderByToken(token);
-    if (!order || order.status === 'closed') {
+    if (!order || !['pending_review','new'].includes(order.status) || Number(revisionRaw || 0) !== Number(order.revision_version || 0)) {
       await telegramService.answerCallback(callback.id, 'Заявка закрыта или не найдена');
       return res.sendStatus(200);
     }
@@ -599,7 +602,7 @@ async function telegramWebhook(req, res) {
         return res.sendStatus(200);
       }
       await telegramService.answerCallback(callback.id, 'Запускаем рассылку…');
-      const result = await require('../services/dispatch.service').dispatch(token, category, vehicleSize);
+      const result = await require('../services/dispatch.service').dispatch(token, category, vehicleSize, { price: plan.price, count: plan.count, revision: Number(revisionRaw || 0) });
       console.log('Dispatch completed:', token, result.count);
     } catch (err) {
       console.error('Dispatch rejected or incomplete:', err.message);
@@ -610,6 +613,27 @@ async function telegramWebhook(req, res) {
     console.error('Telegram webhook handler failed:', err.message);
     return res.sendStatus(200);
   }
+}
+
+function revisionLocals(order, lang) {
+  return { revisionCopy: require('../config/order-revision-copy')(lang), revisionCsrf: order ? require('../services/orderRevision.service').csrfFor(order) : '' };
+}
+
+async function resubmit(req, res) {
+  const existing = await orderService.getOrderByToken(req.params.token);
+  const copy = require('../config/order-revision-copy')(req.lang);
+  if (!existing || !existing.owner_token || req.cookies[ownerCookieName(req.params.token)] !== existing.owner_token ||
+      req.body.revisionCsrf !== require('../services/orderRevision.service').csrfFor(existing)) return res.status(403).json({ success: false, message: copy.stale });
+  if (!Number.isSafeInteger(Number(req.body.version))) return res.status(400).json({ success: false, message: copy.stale });
+  let order;
+  try {
+    order = await require('../services/orderRevision.service').resubmit(req.params.token, existing.owner_token, Number(req.body.version),
+      req.body.description, req.body.district || '', ['ka','ru','en'].includes(req.lang) ? req.lang : 'ka', requestMeta(req));
+  } catch (error) { if (error.message === 'INVALID_DETAILS') return res.status(400).json({ success: false, message: copy.invalid }); throw error; }
+  if (!order) return res.status(409).json({ success: false, message: copy.stale });
+  // The admin queue is authoritative even when the external notification fails.
+  telegramService.notifyModerator(order).catch(error => console.error('Resubmission notification failed:', error.message));
+  return res.json({ success: true, message: copy.sent });
 }
 
 async function show(req, res) {
@@ -649,6 +673,7 @@ async function show(req, res) {
   }
 
   return res.render('order', {
+    ...revisionLocals(order, req.lang),
     order,
     files,
     isOwner,
@@ -696,6 +721,7 @@ async function showByOwnerToken(req, res) {
   res.locals.t = translate(ownerLang);
 
   return res.render('order', {
+    ...revisionLocals(order, ownerLang),
     order,
     files,
     isOwner: true,
@@ -711,6 +737,7 @@ async function myOrders(req, res) {
   const tokens = readMyOrderTokens(req);
   const orders = await orderService.getOrdersByTokens(tokens);
   return res.render('my-orders', {
+    revisionCopy: require('../config/order-revision-copy')(req.lang),
     orders,
     clientStrings: clientStrings(req.lang),
   });
@@ -780,6 +807,7 @@ module.exports = {
   show,
   showByOwnerToken,
   close,
+  resubmit,
   logView,
   telegramWebhook,
   myOrders,

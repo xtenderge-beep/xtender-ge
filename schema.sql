@@ -487,3 +487,11 @@ CREATE TABLE IF NOT EXISTS topup_requests (
 CREATE INDEX IF NOT EXISTS idx_topup_requests_master ON topup_requests(master_id,created_at);
 ALTER TABLE topup_receipts ADD COLUMN IF NOT EXISTS topup_id INTEGER REFERENCES topup_requests(id);
 CREATE INDEX IF NOT EXISTS idx_topup_receipts_request ON topup_receipts(topup_id);
+
+-- Requests returned for clarification; additive and safe to reapply.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_reason TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_requested_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_version INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
+CREATE INDEX IF NOT EXISTS idx_orders_status_created ON orders(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_balance_transactions_created ON balance_transactions(created_at);

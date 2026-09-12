@@ -118,7 +118,7 @@ async function getResponseStats(masterId = null) {
        SELECT bt.order_id, bt.master_id, bt.created_at AS notified_at, MIN(ov.viewed_at) AS responded_at
        FROM balance_transactions bt
        LEFT JOIN order_views ov
-         ON ov.order_id = bt.order_id AND ov.master_id = bt.master_id AND ov.event_type IN ('view', 'call')
+         ON ov.order_id = bt.order_id AND ov.master_id = bt.master_id AND ov.event_type IN ('view', 'call', 'whatsapp') AND ov.viewed_at >= bt.created_at
        WHERE bt.reason = 'lead_charge' ${filter}
        GROUP BY bt.order_id, bt.master_id, bt.created_at
      ) sub`,

@@ -171,42 +171,20 @@ function logout(req, res) {
   res.redirect('/admin/login');
 }
 
-// YYYY-MM-DD из <input type="date"> — локальная полночь, не UTC (иначе часовой пояс
-// сервера сдвигает выбранный день на соседний).
-function parseDateParam(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return null;
-  const [y, m, d] = value.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-function toDateInputValue(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
 async function overview(req, res) {
-  const stats = await adminService.getOverviewStats();
-  const orders = await adminService.listOrdersAdmin();
-  const receiptCount = await pool.query("SELECT COUNT(*)::int AS count FROM topup_receipts WHERE status IN ('received','reviewing')");
-
-  const today = new Date(new Date().setHours(0, 0, 0, 0));
-  const defaultFrom = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000); // 7 дней включительно с сегодня
-  const rangeFrom = parseDateParam(req.query.from) || defaultFrom;
-  const rangeToInclusive = parseDateParam(req.query.to) || today;
-  const rangeToExclusive = new Date(rangeToInclusive.getTime() + 24 * 60 * 60 * 1000);
-  const rangeInvalid = rangeFrom >= rangeToExclusive;
-  const rangeStats = rangeInvalid
-    ? { ordersCount: 0, channelStats: { lead: { count: 0, gel: 0 }, catalog: { count: 0, gel: 0 } } }
-    : await adminService.getStatsForRange(rangeFrom, rangeToExclusive);
-
-  res.render('admin/overview', {
-    stats,
-    waitingOrders: orders.filter(o=>o.status !== 'closed' && !o.first_dispatched_at).length,
-    waitingReceipts: receiptCount.rows[0].count,
-    rangeStats,
-    rangeInvalid,
-    rangeFromValue: toDateInputValue(rangeFrom),
-    rangeToValue: toDateInputValue(rangeToInclusive),
-  });
+  let dashboard;
+  try { dashboard = await require('../services/dashboard.service').getDashboard(req.query); }
+  catch (error) { if (error.code === 'INVALID_RANGE') return res.status(400).send(error.message); throw error; }
+  dashboard.tab = ['providers', 'managers', 'finance'].includes(req.query.tab) ? req.query.tab : 'overview';
+  dashboard.managerFilter = /^\d+$/.test(req.query.manager || '') ? String(req.query.manager) : '';
+  res.set('Cache-Control', 'no-store');
+  if (req.query.format === 'json') {
+    return res.render('admin/_dashboard', { dashboard }, (error, html) => {
+      if (error) return res.status(500).json({ error: 'Dashboard render failed' });
+      res.json({ html, generatedAt: dashboard.generatedAt });
+    });
+  }
+  res.render('admin/overview', { dashboard });
 }
 
 async function mastersList(req, res) {
@@ -303,13 +281,14 @@ async function correctBalance(req, res) {
 async function ordersList(req, res) {
   const orders = await adminService.listOrdersAdmin();
   const q = String(req.query.q || '').trim().slice(0,100);
-  const status = ['waiting','active','closed'].includes(req.query.status) ? req.query.status : '';
-  const filtered = orders.filter(o=>(!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (status === 'closed' ? o.status === 'closed' : status === 'waiting' ? o.status !== 'closed' && !o.first_dispatched_at : o.status !== 'closed' && o.first_dispatched_at)));
+  const status = ['waiting','active','closed','needs_revision','unverified'].includes(req.query.status) ? req.query.status : '';
+  const filtered = orders.filter(o=>(!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (['closed','needs_revision','unverified'].includes(status) ? o.status === status : status === 'waiting' ? o.status === 'pending_review' && !o.first_dispatched_at : o.status === 'new' && o.first_dispatched_at)));
   const page = Math.min(Math.max(1, Math.ceil(filtered.length/30)), Math.max(1, parseInt(req.query.page,10)||1));
   res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, page, total: filtered.length });
 }
 
 async function orderDetail(req, res) {
+  res.locals.revisionNotice = req.query.revisionNotice === 'failed' ? 'failed' : req.query.revisionNotice === 'sent' ? 'sent' : null;
   const order = await adminService.getOrderDetailAdmin(req.params.token);
   if (!order) return res.status(404).send('Заявка не найдена');
   res.render('admin/order-detail', { order, groups: dispatchService.groups });
@@ -318,6 +297,21 @@ async function orderDetail(req, res) {
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
 // исполнителя (в отличие от orderController.close): это административное действие,
 // а не подтверждение клиента, что работа сделана.
+async function requestOrderRevision(req, res) {
+  let order;
+  try { order = await require('../services/orderRevision.service').requestRevision(req.params.token, req.body.reason, requestMeta(req)); }
+  catch (error) { if (/символов/.test(error.message)) return res.status(400).send(error.message); throw error; }
+  if (!order) return res.status(409).send('Заявка уже распределена, закрыта или возвращена на доработку. Обновите страницу.');
+  let notified = true;
+  try {
+    await require('../services/sms.service').sendOrderNotification(order.phone,
+      'Xtender: please update your request. Moderator feedback: ' + baseUrl(req) + '/o/' + order.owner_token,
+      { orderId: order.id, kind: 'transactional' });
+  } catch (error) { notified = false; console.error('Revision SMS failed:', error.message); }
+  await telegramService.updateMessage(order).catch(error => console.error('Revision moderation update failed:', error.message));
+  res.redirect('/admin/orders/' + encodeURIComponent(order.token) + '?revisionNotice=' + (notified ? 'sent' : 'failed'));
+}
+
 async function closeOrder(req, res) {
   const { token } = req.params;
   const order = await orderService.closeOrder(token, { actor: 'admin', reason: 'admin_closed', meta: require('../config/requestMeta').requestMeta(req) });
@@ -542,7 +536,7 @@ async function dispatchPreview(req,res) {
 }
 async function dispatchOrder(req,res) {
   let result=null,error=null;
-  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count}); } catch(err) { error=err.message; }
+  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision}); } catch(err) { error=err.message; }
   res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:dispatchService.groups});
 }
 async function updateWelcomeBonus(req, res) {
@@ -579,6 +573,7 @@ module.exports = {
   ordersList,
   orderDetail,
   closeOrder,
+  requestOrderRevision,
   reviewsQueue,
   approveReview,
   rejectReview,

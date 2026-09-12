@@ -1,0 +1,73 @@
+<% const num = n => Number(n || 0).toLocaleString('ru-RU');
+const gel = n => Number(n || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₾';
+const pct = n => n === null ? '—' : n + '%';
+const duration = n => n === null ? '—' : n < 1 ? '< 1 мин' : Math.round(n) + ' мин';
+const amount = (reason, period = 'current') => dashboard.money[period][reason]?.amount || 0;
+const count = reason => dashboard.money.current[reason]?.count || 0;
+const change = (current, previous) => previous ? ((current - previous) / previous * 100 >= 0 ? '+' : '') + Math.round((current - previous) / previous * 100) + '% к прошлому периоду' : 'Прошлый период: ' + num(previous);
+%>
+<div data-dashboard-time="<%= dashboard.generatedAt %>">
+  <% if (['providers', 'managers'].includes(dashboard.tab)) { %>
+    <%- include('./_people-analytics', { dashboard }) %>
+  <% } else { %>
+  <% if (dashboard.tab !== 'finance') { %>
+  <div class="dash-section-heading"><h2>За выбранный период</h2><span>Дни по Тбилиси · сравнение до того же времени</span></div>
+  <div class="dash-cards">
+    <article class="dash-card"><span>Подтверждённые заявки</span><strong><%= num(dashboard.current.confirmed) %></strong><small><%= change(dashboard.current.confirmed, dashboard.previous.confirmed) %></small></article>
+    <article class="dash-card"><span>Заявки с нажатием контакта</span><strong><%= num(dashboard.current.contacted) %></strong><small><%= change(dashboard.current.contacted, dashboard.previous.contacted) %></small></article>
+    <article class="dash-card"><span>Доля с контактом после рассылки</span><strong><%= pct(dashboard.current.contactRate) %></strong><small>Ранее: <%= pct(dashboard.previous.contactRate) %> · из <%= num(dashboard.current.dispatched) %> заявок</small></article>
+    <article class="dash-card"><span>Первый контакт: медиана / P90</span><strong class="dash-time"><%= duration(dashboard.current.median) %> / <%= duration(dashboard.current.p90) %></strong><small>Среднее: <%= duration(dashboard.current.average) %> · только заявки с контактом</small></article>
+  </div>
+
+  <div class="dash-section-heading"><h2>Требуют внимания сейчас</h2><span>Все открытые заявки, независимо от периода</span></div>
+  <div class="dash-queues">
+    <a href="#problem-orders"><strong><%= num(dashboard.waiting) %></strong>Без рассылки</a>
+    <a href="#problem-orders"><strong><%= num(dashboard.revisions) %></strong>У клиента на доработке</a>
+    <a href="#problem-orders"><strong><%= num(dashboard.noContact) %></strong>После рассылки без контакта</a>
+    <a href="/admin/masters?status=pending"><strong><%= num(dashboard.pendingMasters) %></strong>Профилей на проверке →</a>
+    <a href="/admin/receipts"><strong><%= num(dashboard.queues.receipts) %></strong>Чеков на проверке →</a>
+    <a href="/admin/support"><strong><%= num(dashboard.queues.support) %></strong>Обращений без ответа →</a>
+    <a href="/admin/reviews"><strong><%= num(dashboard.queues.reviews) %></strong>Отзывов на проверке →</a>
+  </div>
+
+  <section class="dash-panel" aria-labelledby="funnel-title">
+    <h2 id="funnel-title">Воронка заявок</h2>
+    <p class="dash-note">Заявки, созданные в выбранном периоде. Каждая заявка учитывается один раз на этапе.</p>
+    <% const stages = [['Созданы, включая без SMS', dashboard.current.created], ['Телефон подтверждён', dashboard.current.confirmed], ['Запущена рассылка', dashboard.current.dispatched], ['Есть открытие после рассылки', dashboard.current.viewed], ['Есть звонок / WhatsApp после рассылки', dashboard.current.contacted]]; %>
+    <% stages.forEach(([label, value]) => { %>
+      <div class="dash-funnel-row"><span><%= label %></span><div class="dash-track"><div style="width:<%= dashboard.current.created ? Math.round(value / dashboard.current.created * 100) : 0 %>%"></div></div><b><%= num(value) %></b><small><%= pct(dashboard.current.created ? Math.round(value / dashboard.current.created * 1000) / 10 : null) %></small></div>
+    <% }); %>
+    <p class="dash-note">Проценты — от созданных заявок. Открытие и контакт считаются независимо: контакт может быть записан без открытия. Новые заявки ещё могут получить отклик. Нажатие контакта не подтверждает разговор или выполнение работы.</p>
+  </section>
+
+  <section class="dash-panel" aria-labelledby="balance-title">
+    <h2 id="balance-title">Баланс спроса и предложения</h2>
+    <p class="dash-note">Допущены к рассылке сейчас: <b><%= num(dashboard.eligible) %></b> · активных профилей: <%= num(dashboard.active) %> · исключены по балансу: <%= num(dashboard.lowBalance) %>. Допуск не означает, что исполнитель свободен.</p>
+    <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Категория</th><th>Заявки за период</th><th>Допущены сейчас</th><th>Не хватает баланса</th><th>Открыты без контакта*</th><th>С контактом</th><th>Следующий шаг</th></tr></thead><tbody>
+      <% dashboard.segments.forEach(s => { %><tr><th><%= s.label %></th><td><%= num(s.demand) %></td><td><%= num(s.ready) %></td><td><%= num(s.lowBalance) %></td><td><%= num(s.unanswered) %></td><td><%= pct(s.contactRate) %></td><td><span class="dash-signal"><%= s.signal %></span></td></tr><% }); %>
+    </tbody></table></div>
+    <p class="dash-note">*После рассылки, среди заявок периода. Категории могут пересекаться; контакт относится к заявке целиком, а не к конкретной группе получателей. Без назначенной категории: <%= num(dashboard.unclassified) %>. <a href="/admin/managers">Открыть менеджеров →</a></p>
+  </section>
+
+  <% } %>
+  <section class="dash-panel"><h2>Деньги и платные каналы</h2>
+    <div class="dash-cards">
+      <article class="dash-card"><span>Пополнения</span><strong><%= gel(amount('topup')) %></strong><small><%= count('topup') %> операций · без бонусов</small></article>
+      <article class="dash-card"><span>Списания за рассылки</span><strong><%= gel(-amount('lead_charge')) %></strong><small><%= count('lead_charge') %> списаний · <%= change(-amount('lead_charge'), -amount('lead_charge', 'previous')) %></small></article>
+      <article class="dash-card"><span>Списания за показ номера</span><strong><%= gel(-amount('catalog_call')) %></strong><small><%= count('catalog_call') %> платных показов · <%= change(-amount('catalog_call'), -amount('catalog_call', 'previous')) %></small></article>
+      <article class="dash-card"><span>Начисленные бонусы</span><strong><%= gel(amount('promo')) %></strong><small>Коррекции администратора: <%= gel(amount('admin_correction')) %></small></article>
+    </div>
+    <p class="dash-note">Остаток на балансах незаблокированных исполнителей сейчас: <b><%= gel(dashboard.balance) %></b>. Денежные операции отбираются по времени операции; воронка — по дате создания заявки. Списания могут расходовать бонусы. Полная воронка каталога и результаты работ пока не измеряются.</p>
+  </section>
+
+  <% if (dashboard.tab !== 'finance') { %>
+  <section class="dash-panel" id="problem-orders"><div class="dash-section-heading"><h2>Очередь вмешательства</h2><a href="/admin/orders">Все заявки →</a></div>
+    <p class="dash-note">Сначала самые долгие ожидания. Показано <%= dashboard.problems.length %> из <%= num(dashboard.problemCount) %>. Ожидание считается от создания или первой рассылки.</p>
+    <% if (!dashboard.problems.length) { %><p class="dash-empty">Открытых заявок без рассылки или нажатия контакта нет.</p><% } else { %>
+      <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Заявка</th><th>Проблема</th><th>Ожидание</th><th>Действие</th></tr></thead><tbody>
+      <% dashboard.problems.forEach(o => { %><tr><td><b>№ <%= o.id %></b><div class="dash-description"><%= (o.description || '').slice(0, 150) %></div><small><%= o.categories || 'Категория не назначена' %></small></td><td><%= o.revision ? 'Ожидаем уточнения клиента' : o.waiting ? 'Не запускалась рассылка' : 'Нет нажатия контакта' %></td><td class="dash-nowrap"><%= o.minutes >= 60 ? Math.floor(o.minutes / 60) + ' ч ' + o.minutes % 60 + ' мин' : o.minutes + ' мин' %></td><td><a href="/admin/orders/<%= encodeURIComponent(o.token) %>"><%= o.revision ? 'Открыть комментарий →' : o.waiting ? 'Проверить и распределить →' : 'Проверить отклики →' %></a></td></tr><% }); %>
+      </tbody></table></div>
+    <% } %>
+  </section>
+  <% } } %>
+</div>

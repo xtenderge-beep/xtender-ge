@@ -11,7 +11,7 @@
 <p>Рассылка по категории в Тбилиси. Районы профиля не ограничивают эту группу. Используется Telegram, при его отсутствии или ошибке — SMS. Списание за отправленную заявку, независимо от сделки.</p>
 <% if(plan.alreadySent) { %><p>Рассылка этой группе уже запускалась. Повторная отправка заблокирована.</p><% } else if(plan.count) { %>
 <form method="POST" action="/admin/orders/<%= token %>/dispatch" class="admin-filter" onsubmit="this.querySelector('button').disabled=true">
-<input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="count" value="<%= plan.count %>">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="revision" value="<%= plan.order.revision_version || 0 %>"><input type="hidden" name="count" value="<%= plan.count %>">
 <button type="submit">Отправить группе и списать баланс</button></form><% } else { %><p>Нет подходящих получателей. Попробуйте другую группу.</p><% } %>
 <% } %></section>
 <%- include('./_footer') %>

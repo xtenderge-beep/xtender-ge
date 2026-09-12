@@ -1,0 +1,36 @@
+<% if (isOwner && order.status === 'needs_revision') { %>
+<section style="padding:18px;border:1px solid #fdba74;border-radius:16px;background:#fff7ed">
+  <h2 style="font-weight:800;margin-bottom:10px"><%= revisionCopy.title %></h2>
+  <p style="font-size:12px;font-weight:700"><%= revisionCopy.reason %></p>
+  <p style="white-space:pre-wrap;margin:6px 0 12px"><%= order.revision_reason %></p>
+  <p style="font-size:12px;margin-bottom:12px"><%= revisionCopy.note %></p>
+  <form id="revision-form" action="/api/orders/<%= order.token %>/resubmit" method="POST">
+    <input type="hidden" name="revisionCsrf" value="<%= revisionCsrf %>">
+    <input type="hidden" name="version" value="<%= order.revision_version %>">
+    <label for="revision-description" style="display:block;font-size:13px;margin-bottom:6px"><%= revisionCopy.description %></label>
+    <textarea id="revision-description" name="description" required minlength="10" maxlength="5000" rows="6" style="width:100%;padding:12px;border:1px solid #d6d3d1;border-radius:10px"><%= order.description %></textarea>
+    <label for="revision-district" style="display:block;font-size:13px;margin:10px 0 6px"><%= revisionCopy.district %></label>
+    <input id="revision-district" name="district" maxlength="200" value="<%= order.district_name %>" style="width:100%;padding:12px;border:1px solid #d6d3d1;border-radius:10px">
+    <button type="submit" style="width:100%;padding:12px;background:#047857;color:white;border-radius:10px;font-weight:700;margin-top:12px"><%= revisionCopy.submit %></button>
+    <p id="revision-result" role="status" aria-live="polite" style="margin-top:10px;font-size:13px"></p>
+  </form>
+</section>
+<script>
+(() => {
+  const form = document.getElementById('revision-form');
+  const result = document.getElementById('revision-result');
+  const failed = <%- JSON.stringify(revisionCopy.failed).replace(/</g, '\\u003c') %>;
+  form.addEventListener('submit', async event => {
+    event.preventDefault(); const button = form.querySelector('button'); button.disabled = true;
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(form.action, { method: 'POST', credentials: 'same-origin', signal: controller.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(form))) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.message || failed);
+      window.location.reload();
+    } catch (error) { result.textContent = error.name === 'AbortError' ? failed : error.message; button.disabled = false; }
+    finally { clearTimeout(timer); }
+  });
+})();
+</script>
+<% } %>

@@ -2,12 +2,15 @@
 
 <a href="/admin/orders" class="text-xs font-bold text-stone-500 hover:text-stone-800">&larr; Все заявки</a>
 
+<% if (revisionNotice) { %><p class="mt-3 p-3 rounded-xl bg-amber-50"><%= revisionNotice === 'sent' ? 'Заявка возвращена на доработку. SMS со ссылкой отправлена.' : 'Заявка возвращена на доработку, но SMS отправить не удалось. Клиент увидит комментарий на странице своей заявки.' %></p><% } %>
+<% if (order.revision_reason) { %><section class="mt-3 p-4 rounded-xl bg-amber-50"><b>Комментарий для доработки</b><p style="white-space:pre-wrap"><%= order.revision_reason %></p><small><%= order.status === 'needs_revision' ? 'Ожидаем исправления от клиента' : 'Клиент повторно отправил заявку либо её статус изменён' %></small></section><% } %>
+<% if (order.status === 'pending_review' && !order.first_dispatched_at) { %><section class="mt-3 p-4 rounded-xl border border-stone-200"><h2 class="font-bold">Вернуть заказчику на доработку</h2><form method="POST" action="/admin/orders/<%= order.token %>/request-revision"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label for="revision-reason" class="block text-sm mt-2">Что нужно исправить или уточнить?</label><textarea id="revision-reason" name="reason" required minlength="5" maxlength="1000" rows="3" class="w-full p-3 border border-stone-200 rounded-xl"></textarea><button class="mt-2 px-3 py-2 bg-stone-900 text-white rounded-xl">Вернуть на доработку и уведомить клиента</button></form></section><% } %>
 <div class="mt-3 bg-white rounded-2xl border border-stone-200 p-5">
     <div class="flex items-center justify-between flex-wrap gap-2">
         <h1 class="text-lg font-black text-stone-900">Заявка #<%= order.id %></h1>
         <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
             <%= order.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
-            <%= order.status === 'closed' ? 'Закрыта' : order.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
+            <%= order.status === 'closed' ? 'Закрыта' : order.status === 'needs_revision' ? 'Нужны уточнения' : order.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
         </span>
     </div>
     <p class="text-sm text-stone-800 mt-3"><%= order.description %></p>
@@ -26,7 +29,7 @@
     <% } %>
 </div>
 
-<% if(order.status !== 'closed') { %><section class="admin-dispatch"><h2>Отправить заявку исполнителям</h2><p>Выберите группу. На следующем шаге — число получателей и стоимость перед отправкой.</p><form class="admin-filter" method="GET" action="/admin/orders/<%= order.token %>/dispatch"><select name="category" aria-label="Группа исполнителей"><% Object.entries(groups).forEach(([value,label])=>{ %><option value="<%= value %>"><%= label %></option><% }) %></select><select name="size" aria-label="Размер транспорта"><option value="">Все размеры</option><% ['S','L','XL','XXL'].forEach(size=>{ %><option><%= size %></option><% }) %></select><button>Рассчитать рассылку</button></form><p class="text-xs">Размер применяется только к перевозкам. Для остальных групп выберите «Все размеры».</p></section><% } %>
+<% if(['pending_review','new'].includes(order.status)) { %><section class="admin-dispatch"><h2>Отправить заявку исполнителям</h2><p>Выберите группу. На следующем шаге — число получателей и стоимость перед отправкой.</p><form class="admin-filter" method="GET" action="/admin/orders/<%= order.token %>/dispatch"><select name="category" aria-label="Группа исполнителей"><% Object.entries(groups).forEach(([value,label])=>{ %><option value="<%= value %>"><%= label %></option><% }) %></select><select name="size" aria-label="Размер транспорта"><option value="">Все размеры</option><% ['S','L','XL','XXL'].forEach(size=>{ %><option><%= size %></option><% }) %></select><button>Рассчитать рассылку</button></form><p class="text-xs">Размер применяется только к перевозкам. Для остальных групп выберите «Все размеры».</p></section><% } %>
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Воронка</h2>
     <p class="text-sm text-stone-700">👀 Просмотров: <%= order.funnel.view %> · Нажатий «Позвонить»: <%= order.funnel.call %> · Нажатий WhatsApp: <%= order.funnel.whatsapp %></p>

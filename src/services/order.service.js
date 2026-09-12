@@ -123,13 +123,14 @@ async function getOrdersByTokens(tokens) {
   return rows;
 }
 
-async function recordDispatch(orderId, category, vehicleSize) {
+async function recordDispatch(orderId, category, vehicleSize, revision = null) {
   try {
-    await pool.query(
-      `INSERT INTO order_dispatches (order_id, category, vehicle_size) VALUES ($1, $2, $3)`,
-      [orderId, category, vehicleSize || '']
-    );
-    return true;
+    return await pool.withTransaction(async client => {
+      const claimed = await client.query("UPDATE orders SET status = 'new', first_dispatched_at = COALESCE(first_dispatched_at, NOW()) WHERE id = $1 AND status IN ('pending_review','new') AND ($2::integer IS NULL OR revision_version = $2) RETURNING id", [orderId, revision]);
+      if (!claimed.rows.length) return false;
+      await client.query('INSERT INTO order_dispatches (order_id, category, vehicle_size) VALUES ($1, $2, $3)', [orderId, category, vehicleSize || '']);
+      return true;
+    });
   } catch (err) {
     if (err.code === '23505') return false;
     throw err;
@@ -256,9 +257,9 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice) {
  return rows;
 }
 async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
-  if (!order || ['closed', 'unverified'].includes(order.status)) return 0;
+  if (!order || !['pending_review', 'new'].includes(order.status)) return 0;
   const current = await getOrderByToken(order.token);
-  if (!current || ['closed', 'unverified'].includes(current.status)) return 0;
+  if (!current || !['pending_review', 'new'].includes(current.status)) return 0;
  const telegramService = require('./telegram.service');
  const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;

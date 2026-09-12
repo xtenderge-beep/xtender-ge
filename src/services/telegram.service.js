@@ -93,6 +93,15 @@ async function buildKeyboardWithCounts(token) {
     });
   }
 
+  const order = await orderService.getOrderByToken(token);
+  rows.forEach(row => row.forEach(button => {
+    if (button.callback_data) {
+      const parts = button.callback_data.split(':');
+      while (parts.length < 4) parts.push('');
+      button.callback_data = parts.join(':') + ':' + (order?.revision_version || 0);
+    }
+  }));
+  rows.push([{ text: '✏️ Проверить / вернуть на доработку', url: getBaseUrl() + '/admin/orders/' + encodeURIComponent(token) }]);
   return { inline_keyboard: rows };
 }
 
@@ -367,7 +376,8 @@ function formatDispatchLine(category, vehicleSize, masterCount) {
 function buildMessageText(order, dispatchLines, funnel) {
   const header =
     order.status === 'closed'
-      ? '🔒 Заявка закрыта клиентом'
+      ? '🔒 Заявка закрыта'
+      : order.status === 'needs_revision' ? '✏️ Ожидаем уточнения клиента: ' + order.revision_reason
       : dispatchLines.length
       ? '✅ Разослано'
       : '🆕 Новая заявка на модерацию';
@@ -425,7 +435,7 @@ async function refreshMessage(order, keyboard) {
 
 async function updateMessage(order) {
   if (!isEnabled()) return;
-  const keyboard = order.status === 'closed' ? { inline_keyboard: [] } : await buildKeyboardWithCounts(order.token);
+  const keyboard = ['closed','needs_revision','unverified'].includes(order.status) ? { inline_keyboard: [] } : await buildKeyboardWithCounts(order.token);
   await refreshMessage(order, keyboard);
 }
 

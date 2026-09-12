@@ -12,6 +12,7 @@ router.post('/otp/send', asyncHandler(otpController.send));
 router.post('/otp/verify', asyncHandler(otpController.verify));
 
 router.post('/orders', upload.array('files', 5), asyncHandler(orderController.create));
+router.post('/orders/:token/resubmit', asyncHandler(orderController.resubmit));
 router.post('/orders/:token/close', asyncHandler(orderController.close));
 router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
 

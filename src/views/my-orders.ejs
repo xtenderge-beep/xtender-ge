@@ -33,7 +33,7 @@
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-500 text-[11px] font-bold">
                   <span class="w-1.5 h-1.5 rounded-full bg-stone-400"></span><%= t('status_closed') %>
                 </span>
-              <% } else if (order.status === 'pending_review') { %>
+              <% } else if (order.status === 'needs_revision') { %><span class="text-xs font-bold text-amber-700"><%= revisionCopy.title %></span><% } else if (order.status === 'pending_review') { %>
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold">
                   <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><%= t('status_pending_review') %>
                 </span>
