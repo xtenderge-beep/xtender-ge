@@ -177,7 +177,7 @@ async function getMasterBalanceHistory(masterId) {
 
 async function setMasterBanned(id, banned, reason) {
   await pool.query(
-    `UPDATE masters SET is_banned = $1, banned_reason = $2, banned_at = CASE WHEN $1 THEN NOW() ELSE NULL END
+    `UPDATE masters SET is_banned = $1, banned_reason = $2, banned_by_manager_id = NULL, banned_at = CASE WHEN $1 THEN NOW() ELSE NULL END
      WHERE id = $3`,
     [banned, reason, id]
   );

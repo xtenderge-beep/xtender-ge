@@ -1,0 +1,73 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
+const {newDb}=require('pg-mem');
+const db=newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg(),pool=new Pool();
+pool.withTransaction=async fn=>{const b=db.backup();try{return await fn(pool);}catch(e){b.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+require.cache[require.resolve('../src/config/redis')]={exports:new(require('ioredis-mock'))()};
+const portal=require('../src/services/managerPortal.service');
+(async()=>{
+ const a=(await pool.query("INSERT INTO managers(name,phone) VALUES('Alice','111') RETURNING id")).rows[0].id;
+ const b=(await pool.query("INSERT INTO managers(name,phone) VALUES('Bob','222') RETURNING id")).rows[0].id;
+ const own=(await pool.query("INSERT INTO masters(name,phone,manager_id,is_banned) VALUES('Own','333',$1,false) RETURNING id",[a])).rows[0].id;
+ const other=(await pool.query("INSERT INTO masters(name,phone,manager_id,is_banned) VALUES('Secret','444',$1,false) RETURNING id",[b])).rows[0].id;
+ await assert.rejects(()=>portal.provision(a,'alice','short',true));
+ await portal.provision(a,'Alice','a-strong-password',true);await portal.provision(b,'bob','another-password',true);
+ await assert.rejects(()=>portal.provision(b,'ALICE','another-password',true));
+ const sid=await portal.login('alice','a-strong-password','test');assert.equal((await portal.session(sid)).id,a);
+ const stored=(await pool.query('SELECT web_password_hash FROM managers WHERE id=$1',[a])).rows[0].web_password_hash;
+ assert.ok(!stored.includes('a-strong-password'));
+ await assert.rejects(()=>portal.login('alice','wrong','test'));
+ await assert.rejects(()=>portal.detail(a,other),{status:404});
+ for(const action of ['note','ban','unban'])await assert.rejects(()=>portal.action(a,other,action,'reason'),{status:404});
+ await portal.action(a,own,'note','<script>unsafe</script>');
+ await portal.action(a,own,'ban','Repeated spam');assert.equal((await portal.detail(a,own)).master.is_banned,true);
+ await require('../src/services/admin.service').setMasterBanned(own,true,'Admin ban');
+ await assert.rejects(()=>portal.action(a,own,'unban','Cannot override admin'),{status:403});
+ await require('../src/services/admin.service').setMasterBanned(own,false,null);
+ await portal.action(a,own,'ban','Manager ban');await portal.action(a,own,'unban','Resolved');
+ const details=await portal.detail(a,own);assert.equal(details.master.is_banned,false);assert.equal(details.events.length,4);
+ await portal.provision(a,'alice','a-new-password-123',true);assert.equal(await portal.session(sid),null);
+ const sid2=await portal.login('alice','a-new-password-123','test');
+ await pool.query('UPDATE managers SET is_active=false WHERE id=$1',[a]);assert.equal(await portal.session(sid2),null);
+ await pool.query('UPDATE managers SET is_active=true WHERE id=$1',[a]);
+ await portal.provision(a,'alice','',false);assert.equal(await portal.session(sid2),null);
+  await portal.provision(a,'alice','',true);
+ const order=(await pool.query("INSERT INTO orders(token,description,phone,first_dispatched_at) VALUES('portal-order','Test','555',$1) RETURNING id",[new Date(Date.now()-1800000)])).rows[0].id;
+ const firstDispatched=(await pool.query('SELECT first_dispatched_at FROM orders WHERE id=$1',[order])).rows[0].first_dispatched_at;
+ await pool.query("INSERT INTO order_views(order_id,master_id,event_type,viewed_at) VALUES($1,$2,'call',$3),($1,$2,'whatsapp',$4)",[order,own,new Date(+firstDispatched+600000),new Date(+firstDispatched+660000)]);
+ const metrics=(await portal.detail(a,own)).metrics;assert.equal(metrics.contacts,1);assert.equal(metrics.averageMinutes,10);
+ for(const [mgr,master,amount] of [[a,own,10000],[b,other,90000]]){
+  const tx=(await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason) VALUES($1,$2,'topup') RETURNING id",[master,amount])).rows[0].id;
+  await pool.query('INSERT INTO manager_commissions(manager_id,master_id,transaction_id,base_tetri,rate_bps,amount_tetri) VALUES($1,$2,$3,$4,2500,$5)',[mgr,master,tx,amount,amount/4]);
+ }
+ assert.equal(Number((await portal.finances(a)).earned),2500);assert.equal(Number((await portal.finances(b)).earned),22500);
+ const summary=await portal.dashboard(a);assert.equal(Number(summary.stats.total),1);assert.equal(Number(summary.stats.active),1);assert.equal(Number(summary.stats.banned),0);
+ const express=require('express'),app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));
+ app.use(express.urlencoded({extended:false}));app.use(require('cookie-parser')());app.use('/manager',require('../src/routes/managerPortal.routes'));
+ app.use((e,req,res,next)=>{console.error(e);res.status(500).send('failure');});
+ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+ try{
+  const base='http://127.0.0.1:'+server.address().port;
+  assert.equal((await fetch(base+'/manager',{redirect:'manual'})).status,302);
+  const login=await fetch(base+'/manager/login'),html=await login.text(),csrf=html.match(/name="_csrf" value="([^"]+)"/)[1],cookie=login.headers.get('set-cookie').split(';')[0];
+  assert.equal((await fetch(base+'/manager/login',{method:'POST',body:new URLSearchParams({login:'alice',password:'a-new-password-123'})})).status,403);
+  const success=await fetch(base+'/manager/login',{method:'POST',headers:{cookie},body:new URLSearchParams({_csrf:csrf,login:'alice',password:'a-new-password-123'}),redirect:'manual'});
+  assert.equal(success.status,302);const auth=success.headers.get('set-cookie').split(';')[0];
+  const detail=await fetch(base+'/manager/masters/'+own,{headers:{cookie:auth}}),body=await detail.text();assert.equal(detail.status,200);assert.ok(body.includes('&lt;script&gt;unsafe&lt;/script&gt;'));assert.ok(!body.includes('<script>unsafe'));
+  assert.equal((await fetch(base+'/manager/masters/'+other,{headers:{cookie:auth}})).status,404);
+  assert.equal((await fetch(base+'/manager/masters/'+own+'/ban',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({body:'No csrf'})})).status,403);
+  const dashboard=await fetch(base+'/manager',{headers:{cookie:auth}});assert.equal(dashboard.status,200);const dash=await dashboard.text();assert.ok(!dash.includes('Secret'));assert.ok(dash.includes('Own'));
+  if(process.env.MANAGER_PORTAL_PREVIEW)fs.writeFileSync(process.env.MANAGER_PORTAL_PREVIEW,dash);
+  const finances=await fetch(base+'/manager/finances',{headers:{cookie:auth}});assert.equal(finances.status,200);
+  assert.equal((await fetch(base+'/manager/finances?month=invalid',{headers:{cookie:auth}})).status,400);
+  const session=await portal.session(auth.split('=')[1]);
+  await fetch(base+'/manager/logout',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({_csrf:session.csrf}),redirect:'manual'});
+  assert.equal(await portal.session(auth.split('=')[1]),null);
+ } finally {server.close();}
+ await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1',[own,b]);await assert.rejects(()=>portal.detail(a,own),{status:404});
+ for(let i=0;i<10;i++)await assert.rejects(()=>portal.login('missing','wrong','limit-ip'));
+ await assert.rejects(()=>portal.login('missing','wrong','limit-ip'),{status:429});
+ console.log('PASS manager portal: credential hash/reset/revocation; tenant isolation; notes/XSS; manager/admin bans; HTTP login/CSRF/logout; scoped dashboard and finances; rate limit.');
+})().catch(e=>{console.error(e);process.exitCode=1;});
+

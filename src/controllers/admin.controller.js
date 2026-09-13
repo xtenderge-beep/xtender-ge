@@ -424,7 +424,9 @@ async function managerDetail(req, res) {
     managerService.getClientFunnel(id),
   ]);
   const partner = await require('../services/partner.service').getManager(id);
+  const portalEvents = (await require('../config/db').query('SELECT master_id,action,body,created_at FROM manager_portal_events WHERE manager_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100',[id])).rows;
   res.render('admin/manager-detail', {
+    portalEvents,
     partner,
     manager, stats, clientFunnel, baseUrl: baseUrl(req),
     newInviteLink: req.query.link || null,

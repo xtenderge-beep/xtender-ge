@@ -526,6 +526,23 @@ CREATE TABLE IF NOT EXISTS manager_payouts (
  void_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_manager_payouts_month ON manager_payouts(manager_id,commission_month);
+-- Separate, revocable manager web access. Existing accounts remain disabled.
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_login VARCHAR(64);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_web_login ON managers(web_login);
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_password_hash TEXT;
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_auth_version INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS banned_by_manager_id INTEGER REFERENCES managers(id);
+CREATE TABLE IF NOT EXISTS manager_portal_events (
+ id SERIAL PRIMARY KEY,
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ master_id INTEGER REFERENCES masters(id),
+ action VARCHAR(40) NOT NULL,
+ body TEXT NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_manager_portal_master ON manager_portal_events(master_id,created_at);
+CREATE INDEX IF NOT EXISTS idx_masters_manager ON masters(manager_id);
 CREATE TABLE IF NOT EXISTS partner_audit (
  id SERIAL PRIMARY KEY,
  manager_id INTEGER NOT NULL REFERENCES managers(id),

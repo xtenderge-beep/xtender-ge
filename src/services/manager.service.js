@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const { toE164 } = require('../config/phone');
 const { generateShortId } = require('../config/shortId');
 
-const FIELDS = 'id, name, phone, telegram_id, telegram_linked_at, is_moderator, is_active, created_at';
+const FIELDS = 'id, name, phone, telegram_id, telegram_linked_at, is_moderator, is_active, created_at, web_login, web_enabled';
 
 async function create({ name, phone, isModerator = false }) {
   const { rows } = await pool.query(
@@ -56,7 +56,7 @@ async function linkTelegram(managerId, telegramId) {
 
 async function update(id, { isModerator, isActive }) {
   const { rows } = await pool.query(
-    `UPDATE managers SET is_moderator = $1, is_active = $2 WHERE id = $3 RETURNING ${FIELDS}`,
+    `UPDATE managers SET is_moderator = $1, is_active = $2, web_auth_version = web_auth_version + 1 WHERE id = $3 RETURNING ${FIELDS}`,
     [Boolean(isModerator), Boolean(isActive), id]
   );
   return rows[0] || null;

@@ -57,6 +57,12 @@ router.post('/managers/:id/partner-bind', verifyCsrf, asyncHandler(require('../c
 router.post('/managers/:id/partner-payment', verifyCsrf, asyncHandler(require('../controllers/partner.controller').pay));
 router.post('/managers/:id/partner-payment/:paymentId/void', verifyCsrf, asyncHandler(require('../controllers/partner.controller').voidPayment));
 router.get('/managers', asyncHandler(adminController.managersList));
+router.post('/managers/:id/web-access', verifyCsrf, asyncHandler(async (req,res) => {
+  try {
+    await require('../services/managerPortal.service').provision(req.params.id,req.body.login,req.body.password,req.body.enabled === 'on');
+    res.redirect('/admin/managers/'+encodeURIComponent(req.params.id));
+  } catch(e) { if (!e.status) throw e; res.status(e.status).render('manager/error',{error:e.message}); }
+}));
 router.post('/managers', verifyCsrf, asyncHandler(adminController.managerCreate));
 router.get('/managers/:id', asyncHandler(adminController.managerDetail));
 router.post('/managers/:id/update', verifyCsrf, asyncHandler(adminController.managerUpdate));

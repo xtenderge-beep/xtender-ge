@@ -26,6 +26,17 @@
 </div>
 
 <%- include('./_partner-settings', { partner }) %>
+<div class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
+  <h2 class="font-extrabold">Веб-кабинет менеджера</h2>
+  <p class="text-sm my-2">Вход: <a href="/manager/login" target="_blank" rel="noopener">/manager/login</a>. При сохранении все прежние сессии закрываются. Пароль передайте менеджеру лично.</p>
+  <form method="post" action="/admin/managers/<%= manager.id %>/web-access">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="block my-2">Логин <input class="border rounded px-3 py-2" name="login" value="<%= manager.web_login || '' %>" required pattern="[a-zA-Z0-9._-]{3,64}" maxlength="64" autocomplete="off"></label>
+    <label class="block my-2">Новый пароль <input class="border rounded px-3 py-2" type="password" name="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="Пусто — оставить прежний"></label>
+    <label class="block my-2"><input type="checkbox" name="enabled" <%= manager.web_enabled?'checked':'' %>> Разрешить вход в веб-кабинет</label>
+    <button class="px-4 py-2 rounded bg-stone-900 text-white">Сохранить доступ</button>
+  </form>
+</div>
 <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3">Заявки клиентов (по ссылкам менеджера)</h2>
 <div class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
     <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
@@ -70,4 +81,8 @@
     <% }); %>
 </div>
 
+<div class="bg-white rounded-2xl border border-stone-200 p-4 mt-6">
+  <h2 class="font-extrabold">Журнал веб-кабинета · последние 100 событий</h2>
+  <% portalEvents.forEach(e=>{ %><div class="border-b py-3"><p class="text-xs text-stone-500"><%= new Date(e.created_at).toLocaleString('ru-RU',{timeZone:'Asia/Tbilisi'}) %> · <%= ({note:'Заметка',ban:'Блокировка',unban:'Разблокировка',access_changed:'Изменение доступа'})[e.action] || e.action %> <% if(e.master_id){ %> · <a href="/admin/masters/<%= e.master_id %>">Специалист #<%= e.master_id %></a><% } %></p><p class="whitespace-pre-wrap break-words"><%= e.body %></p></div><% }) %>
+</div>
 <%- include('./_footer') %>
