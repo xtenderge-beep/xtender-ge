@@ -105,10 +105,10 @@ function fieldsFor(type) {
 // { attributes, errors }. attributes — только валидные значения (для master_services);
 // errors — список ключей полей с проблемами (для показа на форме).
 // input:'size' — особый: читает cargo_length/width/height_cm и выводит тир через deriveVanSize.
-function validateAttributes(type, raw = {}) {
+function validateAttributes(type, raw = {}, definedFields = fieldsFor(type)) {
   const attributes = {};
   const errors = [];
-  for (const f of fieldsFor(type)) {
+  for (const f of definedFields) {
     if (f.input === 'size') {
       const size = deriveVanSize(raw.cargo_length_cm, raw.cargo_width_cm, raw.cargo_height_cm);
       if (size) {
@@ -133,7 +133,10 @@ function validateAttributes(type, raw = {}) {
       if (f.required) errors.push(f.key);
       continue;
     }
-    if (f.input === 'enum') {
+    if (f.input === 'text') {
+      if (typeof val !== 'string' || !val.trim() || val.length > 500) { errors.push(f.key); continue; }
+      attributes[f.key] = val.trim();
+    } else if (f.input === 'enum') {
       if (!f.options.includes(String(val))) { errors.push(f.key); continue; }
       attributes[f.key] = String(val);
     } else if (f.input === 'number') {

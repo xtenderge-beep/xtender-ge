@@ -50,7 +50,7 @@ function apiUrl(method) {
   return `${API_BASE}${process.env.TELEGRAM_BOT_TOKEN}/${method}`;
 }
 
-async function buildKeyboardWithCounts(token) {
+async function buildKeyboardWithCounts(token, page = 0) {
   const counts = await orderService.getMasterCountsByCategory();
 
   const total = (category) =>
@@ -60,29 +60,13 @@ async function buildKeyboardWithCounts(token) {
     .filter((row) => row.category === 'transport' && row.vehicle_size)
     .sort((a, b) => SIZE_ORDER.indexOf(a.vehicle_size) - SIZE_ORDER.indexOf(b.vehicle_size));
 
-  const moversCount = total('movers');
-  const junkCount = total('junk');
-  const transportCount = total('transport');
-  const flatbedCount = total('flatbed');
-  const towCount = total('tow');
-  const bucketLiftCount = total('bucket_lift');
-
-  const rows = [
-    [{ text: `🚚 Перевозки — все размеры (${transportCount})`, callback_data: `cat:${token}:transport` }],
-    [
-      { text: `🚛 Бортовые (${flatbedCount})`, callback_data: `cat:${token}:flatbed` },
-      { text: `💪 Грузчики (${moversCount})`, callback_data: `cat:${token}:movers` },
-    ],
-    [
-      { text: `🛻 Эвакуатор (${towCount})`, callback_data: `cat:${token}:tow` },
-      { text: `🏗️ Автовышка (${bucketLiftCount})`, callback_data: `cat:${token}:bucket_lift` },
-    ],
-  ];
-  // Легаси-профили с category='junk' (саморегистрацией туда не попасть) — кнопка только
-  // если такие ещё есть; новые «вывоз мусора» = «Бортовые».
-  if (junkCount) rows.push([{ text: `🧹 Вывоз мусора (${junkCount})`, callback_data: `cat:${token}:junk` }]);
-
-  if (transportSizes.length) {
+  const groups = await require('./category.service').groups();
+  const entries = Object.entries(groups);
+  const pages = Math.max(1, Math.ceil(entries.length / 20));
+  page = Number.isSafeInteger(page) ? Math.max(0, Math.min(page, pages - 1)) : 0;
+  const visible = entries.slice(page * 20, (page + 1) * 20);
+  const rows = visible.map(([key,label]) => [{text: label+' ('+total(key)+')', callback_data: 'cat:'+token+':'+key}]);
+  if (visible.some(([key])=>key==='transport') && transportSizes.length) {
     transportSizes.forEach((row) => {
       rows.push([
         {
@@ -101,6 +85,13 @@ async function buildKeyboardWithCounts(token) {
       button.callback_data = parts.join(':') + ':' + (order?.revision_version || 0);
     }
   }));
+  if (pages > 1) {
+    const navigation=[];
+    if (page > 0) navigation.push({text:'← Назад',callback_data:'cats_page:'+token+':'+(page-1)});
+    if (page < pages-1) navigation.push({text:'Далее →',callback_data:'cats_page:'+token+':'+(page+1)});
+    rows.push(navigation);
+  }
+  rows.push([{ text: '🔄 Обновить категории', callback_data: 'cats_refresh:'+token }]);
   rows.push([{ text: '✏️ Проверить / вернуть на доработку', url: getBaseUrl() + '/admin/orders/' + encodeURIComponent(token) }]);
   return { inline_keyboard: rows };
 }
@@ -309,7 +300,7 @@ async function forwardSupportMessage(master, body, replyToMessageId) {
     return null;
   }
 
-  const cat = MASTER_CATEGORY_LABELS[master.category] || master.category || '';
+  const cat = (await require('./category.service').get(master.category))?.name_ru || MASTER_CATEGORY_LABELS[master.category] || master.category || '';
   const bal = master.balance_tetri != null ? ` · ${(master.balance_tetri / 100).toFixed(2)} ₾` : '';
   const text = `💬 #${master.id} · ${master.name} · ${cat}${bal}\n━━━━━━━━━━\n${body}`;
   const markup = { inline_keyboard: [[{ text: '✍️ Ответить', callback_data: `support:${master.id}` }]] };
@@ -417,7 +408,8 @@ async function refreshMessage(order, keyboard) {
   }
 
   const dispatches = await orderService.getOrderDispatches(order.id).catch(() => []);
-  const dispatchLines = dispatches.map((d) => formatDispatchLine(d.category, d.vehicle_size, d.master_count));
+  const labels = await require('./category.service').groups(true);
+  const dispatchLines = dispatches.map(d => (labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+' — '+d.master_count);
   const funnel = await orderService.getOrderFunnelStats(order.id);
   const text = buildMessageText(order, dispatchLines, funnel);
 
@@ -431,6 +423,14 @@ async function refreshMessage(order, keyboard) {
         }
       });
   }
+}
+
+async function refreshCategories(order, chatId, messageId, page = 0) {
+  if (!isEnabled()) return;
+  const keyboard = ['pending_review','new'].includes(order.status) ? await buildKeyboardWithCounts(order.token, page) : { inline_keyboard: [] };
+  try {
+    await axios.post(apiUrl('editMessageReplyMarkup'),{chat_id:chatId,message_id:messageId,reply_markup:keyboard});
+  } catch(error) { if(!String(error.response?.data?.description || '').includes('not modified')) throw error; }
 }
 
 async function updateMessage(order) {
@@ -458,6 +458,8 @@ async function setWebhook() {
 
 module.exports = {
   isEnabled,
+  buildKeyboardWithCounts,
+  refreshCategories,
   notifyModerator,
   notifyModeratorNewMaster,
   confirmMasterApproved,

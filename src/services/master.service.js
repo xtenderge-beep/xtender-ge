@@ -273,10 +273,11 @@ async function approveMaster(id) {
     const master = found.rows[0];
     if (!master || master.is_banned) return null;
     const type = master.category === 'transport' ? 'van' : master.category;
-    const config = require('../config/serviceTypes');
+    const config = require('./category.service');
+    const definition = await config.get(type,client);
     const services = await client.query('SELECT * FROM master_services WHERE master_id = $1 AND service_type = $2', [id, type]);
     const service = services.rows[0];
-    if (!config.isKnownType(type) || !service || config.validateAttributes(type, service.attributes).errors.length) return null;
+    if (!service || config.validate(definition, service.attributes).errors.length) return null;
     const { rows } = await client.query('UPDATE masters SET is_active = true WHERE id = $1 RETURNING *', [id]);
     return rows[0];
   });
@@ -356,8 +357,10 @@ async function topUpBalance(phone, amountTetri) {
 async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, isFlatbed, priceText, description, serviceAttributes = {} }) {
   const config = require('../config/serviceTypes');
   const type = category === 'transport' ? 'van' : category;
-  const checked = config.validateAttributes(type, serviceAttributes);
-  if (!config.isKnownType(type) || checked.errors.length) {
+  const categories = require('./category.service');
+  const definition = await categories.get(type);
+  const checked = categories.validate(definition, serviceAttributes);
+  if (type !== definition?.slug || checked.errors.length) {
     const error = new Error('Заполните категорию и обязательные характеристики'); error.code = 'INVALID_SERVICE'; throw error;
   }
   if (type === 'van' && ['S','L','XL','XXL'].includes(vehicleSize)) checked.attributes.size = vehicleSize;
@@ -414,7 +417,8 @@ async function listMasters({ serviceType } = {}) {
       attributes: s ? s.attributes || {} : {},
     };
   });
-  return serviceType ? result.filter((m) => m.service_type === serviceType) : result;
+  const active = new Set((await require('./category.service').list()).filter(c=>c.is_active).map(c=>c.slug));
+  return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType));
 }
 
 // Списание за раскрытие номера в публичном каталоге — атомарно: UPDATE с условием на

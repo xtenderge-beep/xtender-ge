@@ -254,8 +254,15 @@ function dispatchFilter(category, vehicleSize) {
  return { activeWhere, catParams, catClause };
 }
 async function getDispatchRecipients(category, vehicleSize, leadPrice) {
+ const catalog = require('./category.service');
+ const definition = await catalog.get(category);
+ if (!definition?.is_active) return [];
  const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
  const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ if (!definition.is_builtin && rows.length) {
+   const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
+   return rows.filter(m=>services.some(s=>s.master_id===m.id && !catalog.validate(definition,s.attributes).errors.length));
+ }
  return rows;
 }
 async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {

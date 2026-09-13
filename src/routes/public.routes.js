@@ -63,7 +63,9 @@ router.get('/', asyncHandler(async (req, res) => {
   });
   masters.forEach((m) => { m.reviews = reviewsByMaster.get(m.id) || []; });
   const t = translate(locale);
-  masters.forEach((m) => { m.badges = serviceTypes.attributeBadges(m.service_type, m.attributes, t); });
+  const categoryService = require('../services/category.service');
+  const categories = await categoryService.list();
+  masters.forEach(m => { m.badges = categoryService.badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale); });
 
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
@@ -79,7 +81,7 @@ router.get('/', asyncHandler(async (req, res) => {
     catalogCallPriceTetri,
     prefillPhone,
     clientStrings: clientStrings(locale),
-    catalogGroups: serviceTypes.catalogGroupsForView(t),
+    catalogGroups: await categoryService.catalogGroups(locale),
   });
 }));
 

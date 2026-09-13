@@ -20,7 +20,7 @@
         <% } %>
     </div>
     <p class="text-sm text-stone-600 mt-2">
-        <%= master.phone %> · <%= master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
+        <%= master.phone %> · <%= master.category_label || master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
     </p>
     <p class="text-sm text-stone-600 mt-1">Рейтинг: <b><%= master.computed_rating %></b> (<%= master.review_count %> отзывов)</p>
     <p class="text-sm mt-1">
@@ -91,11 +91,8 @@
             <div>
                 <label class="text-xs font-bold text-stone-500">Категория</label>
                 <select id="moderatorCategory" name="category" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
-                    <option value="" <%= !master.category ? 'selected' : '' %>>Назначьте категорию</option>
-                    <option value="transport" <%= master.category === 'transport' ? 'selected' : '' %>>Машины</option>
-                    <option value="movers" <%= master.category === 'movers' ? 'selected' : '' %>>Грузчики</option>
-                    <option value="tow" <%= master.category === 'tow' ? 'selected' : '' %>>Эвакуатор</option>
-                    <option value="bucket_lift" <%= master.category === 'bucket_lift' ? 'selected' : '' %>>Автовышка</option>
+                    <option value="" <%= !serviceConfig.some(svc => (svc.type === 'van' ? 'transport' : svc.type) === master.category) ? 'selected' : '' %>>Назначьте категорию</option>
+                    <% serviceConfig.forEach(svc => { const value = svc.type === 'van' ? 'transport' : svc.type; %><option value="<%= value %>" <%= master.category === value ? 'selected' : '' %>><%= svc.label %></option><% }); %>
                 </select>
             </div>
             <div>

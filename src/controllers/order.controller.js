@@ -160,11 +160,12 @@ async function applyTopUp(phone, amountGel) {
   );
 }
 
-function formatMasterInfo(master) {
+async function formatMasterInfo(master) {
+  const category = (await require('../services/category.service').get(master.category))?.name_ru || master.category || 'Не назначена';
   const status = master.is_active ? '✅ активен' : '⏳ на модерации';
   return [
     `👤 ${master.name} (${master.phone})`,
-    `Категория: ${master.category}${master.vehicle_type ? ' — ' + master.vehicle_type : ''}`,
+    `Категория: ${category}${master.vehicle_type ? ' — ' + master.vehicle_type : ''}`,
     `Статус: ${status}`,
     `Баланс: ${(master.balance_tetri / 100).toFixed(2)} GEL`,
   ].join('\n');
@@ -197,7 +198,7 @@ async function handleAdminFlowStep(chatId, flow, rawText) {
     if (flow.action === 'balance') {
       await clearAdminFlow(chatId);
       const master = await masterService.getMasterByPhone(phone);
-      await telegramService.sendToChat(chatId, master ? formatMasterInfo(master) : `Исполнитель с номером ${phone} не найден`);
+      await telegramService.sendToChat(chatId, master ? await formatMasterInfo(master) : `Исполнитель с номером ${phone} не найден`);
       return;
     }
 
@@ -572,6 +573,16 @@ async function telegramWebhook(req, res) {
       return res.sendStatus(200);
     }
 
+    if (callback.data.startsWith('cats_refresh:') || callback.data.startsWith('cats_page:')) {
+      const callbackChat = String(callback.message?.chat?.id || '');
+      const allowed = callbackChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
+      if (!allowed) { await telegramService.answerCallback(callback.id, 'Нет доступа'); return res.sendStatus(200); }
+      const order = await orderService.getOrderByToken(callback.data.split(':')[1]);
+      if (!order) { await telegramService.answerCallback(callback.id, 'Заявка не найдена'); return res.sendStatus(200); }
+      await telegramService.refreshCategories(order, callback.message.chat.id, callback.message.message_id, Number(callback.data.split(':')[2] || 0));
+      await telegramService.answerCallback(callback.id, 'Категории обновлены');
+      return res.sendStatus(200);
+    }
     if (!callback.data.startsWith('cat:')) {
       return res.sendStatus(200);
     }
@@ -580,7 +591,7 @@ async function telegramWebhook(req, res) {
     const allowedModerator = callbackChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
     if (!allowedModerator) { await telegramService.answerCallback(callback.id, 'Нет доступа'); return res.sendStatus(200); }
     const [, token, categoryRaw, sizeRaw, revisionRaw] = callback.data.split(':');
-    const category = ALLOWED_CATEGORIES.has(categoryRaw) ? categoryRaw : null;
+    const category = (await require('../services/category.service').get(categoryRaw))?.is_active ? categoryRaw : null;
     const vehicleSize = sizeRaw && ALLOWED_SIZES.has(sizeRaw) ? sizeRaw : null;
 
     if (!category) {

@@ -20,7 +20,8 @@ const masters=require('../src/services/master.service');
  assert.equal(detail.work_cities[0].name_ru,'Кутаиси');
  const legacy=await masters.registerMaster({...args,phone:'+995500000889',cityId:cities[0].id});
  // pg-mem cannot plan repeated CREATE TABLE IF NOT EXISTS with foreign keys.
- const migration=schema.slice(schema.indexOf('INSERT INTO master_cities (master_id, city_id)'));
+ const start=schema.indexOf('INSERT INTO master_cities (master_id, city_id)');
+ const migration=schema.slice(start,schema.indexOf(';',start)+1);
  db.public.none(migration);db.public.none(migration);
  assert.deepEqual(await saved(),[cities[2].id]);
  assert.equal((await pool.query('SELECT * FROM master_cities WHERE master_id=$1',[legacy.id])).rows.length,1);

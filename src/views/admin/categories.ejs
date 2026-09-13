@@ -1,0 +1,7 @@
+<%- include('./_header',{active:'categories'}) %>
+<div class="flex items-center justify-between gap-3"><h1 class="text-2xl font-bold">Категории услуг</h1><a href="/admin/categories/new" class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Добавить категорию</a></div>
+<p class="mt-3 text-sm text-stone-600">Активные категории доступны при проверке исполнителей, в каталоге и на кнопках новых заявок Telegram. В старом сообщении нажмите «Обновить категории».</p>
+<div class="mt-5 space-y-3">
+<% categories.forEach(c=>{ %><a class="block p-4 bg-white border rounded-xl" href="/admin/categories/<%= c.slug %>"><strong><%= c.icon %> <%= c.name_ru %></strong><span class="ml-3 text-sm"><%= c.is_active?'Активна':'Отключена' %></span><p class="mt-1 text-sm text-stone-500"><%= c.name_ka %> · <%= c.name_en %> · Характеристик: <%= c.fields.length %></p></a><% }); %>
+</div>
+<%- include('./_footer') %>

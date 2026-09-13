@@ -11,6 +11,13 @@ router.post('/verify-2fa', asyncHandler(adminController.verify2fa));
 router.post('/verify-2fa/resend', asyncHandler(adminController.resend2fa));
 
 router.use(requireAdmin);
+const categories = require('../controllers/category.controller');
+router.get('/categories', asyncHandler(categories.index));
+router.get('/categories/new', asyncHandler(categories.form));
+router.get('/categories/:slug', asyncHandler(categories.form));
+router.post('/categories', verifyCsrf, asyncHandler(categories.save));
+router.post('/categories/:slug', verifyCsrf, asyncHandler(categories.save));
+router.post('/orders/:token/refresh-categories', verifyCsrf, asyncHandler(categories.refreshOrder));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',asyncHandler(crm.show));
 router.post('/crm',verifyCsrf,asyncHandler(crm.create));

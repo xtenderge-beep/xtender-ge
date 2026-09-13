@@ -277,6 +277,8 @@ async function statusPage(req, res) {
     topupService.list(master.id),
   ]);
 
+  const category = await require('../services/category.service').get(master.category);
+  master.category_label = category?.['name_'+req.lang] || category?.name_ru || '';
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
     leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,

@@ -189,6 +189,8 @@ async function overview(req, res) {
 
 async function mastersList(req, res) {
   const masters = await adminService.listMastersAdmin();
+  const labels = await require('../services/category.service').groups(true);
+  masters.forEach(m=>m.category_label=labels[m.category] || m.category || 'Категория не назначена');
   res.render('admin/masters', { masters: req.query.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters });
 }
 
@@ -203,7 +205,7 @@ async function masterDetail(req, res) {
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
   const partnerReferrer = master.referral_manager_id ? await require('../services/partner.service').getManager(master.referral_manager_id) : null;
   res.render('admin/master-detail', {
-    serviceConfig: require('../config/serviceTypes').configForView(require('../config/i18n').translate('ru')),
+    serviceConfig: await require('../services/category.service').configForView('ru'),
     master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
@@ -224,7 +226,7 @@ async function updateMaster(req, res) {
   const priceText = (req.body.priceText || '').trim();
   const description = (req.body.description || '').trim();
 
-  if (!name || !phoneRaw || !ALLOWED_CATEGORIES.has(category)) {
+  if (!name || !phoneRaw || !(await require('../services/category.service').get(category))?.is_active) {
     return res.redirect(`/admin/masters/${id}?error=invalid_fields`);
   }
 
@@ -296,7 +298,7 @@ async function orderDetail(req, res) {
   res.locals.revisionNotice = req.query.revisionNotice === 'failed' ? 'failed' : req.query.revisionNotice === 'sent' ? 'sent' : null;
   const order = await adminService.getOrderDetailAdmin(req.params.token);
   if (!order) return res.status(404).send('Заявка не найдена');
-  res.render('admin/order-detail', { order, groups: dispatchService.groups });
+  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups() });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -542,12 +544,12 @@ async function receiptReview(req, res) {
 async function dispatchPreview(req,res) {
   let plan=null, error=null;
   try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || ''); } catch(err) { error=err.message; }
-  res.status(error ? 400 : 200).render('admin/dispatch',{token:req.params.token,plan,error,result:null,groups:dispatchService.groups});
+  res.status(error ? 400 : 200).render('admin/dispatch',{token:req.params.token,plan,error,result:null,groups:await require('../services/category.service').groups()});
 }
 async function dispatchOrder(req,res) {
   let result=null,error=null;
   try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision}); } catch(err) { error=err.message; }
-  res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:dispatchService.groups});
+  res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:await require('../services/category.service').groups()});
 }
 async function updateWelcomeBonus(req, res) {
   const raw = String(req.body.welcomeBonusGel || '').trim();

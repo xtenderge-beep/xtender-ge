@@ -10,6 +10,8 @@
       </select>
     <% } else if (f.input === 'bool') { %>
       <input type="checkbox" name="<%= svc.type %>_<%= f.key %>" <%= attrs[f.key] ? 'checked' : '' %>>
+    <% } else if (f.input === 'text') { %>
+      <input type="text" maxlength="500" name="<%= svc.type %>_<%= f.key %>" value="<%= attrs[f.key] || '' %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
     <% } else { %>
       <input type="number" name="<%= svc.type %>_<%= f.key %>" value="<%= attrs[f.key] == null ? '' : attrs[f.key] %>" min="<%= f.min %>" max="<%= f.max %>" step="any" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
     <% } %>

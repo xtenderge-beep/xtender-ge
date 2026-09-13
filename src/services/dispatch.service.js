@@ -1,12 +1,12 @@
 const orderService = require('./order.service');
 const settingsService = require('./settings.service');
 const pool = require('../config/db');
-const groups = { transport: 'Перевозки', flatbed: 'Открытый кузов', movers: 'Грузчики', tow: 'Эвакуатор', bucket_lift: 'Автовышка', junk: 'Вывоз — старые профили' };
-function validate(category, size) {
+async function validate(category, size) {
+  const groups = await require('./category.service').groups();
   if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !['S','L','XL','XXL'].includes(size)))) throw new Error('Некорректная группа рассылки');
 }
 async function preview(token, category, size) {
-  validate(category, size);
+  await validate(category, size);
   const order = await orderService.getOrderByToken(token);
   if (!order || !['pending_review', 'new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
   const price = await settingsService.getLeadPriceTetri();
@@ -29,4 +29,4 @@ async function dispatch(token, category, size, expected = null) {
   telegramService.updateMessage(order).catch(err => console.error('Dispatch message update failed:', err.message));
   return { count, price: plan.price };
 }
-module.exports = { groups, preview, dispatch, validate };
+module.exports = { preview, dispatch, validate };
