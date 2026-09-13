@@ -11,6 +11,13 @@ router.post('/verify-2fa', asyncHandler(adminController.verify2fa));
 router.post('/verify-2fa/resend', asyncHandler(adminController.resend2fa));
 
 router.use(requireAdmin);
+const crm=require('../controllers/crm.controller');
+router.get('/processes',asyncHandler(crm.show));
+router.post('/crm',verifyCsrf,asyncHandler(crm.create));
+router.get('/crm/:id',asyncHandler(crm.card));
+router.post('/crm/:id/sent',verifyCsrf,asyncHandler(crm.sent));
+router.post('/crm/:id/note',verifyCsrf,asyncHandler(crm.note));
+router.post('/managers/:id/plan',verifyCsrf,asyncHandler(crm.plan));
 
 router.post('/logout', verifyCsrf, adminController.logout);
 

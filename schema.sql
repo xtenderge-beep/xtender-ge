@@ -1,4 +1,5 @@
 -- Xtender database schema
+-- CRM tables are appended below after their referenced tables.
 
 CREATE TABLE IF NOT EXISTS districts (
     id SERIAL PRIMARY KEY,
@@ -542,6 +543,62 @@ CREATE TABLE IF NOT EXISTS manager_portal_events (
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_manager_portal_master ON manager_portal_events(master_id,created_at);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS origin VARCHAR(30) NOT NULL DEFAULT 'self';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS closed_by VARCHAR(20);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS closing_reason VARCHAR(40);
+CREATE TABLE IF NOT EXISTS crm_invites (
+ id SERIAL PRIMARY KEY,
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ kind VARCHAR(20) NOT NULL CHECK(kind IN ('provider','client','operator')),
+ phone VARCHAR(50) NOT NULL,
+ token VARCHAR(32) NOT NULL UNIQUE,
+ request_key VARCHAR(36) NOT NULL UNIQUE,
+ created_by VARCHAR(20) NOT NULL DEFAULT 'manager',
+ order_id INTEGER UNIQUE REFERENCES orders(id),
+ master_id INTEGER REFERENCES masters(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ sent_at TIMESTAMPTZ,
+ opened_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_crm_invites_manager ON crm_invites(manager_id,created_at);
+CREATE TABLE IF NOT EXISTS crm_notes (
+ id SERIAL PRIMARY KEY,
+ invite_id INTEGER NOT NULL REFERENCES crm_invites(id),
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ body TEXT NOT NULL,
+ actor VARCHAR(20) NOT NULL DEFAULT 'manager',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS manager_plans (
+ manager_id INTEGER NOT NULL REFERENCES managers(id),
+ month VARCHAR(7) NOT NULL,
+ registrations INTEGER NOT NULL DEFAULT 0 CHECK(registrations>=0),
+ first_payers INTEGER NOT NULL DEFAULT 0 CHECK(first_payers>=0),
+ payers INTEGER NOT NULL DEFAULT 0 CHECK(payers>=0),
+ revenue_tetri INTEGER NOT NULL DEFAULT 0 CHECK(revenue_tetri>=0),
+ client_confirmed INTEGER NOT NULL DEFAULT 0 CHECK(client_confirmed>=0),
+ client_contacted INTEGER NOT NULL DEFAULT 0 CHECK(client_contacted>=0),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ PRIMARY KEY(manager_id,month)
+);
+CREATE TABLE IF NOT EXISTS dispatch_runs (
+ id SERIAL PRIMARY KEY,
+ order_id INTEGER NOT NULL REFERENCES orders(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS dispatch_deliveries (
+ id SERIAL PRIMARY KEY,
+ run_id INTEGER NOT NULL REFERENCES dispatch_runs(id),
+ order_id INTEGER NOT NULL REFERENCES orders(id),
+ master_id INTEGER NOT NULL REFERENCES masters(id),
+ manager_id INTEGER REFERENCES managers(id),
+ status VARCHAR(20) NOT NULL DEFAULT 'pending',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ finished_at TIMESTAMPTZ,
+ UNIQUE(run_id,master_id)
+);
+CREATE INDEX IF NOT EXISTS idx_dispatch_delivery_manager ON dispatch_deliveries(manager_id,created_at);
 CREATE INDEX IF NOT EXISTS idx_masters_manager ON masters(manager_id);
 CREATE TABLE IF NOT EXISTS partner_audit (
  id SERIAL PRIMARY KEY,

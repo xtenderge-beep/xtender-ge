@@ -48,6 +48,7 @@
         <div><p class="text-[11px] font-bold text-stone-400 uppercase">Закрыто</p><p class="text-xl font-black text-stone-900"><%= clientFunnel.ordersClosed %></p></div>
     </div>
     <form method="POST" action="/admin/managers/<%= manager.id %>/client-link" class="mt-4 flex gap-2 flex-wrap">
+        <input type="hidden" name="requestKey" value="<%= crmRequestKey %>">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="tel" name="phone" placeholder="+995 5XX XX XX XX" required
             class="flex-1 min-w-[200px] border border-stone-300 rounded-xl px-3 py-2 text-sm">

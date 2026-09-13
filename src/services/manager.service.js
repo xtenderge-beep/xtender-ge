@@ -149,7 +149,9 @@ async function getClientFunnel(managerId) {
     `SELECT token, order_id, opened_at FROM client_invites WHERE manager_id = $1`,
     [managerId]
   );
-  const orderIds = invites.map((i) => i.order_id).filter(Boolean);
+  const modern = (await pool.query("SELECT token,order_id,opened_at FROM crm_invites WHERE manager_id=$1 AND kind IN ('client','operator')",[managerId])).rows;
+  invites.push(...modern);
+  const orderIds = [...new Set(invites.map((i) => i.order_id).filter(Boolean))];
   let orders = [];
   if (orderIds.length) {
     const ph = orderIds.map((_, i) => `$${i + 1}`).join(', ');
@@ -169,7 +171,7 @@ async function getClientFunnel(managerId) {
   return {
     linksSent: invites.length,
     linksOpened: invites.filter((i) => i.opened_at).length,
-    ordersCreated: orderIds.length,
+    ordersCreated: orders.filter(o=>o.status!=='unverified').length,
     ordersDispatched: orders.filter((o) => o.first_dispatched_at).length,
     ordersContacted: orders.filter((o) => o.contacted > 0).length,
     ordersClosed: orders.filter((o) => o.status === 'closed').length,

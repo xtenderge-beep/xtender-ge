@@ -61,7 +61,7 @@ async function sendCode(phone, orderLink, purpose = 'order', orderId = null, con
   // provider ref / orderId на строку согласия, где их уже нет. TTL как у самого кода.
   await redis.set(
     `otp_meta:${purpose}:${phone}`,
-    JSON.stringify({ ref: providerMessageId, orderId, challengeId, consent: context.consent || null, sentAt: new Date().toISOString() }),
+    JSON.stringify({ ref: providerMessageId, orderId, challengeId, consent: context.consent || null, draftDetails: context.draftDetails || null, sentAt: new Date().toISOString() }),
     'EX',
     OTP_TTL_SECONDS
   );
@@ -135,7 +135,7 @@ async function verifyCode(phone, code, purpose = 'order', context = {}) {
     await redis.del(`otp_meta:${purpose}:${phone}`);
     if (protectedFlow) {
       await redis.set(`consent_grant:${purpose}:${phone}:${context.challengeId}`,
-        JSON.stringify({ consentLogId: consentRecord.id, orderId: sendMeta.orderId, snapshot: sendMeta.consent }), 'EX', VERIFIED_TTL_SECONDS);
+        JSON.stringify({ consentLogId: consentRecord.id, orderId: sendMeta.orderId, snapshot: sendMeta.consent, draftDetails: sendMeta.draftDetails || null }), 'EX', VERIFIED_TTL_SECONDS);
     } else {
       await redis.set(`verified:${purpose}:${phone}`, '1', 'EX', VERIFIED_TTL_SECONDS);
     }

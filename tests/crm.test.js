@@ -1,0 +1,67 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),crypto=require('crypto'),vm=require('vm');
+process.env.ADMIN_PASSWORD='test-only';process.env.ADMIN_SESSION_SECRET='test-only-crm';
+const {newDb}=require('pg-mem'),db=newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg(),pool=new Pool();pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+const redis=new(require('ioredis-mock'))();
+const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
+stub('../src/config/db',pool);stub('../src/config/redis',redis);
+let failPhone=null;
+stub('../src/services/sms.service',{sendOtp:async()=>({providerMessageId:'test'}),sendOrderNotification:async(phone)=>{if(phone===failPhone)throw Error('channel unavailable');return {providerMessageId:'test'};}});
+stub('../src/services/telegram.service',{notifyModerator:async()=>null,updateMessage:async()=>{},sendLeadToMaster:async()=>false});
+stub('../src/services/translation.service',{translateOrder:async()=>null});
+const crm=require('../src/services/crm.service'),metrics=require('../src/services/crmMetrics.service'),managers=require('../src/services/manager.service'),portal=require('../src/services/managerPortal.service'),orders=require('../src/services/order.service'),partners=require('../src/services/partner.service'),masters=require('../src/services/master.service'),consent=require('../src/services/consent.service');
+(async()=>{
+ const a=await managers.create({name:'Alice',phone:'+995500010001'}),b=await managers.create({name:'Bob',phone:'+995500010002'});
+ const input={phone:'+995500010003',kind:'operator',description:'Move the furniture',districtName:'Tbilisi',requestKey:crypto.randomUUID()};
+ const draft=await crm.invite(a.id,input);assert.equal((await crm.invite(a.id,input)).id,draft.id);assert.equal((await pool.query('SELECT * FROM orders')).rows.length,1);
+ await assert.rejects(()=>crm.invite(b.id,input),{status:409});await assert.rejects(()=>crm.getInvite(draft.id,b.id),{status:404});await assert.rejects(()=>crm.note(draft.id,b.id,'steal'),{status:404});
+ await crm.markSent(draft.id,a.id);const sent=(await crm.getInvite(draft.id,a.id)).sent_at;await crm.markSent(draft.id,a.id);assert.equal(+(await crm.getInvite(draft.id,a.id)).sent_at,+sent);
+ await crm.note(draft.id,a.id,'Call tomorrow <script>bad()</script>');await crm.note(draft.id,null,'Admin note');assert.equal((await crm.card(draft.id,a.id)).notes[0].actor,'admin');
+ const customer=await crm.invite(a.id,{phone:'+995500010004',kind:'client',requestKey:crypto.randomUUID()});assert.equal((await crm.getInvite(customer.id,a.id)).description,'');
+ const provider=await crm.invite(a.id,{phone:'+995500010005',kind:'provider',requestKey:crypto.randomUUID()});assert.equal(provider.order_id,null);
+ const foreign=await crm.invite(b.id,{phone:'+995500019999',kind:'client',requestKey:crypto.randomUUID()});
+ assert.equal(await orders.notifyMasters(await orders.getOrderByToken((await crm.publicInvite(draft.token)).order_token),'movers',null),0);
+ await portal.provision(a.id,'alice','crm-test-password',true);const sid=await portal.login('alice','crm-test-password','test'),session=await portal.session(sid),managerCookie='manager_session='+sid;
+ const express=require('express'),app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));app.use(express.json());app.use(express.urlencoded({extended:false}));app.use(require('cookie-parser')());
+ app.use((req,res,next)=>{req.lang=req.cookies.lang||'ru';res.locals.lang=req.lang;res.locals.t=require('../src/config/i18n').translate(req.lang);res.locals.currentPath=req.path;next();});
+ app.use(require('../src/routes/crmPublic.routes'));app.use('/manager',require('../src/routes/managerPortal.routes'));app.use('/admin',require('../src/routes/admin.routes'));
+ const wrap=require('../src/middleware/asyncHandler');app.post('/api/otp/verify',wrap(require('../src/controllers/otp.controller').verify));
+ app.post('/api/orders',require('multer')({storage:require('multer').memoryStorage()}).array('files',5),(req,res,next)=>{req.files=(req.files||[]).map(f=>({...f,filename:'crm-test.png'}));next();},wrap(require('../src/controllers/order.controller').create));
+ app.use((err,req,res,next)=>{res.status(err.status||500).json({success:false,message:err.message});});
+ const server=await new Promise(resolve=>{const s=app.listen(0,'127.0.0.1',()=>resolve(s));});
+ try{
+  const base='http://127.0.0.1:'+server.address().port,post=(url,body,cookie='')=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',cookie},body:JSON.stringify(body),redirect:'manual'});
+  for(const lang of ['ru','en','ka']){const page=await fetch(base+'/d/'+draft.token,{headers:{cookie:'lang='+lang}});assert.equal(page.status,200);assert.equal(page.headers.get('cache-control'),'no-store');const html=await page.text();assert.ok(html.includes(input.description));for(const s of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(s[1]);if(process.env.CRM_ARTIFACTS)fs.writeFileSync(path.join(process.env.CRM_ARTIFACTS,'draft-'+lang+'.html'),html);}
+  const page=await fetch(base+'/d/'+draft.token,{headers:{cookie:'lang=ru'}}),cookie=page.headers.get('set-cookie').split(';')[0],csrf=cookie.split('=')[1];
+  const sendBody={_csrf:csrf,description:'Corrected furniture request',districtName:'New address',termsAccepted:true,privacyAccepted:true,consentLanguage:'ru',consentDigest:consent.bundle('client','ru').digest};
+  assert.equal((await post('/api/drafts/'+draft.token+'/send',sendBody)).status,403);
+  assert.equal((await post('/api/drafts/'+draft.token+'/send',{...sendBody,termsAccepted:false},cookie)).status,400);
+  const response=await post('/api/drafts/'+draft.token+'/send',sendBody,cookie);assert.equal(response.status,200);const challenge=await response.json();assert.equal((await crm.getInvite(draft.id,a.id)).description,input.description);
+  const code=await redis.get('otp:order:'+input.phone);assert.equal((await post('/api/otp/verify',{phone:input.phone,code,challengeId:challenge.challengeId})).status,200);
+  const form=()=>{const f=new FormData();f.append('token',challenge.token);f.append('phone',input.phone);f.append('challengeId',challenge.challengeId);f.append('files',new Blob(['test image'],{type:'image/png'}),'photo.png');return f;};
+  const originalQuery=pool.query.bind(pool);pool.query=async(sql,...args)=>{if(sql.includes('INSERT INTO order_files'))throw Error('files offline');return originalQuery(sql,...args);};
+  assert.equal((await fetch(base+'/api/orders',{method:'POST',body:form()})).status,500);pool.query=originalQuery;assert.equal((await crm.getInvite(draft.id,a.id)).status,'unverified');
+  const activated=await fetch(base+'/api/orders',{method:'POST',body:form()});assert.equal(activated.status,200);assert.ok((await activated.json()).ownerLink.startsWith('/o/'));const saved=await crm.getInvite(draft.id,a.id);assert.equal(saved.status,'pending_review');assert.equal(saved.description,sendBody.description);assert.ok(saved.confirmed_at);assert.equal((await crm.card(draft.id,a.id)).files.length,1);
+  assert.equal((await fetch(base+'/api/orders',{method:'POST',body:form()})).status,400);assert.equal((await crm.card(draft.id,a.id)).files.length,1);
+  assert.equal((await post('/api/drafts/'+draft.token+'/send',sendBody,cookie)).status,409);
+  const providerResponse=await fetch(base+'/i/'+provider.token,{redirect:'manual'});assert.equal(providerResponse.status,302);assert.equal(providerResponse.headers.get('location'),'/join?ref='+(await partners.getManager(a.id)).referral_token);
+  const master=await masters.registerMaster({name:'Recruited',phone:provider.phone,serviceType:'movers',attributes:{},districtIds:[],referralToken:(await partners.getManager(a.id)).referral_token});assert.equal((await crm.getInvite(provider.id,a.id)).master_id,master.id);
+  await masters.topUpBalance(master.phone,1000);await masters.topUpBalance(master.phone,2000);
+  let report=await metrics.report(a.id);assert.equal(report.totals.registrations,1);assert.equal(report.totals.payers,1);assert.equal(report.totals.first_payers,1);assert.equal(report.totals.payment_operations,2);assert.equal(report.totals.revenue_tetri,3000);assert.equal(report.totals.confirmed,1);
+  await crm.savePlan(a.id,report.month,{registrations:10,first_payers:5,payers:8,revenue:'1000'});report=await metrics.report(a.id);assert.equal(report.rows[0].plan.first_payers,5);await assert.rejects(()=>crm.savePlan(a.id,report.month,{registrations:-1,first_payers:5,payers:8,revenue:1000}));
+  const receiver=(await pool.query("INSERT INTO masters(name,phone,category,manager_id,is_active,is_banned,balance_tetri) VALUES('Receiver','+995500010007','movers',$1,true,false,10000) RETURNING *",[a.id])).rows[0];
+  const failed=(await pool.query("INSERT INTO masters(name,phone,category,manager_id,is_active,is_banned,balance_tetri) VALUES('Failed','+995500010008','movers',$1,true,false,10000) RETURNING *",[b.id])).rows[0];failPhone=failed.phone;
+  assert.equal(await orders.notifyMasters(await orders.getOrderByToken(challenge.token),'movers',null),1);
+  const delivery=(await pool.query("SELECT * FROM dispatch_deliveries WHERE master_id=$1",[receiver.id])).rows[0];
+  await pool.query("INSERT INTO order_views(order_id,master_id,event_type,viewed_at) VALUES($1,$2,'call',$3),($1,$2,'whatsapp',$4)",[draft.order_id,receiver.id,new Date(+delivery.created_at+1000),new Date(+delivery.created_at+2000)]);
+  report=await metrics.report(a.id);assert.equal(report.totals.accepted,1);assert.equal(report.totals.responded,1);assert.equal((await metrics.report(b.id)).totals.failed,1);
+  await managers.assignProvider(receiver.id,b.id);assert.equal((await metrics.report(a.id)).totals.responded,1);
+  const adminAuth=require('../src/config/adminAuth').createSessionValue(),adminCookie='admin_session='+adminAuth.cookieValue;
+  for(const [url,auth] of [['/manager/processes',managerCookie],['/admin/processes',adminCookie],['/manager/crm/'+draft.id,managerCookie]]){const res=await fetch(base+url,{headers:{cookie:auth}});assert.equal(res.status,200);const html=await res.text();assert.ok(!html.includes('NaN'));if(url.startsWith('/manager'))assert.ok(!html.includes(foreign.phone));for(const s of html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g))new vm.Script(s[1]);if(process.env.CRM_ARTIFACTS)fs.writeFileSync(path.join(process.env.CRM_ARTIFACTS,url.includes('/crm/')?'card.html':url.startsWith('/admin')?'admin.html':'manager.html'),html);}
+  assert.equal((await fetch(base+'/manager/crm/'+foreign.id,{headers:{cookie:managerCookie}})).status,404);
+  assert.equal((await post('/manager/crm/'+draft.id+'/sent',{},managerCookie)).status,403);
+  assert.equal((await post('/manager/crm/'+foreign.id+'/note',{_csrf:session.csrf,body:'attack'},managerCookie)).status,404);
+  assert.equal((await post('/admin/managers/'+a.id+'/plan',{month:report.month},adminCookie)).status,403);
+ }finally{await new Promise(resolve=>server.close(resolve));}
+ console.log('PASS CRM: idempotent drafts; manager isolation; invitation tracking; three-language form; SMS consent snapshots; atomic photos/activation rollback; no duplicate submission; real topup funnel; plans; delivery/errors/contact dedup and historical ownership; authenticated pages and CSRF.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

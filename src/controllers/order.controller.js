@@ -81,12 +81,11 @@ async function create(req, res) {
     return res.status(400).json({ success: false, message: 'Phone not verified' });
   }
 
-  const order = await orderService.activateOrder(token, phone, verified, requestMeta(req));
+  const order = await orderService.activateOrder(token, phone, verified, requestMeta(req), req.files);
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });
   }
   await otpService.clearConsentGrant(phone, 'order', req.body.challengeId);
-  await orderService.attachFiles(order.id, req.files);
 
   res.cookie(ownerCookieName(order.token), order.owner_token, {
     secure: req.secure,

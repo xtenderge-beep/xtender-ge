@@ -64,6 +64,7 @@ app.get('/health', (req, res) => {
 
 app.get('/lang/:code', require('./controllers/language.controller').change);
 
+app.use('/', require('./routes/crmPublic.routes'));
 app.use('/', publicRoutes);
 app.use('/:locale(ru|en)', publicRoutes);
 

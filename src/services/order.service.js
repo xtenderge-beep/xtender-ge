@@ -55,14 +55,16 @@ async function getOrderByOwnerToken(ownerToken) {
   return rows[0] || null;
 }
 
-async function activateOrder(token, phone, grant, meta = {}) {
+async function activateOrder(token, phone, grant, meta = {}, files = []) {
   if (!grant) return null;
   return pool.withTransaction(async client => {
+    if (grant.draftDetails) await client.query("UPDATE orders SET description=$4,district_name=$5 WHERE id=$1 AND token=$2 AND phone=$3 AND status='unverified'",[grant.orderId,token,phone,grant.draftDetails.description,grant.draftDetails.districtName]);
     const { rows } = await client.query(
-      "UPDATE orders SET status = 'pending_review' WHERE token = $1 AND phone = $2 AND id = $3 AND status = 'unverified' RETURNING *",
+      "UPDATE orders SET status = 'pending_review', confirmed_at=NOW() WHERE token = $1 AND phone = $2 AND id = $3 AND status = 'unverified' RETURNING *",
       [token, phone, grant.orderId]);
     const order = rows[0];
     if (!order) return null;
+    await attachFiles(order.id, files, client);
     await consentLog.applyConsent(grant, 'client', order.id, phone, meta, client);
     await consentLog.recordAction({ eventType: 'ORDER_DETAILS_RECORDED', phone, orderId: order.id,
       metadata: { description: order.description, district_name: order.district_name }, meta }, client);
@@ -185,7 +187,7 @@ async function markFirstDispatch(token) {
 async function closeOrder(token, { actor = 'admin', reason = 'admin_closed', meta = {} } = {}) {
   return pool.withTransaction(async client => {
     const { rows } = await client.query(
-      "UPDATE orders SET status = 'closed', closed_at = NOW() WHERE token = $1 AND status != 'closed' RETURNING *", [token]);
+      "UPDATE orders SET status = 'closed', closed_at = NOW(), closed_by=$2, closing_reason=$3 WHERE token = $1 AND status != 'closed' RETURNING *", [token,actor,reason]);
     const order = rows[0];
     if (!order) return null;
     await consentLog.recordAction({ eventType: 'ORDER_CLOSED', phone: order.phone, orderId: order.id,
@@ -253,7 +255,7 @@ function dispatchFilter(category, vehicleSize) {
 }
 async function getDispatchRecipients(category, vehicleSize, leadPrice) {
  const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
- const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
  return rows;
 }
 async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
@@ -265,13 +267,15 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
  const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
  const masters = await getDispatchRecipients(category, vehicleSize, leadPrice);
+ const run = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id',[order.id])).rows[0];
+ for (const master of masters) await pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id) VALUES($1,$2,$3,$4)',[run.id,order.id,master.id,master.manager_id]);
   const base = getBaseUrl();
 
   const notifiedIds = [];
   await Promise.all(
     masters.map(async (master) => {
       const live = await getOrderByToken(order.token);
-      if (!live || live.status === 'closed') return;
+      if (!live || !['pending_review','new'].includes(live.status)) { await pool.query("UPDATE dispatch_deliveries SET status='skipped',finished_at=NOW() WHERE run_id=$1 AND master_id=$2",[run.id,master.id]); return; }
       const link = `${base}/order/${order.token}?master=${master.id}`;
 
       // Привязан Telegram → шлём в бот; при сбое откатываемся на SMS, чтобы лид не пропал.
@@ -291,6 +295,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
           console.error(`Failed to notify master ${master.id}:`, err.message);
         }
       }
+      await pool.query('UPDATE dispatch_deliveries SET status=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2',[run.id,master.id,delivered?'accepted':'failed']);
       if (delivered) notifiedIds.push(master.id);
     })
   );
@@ -333,7 +338,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   return notifiedIds.length;
 }
 
-async function attachFiles(orderId, files) {
+async function attachFiles(orderId, files, client = pool) {
   if (!files || !files.length) return;
 
   const values = [];
@@ -345,7 +350,7 @@ async function attachFiles(orderId, files) {
     })
     .join(', ');
 
-  await pool.query(
+  await client.query(
     `INSERT INTO order_files (order_id, file_path, original_name, mime_type) VALUES ${placeholders}`,
     values
   );

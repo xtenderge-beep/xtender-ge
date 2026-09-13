@@ -63,6 +63,7 @@ async function bindNew(master, isNew, token, promoCode, client) {
   const managerId = await findReferrer(token, promoCode, client);
   if (!managerId) return;
   await client.query('UPDATE masters SET referral_manager_id=$2, referral_bound_at=NOW(), manager_id=COALESCE(manager_id,$2) WHERE id=$1 AND referral_manager_id IS NULL', [master.id, managerId]);
+  await client.query("UPDATE crm_invites SET master_id=$3 WHERE manager_id=$1 AND phone=$2 AND kind='provider' AND master_id IS NULL",[managerId,require('../config/phone').toE164(master.phone),master.id]);
   await audit(client, managerId, 'referral_registered', { master_id: master.id });
 }
 async function bindExisting(managerId, masterId, note) {

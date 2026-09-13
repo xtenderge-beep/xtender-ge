@@ -28,6 +28,12 @@ router.use(wrap(async(req,res,next) => {
   next();
 }));
 router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[service.COOKIE]); res.clearCookie(service.COOKIE,service.cookieOptions);res.redirect('/manager/login'); }));
+const crm=require('../controllers/crm.controller');
+router.get('/processes',wrap(crm.show));
+router.post('/crm',wrap(crm.create));
+router.get('/crm/:id',wrap(crm.card));
+router.post('/crm/:id/sent',wrap(crm.sent));
+router.post('/crm/:id/note',wrap(crm.note));
 router.get('/',wrap(async(req,res) => res.render('manager/dashboard',await service.dashboard(req.managerSession.id,req.query.q,req.query.page))));
 router.get('/finances',wrap(async(req,res) => res.render('manager/finances',await service.finances(req.managerSession.id,req.query.month))));
 router.get('/masters/:id',wrap(async(req,res) => res.render('manager/detail',await service.detail(req.managerSession.id,req.params.id))));

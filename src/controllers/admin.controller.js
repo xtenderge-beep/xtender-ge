@@ -426,6 +426,7 @@ async function managerDetail(req, res) {
   const partner = await require('../services/partner.service').getManager(id);
   const portalEvents = (await require('../config/db').query('SELECT master_id,action,body,created_at FROM manager_portal_events WHERE manager_id=$1 ORDER BY created_at DESC,id DESC LIMIT 100',[id])).rows;
   res.render('admin/manager-detail', {
+    crmRequestKey: require('crypto').randomUUID(),
     portalEvents,
     partner,
     manager, stats, clientFunnel, baseUrl: baseUrl(req),
@@ -439,8 +440,8 @@ async function managerClientLink(req, res) {
   if (!/^\+?\d{9,15}$/.test(phone)) {
     return res.redirect(`/admin/managers/${id}?error=phone`);
   }
-  const token = await managerService.createClientInvite(id, phone);
-  res.redirect(`/admin/managers/${id}?link=${encodeURIComponent(`${baseUrl(req)}/z/${token}`)}`);
+  const item = await require('../services/crm.service').invite(id,{kind:'client',phone,requestKey:req.body.requestKey||require('crypto').randomUUID()},'admin');
+  res.redirect('/admin/crm/'+item.id);
 }
 
 async function assignManager(req, res) {
