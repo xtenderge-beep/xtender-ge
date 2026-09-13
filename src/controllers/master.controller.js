@@ -18,7 +18,6 @@ const { clientStrings } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION } = require('../config/legal');
 const payment = require('../config/payment');
-const serviceTypes = require('../config/serviceTypes');
 
 const PHONE_REGEX = /^\+?\d{9,15}$/;
 const RECEIPT_RATE_MAX = 5;
@@ -167,11 +166,14 @@ async function verifyOtp(req, res) {
 
 async function register(req, res) {
   // Форма /join теперь multipart (для фото), поэтому все значения — строки, чекбоксы —
-  // 'true'/'on'/отсутствуют, districtIds — строка или массив строк.
+  // 'true'/'on'/отсутствуют, cityIds — строка или массив строк.
   const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
   const name = (req.body.name || '').trim();
   const description = (req.body.description || '').trim();
-  const serviceType = req.body.serviceType;
+  const spokenLanguages = require('../config/spokenLanguages').parse(req.body.spokenLanguages);
+  if (!spokenLanguages) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_languages_required });
+  const serviceType = null;
+  if (!description || description.length > 2000) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_services_required });
   const termsAccepted = isChecked(req.body.termsAccepted);
   const privacyAccepted = isChecked(req.body.privacyAccepted);
 
@@ -181,28 +183,20 @@ async function register(req, res) {
   if (!name) {
     return res.status(400).json({ success: false, message: 'Name is required' });
   }
-  if (!serviceTypes.isKnownType(serviceType)) {
-    return res.status(400).json({ success: false, message: 'Invalid service type' });
-  }
   if (!termsAccepted || !privacyAccepted) {
     return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
   }
 
-  const { attributes, errors: attrErrors } = serviceTypes.validateAttributes(serviceType, req.body);
-  if (attrErrors.length) {
-    return res.status(400).json({ success: false, message: 'Заполните обязательные поля услуги', fieldErrors: attrErrors });
-  }
+  const attributes = {};
 
-  const cities = await masterService.getActiveCities();
-  const cityId = Number(req.body.cityId) || null;
-  if (!cities.some((c) => c.id === cityId)) {
-    return res.status(400).json({ success: false, message: 'Выберите город' });
+  const cities = await masterService.getWorkCities();
+  let rawCityIds = req.body.cityIds || [];
+  if (!Array.isArray(rawCityIds)) rawCityIds = [rawCityIds];
+  const cityIds = [...new Set(rawCityIds.map(id => typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : NaN))];
+  if (!cityIds.length || cityIds.some(id => !cities.some(c => c.id === id))) {
+    return res.status(400).json({ success: false, message: clientStrings(req.lang).join_work_cities_required });
   }
-  const cityDistricts = await masterService.getDistrictsByCity(cityId);
-  const validDistrictIds = new Set(cityDistricts.map((d) => d.id));
-  let districtIds = req.body.districtIds || req.body['districtIds[]'] || [];
-  if (!Array.isArray(districtIds)) districtIds = [districtIds];
-  districtIds = [...new Set(districtIds.map(Number).filter((id) => validDistrictIds.has(id)))];
+  const cityId = cityIds[0];
 
   const phone = toE164(rawPhone);
   const verified = await otpService.getConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
@@ -216,9 +210,10 @@ async function register(req, res) {
     description,
     serviceType,
     attributes,
-    vehicleTypeText: (req.body.vehicleType || '').trim() || null,
+    spokenLanguages,
+    vehicleTypeText: null,
     cityId,
-    districtIds,
+    cityIds,
     photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
     consentGrant: verified, requestMeta: requestMeta(req),
     referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,

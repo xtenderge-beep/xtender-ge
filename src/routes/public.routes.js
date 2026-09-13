@@ -129,12 +129,7 @@ router.get('/join', asyncHandler(async (req, res) => {
 
   const t = translate(locale);
   const nameKey = { ka: 'name_ka', ru: 'name_ru', en: 'name_en' }[locale] || 'name_ru';
-  const cities = await masterService.getActiveCities();
-  const districtsByCity = {};
-  for (const c of cities) {
-    districtsByCity[c.id] = (await masterService.getDistrictsByCity(c.id))
-      .map((d) => ({ id: d.id, name: d[nameKey] || d.name_ka }));
-  }
+  const cities = await masterService.getWorkCities();
 
   const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
@@ -143,9 +138,7 @@ router.get('/join', asyncHandler(async (req, res) => {
     welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
     clientStrings: clientStrings(locale),
     promo,
-    serviceConfig: serviceTypes.configForView(t),
     cities: cities.map((c) => ({ id: c.id, name: c[nameKey] || c.name_ka })),
-    districtsByCity,
   });
 }));
 

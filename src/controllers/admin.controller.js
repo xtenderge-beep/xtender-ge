@@ -203,13 +203,15 @@ async function masterDetail(req, res) {
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
   const partnerReferrer = master.referral_manager_id ? await require('../services/partner.service').getManager(master.referral_manager_id) : null;
   res.render('admin/master-detail', {
+    serviceConfig: require('../config/serviceTypes').configForView(require('../config/i18n').translate('ru')),
     master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
 
 async function approveMaster(req, res) {
   const id = parseInt(req.params.id, 10);
-  await masterService.approveMaster(id);
+  const approved = await masterService.approveMaster(id);
+  if (!approved) return res.redirect('/admin/masters/' + id + '?error=service_required');
   res.redirect('/admin/masters');
 }
 
@@ -239,8 +241,10 @@ async function updateMaster(req, res) {
       isFlatbed,
       priceText,
       description,
+      serviceAttributes: Object.fromEntries(Object.entries(req.body).filter(([key]) => key.startsWith((category === 'transport' ? 'van' : category) + '_')).map(([key, value]) => [key.slice((category === 'transport' ? 'van' : category).length + 1), value])),
     });
   } catch (err) {
+    if (err.code === 'INVALID_SERVICE') return res.redirect(`/admin/masters/${id}?error=service_required`);
     if (err.code === '23505') {
       return res.redirect(`/admin/masters/${id}?error=phone_taken`);
     }

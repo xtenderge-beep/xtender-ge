@@ -163,7 +163,9 @@ async function getMasterDetail(id) {
      FROM master_reviews WHERE master_id = $1 AND is_approved = true`,
     [id]
   );
-  return { ...master, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
+  const workCities = await pool.query('SELECT c.name_ru FROM cities c JOIN master_cities mc ON mc.city_id = c.id WHERE mc.master_id = $1 ORDER BY c.sort_order, c.id', [id]);
+  const services = await pool.query('SELECT service_type, attributes FROM master_services WHERE master_id = $1', [id]);
+  return { ...master, services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
 }
 
 async function getMasterBalanceHistory(masterId) {

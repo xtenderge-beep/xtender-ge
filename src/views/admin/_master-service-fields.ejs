@@ -1,0 +1,33 @@
+<% serviceConfig.forEach(svc => { const saved = (master.services || []).find(s => s.service_type === svc.type); const attrs = saved ? saved.attributes : {}; %>
+<fieldset data-service-panel="<%= svc.type %>" class="space-y-3 border border-stone-200 rounded-xl p-3">
+  <legend class="text-sm font-bold"><%= svc.label %>: характеристики</legend>
+  <% svc.fields.filter(f => f.input !== 'size').forEach(f => { %>
+    <label class="block text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
+    <% if (f.input === 'enum') { %>
+      <select name="<%= svc.type %>_<%= f.key %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
+        <option value="">Выберите</option>
+        <% f.options.forEach(o => { %><option value="<%= o.value %>" <%= attrs[f.key] === o.value ? 'selected' : '' %>><%= o.label %></option><% }); %>
+      </select>
+    <% } else if (f.input === 'bool') { %>
+      <input type="checkbox" name="<%= svc.type %>_<%= f.key %>" <%= attrs[f.key] ? 'checked' : '' %>>
+    <% } else { %>
+      <input type="number" name="<%= svc.type %>_<%= f.key %>" value="<%= attrs[f.key] == null ? '' : attrs[f.key] %>" min="<%= f.min %>" max="<%= f.max %>" step="any" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
+    <% } %>
+    </label>
+  <% }); %>
+</fieldset>
+<% }); %>
+<script>
+(() => {
+ const select = document.getElementById('moderatorCategory');
+ function update() {
+  const type = select.value === 'transport' ? 'van' : select.value;
+  document.querySelectorAll('[data-service-panel]').forEach(panel => {
+   const active = panel.dataset.servicePanel === type;
+   panel.hidden = !active;
+   panel.querySelectorAll('input,select').forEach(input => input.disabled = !active);
+  });
+ }
+ select.addEventListener('change', update); update();
+})();
+</script>

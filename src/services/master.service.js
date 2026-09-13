@@ -14,8 +14,8 @@ const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_tex
 // Всё в одной транзакции. ON CONFLICT (phone) — повторная регистрация обновляет профиль
 // и строку услуги того же типа (is_active снова false → снова на модерацию).
 async function registerMaster({
-  name, phone, description, serviceType, attributes = {},
-  vehicleTypeText = null, cityId = null, districtIds = [], photoUrl = null,
+  name, phone, description, serviceType, attributes = {}, spokenLanguages = null,
+  vehicleTypeText = null, cityId = null, districtIds = [], cityIds = null, photoUrl = null,
   consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null,
 }) {
   const masterToken = generateShortId();
@@ -55,6 +55,21 @@ async function registerMaster({
     );
     master = rows[0];
     }
+    if (spokenLanguages !== null) {
+      const languages = require('../config/spokenLanguages').parse(spokenLanguages);
+      if (!languages) throw new Error('Invalid spoken languages');
+      await client.query('UPDATE masters SET spoken_languages = $1::jsonb WHERE id = $2', [JSON.stringify(languages), master.id]);
+      master.spoken_languages = languages;
+    }
+    if (cityIds !== null) {
+      const available = await client.query('SELECT id FROM cities');
+      const valid = new Set(available.rows.map(c => c.id));
+      if (!Array.isArray(cityIds) || !cityIds.length || cityIds.some(id => !Number.isSafeInteger(id) || !valid.has(id))) throw new Error('Invalid work cities');
+      await client.query('DELETE FROM master_cities WHERE master_id = $1', [master.id]);
+      for (const id of new Set(cityIds)) await client.query('INSERT INTO master_cities (master_id, city_id) VALUES ($1, $2)', [master.id, id]);
+      await client.query('UPDATE masters SET city_id = $1 WHERE id = $2', [cityIds[0], master.id]);
+      master.city_id = cityIds[0];
+    }
     // The unique phone constraint selects exactly one first registration, even
     // under concurrent retries. Profile, balance and ledger commit together.
     if (isNew && welcomeBonusTetri > 0) {
@@ -63,13 +78,14 @@ async function registerMaster({
     await require('./partner.service').bindNew(master, isNew, referralToken, referralPromoCode, client);
     master.welcomeBonusTetri = isNew ? welcomeBonusTetri : 0;
 
-    await client.query(
+    if (serviceType) await client.query(
       `INSERT INTO master_services (master_id, service_type, attributes, is_primary)
        VALUES ($1, $2, $3::jsonb, true)
        ON CONFLICT (master_id, service_type) DO UPDATE SET attributes = EXCLUDED.attributes`,
       [master.id, serviceType, JSON.stringify(attributes || {})]
     );
 
+    if (!serviceType) await client.query('DELETE FROM master_services WHERE master_id = $1', [master.id]);
     await client.query(`DELETE FROM master_districts WHERE master_id = $1`, [master.id]);
     for (const did of districtIds || []) {
       if (!Number.isFinite(Number(did))) continue;
@@ -81,6 +97,11 @@ async function registerMaster({
     if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client);
     return master;
   });
+}
+
+async function getWorkCities() {
+  const { rows } = await pool.query('SELECT id, slug, name_ka, name_ru, name_en FROM cities ORDER BY sort_order, id');
+  return rows;
 }
 
 async function getActiveCities() {
@@ -247,11 +268,18 @@ async function getMasterLeads(masterId, limit = 100) {
 }
 
 async function approveMaster(id) {
-  const { rows } = await pool.query(
-    `UPDATE masters SET is_active = true WHERE id = $1 RETURNING *`,
-    [id]
-  );
-  return rows[0] || null;
+  return pool.withTransaction(async client => {
+    const found = await client.query('SELECT * FROM masters WHERE id = $1 FOR UPDATE', [id]);
+    const master = found.rows[0];
+    if (!master || master.is_banned) return null;
+    const type = master.category === 'transport' ? 'van' : master.category;
+    const config = require('../config/serviceTypes');
+    const services = await client.query('SELECT * FROM master_services WHERE master_id = $1 AND service_type = $2', [id, type]);
+    const service = services.rows[0];
+    if (!config.isKnownType(type) || !service || config.validateAttributes(type, service.attributes).errors.length) return null;
+    const { rows } = await client.query('UPDATE masters SET is_active = true WHERE id = $1 RETURNING *', [id]);
+    return rows[0];
+  });
 }
 
 async function getMasterByPhone(phone) {
@@ -325,14 +353,25 @@ async function topUpBalance(phone, amountTetri) {
 // category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
 // остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
 // мастера до одного тира).
-async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, isFlatbed, priceText, description }) {
-  const { rows } = await pool.query(
-    `UPDATE masters SET name = $1, phone = $2, category = $3, vehicle_type = $4, vehicle_size = $5,
-            is_flatbed = $6, price_text = $7, description = $8
-     WHERE id = $9 RETURNING *`,
-    [name, phone, category, vehicleType || null, vehicleSize || null, isFlatbed, priceText || null, description || null, id]
-  );
-  return rows[0] || null;
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, isFlatbed, priceText, description, serviceAttributes = {} }) {
+  const config = require('../config/serviceTypes');
+  const type = category === 'transport' ? 'van' : category;
+  const checked = config.validateAttributes(type, serviceAttributes);
+  if (!config.isKnownType(type) || checked.errors.length) {
+    const error = new Error('Заполните категорию и обязательные характеристики'); error.code = 'INVALID_SERVICE'; throw error;
+  }
+  if (type === 'van' && ['S','L','XL','XXL'].includes(vehicleSize)) checked.attributes.size = vehicleSize;
+  const legacy = config.legacyColumnsFor(type, checked.attributes);
+  return pool.withTransaction(async client => {
+    await client.query('SELECT id FROM masters WHERE id = $1 FOR UPDATE', [id]);
+    const { rows } = await client.query(
+      'UPDATE masters SET name=$1, phone=$2, category=$3, vehicle_type=$4, vehicle_size=$5, is_flatbed=$6, price_text=$7, description=$8 WHERE id=$9 RETURNING *',
+      [name, phone, legacy.category, vehicleType || null, legacy.vehicle_size, legacy.is_flatbed, priceText || null, description || null, id]);
+    if (!rows[0]) return null;
+    await client.query('DELETE FROM master_services WHERE master_id=$1', [id]);
+    await client.query('INSERT INTO master_services (master_id, service_type, attributes, is_primary) VALUES ($1,$2,$3::jsonb,true)', [id,type,JSON.stringify(checked.attributes)]);
+    return rows[0];
+  });
 }
 
 // balance_tetri — только чтобы каталог мог решить, показывать ли кнопку «Показать номер»
@@ -409,6 +448,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
 
 module.exports = {
   registerMaster,
+  getWorkCities,
   getActiveCities,
   getDistrictsByCity,
   getMasterByToken,

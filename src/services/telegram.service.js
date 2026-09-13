@@ -186,12 +186,12 @@ async function notifyModeratorNewMaster(master) {
     '',
     `👤 ${master.name}`,
     `📞 ${master.phone}`,
-    `${MASTER_CATEGORY_LABELS[master.category] || master.category}`,
+    `${MASTER_CATEGORY_LABELS[master.category] || master.category || 'Категорию назначит модератор'}`,
   ];
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
 
-  const markup = { inline_keyboard: [[{ text: '✅ Одобрить', callback_data: `master_approve:${master.id}` }]] };
+  const markup = { inline_keyboard: [[{ text: '📝 Проверить анкету и назначить категорию', url: getBaseUrl() + '/admin/masters/' + master.id }]] };
   let firstId = null;
   for (const chatId of await getModeratorChatIds()) {
     try {

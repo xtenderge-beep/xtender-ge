@@ -363,7 +363,7 @@ async function handleMasterApproval(callback) {
   const master = await masterService.approveMaster(masterId);
 
   if (!master) {
-    await telegramService.answerCallback(callback.id, 'Исполнитель не найден');
+    await telegramService.answerCallback(callback.id, 'Сначала назначьте категорию и характеристики в админке. Профиль должен быть без блокировки.');
     return;
   }
 

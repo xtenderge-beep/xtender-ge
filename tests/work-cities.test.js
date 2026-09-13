@@ -1,0 +1,29 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
+const db=require('pg-mem').newDb();
+const schema=fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8');
+db.public.none(schema);
+const {Pool}=db.adapters.createPg(),pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+const masters=require('../src/services/master.service');
+(async()=>{
+ const cities=await masters.getWorkCities();assert.equal(cities.length,4);
+ const args={name:'Cities',phone:'+995500000888',serviceType:'movers'};
+ const first=await masters.registerMaster({...args,cityIds:[cities[0].id,cities[1].id,cities[0].id]});
+ const saved=async()=> (await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1 ORDER BY city_id',[first.id])).rows.map(r=>r.city_id);
+ assert.deepEqual(await saved(),[cities[0].id,cities[1].id]);
+ await masters.registerMaster({...args,cityIds:[cities[2].id]});
+ assert.deepEqual(await saved(),[cities[2].id]);
+ for(const cityIds of [[],[99999],[null],['1']]) await assert.rejects(masters.registerMaster({...args,cityIds}));
+ assert.deepEqual(await saved(),[cities[2].id]);
+ const detail=await require('../src/services/admin.service').getMasterDetail(first.id);
+ assert.equal(detail.work_cities[0].name_ru,'Кутаиси');
+ const legacy=await masters.registerMaster({...args,phone:'+995500000889',cityId:cities[0].id});
+ // pg-mem cannot plan repeated CREATE TABLE IF NOT EXISTS with foreign keys.
+ const migration=schema.slice(schema.indexOf('INSERT INTO master_cities (master_id, city_id)'));
+ db.public.none(migration);db.public.none(migration);
+ assert.deepEqual(await saved(),[cities[2].id]);
+ assert.equal((await pool.query('SELECT * FROM master_cities WHERE master_id=$1',[legacy.id])).rows.length,1);
+ const ejs=require('ejs');for(const f of ['join.ejs','admin/master-detail.ejs'])ejs.compile(fs.readFileSync(path.join(__dirname,'../src/views',f),'utf8'));
+ console.log('PASS: multiple cities, replacement, invalid cities rollback, admin display, legacy migration and rerun');
+})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,0 +1,41 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
+const db=require('pg-mem').newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg(),pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+const masters=require('../src/services/master.service');
+(async()=>{
+ const args={name:'Pending',phone:'+995500000777',description:'Перевожу мебель',serviceType:null};
+ const first=await masters.registerMaster(args);
+ assert.equal(first.category,null);assert.equal(first.is_active,false);
+ assert.equal((await pool.query('SELECT * FROM master_services WHERE master_id=$1',[first.id])).rows.length,0);
+ assert.equal(await masters.approveMaster(first.id),null);
+ const profile={name:args.name,phone:args.phone,description:args.description,category:'tow',serviceAttributes:{tow_type:'platform',max_tonnage:'8'}};
+ await assert.rejects(masters.updateMasterProfile(first.id,{...profile,serviceAttributes:{}}),{code:'INVALID_SERVICE'});
+ await masters.updateMasterProfile(first.id,profile);
+ assert.equal((await pool.query('SELECT is_active FROM masters WHERE id=$1',[first.id])).rows[0].is_active,false);
+ assert.equal((await masters.approveMaster(first.id)).is_active,true);
+ await masters.updateMasterProfile(first.id,{...profile,category:'transport',vehicleSize:'XL',serviceAttributes:{body:'flatbed',with_helpers:'on'}});
+ const rows=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[first.id])).rows;
+ assert.equal(rows.length,1);assert.equal(rows[0].service_type,'van');assert.equal(rows[0].attributes.size,'XL');
+ const detail=await require('../src/services/admin.service').getMasterDetail(first.id);
+ assert.equal(detail.category,'transport');assert.equal(detail.is_flatbed,true);
+ await masters.registerMaster(args);
+ assert.equal(await masters.approveMaster(first.id),null);
+ await masters.updateMasterProfile(first.id,profile);
+ await pool.query('UPDATE masters SET is_banned=true WHERE id=$1',[first.id]);
+ assert.equal(await masters.approveMaster(first.id),null);
+ const ejs=require('ejs'),config=require('../src/config/serviceTypes'),i18n=require('../src/config/i18n');
+ const form=ejs.render(fs.readFileSync(path.join(__dirname,'../src/views/admin/_master-service-fields.ejs'),'utf8'),{master:detail,serviceConfig:config.configForView(i18n.translate('ru'))});
+ assert.ok(form.includes('tow_max_tonnage'));assert.ok(form.includes('bucket_lift_work_height_m'));
+ new (require('vm').Script)(form.match(/<script>([\s\S]*?)<\/script>/)[1]);
+ const join=fs.readFileSync(path.join(__dirname,'../src/views/join.ejs'),'utf8');
+ assert.ok(!join.includes('serviceType'));assert.ok(!join.includes('collectAttributes'));
+ for(const lang of ['ka','ru','en']) {
+  const script=join.match(/<script>([\s\S]*?)<\/script>/)[1];
+  const rendered=ejs.render(script,{clientStrings:i18n.clientStrings(lang),consent:{language:lang,digest:'test'}});
+  new (require('vm').Script)(rendered);
+  assert.ok(i18n.clientStrings(lang).join_services_description);
+ }
+ console.log('PASS: uncategorized signup, approval guard, required attributes, catalog sync, re-registration, banned approval, localized browser scripts');
+})().catch(e=>{console.error(e);process.exitCode=1;});

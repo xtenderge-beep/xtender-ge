@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS master_districts (
     PRIMARY KEY (master_id, district_id)
 );
 
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS spoken_languages JSONB NOT NULL DEFAULT '[]'::jsonb;
+
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     district_id INTEGER REFERENCES districts(id) ON DELETE RESTRICT,
@@ -607,3 +609,15 @@ CREATE TABLE IF NOT EXISTS partner_audit (
  detail JSONB NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Provider work coverage; legacy city_id is retained for compatibility.
+CREATE TABLE IF NOT EXISTS master_cities (
+  master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  city_id INTEGER NOT NULL REFERENCES cities(id) ON DELETE CASCADE,
+  PRIMARY KEY (master_id, city_id)
+);
+INSERT INTO master_cities (master_id, city_id)
+SELECT m.id, m.city_id FROM masters m JOIN cities c ON c.id = m.city_id
+LEFT JOIN master_cities mc ON mc.master_id = m.id
+WHERE mc.master_id IS NULL
+ON CONFLICT DO NOTHING;
