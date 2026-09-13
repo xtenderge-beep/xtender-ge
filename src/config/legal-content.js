@@ -205,7 +205,7 @@ const terms = {
 
 const privacy = {
   version: PRIVACY_VERSION,
-  updated: { ka: '2026 წლის 12 სექტემბერი', ru: '12 сентября 2026 г.', en: 'September 12, 2026' },
+  updated: { ka: '2026 წლის 13 სექტემბერი', ru: '13 сентября 2026 г.', en: 'September 13, 2026' },
   body: {
     ka: [
       { h: '2.1. ზოგადი დებულებები' },

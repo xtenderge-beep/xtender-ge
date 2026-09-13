@@ -3,7 +3,7 @@ module.exports = {
   ru: {
     platform: 'Xtender — платформа для связи заказчиков и независимых исполнителей. Xtender не выполняет работы и не гарантирует их качество. Заказчик и исполнитель самостоятельно согласовывают цену, объём и условия работ. Это не исключает ответственность Xtender за собственные нарушения.',
     clientTerms: 'Мне исполнилось 18 лет. Принимаю условия платформы и понимаю её роль.',
-    clientSharing: 'Разрешаю передать мой номер телефона и сведения об этой заявке подходящим исполнителям для связи со мной по этой заявке. Ознакомлен с Политикой конфиденциальности.',
+    clientSharing: 'Разрешаю передать мой номер телефона и сведения об этой заявке подходящим исполнителям для связи со мной по этой заявке. Согласен получать от Xtender сервисные SMS по этой заявке: код подтверждения, ссылку для управления заявкой, уведомления о её статусе и приглашение оставить отзыв. Это согласие не распространяется на рекламные SMS. Ознакомлен с Политикой конфиденциальности.',
     provider: 'Принимаю правила получения заявок. Заявка может быть направлена нескольким исполнителям; получение заявки не гарантирует заказ или заработок. Стоимость и правила списания определяются отдельно согласованными со мной условиями.',
     closing: 'Нашли исполнителя или услуга больше не нужна? Откройте свою заявку по ссылке из SMS и закройте её, чтобы прекратить новые рассылки. Уже получившие контакты исполнители могут ещё связаться с вами.',
     withdrawal: 'Для отзыва согласия на передачу контактов закройте заявку; по вопросам обработки данных обращайтесь: support@xtender.ge.',
@@ -15,7 +15,7 @@ module.exports = {
   en: {
     platform: 'Xtender connects customers with independent providers. Xtender does not perform the work or guarantee its quality. Customers and providers agree directly on the price, scope and terms of work. This does not exclude Xtender’s liability for its own breaches.',
     clientTerms: 'I am at least 18 years old. I accept the platform terms and understand its role.',
-    clientSharing: 'I consent to sharing my phone number and this request with suitable providers so they can contact me about this request. I have read the Privacy Policy.',
+    clientSharing: 'I consent to sharing my phone number and this request with suitable providers so they can contact me about this request. I agree to receive service SMS from Xtender about this request: a verification code, a request management link, status updates and an invitation to leave a review. This consent does not cover advertising SMS. I have read the Privacy Policy.',
     provider: 'I accept the rules for receiving requests. A request may reach multiple providers; receiving it does not guarantee a job or income. Prices and charging rules are governed by the terms separately agreed with me.',
     closing: 'Found a provider or no longer need the service? Open your request using the SMS link and close it to stop new dispatches. Providers who already received your contact details may still contact you.',
     withdrawal: 'To withdraw consent to sharing your contact details, close the request. For data processing enquiries contact support@xtender.ge.',
@@ -27,7 +27,7 @@ module.exports = {
   ka: {
     platform: 'Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან. Xtender არ ასრულებს სამუშაოს და არ იძლევა მისი ხარისხის გარანტიას. ფასს, სამუშაოს მოცულობასა და პირობებს დამკვეთი და შემსრულებელი უშუალოდ ათანხმებენ. ეს არ გამორიცხავს Xtender-ის პასუხისმგებლობას საკუთარ დარღვევებზე.',
     clientTerms: 'ვარ 18 წლის ან მეტის. ვეთანხმები პლატფორმის პირობებს და მესმის მისი როლი.',
-    clientSharing: 'ვეთანხმები ჩემი ტელეფონის ნომრისა და ამ განაცხადის მონაცემების შესაბამისი შემსრულებლებისთვის გადაცემას, რათა ამ განაცხადთან დაკავშირებით დამიკავშირდნენ. გავეცანი კონფიდენციალურობის პოლიტიკას.',
+    clientSharing: 'ვეთანხმები ჩემი ტელეფონის ნომრისა და ამ განაცხადის მონაცემების შესაბამისი შემსრულებლებისთვის გადაცემას, რათა ამ განაცხადთან დაკავშირებით დამიკავშირდნენ. ვეთანხმები Xtender-ისგან ამ განაცხადთან დაკავშირებული სერვისული SMS-ების მიღებას: დადასტურების კოდი, განაცხადის მართვის ბმული, სტატუსის შეტყობინებები და შეფასების დატოვების მოწვევა. ეს თანხმობა არ ვრცელდება სარეკლამო SMS-ებზე. გავეცანი კონფიდენციალურობის პოლიტიკას.',
     provider: 'ვეთანხმები განაცხადების მიღების წესებს. განაცხადი შეიძლება რამდენიმე შემსრულებელს გაეგზავნოს; მისი მიღება არ იძლევა სამუშაოს ან შემოსავლის გარანტიას. ფასი და თანხის ჩამოჭრის წესები განისაზღვრება ჩემთან ცალკე შეთანხმებული პირობებით.',
     closing: 'იპოვეთ შემსრულებელი ან მომსახურება აღარ გჭირდებათ? გახსენით თქვენი განაცხადი SMS-ის ბმულით და დახურეთ, რათა შეწყდეს ახალი გაგზავნები. შემსრულებლები, რომლებმაც უკვე მიიღეს თქვენი საკონტაქტო მონაცემები, შესაძლოა კვლავ დაგიკავშირდნენ.',
     withdrawal: 'საკონტაქტო მონაცემების გადაცემაზე თანხმობის გამოსათხოვად დახურეთ განაცხადი. მონაცემთა დამუშავების საკითხებზე მოგვწერეთ: support@xtender.ge.',
