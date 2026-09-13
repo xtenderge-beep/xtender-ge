@@ -98,6 +98,17 @@ router.get('/z/:token', asyncHandler(async (req, res) => {
   res.redirect(`${locale}/#post-section`);
 }));
 
+// Public referral alias; the manager ID prevents collisions between token prefixes.
+router.get('/p/:code', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const match = /^([1-9a-z][0-9a-z]{0,6})-([a-f0-9]{8})$/.exec(req.params.code);
+  const id = match ? parseInt(match[1], 36) : 0;
+  if (!id || id > 2147483647 || id.toString(36) !== match[1]) return res.status(404).send('Ссылка не найдена');
+  const manager = await require('../services/partner.service').getManager(id);
+  if (!manager?.is_active || !manager.referral_token || manager.referral_token.slice(0, 8) !== match[2]) return res.status(404).send('Ссылка не найдена');
+  res.redirect('/join?ref=' + encodeURIComponent(manager.referral_token));
+}));
+
 router.get('/join', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '/join')) return;
   const locale = resolveLocale(req, res, '/join');

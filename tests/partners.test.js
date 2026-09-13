@@ -64,6 +64,14 @@ const signup=(phone,referralToken)=>({phone,name:'Partner provider',description:
  try {
   const base='http://127.0.0.1:'+server.address().port,auth=require('../src/config/adminAuth').createSessionValue(),cookie='admin_session='+auth.cookieValue;
   assert.equal((await fetch(base+'/admin/partner-payouts',{redirect:'manual'})).status,302);
+  const shortPath='/p/'+a.id.toString(36)+'-'+token.slice(0,8);
+  const short=await fetch(base+shortPath,{redirect:'manual'});assert.equal(short.status,302);assert.equal(short.headers.get('location'),'/join?ref='+token);
+  const followed=await fetch(base+shortPath);assert.equal(followed.status,200);assert.ok(followed.headers.get('set-cookie').includes('partner_ref='+token));
+  const preserved=await fetch(base+shortPath,{headers:{cookie:'partner_ref='+secondToken}});assert.ok(!(preserved.headers.get('set-cookie')||'').includes('partner_ref='+token));
+  for(const code of ['bad','0-12345678','zzzzzzz-12345678',a.id.toString(36)+'-'+(token[0]==='0'?'1':'0')+token.slice(1,8)])assert.equal((await fetch(base+'/p/'+code)).status,404);
+  await pool.query('UPDATE managers SET is_active=false WHERE id=$1',[a.id]);assert.equal((await fetch(base+shortPath)).status,404);await pool.query('UPDATE managers SET is_active=true WHERE id=$1',[a.id]);
+  const settings=await fetch(base+'/admin/managers/'+a.id,{headers:{cookie}});assert.ok((await settings.text()).includes(shortPath));
+  const promo=await fetch(base+'/r/TEST',{redirect:'manual'});assert.equal(promo.headers.get('location'),'/join?promo=TEST');
   const joinResponse=await fetch(base+'/join?ref='+token);assert.equal(joinResponse.status,200);assert.ok(joinResponse.headers.get('set-cookie').includes('partner_ref='+token));assert.ok(joinResponse.headers.get('set-cookie').includes('HttpOnly'));
   const localized=await fetch(base+'/ru/join?ref='+secondToken,{headers:{cookie:'partner_ref='+token}});assert.equal(localized.status,200);assert.ok(!(localized.headers.get('set-cookie')||'').includes('partner_ref='+secondToken));
   const invalid=await fetch(base+'/join?ref=bad');assert.equal(invalid.status,200);assert.ok(!(invalid.headers.get('set-cookie')||'').includes('partner_ref='));
