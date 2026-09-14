@@ -75,7 +75,8 @@
       <div class="home-shell">
         <div class="home-hero-layout">
           <section id="seo-hero" class="home-intro">
-            <h1 class="sr-only"><%= t('home_title') %> <%= t('home_title_accent') %></h1>
+            <h1 class="sr-only home-intro-title"><%= t('home_title') %> <span><%= t('home_title_accent') %></span></h1>
+            <p class="home-desktop-lead"><%= t('home_lead') %></p>
             <% const homeExamplesFirst = t('home_examples_data')[0]; %>
             <div class="home-examples home-examples--hero" id="homeExamples">
               <p class="home-examples-label"><%= t('home_examples_label') %></p>
@@ -83,10 +84,11 @@
                 <div class="home-example is-active">
                   <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= homeExamplesFirst.emoji %></span><%= homeExamplesFirst.request %></p>
                   <% homeExamplesFirst.responses.forEach(function (resp) { %>
-                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><b><%= resp.name %>:</b> <%= resp.text %></p>
+                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><b><%= resp.name %>:</b> <span><%= resp.text %></span></p>
                   <% }); %>
                 </div>
               </div>
+              <p class="home-example-outcome"><i class="fa-solid fa-check" aria-hidden="true"></i><%= t('home_choice') %></p>
               <p class="home-examples-note"><%= t('home_examples_note') %></p>
             </div>
             <a href="#masters-section" class="home-text-link"><%= t('catalog_choice_label') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
