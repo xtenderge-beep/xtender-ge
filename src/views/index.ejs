@@ -83,6 +83,25 @@
               <li><span class="home-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span><%= t(key) %></li>
               <% }); %>
             </ul>
+            <div class="home-examples">
+              <p class="home-examples-label"><%= t('home_examples_label') %></p>
+              <div class="home-examples-track">
+                <%
+                  const homeExampleIcons = ['🧹', '🚚', '💪', '🛻', '🏗️'];
+                  const homeExamples = homeExampleIcons.map(function (emoji, i) {
+                    const n = i + 1;
+                    return { emoji: emoji, request: t('home_example' + n + '_request'), response: t('home_example' + n + '_response') };
+                  });
+                %>
+                <% homeExamples.forEach(function (ex, i) { %>
+                <div class="home-example<%= i === 0 ? ' is-active' : '' %>">
+                  <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= ex.emoji %></span><%= ex.request %></p>
+                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= ex.response %></p>
+                </div>
+                <% }); %>
+              </div>
+              <p class="home-examples-note"><%= t('home_examples_note') %></p>
+            </div>
             <a href="#masters-section" class="home-text-link"><%= t('catalog_choice_label') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </section>
                     <section id="post-section" class="home-request scroll-mt-20" aria-labelledby="home-form-title">
@@ -1188,6 +1207,25 @@
 
         applyFilters();
         resetWizard();
+
+        (function () {
+            const exampleEls = document.querySelectorAll('.home-example');
+            if (exampleEls.length < 2) return;
+            let activeIndex = 0;
+            let timer = setInterval(advance, 4200);
+            function advance() {
+                exampleEls[activeIndex].classList.remove('is-active');
+                activeIndex = (activeIndex + 1) % exampleEls.length;
+                exampleEls[activeIndex].classList.add('is-active');
+            }
+            const track = document.querySelector('.home-examples-track');
+            if (track) {
+                track.addEventListener('mouseenter', function () { clearInterval(timer); });
+                track.addEventListener('mouseleave', function () { timer = setInterval(advance, 4200); });
+                track.addEventListener('focusin', function () { clearInterval(timer); });
+                track.addEventListener('focusout', function () { timer = setInterval(advance, 4200); });
+            }
+        })();
     </script>
 </body>
 </html>
