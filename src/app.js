@@ -109,6 +109,13 @@ const PORT = process.env.PORT || 3000;
 
 async function runMigrations() {
   if (process.env.SKIP_DB_MIGRATIONS) return;
+  // business_orders/business_masters (schema.sql) SELECT * FROM orders/masters, so their
+  // view rule locks in every column's type — including orders.token, which schema.sql
+  // narrows from UUID to VARCHAR(20) on every boot. Once the views exist (after the first
+  // successful migration), that ALTER fails with "cannot alter type of a column used by
+  // a view or rule" on every later boot. Drop them first (CASCADE takes the views built on
+  // top of them); schema.sql recreates all five at the end of the same run either way.
+  await pool.query('DROP VIEW IF EXISTS business_orders, business_masters CASCADE');
   const schema = fs.readFileSync(path.join(__dirname, '..', 'schema.sql'), 'utf8');
   await pool.query(schema);
   // Триггеры/функции, которые не тянет pg-mem (dev-server сюда не заходит). Идемпотентны.
