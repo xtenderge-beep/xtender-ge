@@ -1529,6 +1529,8 @@ const providerCopy = require('./provider-copy');
 for (const locale of LANGS) Object.assign(dictionaries[locale], providerCopy[locale]);
 const homeExamplesCopy = require('./home-examples-copy');
 for (const locale of LANGS) dictionaries[locale].home_examples_data = homeExamplesCopy[locale];
+const providerNotificationCopy = require('./provider-notification-copy');
+for (const locale of LANGS) dictionaries[locale].provider_notifications_data = providerNotificationCopy[locale];
 
 function normalizeLang(lang) {
   return LANGS.includes(lang) ? lang : DEFAULT_LANG;

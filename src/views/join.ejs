@@ -43,7 +43,23 @@
         </a>
 
         <ol class="provider-steps"><% ['provider_step1','provider_step2','provider_step3','provider_step4'].forEach((key,i)=>{ %><li><span><%= i+1 %></span><%= t(key) %></li><% }) %></ol>
-        <div class="provider-join-grid"><aside><% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
+        <div class="provider-join-grid"><aside>
+          <% const providerNotifFirst = t('provider_notifications_data')[0]; %>
+          <div class="provider-illustration">
+            <p class="provider-illustration-label"><%= t('provider_illustration_label') %></p>
+            <div class="provider-illustration-track" id="providerIllustrationTrack" aria-hidden="true">
+              <div class="provider-illustration-card is-active">
+                <p class="provider-illustration-category"><span aria-hidden="true"><%= providerNotifFirst.emoji %></span><span><%= providerNotifFirst.notification %></span></p>
+                <p class="provider-illustration-body"><%= providerNotifFirst.body %></p>
+                <div class="provider-illustration-actions is-pulsing">
+                  <span class="provider-illustration-btn provider-illustration-btn--call"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= t('btn_call') %></span>
+                  <span class="provider-illustration-btn provider-illustration-btn--whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><%= t('btn_whatsapp') %></span>
+                </div>
+              </div>
+            </div>
+            <p class="provider-illustration-note"><%= t('provider_illustration_note') %></p>
+          </div>
+          <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
         <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
             <div id="detailsStep" class="p-5 sm:p-6 space-y-4"><h2 class="provider-section-title"><%= t('provider_services_section') %></h2><p class="provider-help"><%= t('provider_registration_hint') %></p>
@@ -169,6 +185,7 @@
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
+        const PROVIDER_NOTIFICATIONS = <%- JSON.stringify(t('provider_notifications_data')) %>;
 
         const photoInput = document.getElementById('photoInput');
         const photoName = document.getElementById('photoName');
@@ -305,6 +322,115 @@
                 pb.classList.remove('hidden');
             }
         }
+
+        (function () {
+            const track = document.getElementById('providerIllustrationTrack');
+            if (!track || !Array.isArray(PROVIDER_NOTIFICATIONS) || PROVIDER_NOTIFICATIONS.length < 2) return;
+
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let paused = false;
+
+            function wait(ms) {
+                return new Promise(function (resolve) {
+                    let remaining = ms;
+                    const iv = setInterval(function () {
+                        if (paused) return;
+                        remaining -= 60;
+                        if (remaining <= 0) { clearInterval(iv); resolve(); }
+                    }, 60);
+                });
+            }
+
+            function typeInto(el, text, speed) {
+                return new Promise(function (resolve) {
+                    if (reduceMotion) { el.textContent = text; return resolve(); }
+                    let i = 0;
+                    el.textContent = '';
+                    const iv = setInterval(function () {
+                        if (paused) return;
+                        i++;
+                        el.textContent = text.slice(0, i);
+                        if (i >= text.length) { clearInterval(iv); resolve(); }
+                    }, speed);
+                });
+            }
+
+            async function playExample(ex) {
+                track.innerHTML = '';
+                const card = document.createElement('div');
+                card.className = 'provider-illustration-card is-active';
+
+                const notif = document.createElement('div');
+                notif.className = 'provider-illustration-notif';
+                const notifIcon = document.createElement('span');
+                notifIcon.className = 'provider-illustration-notif-icon';
+                notifIcon.setAttribute('aria-hidden', 'true');
+                notifIcon.textContent = '🔔';
+                const notifText = document.createElement('div');
+                const notifTitle = document.createElement('p');
+                notifTitle.className = 'provider-illustration-notif-title';
+                notifTitle.textContent = 'Xtender';
+                const notifBody = document.createElement('p');
+                notifBody.className = 'provider-illustration-notif-text';
+                notifBody.textContent = ex.emoji + ' ' + ex.notification;
+                notifText.appendChild(notifTitle);
+                notifText.appendChild(notifBody);
+                notif.appendChild(notifIcon);
+                notif.appendChild(notifText);
+                card.appendChild(notif);
+                track.appendChild(card);
+
+                await wait(reduceMotion ? 500 : 1600);
+
+                card.innerHTML = '';
+                const category = document.createElement('p');
+                category.className = 'provider-illustration-category';
+                const catEmoji = document.createElement('span');
+                catEmoji.setAttribute('aria-hidden', 'true');
+                catEmoji.textContent = ex.emoji;
+                const catText = document.createElement('span');
+                catText.textContent = ex.notification;
+                category.appendChild(catEmoji);
+                category.appendChild(catText);
+                card.appendChild(category);
+
+                const bodyP = document.createElement('p');
+                bodyP.className = 'provider-illustration-body';
+                card.appendChild(bodyP);
+                await typeInto(bodyP, ex.body, 18);
+                await wait(300);
+
+                const actions = document.createElement('div');
+                actions.className = 'provider-illustration-actions is-pulsing';
+                const callBtn = document.createElement('span');
+                callBtn.className = 'provider-illustration-btn provider-illustration-btn--call';
+                callBtn.innerHTML = '<i class="fa-solid fa-phone" aria-hidden="true"></i>';
+                callBtn.appendChild(document.createTextNode(T.btn_call));
+                const waBtn = document.createElement('span');
+                waBtn.className = 'provider-illustration-btn provider-illustration-btn--whatsapp';
+                waBtn.innerHTML = '<i class="fa-brands fa-whatsapp" aria-hidden="true"></i>';
+                waBtn.appendChild(document.createTextNode(T.btn_whatsapp));
+                actions.appendChild(callBtn);
+                actions.appendChild(waBtn);
+                card.appendChild(actions);
+
+                await wait(3200);
+            }
+
+            async function loop() {
+                let index = 0;
+                for (;;) {
+                    await playExample(PROVIDER_NOTIFICATIONS[index]);
+                    index = (index + 1) % PROVIDER_NOTIFICATIONS.length;
+                }
+            }
+            loop();
+
+            track.addEventListener('mouseenter', function () { paused = true; });
+            track.addEventListener('mouseleave', function () { paused = false; });
+            track.addEventListener('focusin', function () { paused = true; });
+            track.addEventListener('focusout', function () { paused = false; });
+        })();
     </script>
 </body>
 </html>
