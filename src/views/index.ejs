@@ -76,22 +76,16 @@
         <div class="home-hero-layout">
           <section id="seo-hero" class="home-intro">
             <h1 class="sr-only"><%= t('home_title') %> <%= t('home_title_accent') %></h1>
-            <div class="home-examples home-examples--hero">
+            <% const homeExamplesFirst = t('home_examples_data')[0]; %>
+            <div class="home-examples home-examples--hero" id="homeExamples">
               <p class="home-examples-label"><%= t('home_examples_label') %></p>
-              <div class="home-examples-track">
-                <%
-                  const homeExampleIcons = ['🧹', '🚚', '💪', '🛻', '🏗️'];
-                  const homeExamples = homeExampleIcons.map(function (emoji, i) {
-                    const n = i + 1;
-                    return { emoji: emoji, request: t('home_example' + n + '_request'), response: t('home_example' + n + '_response') };
-                  });
-                %>
-                <% homeExamples.forEach(function (ex, i) { %>
-                <div class="home-example<%= i === 0 ? ' is-active' : '' %>">
-                  <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= ex.emoji %></span><%= ex.request %></p>
-                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= ex.response %></p>
+              <div class="home-examples-track" id="homeExamplesTrack">
+                <div class="home-example is-active">
+                  <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= homeExamplesFirst.emoji %></span><%= homeExamplesFirst.request %></p>
+                  <% homeExamplesFirst.responses.forEach(function (resp) { %>
+                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><b><%= resp.name %>:</b> <%= resp.text %></p>
+                  <% }); %>
                 </div>
-                <% }); %>
               </div>
               <p class="home-examples-note"><%= t('home_examples_note') %></p>
             </div>
@@ -540,6 +534,7 @@
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
+        const HOME_EXAMPLES = <%- JSON.stringify(t('home_examples_data')) %>;
 
         const descriptionInput = document.getElementById('description');
         const phoneInput = document.getElementById('phone');
@@ -1202,22 +1197,91 @@
         resetWizard();
 
         (function () {
-            const exampleEls = document.querySelectorAll('.home-example');
-            if (exampleEls.length < 2) return;
-            let activeIndex = 0;
-            let timer = setInterval(advance, 4200);
-            function advance() {
-                exampleEls[activeIndex].classList.remove('is-active');
-                activeIndex = (activeIndex + 1) % exampleEls.length;
-                exampleEls[activeIndex].classList.add('is-active');
+            const track = document.getElementById('homeExamplesTrack');
+            if (!track || !Array.isArray(HOME_EXAMPLES) || HOME_EXAMPLES.length < 2) return;
+
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let paused = false;
+
+            function wait(ms) {
+                return new Promise(function (resolve) {
+                    let remaining = ms;
+                    const iv = setInterval(function () {
+                        if (paused) return;
+                        remaining -= 60;
+                        if (remaining <= 0) { clearInterval(iv); resolve(); }
+                    }, 60);
+                });
             }
-            const track = document.querySelector('.home-examples-track');
-            if (track) {
-                track.addEventListener('mouseenter', function () { clearInterval(timer); });
-                track.addEventListener('mouseleave', function () { timer = setInterval(advance, 4200); });
-                track.addEventListener('focusin', function () { clearInterval(timer); });
-                track.addEventListener('focusout', function () { timer = setInterval(advance, 4200); });
+
+            function typeInto(el, text, speed) {
+                return new Promise(function (resolve) {
+                    if (reduceMotion) { el.textContent = text; return resolve(); }
+                    let i = 0;
+                    el.textContent = '';
+                    const iv = setInterval(function () {
+                        if (paused) return;
+                        i++;
+                        el.textContent = text.slice(0, i);
+                        if (i >= text.length) { clearInterval(iv); resolve(); }
+                    }, speed);
+                });
             }
+
+            async function playExample(ex) {
+                track.innerHTML = '';
+                const card = document.createElement('div');
+                card.className = 'home-example is-active';
+
+                const reqP = document.createElement('p');
+                reqP.className = 'home-example-request';
+                const reqEmoji = document.createElement('span');
+                reqEmoji.className = 'home-example-emoji';
+                reqEmoji.setAttribute('aria-hidden', 'true');
+                reqEmoji.textContent = ex.emoji;
+                const reqText = document.createElement('span');
+                reqP.appendChild(reqEmoji);
+                reqP.appendChild(reqText);
+                card.appendChild(reqP);
+                track.appendChild(card);
+
+                await typeInto(reqText, ex.request, 22);
+                await wait(500);
+
+                for (const resp of ex.responses) {
+                    const respP = document.createElement('p');
+                    respP.className = 'home-example-response';
+                    const icon = document.createElement('i');
+                    icon.className = 'fa-solid fa-phone';
+                    icon.setAttribute('aria-hidden', 'true');
+                    const nameB = document.createElement('b');
+                    nameB.textContent = resp.name + ': ';
+                    const respText = document.createElement('span');
+                    respP.appendChild(icon);
+                    respP.appendChild(nameB);
+                    respP.appendChild(respText);
+                    card.appendChild(respP);
+
+                    await typeInto(respText, resp.text, 16);
+                    await wait(450);
+                }
+
+                await wait(2600);
+            }
+
+            async function loop() {
+                let index = 0;
+                for (;;) {
+                    await playExample(HOME_EXAMPLES[index]);
+                    index = (index + 1) % HOME_EXAMPLES.length;
+                }
+            }
+            loop();
+
+            track.addEventListener('mouseenter', function () { paused = true; });
+            track.addEventListener('mouseleave', function () { paused = false; });
+            track.addEventListener('focusin', function () { paused = true; });
+            track.addEventListener('focusout', function () { paused = false; });
         })();
     </script>
 </body>
