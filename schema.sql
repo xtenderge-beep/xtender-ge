@@ -655,3 +655,28 @@ CREATE OR REPLACE VIEW business_dispatch_deliveries AS
  SELECT d.* FROM dispatch_deliveries d JOIN business_orders o ON o.id = d.order_id;
 CREATE OR REPLACE VIEW business_dispatch_runs AS
  SELECT d.* FROM dispatch_runs d JOIN business_orders o ON o.id = d.order_id;
+
+-- Card payments — structure only, no gateway wired up yet (BOG application pending,
+-- see docs/current-state.md). Parallels topup_requests: same balance_transactions
+-- crediting path, but for a real-time card flow instead of bank transfer + receipt.
+-- external_id is the gateway's payment/order id — NULL until the create-payment call
+-- returns one; Postgres UNIQUE allows multiple NULLs, so several pending rows can
+-- coexist before that happens.
+CREATE TABLE IF NOT EXISTS card_payments (
+ id SERIAL PRIMARY KEY,
+ master_id INTEGER NOT NULL REFERENCES masters(id),
+ amount_tetri INTEGER NOT NULL CHECK (amount_tetri >= 500 AND amount_tetri <= 100000),
+ external_id VARCHAR(100) UNIQUE,
+ status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','paid','failed','cancelled')),
+ balance_transaction_id INTEGER UNIQUE REFERENCES balance_transactions(id),
+ credited_tetri INTEGER,
+ raw_response JSONB,
+ error_message TEXT,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ CONSTRAINT card_payments_paid_requires_transaction CHECK (
+   (status = 'paid' AND balance_transaction_id IS NOT NULL AND credited_tetri > 0) OR
+   (status <> 'paid' AND balance_transaction_id IS NULL AND credited_tetri IS NULL)
+ )
+);
+CREATE INDEX IF NOT EXISTS idx_card_payments_master ON card_payments(master_id, created_at);
