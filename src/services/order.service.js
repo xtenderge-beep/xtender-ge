@@ -201,6 +201,28 @@ async function closeOrder(token, { actor = 'admin', reason = 'admin_closed', met
   });
 }
 
+// Админ удаляет мусорную/тестовую заявку целиком, а не закрывает. dispatch_runs/
+// dispatch_deliveries не каскадируют по FK (RESTRICT по умолчанию, без ON DELETE) —
+// удаляем их здесь явно, до самой заявки. order_views/order_files/order_dispatches/
+// order_moderation_messages/master_reviews каскадируются схемой сами.
+// balance_transactions.order_id уходит в NULL схемой — списание с баланса мастера
+// остаётся в истории, просто теряет ссылку на удалённую заявку. crm_invites.order_id
+// отвязываем (сам инвайт менеджера — самостоятельная запись, не только про эту заявку).
+// sms_consent_logs НЕ трогаем: журнал согласий переживает удаление заявки нарочно.
+async function deleteOrder(token, { meta = {} } = {}) {
+  return pool.withTransaction(async client => {
+    const order = (await client.query("SELECT * FROM orders WHERE token = $1", [token])).rows[0];
+    if (!order) return null;
+    await consentLog.recordAction({ eventType: 'ORDER_DELETED', phone: order.phone, orderId: order.id,
+      metadata: { description: order.description, status: order.status, is_technical: order.is_technical }, meta }, client);
+    await client.query('UPDATE crm_invites SET order_id = NULL WHERE order_id = $1', [order.id]);
+    await client.query('DELETE FROM dispatch_deliveries WHERE order_id = $1', [order.id]);
+    await client.query('DELETE FROM dispatch_runs WHERE order_id = $1', [order.id]);
+    await client.query('DELETE FROM orders WHERE id = $1', [order.id]);
+    return order;
+  });
+}
+
 async function getMasterCountsByCategory(isTechnical = false) {
   const leadPrice = await settingsService.getLeadPriceTetri();
   const { rows } = await pool.query(
@@ -376,6 +398,7 @@ module.exports = {
   recordModerationMessages,
   getModerationMessages,
   closeOrder,
+  deleteOrder,
   notifyMasters,
   getMasterCountsByCategory,
   getOrderFunnelStats,

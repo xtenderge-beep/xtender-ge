@@ -332,6 +332,13 @@ async function closeOrder(req, res) {
   res.redirect(`/admin/orders/${token}`);
 }
 
+async function deleteOrder(req, res) {
+  const { token } = req.params;
+  const order = await orderService.deleteOrder(token, { meta: require('../config/requestMeta').requestMeta(req) });
+  if (!order) return res.status(404).send('Заявка не найдена');
+  res.redirect('/admin/orders?deleted=1');
+}
+
 async function reviewsQueue(req, res) {
   const pending = await reviewService.listPending();
   res.render('admin/reviews', { pending });
@@ -586,6 +593,7 @@ module.exports = {
   ordersList,
   orderDetail,
   closeOrder,
+  deleteOrder,
   requestOrderRevision,
   reviewsQueue,
   approveReview,
