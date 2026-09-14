@@ -75,15 +75,8 @@
       <div class="home-shell">
         <div class="home-hero-layout">
           <section id="seo-hero" class="home-intro">
-            <p class="home-eyebrow"><span class="home-eyebrow-line" aria-hidden="true"></span><%= t('home_eyebrow') %></p>
-            <h1><%= t('home_title') %><span><%= t('home_title_accent') %></span></h1>
-            <p class="home-lead"><%= t('home_lead') %></p>
-            <ul class="home-benefits">
-              <% ['home_free', 'home_direct', 'home_choice'].forEach(function (key) { %>
-              <li><span class="home-check" aria-hidden="true"><i class="fa-solid fa-check"></i></span><%= t(key) %></li>
-              <% }); %>
-            </ul>
-            <div class="home-examples">
+            <h1 class="sr-only"><%= t('home_title') %> <%= t('home_title_accent') %></h1>
+            <div class="home-examples home-examples--hero">
               <p class="home-examples-label"><%= t('home_examples_label') %></p>
               <div class="home-examples-track">
                 <%
