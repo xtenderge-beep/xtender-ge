@@ -6,14 +6,14 @@ const { getBaseUrl } = require('../config/url');
 const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION } = require('../config/legal');
 
-const PHONE_REGEX = /^\+?\d{9,15}$/;
+const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 
 async function send(req, res) {
   const { description, districtName } = req.body;
-  const phone = (req.body.phone || '').replace(/\s+/g, '');
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
 
-  if (!phone || !PHONE_REGEX.test(phone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  if (!phone || !isGeorgianPhone(phone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   if (!description || !description.trim()) {
     return res.status(400).json({ success: false, message: 'Description is required' });
@@ -59,9 +59,9 @@ async function send(req, res) {
 
 async function verify(req, res) {
   const { code } = req.body;
-  const phone = (req.body.phone || '').replace(/\s+/g, '');
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
 
-  if (!phone || !PHONE_REGEX.test(phone) || !code) {
+  if (!phone || !isGeorgianPhone(phone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
 

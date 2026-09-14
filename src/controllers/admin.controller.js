@@ -289,9 +289,10 @@ async function ordersList(req, res) {
   const orders = await adminService.listOrdersAdmin();
   const q = String(req.query.q || '').trim().slice(0,100);
   const status = ['waiting','active','closed','needs_revision','unverified'].includes(req.query.status) ? req.query.status : '';
-  const filtered = orders.filter(o=>(!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (['closed','needs_revision','unverified'].includes(status) ? o.status === status : status === 'waiting' ? o.status === 'pending_review' && !o.first_dispatched_at : o.status === 'new' && o.first_dispatched_at)));
+  const kind = ['real','technical'].includes(req.query.kind) ? req.query.kind : '';
+  const filtered = orders.filter(o=>(!kind || (kind === 'technical' ? o.is_technical : !o.is_technical)) && (!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (['closed','needs_revision','unverified'].includes(status) ? o.status === status : status === 'waiting' ? o.status === 'pending_review' && !o.first_dispatched_at : o.status === 'new' && o.first_dispatched_at)));
   const page = Math.min(Math.max(1, Math.ceil(filtered.length/30)), Math.max(1, parseInt(req.query.page,10)||1));
-  res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, page, total: filtered.length });
+  res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, kind, page, total: filtered.length });
 }
 
 async function orderDetail(req, res) {

@@ -51,7 +51,8 @@ function apiUrl(method) {
 }
 
 async function buildKeyboardWithCounts(token, page = 0) {
-  const counts = await orderService.getMasterCountsByCategory();
+  const order = await orderService.getOrderByToken(token);
+  const counts = await orderService.getMasterCountsByCategory(order?.is_technical === true);
 
   const total = (category) =>
     counts.filter((row) => row.category === category).reduce((sum, row) => sum + row.count, 0);
@@ -77,7 +78,6 @@ async function buildKeyboardWithCounts(token, page = 0) {
     });
   }
 
-  const order = await orderService.getOrderByToken(token);
   rows.forEach(row => row.forEach(button => {
     if (button.callback_data) {
       const parts = button.callback_data.split(':');
@@ -114,7 +114,7 @@ async function notifyModerator(order) {
 
   const base = getBaseUrl();
   const text = [
-    '🆕 Новая заявка на модерацию',
+    order.is_technical ? '🧪 ТЕСТ — только техническим исполнителям' : '🆕 Новая заявка на модерацию',
     '',
     moderatorDescription(order),
     '',
@@ -338,7 +338,7 @@ async function sendLeadToMaster(master, order, link) {
     return true;
   }
 
-  const lines = [`🆕 Заявка #${order.id}`, '', order.description];
+  const lines = [(order.is_technical ? '🧪 ТЕСТ · ' : '') + `🆕 Заявка #${order.id}`, '', order.description];
   if (order.district_name) lines.push('', `📍 ${order.district_name}`);
   lines.push('', 'Нажмите ниже, чтобы посмотреть детали и позвонить или написать в WhatsApp.');
 
@@ -373,7 +373,7 @@ function buildMessageText(order, dispatchLines, funnel) {
       ? '✅ Разослано'
       : '🆕 Новая заявка на модерацию';
   const lines = [
-    header,
+    (order.is_technical ? '🧪 ТЕСТ · ' : '') + header,
     '',
     moderatorDescription(order),
     '',

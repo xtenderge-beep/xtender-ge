@@ -635,3 +635,23 @@ INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_built
 INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_builtin,sort_order) VALUES('tow','ევაკუატორი','Эвакуатор','Tow truck','🛻','[{"key":"tow_type","input":"enum","options":["platform","spider"],"match":"exact","filter":true,"required":true,"labels":{"ka":"დატვირთვის ტიპი","ru":"Тип погрузки","en":"Loading type"},"optionLabels":{"platform":{"ka":"გადამტეხი პლატფორმა (სრული დატვირთვა)","ru":"Ломаная платформа (полная погрузка)","en":"Slide-back flatbed (full load)"},"spider":{"ka":"ობობა (ნაწილობრივი დატვირთვა)","ru":"Паук (частичная погрузка)","en":"Wheel-lift / spider (partial load)"}}},{"key":"max_tonnage","input":"enum","options":["3.5","8","20"],"unit":"т","match":"gte","filter":true,"required":true,"labels":{"ka":"მაქს. ტონაჟი","ru":"Макс. тоннаж","en":"Max tonnage"},"optionLabels":{"8":{"ka":"8 ტ-მდე","ru":"до 8 т","en":"up to 8 t"},"20":{"ka":"20+ ტ","ru":"20+ т","en":"20+ t"},"3.5":{"ka":"3.5 ტ-მდე","ru":"до 3.5 т","en":"up to 3.5 t"}}}]',true,3) ON CONFLICT(slug) DO NOTHING;
 INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_builtin,sort_order) VALUES('bucket_lift','ავტოამწე (ჟირაფი)','Автовышка (жираф)','Bucket lift','🏗️','[{"key":"work_height_m","input":"number","unit":"м","min":8,"max":60,"match":"gte","filter":true,"required":true,"labels":{"ka":"სამუშაო სიმაღლე","ru":"Рабочая высота","en":"Working height"},"optionLabels":{}},{"key":"boom_type","input":"enum","options":["telescopic","articulated"],"match":"exact","filter":true,"labels":{"ka":"ისრის ტიპი","ru":"Тип стрелы","en":"Boom type"},"optionLabels":{"telescopic":{"ka":"ტელესკოპური","ru":"Телескопическая","en":"Telescopic"},"articulated":{"ka":"მუხლისებრი","ru":"Коленчатая","en":"Articulated"}}}]',true,4) ON CONFLICT(slug) DO NOTHING;
 INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_builtin,sort_order) VALUES('junk','ნარჩენების გატანა','Вывоз мусора','Waste removal','🧹','[]',true,5) ON CONFLICT(slug) DO NOTHING;
+
+
+-- Parallel technical requests. Existing orders and providers remain production.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS is_technical BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS is_technical BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS technical_client_phones (
+ phone VARCHAR(20) PRIMARY KEY,
+ note VARCHAR(200) NOT NULL DEFAULT '',
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
+CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
+CREATE OR REPLACE VIEW business_balance_transactions AS
+ SELECT b.* FROM balance_transactions b JOIN business_masters m ON m.id = b.master_id
+ LEFT JOIN orders o ON o.id = b.order_id
+ WHERE b.order_id IS NULL OR o.is_technical = false;
+CREATE OR REPLACE VIEW business_dispatch_deliveries AS
+ SELECT d.* FROM dispatch_deliveries d JOIN business_orders o ON o.id = d.order_id;
+CREATE OR REPLACE VIEW business_dispatch_runs AS
+ SELECT d.* FROM dispatch_runs d JOIN business_orders o ON o.id = d.order_id;

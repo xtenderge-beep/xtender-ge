@@ -19,7 +19,7 @@ const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION } = require('../config/legal');
 const payment = require('../config/payment');
 
-const PHONE_REGEX = /^\+?\d{9,15}$/;
+const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 const RECEIPT_RATE_MAX = 5;
 const RECEIPT_RATE_WINDOW_SECONDS = 3600;
 const MASTER_LOGIN_PURPOSE = 'master_login';
@@ -50,9 +50,9 @@ async function list(req, res) {
 }
 
 async function catalogOtpSend(req, res) {
-  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
-  if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
+  if (!rawPhone || !isGeorgianPhone(rawPhone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   const result = await otpService.sendCode(toE164(rawPhone), null, CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req) });
   if (!result.success) {
@@ -65,9 +65,9 @@ async function catalogOtpSend(req, res) {
 }
 
 async function catalogOtpVerify(req, res) {
-  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
+  const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
-  if (!rawPhone || !PHONE_REGEX.test(rawPhone) || !code) {
+  if (!rawPhone || !isGeorgianPhone(rawPhone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
   const phone = toE164(rawPhone);
@@ -117,9 +117,9 @@ async function revealPhone(req, res) {
 }
 
 async function sendOtp(req, res) {
-  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
-  if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
+  if (!rawPhone || !isGeorgianPhone(rawPhone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
   const acceptance = consentService.acceptedRequest(req, 'provider');
@@ -136,12 +136,12 @@ async function sendOtp(req, res) {
 }
 
 async function verifyOtp(req, res) {
-  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
+  const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
   const termsAccepted = req.body.termsAccepted === true;
   const privacyAccepted = req.body.privacyAccepted === true;
 
-  if (!rawPhone || !PHONE_REGEX.test(rawPhone) || !code) {
+  if (!rawPhone || !isGeorgianPhone(rawPhone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
   // Оба согласия обязательны: их же и снимаем в журнал этим подтверждением кода.
@@ -167,7 +167,7 @@ async function verifyOtp(req, res) {
 async function register(req, res) {
   // Форма /join теперь multipart (для фото), поэтому все значения — строки, чекбоксы —
   // 'true'/'on'/отсутствуют, cityIds — строка или массив строк.
-  const rawPhone = (req.body.phone || '').replace(/\s+/g, '');
+  const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const name = (req.body.name || '').trim();
   const description = (req.body.description || '').trim();
   const spokenLanguages = require('../config/spokenLanguages').parse(req.body.spokenLanguages);
@@ -177,8 +177,8 @@ async function register(req, res) {
   const termsAccepted = isChecked(req.body.termsAccepted);
   const privacyAccepted = isChecked(req.body.privacyAccepted);
 
-  if (!rawPhone || !PHONE_REGEX.test(rawPhone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  if (!rawPhone || !isGeorgianPhone(rawPhone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   if (!name) {
     return res.status(400).json({ success: false, message: 'Name is required' });
@@ -337,9 +337,9 @@ async function logout(req, res) {
 
 // Вход в кабинет по телефону: код отправляем только если на номер есть профиль.
 async function loginRequestCode(req, res) {
-  const phone = toE164((req.body.phone || '').replace(/\s+/g, ''));
-  if (!PHONE_REGEX.test(phone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
+  if (!isGeorgianPhone(phone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
   const master = await masterService.getMasterByPhone(phone);
@@ -358,9 +358,9 @@ async function loginRequestCode(req, res) {
 }
 
 async function loginVerify(req, res) {
-  const phone = toE164((req.body.phone || '').replace(/\s+/g, ''));
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
-  if (!PHONE_REGEX.test(phone) || !code) {
+  if (!isGeorgianPhone(phone) || !code) {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
 

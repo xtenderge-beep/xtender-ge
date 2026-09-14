@@ -7,7 +7,7 @@
       <div class="bg-white rounded-2xl border border-stone-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                  <a href="/admin/masters/<%= m.id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= m.name %></a>
+                  <a href="/admin/masters/<%= m.id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= m.name %></a><% if(m.is_technical) { %><span class="text-amber-700 font-bold">🧪 Технический</span><% } %>
                   <span class="font-mono text-xs text-stone-500"><%= m.phone %></span>
                   <% if (m.is_banned) { %>
                     <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">Забанен</span>

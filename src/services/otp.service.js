@@ -1,3 +1,4 @@
+const { isGeorgianPhone } = require('../config/phone');
 const redis = require('../config/redis');
 const smsService = require('./sms.service');
 const consentLog = require('./consentLog.service');
@@ -33,6 +34,7 @@ async function readSendMeta(phone, purpose) {
 
 // context: { meta } — { ip, userAgent, xForwardedFor } из requestMeta(req), для журнала.
 async function sendCode(phone, orderLink, purpose = 'order', orderId = null, context = {}) {
+  if (!isGeorgianPhone(phone)) return { success: false, reason: 'invalid_phone' };
   const allowed = await checkRateLimit(phone, purpose);
   if (!allowed) {
     return { success: false, reason: 'rate_limited' };
@@ -89,6 +91,7 @@ async function sendCode(phone, orderLink, purpose = 'order', orderId = null, con
 //   { strict: true } — запись согласия обязательна: если БД недоступна, verify падает
 //   { recordConsent: false } — вообще не писать строку согласия для этого вызова
 async function verifyCode(phone, code, purpose = 'order', context = {}) {
+  if (!isGeorgianPhone(phone)) return false;
   const lockKey = `otp_verify_lock:${purpose}:${phone}`;
   const lock = crypto.randomBytes(16).toString('hex');
   if (!await redis.set(lockKey, lock, 'EX', 30, 'NX')) return false;
@@ -146,6 +149,7 @@ async function verifyCode(phone, code, purpose = 'order', context = {}) {
 }
 
 async function getConsentGrant(phone, purpose, challengeId) {
+  if (!isGeorgianPhone(phone)) return null;
   if (typeof challengeId !== 'string' || !/^[a-f0-9]{48}$/.test(challengeId)) return null;
   const raw = await redis.get(`consent_grant:${purpose}:${phone}:${challengeId}`);
   return raw ? JSON.parse(raw) : null;
@@ -156,6 +160,7 @@ async function clearConsentGrant(phone, purpose, challengeId) {
 }
 
 async function isPhoneVerified(phone, purpose = 'order') {
+  if (!isGeorgianPhone(phone)) return false;
   const value = await redis.get(`verified:${purpose}:${phone}`);
   return value === '1';
 }

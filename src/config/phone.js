@@ -14,4 +14,7 @@ function phoneVariants(phone) {
   return [...new Set([`+995${last9}`, `995${last9}`, last9, `+${digits}`, digits])];
 }
 
-module.exports = { toE164, phoneVariants };
+// The same strict +995 policy runs in public forms and at OTP boundaries.
+const georgianPhone = require('../../public/js/georgian-phone');
+module.exports = { toE164, phoneVariants, isGeorgianPhone: georgianPhone.isValid,
+  normalizeGeorgianPhone: georgianPhone.normalize, georgianPhoneError: georgianPhone.message };

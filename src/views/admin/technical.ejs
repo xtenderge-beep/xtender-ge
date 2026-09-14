@@ -1,0 +1,39 @@
+<%- include('./_header', { active: 'settings' }) %>
+<a href="/admin/settings" class="text-emerald-700 underline">← Настройки</a>
+<h1 class="text-2xl font-black mt-4">Тестирование через сайт</h1>
+<p class="mt-2 text-stone-600">Оформляйте заявки через обычную форму. После подтверждения номера из списка заявка автоматически становится тестовой и уходит только техническим исполнителям. Реальные заявки продолжают работать.</p>
+<% if(error) { %><p role="alert" class="mt-4 p-4 bg-red-50 text-red-800"><%= error %></p><% } %>
+<% if(saved) { %><p role="status" class="mt-4 p-4 bg-emerald-50 text-emerald-800">Сохранено. Тип уже подтверждённых заявок не изменился.</p><% } %>
+<section class="mt-6 p-5 bg-white border border-stone-200 rounded-2xl">
+  <h2 class="text-lg font-bold">1. Технические номера клиентов</h2>
+  <p class="text-sm text-stone-600 mt-2">Добавьте номер до подтверждения заявки. Форматы +995 5XX XX XX XX и 5XXXXXXXX распознаются одинаково.</p>
+  <form method="POST" action="/admin/settings/technical" class="admin-filter mt-4">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="add_client">
+    <label>Номер клиента <input type="tel" name="value" required maxlength="40" placeholder="+995…"></label>
+    <label>Комментарий <input name="note" maxlength="200" placeholder="Например: мой тестовый телефон"></label>
+    <button>Добавить номер</button>
+  </form>
+  <% if(!clients.length) { %><p class="mt-4 text-stone-500">Список пуст. Все новые подтверждённые заявки считаются обычными.</p><% } %>
+  <% clients.forEach(c=>{ %><div class="mt-4 flex flex-wrap gap-3 items-center justify-between border-t pt-3">
+    <div><strong><%= c.phone %></strong><span class="ml-3 text-stone-500"><%= c.note %></span></div>
+    <form method="POST" action="/admin/settings/technical"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="remove_client"><input type="hidden" name="value" value="<%= c.phone %>"><button class="text-red-700 underline">Удалить из списка</button></form>
+  </div><% }) %>
+  <p class="text-sm text-stone-500 mt-4">После удаления номера следующие заявки будут обычными. Уже подтверждённые тестовые заявки навсегда сохранят отметку «Тест».</p>
+</section>
+<section class="mt-6 p-5 bg-white border border-stone-200 rounded-2xl">
+  <h2 class="text-lg font-bold">2. Технические исполнители</h2>
+  <p class="text-sm text-stone-600 mt-2">Укажите номер зарегистрированного исполнителя. Он будет скрыт из каталога и исключён из реальных рассылок. Для тестов нужны одобренный профиль, подходящая категория, активная подписка и достаточный баланс. Списание за тестовую заявку идёт с его баланса по обычному тарифу.</p>
+  <form method="POST" action="/admin/settings/technical" class="admin-filter mt-4">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="add_master">
+    <label>Номер исполнителя <input type="tel" name="value" required maxlength="40" placeholder="+995…"></label><button>Добавить исполнителя</button>
+  </form>
+  <% if(!masters.length) { %><p class="mt-4 text-amber-800">Технических исполнителей пока нет. Тестовые заявки не будут отправлены реальным исполнителям.</p><% } %>
+  <% masters.forEach(m=>{ %><div class="mt-4 flex flex-wrap gap-3 items-center justify-between border-t pt-3">
+    <div><a class="font-bold text-emerald-700 underline" href="/admin/masters/<%= m.id %>"><%= m.name %></a> · <%= m.phone %>
+      <p class="text-sm text-stone-500"><%= m.category %> · <%= m.is_banned ? 'Заблокирован' : m.is_active ? 'Одобрен' : 'На модерации' %> · <%= (m.balance_tetri/100).toFixed(2) %> ₾ · <%= m.telegram_id ? 'Telegram, резерв SMS' : 'SMS' %></p></div>
+    <form method="POST" action="/admin/settings/technical"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="action" value="remove_master"><input type="hidden" name="value" value="<%= m.id %>"><button class="text-red-700 underline">Перевести в реальные</button></form>
+  </div><% }) %>
+  <p class="text-sm text-stone-500 mt-4">Перевод в реальные возвращает участие в обычных рассылках и каталоге при соблюдении обычных условий. Уже отправленные уведомления отозвать нельзя.</p>
+</section>
+<p class="mt-6 text-sm text-stone-600">Тестовые заявки видны в разделе «Заявки» с отметкой 🧪 ТЕСТ и проходят обычную модерацию. Они исключены из рабочих показателей заявок и рассылок. Проверить списания можно в карточке заявки и истории баланса технического исполнителя.</p>
+<%- include('./_footer') %>

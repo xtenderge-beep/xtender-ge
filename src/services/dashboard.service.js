@@ -94,20 +94,20 @@ async function getPeople(window, now, leadPrice) {
     pool.query(`SELECT m.id, m.name, m.phone, m.category, m.vehicle_size, m.manager_id, m.referral_manager_id, m.promo_code_used,
       m.is_active, m.is_banned, m.is_subscribed, m.subscription_until, m.balance_tetri, m.created_at,
       mgr.name AS manager_name, COALESCE(m.referral_manager_id, pc.manager_id) AS source_manager_id, source.name AS source_manager_name
-      FROM masters m LEFT JOIN managers mgr ON mgr.id = m.manager_id
+      FROM business_masters m LEFT JOIN managers mgr ON mgr.id = m.manager_id
       LEFT JOIN promo_codes pc ON pc.code = m.promo_code_used LEFT JOIN managers source ON source.id = COALESCE(m.referral_manager_id, pc.manager_id) ORDER BY m.id DESC`),
     pool.query('SELECT id, name, is_active FROM managers ORDER BY id'),
     pool.query(`SELECT b.master_id, b.order_id, b.sent_at,
       MIN(CASE WHEN v.event_type = 'view' THEN v.viewed_at END) AS opened_at,
       MIN(CASE WHEN v.event_type IN ('call', 'whatsapp') THEN v.viewed_at END) AS contacted_at
-      FROM (SELECT master_id, order_id, MIN(created_at) AS sent_at FROM balance_transactions
+      FROM (SELECT master_id, order_id, MIN(created_at) AS sent_at FROM business_balance_transactions
         WHERE reason = 'lead_charge' AND created_at >= $1 AND created_at < $2 GROUP BY master_id, order_id) b
       LEFT JOIN order_views v ON v.master_id = b.master_id AND v.order_id = b.order_id AND v.viewed_at >= b.sent_at AND v.viewed_at < $3
       GROUP BY b.master_id, b.order_id, b.sent_at`, [new Date(window.start), new Date(window.end), new Date(now)]),
     pool.query(`SELECT master_id, reason, COUNT(*)::int AS lifetime_count,
       SUM(CASE WHEN created_at >= $1 AND created_at < $2 THEN amount_tetri ELSE 0 END) AS amount,
       COUNT(CASE WHEN created_at >= $1 AND created_at < $2 THEN 1 END)::int AS period_count
-      FROM balance_transactions WHERE created_at < $3 GROUP BY master_id, reason`, [new Date(window.start), new Date(window.end), new Date(now)]),
+      FROM business_balance_transactions WHERE created_at < $3 GROUP BY master_id, reason`, [new Date(window.start), new Date(window.end), new Date(now)]),
   ]);
   const responses = new Map();
   for (const row of activity.rows) {
@@ -162,17 +162,17 @@ async function getDashboard(period) {
         COUNT(CASE WHEN v.event_type = 'view' THEN 1 END)::int AS view_count,
         COUNT(CASE WHEN v.event_type IN ('call', 'whatsapp') THEN 1 END)::int AS contact_count,
         MIN(CASE WHEN v.event_type IN ('call', 'whatsapp') THEN v.viewed_at END) AS first_contact_at
-      FROM orders o LEFT JOIN order_views v ON v.order_id = o.id
+      FROM business_orders o LEFT JOIN order_views v ON v.order_id = o.id
         AND v.viewed_at >= o.first_dispatched_at AND v.viewed_at < $2
       WHERE (o.created_at >= $1 AND o.created_at < $2) OR (o.status NOT IN ('closed', 'unverified') AND o.created_at < $2)
       GROUP BY o.id, o.token, o.description, o.target_categories, o.status, o.created_at, o.first_dispatched_at`,
       [new Date(window.previousStart), new Date(now)]),
-    pool.query(`SELECT id, category, is_flatbed, is_active, is_banned, is_subscribed, subscription_until, balance_tetri FROM masters`),
+    pool.query(`SELECT id, category, is_flatbed, is_active, is_banned, is_subscribed, subscription_until, balance_tetri FROM business_masters`),
     pool.query(`SELECT 'current' AS period, reason, SUM(amount_tetri) AS amount, COUNT(*)::int AS count
-      FROM balance_transactions WHERE created_at >= $1 AND created_at < $2 GROUP BY reason
+      FROM business_balance_transactions WHERE created_at >= $1 AND created_at < $2 GROUP BY reason
       UNION ALL
       SELECT 'previous' AS period, reason, SUM(amount_tetri) AS amount, COUNT(*)::int AS count
-      FROM balance_transactions WHERE created_at >= $3 AND created_at < $4 GROUP BY reason`,
+      FROM business_balance_transactions WHERE created_at >= $3 AND created_at < $4 GROUP BY reason`,
       [new Date(window.start), new Date(window.end), new Date(window.previousStart), new Date(window.previousEnd)]),
     pool.query("SELECT COUNT(*)::int AS count FROM topup_receipts WHERE status IN ('received','reviewing')"),
     require('./support.service').countOpenThreads(),

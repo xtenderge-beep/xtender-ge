@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { toE164 } = require('../config/phone');
+const { toE164, isGeorgianPhone } = require('../config/phone');
 const consentLog = require('./consentLog.service');
 
 const SMS_GATEWAY_URL = process.env.SMS_GATEWAY_URL || 'http://212.72.155.180:2375/api/sendmsg.php';
@@ -90,6 +90,7 @@ async function send(phone, text, context = {}) {
 // Код авторизации. `log: false` — строку журнала пишет otp.service (там есть код для
 // хэша, purpose и метаданные запроса).
 function sendOtp(phone, code, context = {}) {
+  if (!isGeorgianPhone(phone)) throw new Error('OTP is available only for Georgian numbers (+995 and 9 digits)');
   return send(phone, `Code: ${code}`, { ...context, log: false });
 }
 

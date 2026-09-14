@@ -12,6 +12,7 @@ router.get('/d/:token',wrap(async(req,res)=>{
 router.post('/api/drafts/:token/send',wrap(async(req,res)=>{
  if(!req.cookies.draft_csrf||req.cookies.draft_csrf!==req.body._csrf)return res.status(403).json({success:false,message:'Обновите страницу / Refresh the page'});
  const item=await crm.publicInvite(req.params.token);if(item.kind==='provider'||item.status!=='unverified')throw crm.fail('Заявка уже отправлена / Request already submitted',409);
+ if(!require('../config/phone').isGeorgianPhone(item.phone))return res.status(400).json({success:false,message:require('../config/phone').georgianPhoneError(req.lang)});
  const snapshot=crm.details(req.body),accepted=consent.acceptedRequest(req,'client');if(accepted.error)return res.status(accepted.status).json({success:false,message:accepted.error});
  const order=await require('../services/order.service').getOrderByToken(item.order_token);
  const ownerLink=require('../config/url').getBaseUrl()+'/o/'+order.owner_token;

@@ -1,14 +1,14 @@
 const crypto=require('crypto');
 const pool=require('../config/db');
-const {toE164}=require('../config/phone');
+const {normalizeGeorgianPhone}=require('../config/phone');
 const {generateShortId}=require('../config/shortId');
 const partners=require('./partner.service');
 const fail=(message,status=400)=>Object.assign(new Error(message),{status});
 function validId(value){const n=Number(value);if(!Number.isSafeInteger(n)||n<1||n>2147483647)throw fail('Некорректный ID.');return n;}
 function details(body){const description=String(body.description||'').trim(),districtName=String(body.districtName||'').trim();if(description.length<5||description.length>5000||districtName.length>500)throw fail('Описание: 5–5000 символов; адрес: до 500 символов.');return {description,districtName};}
 async function invite(managerId,input,actor='manager'){
- managerId=validId(managerId);const phone=toE164(String(input.phone||'').replace(/\s/g,''));
- if(!/^\+\d{9,15}$/.test(phone||''))throw fail('Укажите телефон с кодом страны.');
+ managerId=validId(managerId);const phone=normalizeGeorgianPhone(input.phone);
+ if(!phone)throw fail('Укажите грузинский номер: +995 и 9 цифр.');
  if(!['provider','client','operator'].includes(input.kind))throw fail('Выберите тип приглашения.');
  if(!/^[a-f0-9-]{36}$/.test(input.requestKey||''))throw fail('Обновите форму.');
  const draft=input.kind==='operator'?details(input):{description:'',districtName:''};

@@ -30,34 +30,34 @@ async function getOverviewStats() {
            COALESCE(SUM(CASE WHEN is_banned = true THEN 1 ELSE 0 END), 0) AS banned,
            COALESCE(SUM(CASE WHEN is_banned = false AND is_active = true THEN 1 ELSE 0 END), 0) AS active,
            COALESCE(SUM(CASE WHEN is_banned = false AND is_active = false THEN 1 ELSE 0 END), 0) AS pending
-         FROM masters`
+         FROM business_masters`
       ),
-      pool.query(`SELECT COALESCE(SUM(balance_tetri), 0) AS total FROM masters WHERE is_banned = false`),
+      pool.query(`SELECT COALESCE(SUM(balance_tetri), 0) AS total FROM business_masters WHERE is_banned = false`),
       pool.query(
-        `SELECT COUNT(*)::int AS count FROM masters WHERE is_banned = false AND is_active = true AND balance_tetri < $1`,
+        `SELECT COUNT(*)::int AS count FROM business_masters WHERE is_banned = false AND is_active = true AND balance_tetri < $1`,
         [lowBalanceThreshold]
       ),
       // date_trunc() не поддерживается pg-mem (локальная разработка) — считаем полночь в JS.
-      pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE created_at >= $1`, [
+      pool.query(`SELECT COUNT(*)::int AS count FROM business_orders WHERE created_at >= $1`, [
         new Date(new Date().setHours(0, 0, 0, 0)),
       ]),
-      pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE created_at >= NOW() - INTERVAL '7 days'`),
+      pool.query(`SELECT COUNT(*)::int AS count FROM business_orders WHERE created_at >= NOW() - INTERVAL '7 days'`),
       pool.query(`SELECT COUNT(*)::int AS count FROM master_reviews WHERE is_approved = false`),
       getResponseStats(),
       pool.query(
-        `SELECT COUNT(*)::int AS count FROM masters WHERE is_banned = false AND is_active = true AND telegram_id IS NOT NULL`
+        `SELECT COUNT(*)::int AS count FROM business_masters WHERE is_banned = false AND is_active = true AND telegram_id IS NOT NULL`
       ),
       supportService.countOpenThreads(),
       pool.query(
         `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
-         FROM balance_transactions
+         FROM business_balance_transactions
          WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= $1
          GROUP BY reason`,
         [new Date(new Date().setHours(0, 0, 0, 0))]
       ),
       pool.query(
         `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
-         FROM balance_transactions
+         FROM business_balance_transactions
          WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= NOW() - INTERVAL '7 days'
          GROUP BY reason`
       ),
@@ -85,10 +85,10 @@ async function getOverviewStats() {
 // (полночь ПОСЛЕ выбранного дня), чтобы выбранный день попадал в срез целиком.
 async function getStatsForRange(from, to) {
   const [orders, channels] = await Promise.all([
-    pool.query(`SELECT COUNT(*)::int AS count FROM orders WHERE created_at >= $1 AND created_at < $2`, [from, to]),
+    pool.query(`SELECT COUNT(*)::int AS count FROM business_orders WHERE created_at >= $1 AND created_at < $2`, [from, to]),
     pool.query(
       `SELECT reason, COUNT(*)::int AS count, COALESCE(SUM(-amount_tetri), 0)::int AS tetri
-       FROM balance_transactions
+       FROM business_balance_transactions
        WHERE reason IN ('lead_charge', 'catalog_call') AND created_at >= $1 AND created_at < $2
        GROUP BY reason`,
       [from, to]
@@ -116,7 +116,7 @@ async function getResponseStats(masterId = null) {
             COUNT(*)::int AS total_count
      FROM (
        SELECT bt.order_id, bt.master_id, bt.created_at AS notified_at, MIN(ov.viewed_at) AS responded_at
-       FROM balance_transactions bt
+       FROM business_balance_transactions bt
        LEFT JOIN order_views ov
          ON ov.order_id = bt.order_id AND ov.master_id = bt.master_id AND ov.event_type IN ('view', 'call', 'whatsapp') AND ov.viewed_at >= bt.created_at
        WHERE bt.reason = 'lead_charge' ${filter}
@@ -136,7 +136,7 @@ async function listMastersAdmin() {
   // last_topup_at через JOIN с производной таблицей, а не коррелированный подзапрос —
   // pg-mem (локальная разработка) коррелированные подзапросы не поддерживает.
   const { rows } = await pool.query(
-    `SELECT m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
+    `SELECT m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
             m.banned_reason, m.balance_tetri, m.created_at, lt.last_topup_at,
             COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating,
             COUNT(r.id)::int AS review_count
@@ -146,7 +146,7 @@ async function listMastersAdmin() {
        SELECT master_id, MAX(created_at) AS last_topup_at
        FROM balance_transactions WHERE reason = 'topup' GROUP BY master_id
      ) lt ON lt.master_id = m.id
-     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
+     GROUP BY m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
               m.banned_reason, m.balance_tetri, m.created_at, lt.last_topup_at
      ORDER BY m.id`
   );
@@ -188,7 +188,7 @@ async function setMasterBanned(id, banned, reason) {
 
 async function listOrdersAdmin() {
   const { rows } = await pool.query(
-    `SELECT o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
+    `SELECT o.is_technical, o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
             o.first_dispatched_at, o.closed_at, o.manager_id, mgr.name AS manager_name,
             COUNT(*) FILTER (WHERE ov.event_type = 'view')::int AS view_count,
             COUNT(*) FILTER (WHERE ov.event_type = 'call')::int AS call_count,
@@ -196,7 +196,7 @@ async function listOrdersAdmin() {
      FROM orders o
      LEFT JOIN order_views ov ON ov.order_id = o.id
      LEFT JOIN managers mgr ON mgr.id = o.manager_id
-     GROUP BY o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
+     GROUP BY o.is_technical, o.id, o.token, o.description, o.status, o.target_categories, o.created_at,
               o.first_dispatched_at, o.closed_at, o.manager_id, mgr.name
      ORDER BY o.created_at DESC`
   );

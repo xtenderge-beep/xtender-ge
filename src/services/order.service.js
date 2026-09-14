@@ -4,6 +4,7 @@ const redis = require('../config/redis');
 const smsService = require('./sms.service');
 const masterService = require('./master.service');
 const settingsService = require('./settings.service');
+const technical = require('./technical.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
@@ -15,7 +16,7 @@ const NUDGE_THROTTLE_SECONDS = 24 * 60 * 60;
 // Разовый (не чаще раза в сутки) пинок «пополни баланс» — в Telegram, если привязан,
 // иначе SMS. reason: 'low' (списание уронило баланс) | 'missed' (не хватило на лид).
 async function nudgeLowBalance(master, telegramService, reason) {
-  const key = `lowbal_nudge:${master.id}`;
+  const key = `lowbal_nudge:${master.is_technical ? 'technical:' : ''}${master.id}`;
   const n = await redis.incr(key);
   if (n === 1) await redis.expire(key, NUDGE_THROTTLE_SECONDS);
   if (n > 1) return;
@@ -58,16 +59,17 @@ async function getOrderByOwnerToken(ownerToken) {
 async function activateOrder(token, phone, grant, meta = {}, files = []) {
   if (!grant) return null;
   return pool.withTransaction(async client => {
+    const isTechnical = await technical.isClientPhone(phone, client);
     if (grant.draftDetails) await client.query("UPDATE orders SET description=$4,district_name=$5 WHERE id=$1 AND token=$2 AND phone=$3 AND status='unverified'",[grant.orderId,token,phone,grant.draftDetails.description,grant.draftDetails.districtName]);
     const { rows } = await client.query(
-      "UPDATE orders SET status = 'pending_review', confirmed_at=NOW() WHERE token = $1 AND phone = $2 AND id = $3 AND status = 'unverified' RETURNING *",
-      [token, phone, grant.orderId]);
+      "UPDATE orders SET status = 'pending_review', confirmed_at=NOW(), is_technical=$4 WHERE token = $1 AND phone = $2 AND id = $3 AND status = 'unverified' RETURNING *",
+      [token, phone, grant.orderId, isTechnical]);
     const order = rows[0];
     if (!order) return null;
     await attachFiles(order.id, files, client);
     await consentLog.applyConsent(grant, 'client', order.id, phone, meta, client);
     await consentLog.recordAction({ eventType: 'ORDER_DETAILS_RECORDED', phone, orderId: order.id,
-      metadata: { description: order.description, district_name: order.district_name }, meta }, client);
+      metadata: { description: order.description, district_name: order.district_name, is_technical: order.is_technical }, meta }, client);
     return order;
   });
 }
@@ -146,7 +148,8 @@ async function getOrderDispatches(orderId) {
   );
   if (!dispatches.length) return [];
 
-  const counts = await getMasterCountsByCategory();
+  const order = (await pool.query('SELECT is_technical FROM orders WHERE id=$1', [orderId])).rows[0];
+  const counts = await getMasterCountsByCategory(order?.is_technical === true);
   const totalFor = (category) =>
     counts.filter((row) => row.category === category).reduce((sum, row) => sum + row.count, 0);
   const sizedFor = (category, size) => {
@@ -198,21 +201,21 @@ async function closeOrder(token, { actor = 'admin', reason = 'admin_closed', met
   });
 }
 
-async function getMasterCountsByCategory() {
+async function getMasterCountsByCategory(isTechnical = false) {
   const leadPrice = await settingsService.getLeadPriceTetri();
   const { rows } = await pool.query(
     `SELECT category, vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
+     WHERE is_technical = $2 AND is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
      GROUP BY category, vehicle_size
      UNION ALL
      SELECT 'flatbed' AS category, NULL AS vehicle_size, COUNT(*)::int AS count
      FROM masters
-     WHERE is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
+     WHERE is_technical = $2 AND is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
        AND (subscription_until IS NULL OR subscription_until > NOW())
        AND category = 'transport' AND is_flatbed = true`,
-    [leadPrice]
+    [leadPrice, isTechnical === true]
   );
   return rows;
 }
@@ -232,7 +235,7 @@ async function getOrderFunnelStats(orderId) {
   return stats;
 }
 
-function dispatchFilter(category, vehicleSize) {
+function dispatchFilter(category, vehicleSize, isTechnical = false) {
   // Условие по категории/размеру строим один раз — оно нужно и для «кому разослать»
   // (баланс есть), и для «кто подходил, но денег не хватило» (missed). $1 = цена лида.
   const catParams = [];
@@ -247,17 +250,17 @@ function dispatchFilter(category, vehicleSize) {
       catClause += ` AND (vehicle_size = $${catParams.length + 1} OR vehicle_size IS NULL)`;
     }
   }
-  const activeWhere = `is_active = true AND is_subscribed = true AND is_banned = false
+  const activeWhere = `is_technical = ${isTechnical === true ? 'true' : 'false'} AND is_active = true AND is_subscribed = true AND is_banned = false
                        AND (subscription_until IS NULL OR subscription_until > NOW())`;
 
 
  return { activeWhere, catParams, catClause };
 }
-async function getDispatchRecipients(category, vehicleSize, leadPrice) {
+async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false) {
  const catalog = require('./category.service');
  const definition = await catalog.get(category);
  if (!definition?.is_active) return [];
- const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
+ const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
  const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
  if (!definition.is_builtin && rows.length) {
    const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
@@ -266,82 +269,59 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice) {
  return rows;
 }
 async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
+  if (!order) return 0;
+  // Always use persisted routing, never a flag supplied by a caller or old preview.
+  order = await getOrderByToken(order.token);
   if (!order || !['pending_review', 'new'].includes(order.status)) return 0;
-  const current = await getOrderByToken(order.token);
-  if (!current || !['pending_review', 'new'].includes(current.status)) return 0;
- const telegramService = require('./telegram.service');
- const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
- const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
- const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize);
- const masters = await getDispatchRecipients(category, vehicleSize, leadPrice);
- const run = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id',[order.id])).rows[0];
- for (const master of masters) await pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id) VALUES($1,$2,$3,$4)',[run.id,order.id,master.id,master.manager_id]);
-  const base = getBaseUrl();
-
+  const isTechnical = order.is_technical === true;
+  const telegramService = require('./telegram.service');
+  const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
+  const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
+  const masters = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical);
+  const run = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id', [order.id])).rows[0];
+  for (const master of masters) await pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id) VALUES($1,$2,$3,$4)', [run.id,order.id,master.id,master.manager_id]);
   const notifiedIds = [];
-  await Promise.all(
-    masters.map(async (master) => {
-      const live = await getOrderByToken(order.token);
-      if (!live || !['pending_review','new'].includes(live.status)) { await pool.query("UPDATE dispatch_deliveries SET status='skipped',finished_at=NOW() WHERE run_id=$1 AND master_id=$2",[run.id,master.id]); return; }
-      const link = `${base}/order/${order.token}?master=${master.id}`;
-
-      // Привязан Telegram → шлём в бот; при сбое откатываемся на SMS, чтобы лид не пропал.
+  // A row lock serializes routing changes against delivery and charging. Limit
+  // concurrency so background SMS auditing can still obtain a pool connection.
+  for (let offset = 0; offset < masters.length; offset += 4) {
+   await Promise.all(masters.slice(offset, offset + 4).map(async candidate => {
+    let outcome = 'skipped';
+    await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
+      const live = (await client.query('SELECT status FROM orders WHERE id=$1', [order.id])).rows[0];
+      if (!live || !['pending_review','new'].includes(live.status) || !master.is_active || master.is_banned || !master.is_subscribed ||
+          (master.subscription_until && new Date(master.subscription_until) <= new Date()) || master.balance_tetri < leadPrice) return;
+      const link = getBaseUrl() + '/order/' + order.token + '?master=' + master.id;
       let delivered = false;
-      if (master.telegram_id) {
-        delivered = await telegramService.sendLeadToMaster(master, order, link).catch(() => false);
-      }
+      if (master.telegram_id) delivered = await telegramService.sendLeadToMaster(master, order, link).catch(() => false);
       if (!delivered) {
         try {
-          await smsService.sendOrderNotification(master.phone, `Xtender: new order #${order.id}: ${link}`, {
-            kind: 'lead',
-            masterId: master.id,
-            orderId: order.id,
-          });
+          await smsService.sendOrderNotification(master.phone, 'Xtender: ' + (isTechnical ? '[TEST] ' : '') + 'new order #' + order.id + ': ' + link,
+            { kind: 'lead', masterId: master.id, orderId: order.id });
           delivered = true;
-        } catch (err) {
-          console.error(`Failed to notify master ${master.id}:`, err.message);
-        }
+        } catch (err) { console.error('Failed to notify master ' + master.id + ':', err.message); }
       }
-      await pool.query('UPDATE dispatch_deliveries SET status=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2',[run.id,master.id,delivered?'accepted':'failed']);
-      if (delivered) notifiedIds.push(master.id);
-    })
-  );
-
-  if (notifiedIds.length) {
-    await pool.withTransaction((client) =>
-      masterService.chargeMastersForLead(notifiedIds, leadPrice, order.id, client)
-    );
-
-    // Списание уронило баланс ниже «мало» — разовый пинок «пополни».
-    await Promise.all(
-      masters
-        .filter((m) =>
-          notifiedIds.includes(m.id) &&
-          m.balance_tetri >= lowBalanceNudgeTetri &&
-          m.balance_tetri - leadPrice < lowBalanceNudgeTetri)
-        .map((m) =>
-          nudgeLowBalance({ ...m, balance_tetri: m.balance_tetri - leadPrice }, telegramService, 'low'))
-    );
+      outcome = delivered ? 'accepted' : 'failed';
+      if (delivered) {
+        await masterService.chargeMastersForLead([master.id], leadPrice, order.id, client);
+        notifiedIds.push(master.id);
+        if (master.balance_tetri >= lowBalanceNudgeTetri && master.balance_tetri - leadPrice < lowBalanceNudgeTetri)
+          await nudgeLowBalance({ ...master, balance_tetri: master.balance_tetri - leadPrice }, telegramService, 'low');
+      }
+      await client.query('UPDATE dispatch_deliveries SET status=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2', [run.id,master.id,outcome]);
+    });
+    if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id]);
+   }));
   }
-
-  // Подходили под рассылку, но денег не хватило — считаем пропуск + разовый пинок.
-  const { rows: broke } = await pool.query(
-    `SELECT id, phone, telegram_id, master_token, balance_tetri FROM masters
-     WHERE ${activeWhere} AND balance_tetri < $1${catClause}`,
-    [leadPrice, ...catParams]
-  );
-  if (broke.length) {
-    const missed = broke.filter(m => !notifiedIds.includes(m.id));
-    const brokeIds = missed.map((m) => m.id);
-    if (!brokeIds.length) return notifiedIds.length;
-    await pool.query(
-      `UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1
-       WHERE id IN (${brokeIds.map((_, i) => `$${i + 1}`).join(', ')})`,
-      brokeIds
-    );
-    await Promise.all(missed.map((m) => nudgeLowBalance(m, telegramService, 'missed')));
+  const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
+  const { rows: broke } = await pool.query('SELECT id FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1' + catClause, [leadPrice, ...catParams]);
+  for (const candidate of broke) {
+    if (notifiedIds.includes(candidate.id)) continue;
+    await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
+      if (!master.is_active || master.is_banned || !master.is_subscribed || master.balance_tetri >= leadPrice) return;
+      await client.query('UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1 WHERE id=$1', [master.id]);
+      await nudgeLowBalance(master, telegramService, 'missed');
+    });
   }
-
   return notifiedIds.length;
 }
 

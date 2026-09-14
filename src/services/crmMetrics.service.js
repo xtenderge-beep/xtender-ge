@@ -7,14 +7,14 @@ async function report(managerId,month){
  const [managers,invites,masters,topups,orders,deliveries,views,plans,runs,clientViews]=await Promise.all([
   pool.query('SELECT id,name FROM managers WHERE ($1::int IS NULL OR id=$1) ORDER BY name',[managerId]),
   pool.query('SELECT * FROM crm_invites WHERE ($1::int IS NULL OR manager_id=$1)',[managerId]),
-  pool.query('SELECT id,referral_manager_id,created_at,is_active FROM masters WHERE ($1::int IS NULL OR referral_manager_id=$1)',[managerId]),
-  pool.query("SELECT b.master_id,b.amount_tetri,b.created_at,m.referral_manager_id,m.referral_bound_at FROM balance_transactions b JOIN masters m ON m.id=b.master_id WHERE b.reason='topup' AND b.amount_tetri>0 AND ($1::int IS NULL OR m.referral_manager_id=$1) ORDER BY b.created_at,b.id",[managerId]),
-  pool.query('SELECT id,manager_id,created_at,confirmed_at,status,first_dispatched_at,closed_at,closed_by,closing_reason FROM orders WHERE ($1::int IS NULL OR manager_id=$1)',[managerId]),
-  pool.query('SELECT * FROM dispatch_deliveries WHERE ($1::int IS NULL OR manager_id=$1)',[managerId]),
-  pool.query("SELECT v.order_id,v.master_id,v.viewed_at FROM order_views v JOIN dispatch_deliveries d ON d.order_id=v.order_id AND d.master_id=v.master_id WHERE v.event_type IN ('call','whatsapp') AND ($1::int IS NULL OR d.manager_id=$1)",[managerId]),
+  pool.query('SELECT id,referral_manager_id,created_at,is_active FROM business_masters WHERE ($1::int IS NULL OR referral_manager_id=$1)',[managerId]),
+  pool.query("SELECT b.master_id,b.amount_tetri,b.created_at,m.referral_manager_id,m.referral_bound_at FROM business_balance_transactions b JOIN business_masters m ON m.id=b.master_id WHERE b.reason='topup' AND b.amount_tetri>0 AND ($1::int IS NULL OR m.referral_manager_id=$1) ORDER BY b.created_at,b.id",[managerId]),
+  pool.query('SELECT id,manager_id,created_at,confirmed_at,status,first_dispatched_at,closed_at,closed_by,closing_reason FROM business_orders WHERE ($1::int IS NULL OR manager_id=$1)',[managerId]),
+  pool.query('SELECT * FROM business_dispatch_deliveries WHERE ($1::int IS NULL OR manager_id=$1)',[managerId]),
+  pool.query("SELECT v.order_id,v.master_id,v.viewed_at FROM order_views v JOIN business_dispatch_deliveries d ON d.order_id=v.order_id AND d.master_id=v.master_id WHERE v.event_type IN ('call','whatsapp') AND ($1::int IS NULL OR d.manager_id=$1)",[managerId]),
   pool.query('SELECT * FROM manager_plans WHERE month=$1 AND ($2::int IS NULL OR manager_id=$2)',[range.month,managerId]),
-  managerId?pool.query('SELECT run_id AS id,created_at FROM dispatch_deliveries WHERE manager_id=$1',[managerId]):pool.query('SELECT id,created_at FROM dispatch_runs'),
-  pool.query("SELECT v.order_id,v.viewed_at,o.manager_id FROM order_views v JOIN orders o ON o.id=v.order_id WHERE v.event_type IN ('call','whatsapp') AND ($1::int IS NULL OR o.manager_id=$1)",[managerId])
+  managerId?pool.query('SELECT run_id AS id,created_at FROM business_dispatch_deliveries WHERE manager_id=$1',[managerId]):pool.query('SELECT id,created_at FROM business_dispatch_runs'),
+  pool.query("SELECT v.order_id,v.viewed_at,o.manager_id FROM order_views v JOIN business_orders o ON o.id=v.order_id WHERE v.event_type IN ('call','whatsapp') AND ($1::int IS NULL OR o.manager_id=$1)",[managerId])
  ]);
  const first=new Map();for(const t of topups.rows)if(!first.has(t.master_id))first.set(t.master_id,t);
  function calculate(id,start,end){

@@ -1,0 +1,152 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const { newDb } = require('pg-mem');
+const db = newDb();
+const schema = fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8');
+db.public.none(schema);
+const { Pool } = db.adapters.createPg();
+const pool = new Pool();
+pool.withTransaction = async fn => { const before=db.backup();try{return await fn(pool);}catch(e){before.restore();throw e;} };
+const stub=(name,exports)=>require.cache[require.resolve(name)]={exports};
+const redis = new(require('ioredis-mock'))();
+stub('../src/config/db',pool);stub('../src/config/redis',redis);
+const sent=[];
+stub('../src/services/sms.service',{
+ sendOtp:async()=>({providerMessageId:'fake-otp'}),
+ sendOrderNotification:async(phone,text,context)=>{sent.push({channel:'sms',phone,text,context});return {ok:true};},
+});
+stub('../src/services/translation.service',{translateOrder:async()=>null});
+const technical=require('../src/services/technical.service');
+const orders=require('../src/services/order.service');
+const masters=require('../src/services/master.service');
+const dispatch=require('../src/services/dispatch.service');
+const telegram=require('../src/services/telegram.service');
+telegram.notifyModerator=async()=>null;telegram.updateMessage=async()=>{};
+let telegramWorks=true;
+telegram.sendLeadToMaster=async(m,o)=>{sent.push({channel:'telegram',masterId:m.id,orderId:o.id,isTechnical:o.is_technical});return telegramWorks;};
+telegram.sendToChat=async(id,text)=>sent.push({channel:'nudge',id,text});
+const consent=require('../src/services/consent.service');
+const otpController=require('../src/controllers/otp.controller');
+const orderController=require('../src/controllers/order.controller');
+const technicalController=require('../src/controllers/technical.controller');
+const admin=require('../src/services/admin.service');
+const dashboard=require('../src/services/dashboard.service');
+const crm=require('../src/services/crmMetrics.service');
+const response=()=>({statusCode:200,locals:{},status(code){this.statusCode=code;return this;},json(data){this.data=data;return this;},cookie(){},clearCookie(){},render(view,data){this.view=view;this.data=data;},redirect(url){this.redirectTo=url;}});
+const req=body=>({body,cookies:{},headers:{},get:()=> 'localhost',lang:'ru',protocol:'http',ip:'127.0.0.1'});
+async function websiteOrder(phone, claimedTechnical) {
+ const bundle=consent.bundle('client','ru');
+ const body={phone,description:'Check the ordinary website request flow',districtName:'Tbilisi',termsAccepted:true,privacyAccepted:true,consentLanguage:'ru',consentDigest:bundle.digest,is_technical:claimedTechnical};
+ let res=response();await otpController.send(req(body),res);assert.equal(res.statusCode,200);assert.equal(res.data.success,true);
+ const {token,challengeId}=res.data;
+ let denied=response();await orderController.create(req({phone,token,challengeId,is_technical:claimedTechnical}),denied);assert.equal(denied.statusCode,400);
+ const before=await orders.getOrderByToken(token);assert.equal(before.status,'unverified');assert.equal(before.is_technical,false);
+ const code=await redis.get('otp:order:'+phone);
+ res=response();await otpController.verify(req({phone,code,challengeId}),res);assert.equal(res.data.success,true);
+ res=response();await orderController.create(req({phone,token,challengeId,is_technical:claimedTechnical}),res);assert.equal(res.data.success,true);
+ return orders.getOrderByToken(token);
+}
+async function insertMaster(name,phone,balance,technicalRole,telegramId=null) {
+ const m=(await pool.query("INSERT INTO masters(name,phone,category,is_active,is_subscribed,balance_tetri,is_technical,telegram_id,master_token) VALUES($1,$2,'movers',true,true,$3,$4,$5,$6) RETURNING *",[name,phone,balance,technicalRole,telegramId,'token-'+name])).rows[0];
+ await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[m.id]);
+ return m;
+}
+(async()=>{
+ assert.equal(technical.normalizePhone('500 001 001'),'+995500001001');
+ assert.equal(technical.normalizePhone('+995 (500) 001-001'),'+995500001001');
+ assert.throws(()=>technical.normalizePhone('abc500001001'));
+ assert.throws(()=>technical.normalizePhone('+01234567890'));
+ await technical.update('add_client','500001001','QA phone');
+ await technical.update('add_client','+995 500 001 001','QA updated');
+ assert.equal((await technical.list()).clients.length,1);
+ const real=await insertMaster('real','+995500002001',1000,false);
+ const tech=await insertMaster('tech','+995500002002',1000,false,'2002');
+ const realLow=await insertMaster('real-low','+995500002003',0,false);
+ const techLow=await insertMaster('tech-low','+995500002004',0,true);
+ await technical.update('add_master','500002002');
+ await assert.rejects(technical.update('add_master','500009999'),/не найден/);
+ assert.deepEqual((await masters.listMasters()).map(m=>m.id),[real.id,realLow.id]);
+ assert.equal(await masters.revealPhoneForCall(tech.id,50,'+995500001001'),null);
+ const testOrder=await websiteOrder('+995500001001',false);
+ assert.equal(testOrder.is_technical,true);
+ const realOrder=await websiteOrder('+995500001002',true);
+ assert.equal(realOrder.is_technical,false,'browser flag cannot override confirmed phone');
+ await technical.update('remove_client','500001001');
+ assert.equal((await orders.getOrderByToken(testOrder.token)).is_technical,true);
+ const nextReal=await websiteOrder('+995500001001',true);
+ assert.equal(nextReal.is_technical,false);
+ assert.equal(await orders.activateOrder(testOrder.token,testOrder.phone,{orderId:testOrder.id}),null);
+ assert.equal((await orders.getOrderByToken(testOrder.token)).is_technical,true);
+ const keyboard=await telegram.buildKeyboardWithCounts(testOrder.token);
+ assert.ok(keyboard.inline_keyboard.flat().find(b=>b.callback_data?.includes(':movers:')).text.includes('(1)'));
+ const testPlan=await dispatch.preview(testOrder.token,'movers','');
+ assert.deepEqual(testPlan.recipients.map(m=>m.id),[tech.id]);
+ assert.deepEqual((await dispatch.preview(realOrder.token,'movers','')).recipients.map(m=>m.id),[real.id]);
+ sent.length=0;
+ const sentTest=await dispatch.dispatch(testOrder.token,'movers','',{price:testPlan.price,count:1,revision:0});
+ assert.equal(sentTest.count,1);
+ assert.ok(sent.some(s=>s.channel==='telegram'&&s.masterId===tech.id&&s.isTechnical));
+ assert.ok(sent.some(s=>s.phone===techLow.phone),'technical low balance reminder exercised');
+ assert.ok(!sent.some(s=>s.phone===real.phone||s.phone===realLow.phone));
+ assert.equal((await masters.getMasterById(real.id)).balance_tetri,1000);
+ assert.equal((await masters.getMasterById(tech.id)).balance_tetri,950);
+ assert.equal((await pool.query('SELECT missed_dispatch_count FROM masters WHERE id=$1',[realLow.id])).rows[0].missed_dispatch_count,0);
+ await assert.rejects(dispatch.dispatch(testOrder.token,'movers',''),/уже запускалась/);
+ sent.length=0;
+ assert.equal((await dispatch.dispatch(realOrder.token,'movers','')).count,1);
+ assert.ok(sent.some(s=>s.phone===real.phone&&s.context.kind==='lead'));
+ assert.ok(!sent.some(s=>s.masterId===tech.id||s.phone===tech.phone||s.phone===techLow.phone));
+ assert.equal((await masters.getMasterById(tech.id)).balance_tetri,950);
+ // A stale caller cannot change persisted routing; Telegram failure falls back to
+ // the technical phone only, using the same billing and delivery history.
+ telegramWorks=false;sent.length=0;
+ assert.equal(await orders.notifyMasters({...testOrder,is_technical:false},'movers',''),1);
+ assert.ok(sent.some(s=>s.phone===tech.phone&&s.text.includes('[TEST]')));
+ assert.ok(!sent.some(s=>s.phone===real.phone));
+ telegramWorks=true;
+ await technical.update('remove_master',tech.id);
+ const empty=await dispatch.preview(testOrder.token,'transport','');assert.equal(empty.count,0);
+ await assert.rejects(dispatch.dispatch(testOrder.token,'transport',''),/Нет исполнителей/);
+ sent.length=0;
+ assert.equal(await orders.notifyMasters(testOrder,'movers',''),0);
+ assert.equal(sent.length,0,'no fallback to real providers when technical group is empty');
+ // Historical test charges remain excluded even after the provider becomes real.
+ assert.equal((await pool.query("SELECT * FROM business_balance_transactions WHERE reason='lead_charge'")).rows.length,1);
+ await technical.update('add_master',tech.phone);
+ // Candidate changes role after selection but before the delivery lock.
+ const original=technical.withMaster;
+ let changed=false;
+ technical.withMaster=async(id,role,fn)=>{if(id===tech.id&&!changed){changed=true;await technical.update('remove_master',id);}return original(id,role,fn);};
+ sent.length=0;assert.equal(await orders.notifyMasters(testOrder,'movers',''),0);assert.equal(sent.length,0);
+ technical.withMaster=original;
+ await technical.update('add_master',tech.phone);
+ const report=await dashboard.getDashboard('7');
+ assert.equal(report.current.confirmed,2);assert.equal(report.current.dispatched,1);
+ assert.equal(report.money.current.lead_charge.count,1);
+ assert.ok(!report.providers.some(p=>p.id===tech.id||p.id===techLow.id));
+ const month=new Date(Date.now()+14400000).toISOString().slice(0,7);
+ const crmReport=await crm.report(null,month);assert.equal(crmReport.totals.confirmed,2);assert.equal(crmReport.totals.accepted,1);
+ assert.ok((await admin.listOrdersAdmin()).find(o=>o.id===testOrder.id).is_technical);
+ // Revision preserves routing and uses the same moderation path.
+ const revision=await require('../src/services/orderRevision.service').requestRevision(nextReal.token,'Please clarify the dimensions');
+ assert.equal(revision.is_technical,false);
+ // Admin handlers, validation, audit rollback and empty/populated EJS states.
+ let res=response();await technicalController.update(req({action:'add_client',value:'bad'}),res);assert.equal(res.statusCode,400);
+ res=response();await technicalController.update(req({action:'add_client',value:'500001003',note:'<script>alert(1)</script>'}),res);assert.equal(res.redirectTo,'/admin/settings/technical?saved=1');
+ res=response();await technicalController.show({query:{}},res);
+ const ejs=require('ejs'),file=path.join(__dirname,'../src/views/admin/technical.ejs');
+ const html=ejs.render(fs.readFileSync(file,'utf8'),{...res.data,csrfToken:'csrf'},{filename:file});
+ assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>alert'));
+ assert.ok(html.includes('name="_csrf"'));assert.ok(html.includes(tech.phone));
+ const emptyHtml=ejs.render(fs.readFileSync(file,'utf8'),{clients:[],masters:[],error:null,saved:false,csrfToken:'csrf'},{filename:file});
+ assert.ok(emptyHtml.includes('Список пуст'));
+ const {requireAdmin,verifyCsrf}=require('../src/middleware/requireAdmin');
+ res=response();requireAdmin({cookies:{}},res,()=>assert.fail('unauthenticated'));assert.equal(res.redirectTo,'/admin/login');
+ res=response();res.send=function(message){this.message=message;};verifyCsrf({body:{_csrf:'wrong'},adminSession:{csrfToken:'right'}},res,()=>assert.fail('csrf'));assert.equal(res.statusCode,403);
+ const query=pool.query.bind(pool);
+ pool.query=async(sql,args)=>{if(sql.includes('INSERT INTO sms_consent_logs'))throw Error('audit unavailable');return query(sql,args);};
+ await assert.rejects(technical.update('add_client','500001004'),/audit unavailable/);
+ pool.query=query;assert.equal(await technical.isClientPhone('500001004'),false);
+ console.log('PASS technical routing: ordinary website OTP flow, anti-forgery, permanent classification, both delivery channels, fallback, charges, low balance isolation, empty group, role changes, catalog, dashboards, CRM, admin, CSRF and audit rollback');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -32,7 +32,7 @@ const REF_MAX_GEL = 20; // потолок бонуса, который мене�
 const SUPPORT_HEADER_REGEX = /^💬 #(\d+) /;
 const ADMIN_FLOW_TTL_SECONDS = 300;
 
-const PHONE_REGEX = /^\+?\d{9,15}$/;
+const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 // transport/movers/junk/flatbed — старые; tow/bucket_lift — спецтехника (у мастеров
 // masters.category = сам тип, см. serviceTypes.legacyColumnsFor). Кнопки — telegram.service.
@@ -67,10 +67,10 @@ function rememberOrderToken(req, res, token) {
 
 async function create(req, res) {
   const { token } = req.body;
-  const phone = (req.body.phone || '').replace(/\s+/g, '');
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
 
-  if (!phone || !PHONE_REGEX.test(phone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  if (!phone || !isGeorgianPhone(phone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   if (!token) {
     return res.status(400).json({ success: false, message: 'Order token is required' });
@@ -189,7 +189,7 @@ async function handleAdminFlowStep(chatId, flow, rawText) {
 
   if (flow.step === 'phone') {
     const phoneDigits = rawText.replace(/\s+/g, '');
-    if (!PHONE_REGEX.test(phoneDigits)) {
+    if (!isGeorgianPhone(phoneDigits)) {
       await telegramService.askModerator(chatId, 'Это не похоже на номер телефона. Введите номер телефона исполнителя:');
       return;
     }
@@ -447,7 +447,7 @@ async function handleManagerCommand(message, manager) {
 
   if (text === '/link' || text.startsWith('/link ')) {
     const raw = text.slice('/link'.length).trim().replace(/\s+/g, '');
-    if (!/^\+?\d{9,15}$/.test(raw)) {
+    if (!isGeorgianPhone(raw)) {
       await telegramService.sendToChat(chatId, 'Формат: /link +995XXXXXXXXX\nТелефон позвонившего клиента. В ответ — ссылка, которую отправляете ему.');
       return;
     }

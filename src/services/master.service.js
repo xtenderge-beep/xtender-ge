@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
 
-const FIELDS = 'id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating';
+const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating';
 
 // Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
 //   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
@@ -166,7 +166,7 @@ async function unlinkTelegram(masterToken) {
 // ответа модератора в поддержке (нужен telegram_id, чтобы пингнуть).
 async function getMasterById(id) {
   const { rows } = await pool.query(
-    `SELECT id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
      FROM masters WHERE id = $1`,
     [id]
   );
@@ -175,7 +175,7 @@ async function getMasterById(id) {
 
 async function getMasterByTelegramId(telegramId) {
   const { rows } = await pool.query(
-    `SELECT id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
      FROM masters WHERE telegram_id = $1`,
     [telegramId]
   );
@@ -391,7 +391,7 @@ async function listMasters({ serviceType } = {}) {
     `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating, COUNT(r.id)::int AS review_count
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
-     WHERE m.is_active = true AND m.is_banned = false
+     WHERE m.is_technical = false AND m.is_active = true AND m.is_banned = false
      GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id
      ORDER BY m.id`
   );
@@ -436,7 +436,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
   return pool.withTransaction(async (client) => {
     const { rows } = await client.query(
       `UPDATE masters SET balance_tetri = balance_tetri + $1
-       WHERE id = $2 AND is_active = true AND is_banned = false AND balance_tetri >= $3
+       WHERE id = $2 AND is_technical = false AND is_active = true AND is_banned = false AND balance_tetri >= $3
        RETURNING id, phone, balance_tetri`,
       [-priceTetri, masterId, priceTetri]
     );

@@ -77,9 +77,9 @@ async function action(managerId, masterId, action, body) {
 async function dashboard(id, search = '', page = 1) {
   page = Math.max(1, Math.min(100000, parseInt(page,10) || 1));
   search = String(search).slice(0,100);
-  const providers = (await pool.query('SELECT id,name,phone,balance_tetri,is_active,is_banned,is_subscribed,subscription_until FROM masters WHERE manager_id=$1 AND (name ILIKE $2 OR phone ILIKE $2) ORDER BY id DESC LIMIT 51 OFFSET $3', [id,'%'+search+'%',(page-1)*50])).rows;
-  const stats = (await pool.query('SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN is_active=true AND is_banned=false THEN 1 ELSE 0 END),0) AS active,COALESCE(SUM(CASE WHEN is_banned=true THEN 1 ELSE 0 END),0) AS banned,COALESCE(SUM(CASE WHEN balance_tetri<=0 THEN 1 ELSE 0 END),0) AS empty,SUM(balance_tetri) AS balance FROM masters WHERE manager_id=$1', [id])).rows[0];
-  const orders = (await pool.query('SELECT id,phone,description,status,created_at FROM orders WHERE manager_id=$1 ORDER BY created_at DESC LIMIT 100',[id])).rows;
+  const providers = (await pool.query('SELECT id,name,phone,balance_tetri,is_active,is_banned,is_subscribed,subscription_until FROM business_masters WHERE manager_id=$1 AND (name ILIKE $2 OR phone ILIKE $2) ORDER BY id DESC LIMIT 51 OFFSET $3', [id,'%'+search+'%',(page-1)*50])).rows;
+  const stats = (await pool.query('SELECT COUNT(*) AS total,COALESCE(SUM(CASE WHEN is_active=true AND is_banned=false THEN 1 ELSE 0 END),0) AS active,COALESCE(SUM(CASE WHEN is_banned=true THEN 1 ELSE 0 END),0) AS banned,COALESCE(SUM(CASE WHEN balance_tetri<=0 THEN 1 ELSE 0 END),0) AS empty,SUM(balance_tetri) AS balance FROM business_masters WHERE manager_id=$1', [id])).rows[0];
+  const orders = (await pool.query('SELECT id,phone,description,status,created_at FROM business_orders WHERE manager_id=$1 ORDER BY created_at DESC LIMIT 100',[id])).rows;
   const funnel = await require('./manager.service').getClientFunnel(id);
   return { providers: providers.slice(0,50), more: providers.length>50, stats, orders, funnel, search, page };
 }

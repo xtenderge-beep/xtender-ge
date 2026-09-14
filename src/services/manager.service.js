@@ -22,7 +22,7 @@ async function list() {
             COALESCE(pc.cnt, 0) AS provider_count
      FROM managers m
      LEFT JOIN (
-       SELECT manager_id, COUNT(*)::int AS cnt FROM masters WHERE manager_id IS NOT NULL GROUP BY manager_id
+       SELECT manager_id, COUNT(*)::int AS cnt FROM business_masters WHERE manager_id IS NOT NULL GROUP BY manager_id
      ) pc ON pc.manager_id = m.id
      ORDER BY m.created_at DESC`
   );
@@ -81,7 +81,7 @@ async function isActiveModerator(telegramId) {
 async function getProviders(managerId) {
   const { rows } = await pool.query(
     `SELECT id, name, phone, balance_tetri, is_active, is_banned, promo_code_used, created_at
-     FROM masters WHERE manager_id = $1 ORDER BY created_at DESC`,
+     FROM business_masters WHERE manager_id = $1 ORDER BY created_at DESC`,
     [managerId]
   );
   return rows;
@@ -93,7 +93,7 @@ async function getStats(managerId) {
     getProviders(managerId),
     pool.query(
       `SELECT COALESCE(SUM(bt.amount_tetri), 0)::int AS total
-       FROM balance_transactions bt
+       FROM business_balance_transactions bt
        JOIN promo_codes pc ON pc.code = bt.note
        WHERE bt.reason = 'promo' AND pc.manager_id = $1`,
       [managerId]
@@ -158,7 +158,7 @@ async function getClientFunnel(managerId) {
     const { rows } = await pool.query(
       `SELECT o.id, o.status, o.first_dispatched_at,
               COALESCE(ev.contacted, 0)::int AS contacted
-       FROM orders o
+       FROM business_orders o
        LEFT JOIN (
          SELECT order_id, COUNT(*) AS contacted FROM order_views
          WHERE event_type IN ('call', 'whatsapp') GROUP BY order_id

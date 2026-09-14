@@ -9,7 +9,7 @@ const { TERMS_VERSION } = require('../config/legal');
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
-const PHONE_REGEX = /^\+?\d{9,15}$/;
+const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 const REVIEW_PURPOSE = 'review';
 
 async function checkRateLimit(scope) {
@@ -33,9 +33,9 @@ async function showInvite(req, res) {
 // --- Флоу «оставить отзыв из каталога» (кнопка на карточке мастера) ---
 
 async function requestCode(req, res) {
-  const phone = (req.body.phone || '').replace(/\s+/g, '');
-  if (!phone || !PHONE_REGEX.test(phone)) {
-    return res.status(400).json({ success: false, message: 'Invalid phone number' });
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
+  if (!phone || !isGeorgianPhone(phone)) {
+    return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
   const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE, null, { meta: requestMeta(req) });
@@ -49,11 +49,11 @@ async function requestCode(req, res) {
 }
 
 async function verifyForMaster(req, res) {
-  const phone = (req.body.phone || '').replace(/\s+/g, '');
+  const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
   const masterId = parseInt(req.body.masterId, 10);
 
-  if (!phone || !PHONE_REGEX.test(phone) || !code || !Number.isInteger(masterId)) {
+  if (!phone || !isGeorgianPhone(phone) || !code || !Number.isInteger(masterId)) {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
 
@@ -97,9 +97,9 @@ async function submit(req, res) {
     }
     orderId = order.id;
   } else {
-    const phone = (req.body.phone || '').replace(/\s+/g, '');
-    if (!phone || !PHONE_REGEX.test(phone)) {
-      return res.status(400).json({ success: false, message: 'Invalid phone number' });
+    const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
+    if (!phone || !isGeorgianPhone(phone)) {
+      return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
     }
     if (!(await otpService.isPhoneVerified(phone, REVIEW_PURPOSE))) {
       return res.status(403).json({ success: false, message: 'Phone not verified' });

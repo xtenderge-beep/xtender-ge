@@ -10,7 +10,7 @@
 <section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Источник привлечения и комиссия</h2><% if(partnerReferrer) { %><p class="text-sm mt-2">Привёл: <a href="/admin/managers/<%= partnerReferrer.id %>" class="text-emerald-700 underline"><%= partnerReferrer.name %></a> · ставка на будущие пополнения: <%= partnerReferrer.commission_bps/100 %>%.</p><a href="/admin/partner-payouts?manager=<%= partnerReferrer.id %>" class="text-sm text-emerald-700 underline">Начисления и выплаты →</a><p class="text-xs text-stone-500 mt-2">Смена ответственного менеджера не меняет этот источник привлечения.</p><% } else { %><p class="text-sm mt-2">Источник для комиссии не закреплён. Для ранее привлечённого специалиста укажите его ID <%= master.id %> и основание в карточке менеджера. Прошлые пополнения автоматически не пересчитываются.</p><% } %></section>
 <div class="mt-3 bg-white rounded-2xl border border-stone-200 p-5">
     <div class="flex items-center gap-2 flex-wrap">
-        <h1 class="text-xl font-black text-stone-900"><%= master.name %></h1>
+        <h1 class="text-xl font-black text-stone-900"><%= master.name %></h1><% if(master.is_technical) { %><a href="/admin/settings/technical" class="text-amber-700 font-bold underline">🧪 Технический — только тестовые заявки</a><% } %>
         <% if (master.is_banned) { %>
           <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200">Забанен<% if (master.banned_reason) { %>: <%= master.banned_reason %><% } %></span>
         <% } else if (!master.is_active) { %>

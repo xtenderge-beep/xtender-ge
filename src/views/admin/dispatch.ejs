@@ -5,7 +5,9 @@
 <% if(error) { %><p role="alert" class="text-red-800"><%= error %></p><% } %>
 <% if(result) { %><p role="status">Уведомлений отправлено: <strong><%= result.count %></strong>. Списано: <strong><%= (result.count*result.price/100).toFixed(2) %> ₾</strong>.</p><p>Это подтверждение отправки через канал уведомлений. Просмотры и нажатия контактов доступны в карточке заявки.</p><% } %>
 <% if(plan) { %>
+<p class="font-bold"><%= plan.order.is_technical ? '🧪 ТЕСТ — только технические исполнители' : 'Обычная заявка — только реальные исполнители' %></p>
 <p><%= plan.order.description %></p>
+<% if(plan.recipients && plan.recipients.length) { %><details><summary>Показать получателей</summary><ul><% plan.recipients.forEach(m=>{ %><li>#<%= m.id %> · <%= m.phone %> · <%= m.telegram_id ? 'Telegram (резерв: SMS)' : 'SMS' %></li><% }) %></ul></details><% } %>
 <p>Группа: <strong><%= groups[plan.category] %><%= plan.size ? ' · '+plan.size : '' %></strong></p>
 <p>Получателей с достаточным балансом: <strong><%= plan.count %></strong><br>Тариф каждому: <strong><%= (plan.price/100).toFixed(2) %> ₾</strong><br>Расчётное списание по группе: <strong><%= (plan.count*plan.price/100).toFixed(2) %> ₾</strong></p>
 <p>Рассылка по категории в Тбилиси. Районы профиля не ограничивают эту группу. Используется Telegram, при его отсутствии или ошибке — SMS. Списание за отправленную заявку, независимо от сделки.</p>

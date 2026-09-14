@@ -10,9 +10,9 @@ async function preview(token, category, size) {
   const order = await orderService.getOrderByToken(token);
   if (!order || !['pending_review', 'new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
   const price = await settingsService.getLeadPriceTetri();
-  const recipients = await orderService.getDispatchRecipients(category, size, price);
+  const recipients = await orderService.getDispatchRecipients(category, size, price, order.is_technical === true);
   const previous = await pool.query(`SELECT id FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
-  return { order, category, size: size || '', price, count: recipients.length, alreadySent: previous.rows.length > 0 };
+  return { order, category, size: size || '', price, recipients, count: recipients.length, alreadySent: previous.rows.length > 0 };
 }
 async function dispatch(token, category, size, expected = null) {
   const plan = await preview(token, category, size);

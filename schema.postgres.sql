@@ -37,3 +37,17 @@ CREATE TABLE IF NOT EXISTS topup_receipts (
  CHECK ((status = 'credited' AND balance_transaction_id IS NOT NULL AND credited_tetri > 0) OR (status <> 'credited' AND balance_transaction_id IS NULL AND credited_tetri IS NULL))
 );
 CREATE INDEX IF NOT EXISTS idx_topup_receipts_master ON topup_receipts(master_id, created_at);
+
+
+-- A verified request keeps its routing even after its phone leaves the test pool.
+CREATE OR REPLACE FUNCTION preserve_order_routing() RETURNS trigger AS $$
+BEGIN
+ IF OLD.status <> 'unverified' AND NEW.is_technical IS DISTINCT FROM OLD.is_technical THEN
+  RAISE EXCEPTION 'Verified order routing cannot be changed';
+ END IF;
+ RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_preserve_order_routing ON orders;
+CREATE TRIGGER trg_preserve_order_routing BEFORE UPDATE ON orders
+ FOR EACH ROW EXECUTE PROCEDURE preserve_order_routing();

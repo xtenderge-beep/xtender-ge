@@ -93,7 +93,7 @@
 
                 <div>
                     <label for="phoneInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_phone_label') %></label>
-                    <input type="tel" id="phoneInput" autocomplete="tel" inputmode="tel" placeholder="<%= t('form_phone_placeholder') %>"
+                    <input type="tel" data-georgian-phone value="+995" pattern="\+995(?:\s*[0-9]){9}\s*" id="phoneInput" autocomplete="tel" inputmode="tel" placeholder="<%= t('form_phone_placeholder') %>"
                         class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold text-stone-900 bg-white">
                 </div>
 
@@ -221,7 +221,7 @@
             if (!payload.name) return showMsg(T.join_err_name_required, true);
             if (!payload.description) return showMsg(T.join_services_required, true);
             if (!payload.cityIds.length) return showMsg(T.join_work_cities_required, true);
-            if (!payload.phone) return showMsg(T.js_err_empty_phone, true);
+            if (!window.GeorgianPhone.validate(document.getElementById('phoneInput'))) return;
             if (!payload.termsAccepted) return showMsg(T.join_err_terms_required, true);
             if (!payload.privacyAccepted) return showMsg(T.join_err_privacy_required, true);
 

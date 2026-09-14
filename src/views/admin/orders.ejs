@@ -2,7 +2,8 @@
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Заявки (<%= total %>)</h1>
 
-<form method="GET" class="admin-filter"><input name="q" aria-label="Поиск заявки" value="<%= q %>" placeholder="Номер, описание, менеджер"><select name="status" aria-label="Статус заявки"><% [['','Все статусы'],['waiting','Ожидают рассылки'],['needs_revision','У клиента на доработке'],['unverified','Телефон не подтверждён'],['active','В работе'],['closed','Закрыты']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===status?'selected':'' %>><%= label %></option><% }) %></select><button>Найти</button><a href="/admin/orders">Сбросить</a></form>
+<% const selectedKind = typeof kind === 'string' ? kind : ''; %>
+<form method="GET" class="admin-filter"><select name="kind" aria-label="Тип заявки"><% [['','Все заявки'],['real','Обычные'],['technical','Тестовые']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===selectedKind?'selected':'' %>><%= label %></option><% }) %></select><input name="q" aria-label="Поиск заявки" value="<%= q %>" placeholder="Номер, описание, менеджер"><select name="status" aria-label="Статус заявки"><% [['','Все статусы'],['waiting','Ожидают рассылки'],['needs_revision','У клиента на доработке'],['unverified','Телефон не подтверждён'],['active','В работе'],['closed','Закрыты']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===status?'selected':'' %>><%= label %></option><% }) %></select><button>Найти</button><a href="/admin/orders">Сбросить</a></form>
 <% if(!orders.length) { %><p class="p-6 bg-white rounded-xl">По этим условиям заявок нет.</p><% } %><div class="space-y-2">
     <% orders.forEach(function (o) { %>
       <a href="/admin/orders/<%= o.token %>" class="block bg-white rounded-2xl border border-stone-200 p-4 hover:border-emerald-300 transition">
@@ -13,7 +14,7 @@
                   <%= o.status === 'closed' ? 'Закрыта' : o.status === 'needs_revision' ? 'Нужны уточнения' : o.status === 'unverified' ? 'Телефон не подтверждён' : o.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
               </span>
           </div>
-          <% if(o.status !== 'closed' && !o.first_dispatched_at) { %><p class="text-xs text-amber-700 mt-2">Ожидает <%= Math.max(0,Math.floor((Date.now()-new Date(o.created_at))/60000)) %> мин</p><% } %><p class="text-sm text-stone-800 mt-1.5 line-clamp-2"><%= o.description %></p>
+          <% if(o.status !== 'closed' && !o.first_dispatched_at) { %><p class="text-xs text-amber-700 mt-2">Ожидает <%= Math.max(0,Math.floor((Date.now()-new Date(o.created_at))/60000)) %> мин</p><% } %><p class="text-sm text-stone-800 mt-1.5 line-clamp-2"><% if(o.is_technical) { %><strong class="text-amber-700">🧪 ТЕСТ · </strong><% } %><%= o.description %></p>
           <p class="text-xs text-stone-500 mt-1.5">
               Категории: <%= (Array.isArray(o.target_categories) ? o.target_categories : []).join(', ') || '—' %>
               · Просмотров: <%= o.view_count %> · Нажатий звонка: <%= o.call_count %> · WhatsApp: <%= o.whatsapp_count %>
@@ -23,4 +24,4 @@
     <% }); %>
 </div>
 
-<nav class="flex gap-4 mt-5" aria-label="Страницы"><% if(page>1) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&page=<%= page-1 %>">← Назад</a><% } %><span>Страница <%= page %></span><% if(page*30<total) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&page=<%= page+1 %>">Далее →</a><% } %></nav><%- include('./_footer') %>
+<nav class="flex gap-4 mt-5" aria-label="Страницы"><% if(page>1) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&kind=<%= selectedKind %>&page=<%= page-1 %>">← Назад</a><% } %><span>Страница <%= page %></span><% if(page*30<total) { %><a href="?q=<%= encodeURIComponent(q) %>&status=<%= status %>&kind=<%= selectedKind %>&page=<%= page+1 %>">Далее →</a><% } %></nav><%- include('./_footer') %>
