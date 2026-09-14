@@ -23,11 +23,41 @@
     if (!valid && report) input.reportValidity();
     return valid;
   };
+  // Поле всегда начинается с '+995' (см. value="+995" в разметке) — здесь запрещаем
+  // редактирование этого префикса, чтобы его нельзя было стереть/заменить на код другой
+  // страны. Правим только то, что относится к самому префиксу; остальную валидацию формата
+  // (9 цифр и т.п.) по-прежнему делает policy.validate/сервер.
+  const PREFIX = '+995';
+  function lockPrefix(input) {
+    input.addEventListener('beforeinput', function (e) {
+      if (e.inputType === 'insertFromPaste') return; // обрабатывается ниже, через 'paste'
+      const start = input.selectionStart, end = input.selectionEnd;
+      if (e.inputType === 'deleteContentBackward') {
+        if (start <= PREFIX.length && end <= PREFIX.length) e.preventDefault();
+        return;
+      }
+      if (start < PREFIX.length) e.preventDefault();
+    });
+    input.addEventListener('paste', function (e) {
+      e.preventDefault();
+      const text = (e.clipboardData || root.clipboardData).getData('text');
+      let digits = text.replace(/\D/g, '');
+      if (digits.startsWith('995')) digits = digits.slice(3);
+      // Clamp the replaced range to start after the prefix — a selection reaching into
+      // (or a caret inside) the prefix pastes the digits right after it instead of
+      // overwriting the whole field, so anything already typed past the prefix survives.
+      const start = Math.max(input.selectionStart, PREFIX.length);
+      const end = Math.max(input.selectionEnd, PREFIX.length);
+      input.setRangeText(digits, start, end, 'end');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-georgian-phone]').forEach(function (input) {
       input.title = policy.message(document.documentElement.lang);
       input.addEventListener('input', function () { policy.validate(input, false); });
       input.addEventListener('blur', function () { policy.validate(input, false); });
+      lockPrefix(input);
     });
   });
 })(typeof window === 'object' ? window : globalThis);
