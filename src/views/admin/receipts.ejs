@@ -1,6 +1,13 @@
 <%- include('./_header', { active: 'receipts' }) %>
+<% const query = typeof q === 'string' ? q : ''; const summary = typeof statementSummary !== 'undefined' ? statementSummary : null; %>
 <h1 class="text-2xl font-black">Проверка пополнений</h1>
 <p class="text-sm text-stone-600 mt-3">Здесь показан каждый созданный исполнителем счёт на пополнение — включая те, к которым ещё не приложен чек. Проверьте перевод в банке и нажмите «Подтвердить оплату» — сумма сразу зачислится на баланс исполнителя.</p>
+<form method="GET" class="admin-filter"><input name="q" value="<%= query %>" placeholder="Номер счёта, имя, телефон"><button>Найти</button><% if (query) { %><a href="/admin/receipts">Сбросить</a><% } %></form>
+<form method="POST" action="/admin/receipts/import-statement" enctype="multipart/form-data" class="admin-filter">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<label>Выписка банка (.xlsx)<input type="file" name="statement" accept=".xlsx" required></label>
+<button type="submit">Загрузить и найти совпадения</button></form>
+<% if (summary) { %><p class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-3">Из выписки: платежей со ссылкой на счёт — <%= summary.totalCredits %>, совпало с ожидающими счетами — <%= summary.matched %>.<% if (!summary.matched) { %> Ни один счёт не найден — проверьте, что в назначении платежа сохранился номер вида XT-XXXXXXXXXXXX.<% } %></p><% } %>
 <% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-3"><%= error %></p><% } %>
 <% if (!receipts.length) { %><p class="p-6 mt-4 bg-white rounded-xl">Пока нет созданных счетов. Здесь будут появляться новые обращения.</p><% } %>
 <% const statusLabel = {awaiting:'Ожидает оплаты', received:'Чек получен', reviewing:'На проверке', credited:'Зачислено', rejected:'Нужно уточнение'};
@@ -9,6 +16,7 @@ receipts.forEach(t=>{ %><article class="admin-receipt">
 <p>Назначение: <%= t.purposeText %></p>
 <h2><a class="text-emerald-700 underline" href="/admin/masters/<%= t.master_id %>"><%= t.name %></a></h2>
 <p><%= t.phone %> · <%= new Date(t.created_at).toLocaleString('ru') %> · <strong><%= statusLabel[t.status] %></strong></p>
+<% if (t.statementMatch) { %><p class="font-bold text-emerald-700">✓ Найдено в выписке: <%= (t.statementMatch.amountTetri/100).toFixed(2) %> ₾ от <%= t.statementMatch.date %></p><% } %>
 <% if (t.receipt) { %>
 <p>Чек #<%= t.receipt.id %> · <a class="text-emerald-700 underline" href="/uploads/<%= encodeURIComponent(t.receipt.filename) %>" target="_blank" rel="noopener">Открыть файл ↗</a> · <%= statusLabel[t.receipt.status] %></p>
 <% if (t.receipt.status !== 'credited') { %>
@@ -22,8 +30,8 @@ receipts.forEach(t=>{ %><article class="admin-receipt">
 <% if (t.status === 'credited') { %><p>Подтверждено <%= (t.credited_tetri/100).toFixed(2) %> ₾ · операция #<%= t.balance_transaction_id %><% if (t.note) { %> · <%= t.note %><% } %></p><% } else { %>
 <form class="admin-filter" method="POST" action="/admin/receipts/<%= t.id %>/confirm">
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-<label>Сумма к зачислению, ₾<input name="amountGel" type="number" min="0.01" max="1000" step="0.01" value="<%= (t.amount_tetri/100).toFixed(2) %>" required></label>
-<label>Комментарий (обязателен, если сумма отличается)<input name="note" maxlength="500" value="<%= t.note || '' %>" placeholder="Например: банк удержал комиссию"></label>
+<label>Сумма к зачислению, ₾<input name="amountGel" type="number" min="0.01" max="1000" step="0.01" value="<%= ((t.statementMatch ? t.statementMatch.amountTetri : t.amount_tetri)/100).toFixed(2) %>" required></label>
+<label>Комментарий (обязателен, если сумма отличается)<input name="note" maxlength="500" value="<%= t.note || (t.statementMatch && t.statementMatch.amountTetri !== t.amount_tetri ? 'По выписке от '+t.statementMatch.date : '') %>" placeholder="Например: банк удержал комиссию"></label>
 <button type="submit">Подтвердить оплату и зачислить</button></form>
 <form method="POST" action="/admin/receipts/<%= t.id %>/cancel" class="mt-2" onsubmit="return confirm('Удалить счёт <%= t.reference %>? Исполнитель больше не сможет его оплатить.')">
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">

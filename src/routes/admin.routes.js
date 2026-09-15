@@ -1,9 +1,19 @@
 const express = require('express');
+const multer = require('multer');
 const adminController = require('../controllers/admin.controller');
 const asyncHandler = require('../middleware/asyncHandler');
 const { requireAdmin, verifyCsrf } = require('../middleware/requireAdmin');
 
 const router = express.Router();
+
+// Bank statements carry account numbers and counterparties — memory storage only
+// (never written to public/uploads, unlike src/config/upload.js's receipt images),
+// parsed once per request and discarded.
+const statementUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => cb(null, /\.xlsx$/i.test(file.originalname || '') || file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
+});
 
 router.get('/login', adminController.showLogin);
 router.post('/login', asyncHandler(adminController.login));
@@ -42,6 +52,7 @@ router.get('/receipts', asyncHandler(adminController.receiptsList));
 router.post('/receipts/:id/review', verifyCsrf, asyncHandler(adminController.receiptReview));
 router.post('/receipts/:id/confirm', verifyCsrf, asyncHandler(adminController.confirmTopup));
 router.post('/receipts/:id/cancel', verifyCsrf, asyncHandler(adminController.cancelTopup));
+router.post('/receipts/import-statement', statementUpload.single('statement'), verifyCsrf, asyncHandler(adminController.importStatement));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));

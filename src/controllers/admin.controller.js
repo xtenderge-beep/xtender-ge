@@ -1,6 +1,7 @@
 const topupService = require('../services/topup.service');
 const dispatchService = require('../services/dispatch.service');
 const receiptService = require('../services/receipt.service');
+const bankStatementService = require('../services/bankStatement.service');
 const redis = require('../config/redis');
 const adminAuth = require('../config/adminAuth');
 const otpService = require('../services/otp.service');
@@ -538,12 +539,30 @@ async function updateCatalogCallPrice(req, res) {
   res.redirect('/admin/settings?saved=catalog');
 }
 
-async function receiptsWithPurpose() {
-  const topups = await receiptService.list();
-  return topups.map(t => ({ ...t, purposeText: topupService.purpose(t) }));
+async function receiptsWithPurpose(topups = null) {
+  const list = topups || await receiptService.list();
+  return list.map(t => ({ ...t, purposeText: topupService.purpose(t) }));
 }
 async function receiptsList(req, res) {
-  res.render('admin/receipts', { receipts: await receiptsWithPurpose(), error: null });
+  const q = String(req.query.q || '').trim().slice(0, 100);
+  let receipts = await receiptsWithPurpose();
+  if (q) {
+    const needle = q.toLowerCase();
+    receipts = receipts.filter(t => [t.reference, t.name, t.phone].some(v => String(v || '').toLowerCase().includes(needle)));
+  }
+  res.render('admin/receipts', { receipts, error: null, q, statementSummary: null });
+}
+async function importStatement(req, res) {
+  try {
+    if (!req.file) throw new Error('Прикрепите файл выписки (.xlsx)');
+    const credits = await bankStatementService.parseCredits(req.file.buffer);
+    const { topups, matched, totalCredits } = bankStatementService.matchCredits(await receiptService.list(), credits);
+    // Surface matches first — that's the whole point of uploading the statement.
+    topups.sort((a, b) => (b.statementMatch ? 1 : 0) - (a.statementMatch ? 1 : 0));
+    res.render('admin/receipts', { receipts: await receiptsWithPurpose(topups), error: null, q: '', statementSummary: { matched, totalCredits } });
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null });
+  }
 }
 async function receiptReview(req, res) {
   try {
@@ -598,7 +617,7 @@ module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
-  receiptsList, receiptReview, confirmTopup, cancelTopup,
+  receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement,
   showLogin,
   login,
   verify2fa,
