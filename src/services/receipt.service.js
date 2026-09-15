@@ -16,7 +16,7 @@ async function listForMaster(masterId) {
   return (await pool.query('SELECT id, status, credited_tetri, note, created_at, topup_id FROM topup_receipts WHERE master_id = $1 ORDER BY created_at DESC LIMIT 30', [masterId])).rows;
 }
 async function list() {
-  return (await pool.query(`SELECT r.*, m.name, m.phone, p.reference, p.amount_tetri AS requested_tetri FROM topup_receipts r JOIN masters m ON m.id = r.master_id LEFT JOIN topup_requests p ON p.id = r.topup_id ORDER BY CASE WHEN r.status IN ('received','reviewing') THEN 0 ELSE 1 END, r.created_at DESC LIMIT 100`)).rows;
+  return (await pool.query(`SELECT r.*, m.name, m.phone, p.reference, p.amount_tetri AS requested_tetri, p.created_at AS topup_created_at FROM topup_receipts r JOIN masters m ON m.id = r.master_id LEFT JOIN topup_requests p ON p.id = r.topup_id ORDER BY CASE WHEN r.status IN ('received','reviewing') THEN 0 ELSE 1 END, r.created_at DESC LIMIT 100`)).rows;
 }
 // A receipt documents a transfer already checked by a moderator. Linking an existing
 // credit avoids charging/crediting twice when Telegram /topup was used first.

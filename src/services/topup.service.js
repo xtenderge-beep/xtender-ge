@@ -57,5 +57,9 @@ async function get(id, masterId) {
 async function list(masterId) {
   return (await pool.query('SELECT * FROM topup_requests WHERE master_id = $1 ORDER BY created_at DESC LIMIT 50', [masterId])).rows;
 }
-function purpose(topup) { return `Xtender balance ${topup.reference} / provider ${topup.master_id}`; }
+function purpose(topup) {
+  const date = new Date(topup.created_at).toLocaleDateString('en-CA', { timeZone: 'Asia/Tbilisi' });
+  const amount = (topup.amount_tetri / 100).toFixed(2);
+  return `ბალანსის შევსება, ოფერტა № ${topup.reference}, ${date}, თანხა ${amount} GEL`;
+}
 module.exports = { parseAmount, validIban, getDetails, saveDetails, create, get, list, purpose };

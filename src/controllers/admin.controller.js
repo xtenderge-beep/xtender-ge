@@ -538,15 +538,19 @@ async function updateCatalogCallPrice(req, res) {
   res.redirect('/admin/settings?saved=catalog');
 }
 
+async function receiptsWithPurpose() {
+  const receipts = await receiptService.list();
+  return receipts.map(r => ({ ...r, purposeText: r.reference ? topupService.purpose({ reference: r.reference, master_id: r.master_id, amount_tetri: r.requested_tetri, created_at: r.topup_created_at }) : null }));
+}
 async function receiptsList(req, res) {
-  res.render('admin/receipts', { receipts: await receiptService.list(), error: null });
+  res.render('admin/receipts', { receipts: await receiptsWithPurpose(), error: null });
 }
 async function receiptReview(req, res) {
   try {
     await receiptService.review(Number(req.params.id), req.body.status, Number(req.body.transactionId), String(req.body.note || '').trim().slice(0, 500));
     res.redirect('/admin/receipts');
   } catch (error) {
-    res.status(400).render('admin/receipts', { receipts: await receiptService.list(), error: error.message });
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
   }
 }
 async function dispatchPreview(req,res) {
