@@ -1,6 +1,8 @@
 <div data-field class="border rounded-xl p-3 space-y-2">
 <input type="hidden" name="fields[<%= index %>][key]" value="<%= field.key || '' %>">
-<% [['ru','Название на русском'],['ka','Название на грузинском'],['en','Название на английском']].forEach(([lang,label])=>{ %><label class="block text-sm"><%= label %><input required maxlength="100" name="fields[<%= index %>][name_<%= lang %>]" value="<%= field['name_'+lang] || '' %>" class="block w-full border rounded-xl px-3 py-2"></label><% }); %>
+<label class="block text-sm">Название характеристики (русский)<input required maxlength="100" name="fields[<%= index %>][name_ru]" value="<%= field.name_ru || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+<label class="block text-sm">Название на грузинском (необязательно — иначе покажем русское)<input maxlength="100" name="fields[<%= index %>][name_ka]" value="<%= field.name_ka || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+<label class="block text-sm">Название на английском (необязательно — иначе покажем русское)<input maxlength="100" name="fields[<%= index %>][name_en]" value="<%= field.name_en || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
 <label class="block text-sm">Тип поля<select name="fields[<%= index %>][input]" class="block border rounded-xl px-3 py-2"><% [['text','Текст'],['number','Число'],['bool','Да / нет'],['enum','Выбор из списка']].forEach(([type,label])=>{ %><option value="<%= type %>" <%= field.input===type?'selected':'' %>><%= label %></option><% }); %></select></label>
 <label class="block text-sm">Варианты для списка — каждый с новой строки<textarea name="fields[<%= index %>][choices]" maxlength="1000" rows="3" class="block w-full border rounded-xl px-3 py-2"><%= field.choices || '' %></textarea></label>
 <label class="flex gap-2 text-sm"><input type="checkbox" name="fields[<%= index %>][required]" <%= field.required?'checked':'' %>>Обязательно при проверке анкеты</label>

@@ -15,7 +15,7 @@ function view(row, lang = 'ru') {
   const t = translate(lang);
   return { type: row.slug, label: row['name_'+lang] || row.name_ru, icon: row.icon, active: row.is_active,
     fields: row.fields.map(f => ({ ...f, min: f.min ?? null, max: f.max ?? null,
-      label: f.labels?.[lang] || t('svc_'+row.slug+'_'+f.key),
+      label: f.labels?.[lang] || f.labels?.ru || t('svc_'+row.slug+'_'+f.key),
       options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || value})) })) };
 }
 async function configForView(lang = 'ru') { return (await list()).filter(r=>r.is_active).map(r=>view(r,lang)); }
@@ -54,7 +54,12 @@ function parseFields(input, previous) {
     if(!/^f_[a-f0-9]{8}$/.test(key) || seen.has(key) || (f.key && !previous.some(p=>p.key===key))) throw fail('Некорректная характеристика.');
     seen.add(key);
     if(!['text','number','bool','enum'].includes(f.input)) throw fail('Неизвестный тип характеристики.');
-    const labels=Object.fromEntries(['ru','ka','en'].map(lang=>[lang,text(f['name_'+lang],100,'Название характеристики')]));
+    const nameRu=text(f.name_ru,100,'Название характеристики');
+    const labels={ru:nameRu};
+    ['ka','en'].forEach(lang=>{
+      const raw=typeof f['name_'+lang]==='string' ? f['name_'+lang].trim() : '';
+      if(raw){ if(raw.length>100) throw fail('Название характеристики: до 100 символов.'); labels[lang]=raw; }
+    });
     const out={key,input:f.input,labels,required:f.required===true,match:'ignore'};
     if(out.input==='enum') {
       out.options=text(f.choices,1000,'Варианты').split('\n').map(s=>s.trim()).filter(Boolean);
