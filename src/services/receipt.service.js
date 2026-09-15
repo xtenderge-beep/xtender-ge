@@ -22,7 +22,7 @@ async function listForMaster(masterId) {
 // topup can have several receipts (rejected, then re-uploaded) and this stays simple
 // under pg-mem, which the dev/test harness relies on.
 async function list() {
-  const { rows: topups } = await pool.query(`SELECT t.*, m.name, m.phone FROM topup_requests t JOIN masters m ON m.id = t.master_id ORDER BY CASE WHEN t.status = 'credited' THEN 1 ELSE 0 END, t.created_at DESC LIMIT 100`);
+  const { rows: topups } = await pool.query(`SELECT t.*, m.name, m.phone FROM topup_requests t JOIN masters m ON m.id = t.master_id WHERE t.status != 'cancelled' ORDER BY CASE WHEN t.status = 'credited' THEN 1 ELSE 0 END, t.created_at DESC LIMIT 100`);
   if (!topups.length) return topups;
   const ids = topups.map(t => t.id);
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -73,4 +73,18 @@ async function confirmPayment(topupId, amountTetri, note) {
     if (latestReceipt) await client.query('UPDATE topup_receipts SET status = $2, balance_transaction_id = $3, credited_tetri = $4, note = $5, reviewed_at = NOW() WHERE id = $1', [latestReceipt.id, 'credited', ledger.id, amountTetri, note]);
   });
 }
-module.exports = { create, listForMaster, list, review, confirmPayment };
+// Lets admins clear unpaid/duplicate invoices out of the list — a master can create
+// several and only pay one. Never touches a credited one, and leaves any attached
+// receipt row alone (still visible for audit if anyone goes looking).
+async function cancel(topupId, note) {
+  if (!Number.isSafeInteger(topupId) || topupId < 1) throw new Error('Invalid top-up');
+  note = String(note || '').trim().slice(0, 500) || null;
+  return pool.withTransaction(async client => {
+    const topup = (await client.query('SELECT * FROM topup_requests WHERE id = $1 FOR UPDATE', [topupId])).rows[0];
+    if (!topup) throw new Error('Пополнение не найдено');
+    if (topup.status === 'credited') throw new Error('Пополнение уже зачислено — отменить нельзя');
+    if (topup.status === 'cancelled') throw new Error('Уже отменено');
+    await client.query('UPDATE topup_requests SET status = $2, note = $3, updated_at = NOW() WHERE id = $1', [topupId, 'cancelled', note]);
+  });
+}
+module.exports = { create, listForMaster, list, review, confirmPayment, cancel };

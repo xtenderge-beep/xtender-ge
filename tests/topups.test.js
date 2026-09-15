@@ -60,9 +60,17 @@ const receipts = require('../src/services/receipt.service');
   assert.equal(invoices.find(i=>i.id===noReceipt.id).receipt,null);
   assert.equal(invoices.find(i=>i.id===another.id).receipt.id,anotherReceipt.id);
   assert.equal(invoices.find(i=>i.id===first.id).receipt.id,replacement.id);
+  // Cancelling clears an unpaid duplicate out of the admin list without touching money.
+  await assert.rejects(()=>receipts.cancel(first.id,'')); // already credited
+  await receipts.cancel(noReceipt.id,'Duplicate, master paid the other one');
+  assert.equal((await topups.get(noReceipt.id,1)).status,'cancelled');
+  assert.equal((await pool.query('SELECT balance_tetri FROM masters WHERE id=1')).rows[0].balance_tetri,2400);
+  assert.equal((await receipts.list()).find(i=>i.id===noReceipt.id),undefined);
+  await assert.rejects(()=>receipts.cancel(noReceipt.id,'')); // already cancelled
+  await assert.rejects(()=>receipts.create(1,'late.pdf',noReceipt.id)); // cancelled top-up can't take a receipt
   if (process.env.RENDER_PAYMENT_FIXTURES === '1') {
     const output=path.join(__dirname,'../output/pdf');fs.mkdirSync(output,{recursive:true});
     for(const lang of ['ka','ru','en'])fs.writeFileSync(path.join(output,`payment-${lang}.pdf`),await require('../src/services/topup-pdf.service').generate({...first,status:'awaiting'},lang));
   }
-  console.log('PASS: amount and IBAN checks; idempotency; ownership; immutable details; upload/review transitions; replacement receipt; confirmPayment credits balance, rejects mismatch without note, double-confirm and unknown top-up; invoice list surfaces receipt-less top-ups.');
+  console.log('PASS: amount and IBAN checks; idempotency; ownership; immutable details; upload/review transitions; replacement receipt; confirmPayment credits balance, rejects mismatch without note, double-confirm and unknown top-up; invoice list surfaces receipt-less top-ups; cancel removes from list without touching balance and blocks late receipts.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -41,6 +41,7 @@ router.post('/masters/:id/balance-correction', verifyCsrf, asyncHandler(adminCon
 router.get('/receipts', asyncHandler(adminController.receiptsList));
 router.post('/receipts/:id/review', verifyCsrf, asyncHandler(adminController.receiptReview));
 router.post('/receipts/:id/confirm', verifyCsrf, asyncHandler(adminController.confirmTopup));
+router.post('/receipts/:id/cancel', verifyCsrf, asyncHandler(adminController.cancelTopup));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));

@@ -563,6 +563,14 @@ async function confirmTopup(req, res) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
   }
 }
+async function cancelTopup(req, res) {
+  try {
+    await receiptService.cancel(Number(req.params.id), req.body.note);
+    res.redirect('/admin/receipts');
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
+  }
+}
 async function dispatchPreview(req,res) {
   let plan=null, error=null;
   try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || ''); } catch(err) { error=err.message; }
@@ -590,7 +598,7 @@ module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
-  receiptsList, receiptReview, confirmTopup,
+  receiptsList, receiptReview, confirmTopup, cancelTopup,
   showLogin,
   login,
   verify2fa,

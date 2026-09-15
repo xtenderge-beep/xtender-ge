@@ -479,7 +479,9 @@ CREATE TABLE IF NOT EXISTS topup_requests (
  request_key VARCHAR(36) NOT NULL,
  recipient JSONB NOT NULL,
  payer_name TEXT NOT NULL,
- status VARCHAR(20) NOT NULL DEFAULT 'awaiting' CHECK(status IN ('awaiting','received','reviewing','credited','rejected')),
+ -- Named explicitly (see balance_transactions.reason above) so the later ALTER's DROP
+ -- CONSTRAINT reliably finds this same check under pg-mem too, not just real Postgres.
+ status VARCHAR(20) NOT NULL DEFAULT 'awaiting' CONSTRAINT topup_requests_status_check CHECK(status IN ('awaiting','received','reviewing','credited','rejected')),
  credited_tetri INTEGER,
  balance_transaction_id INTEGER UNIQUE REFERENCES balance_transactions(id),
  note TEXT,
@@ -490,6 +492,13 @@ CREATE TABLE IF NOT EXISTS topup_requests (
 CREATE INDEX IF NOT EXISTS idx_topup_requests_master ON topup_requests(master_id,created_at);
 ALTER TABLE topup_receipts ADD COLUMN IF NOT EXISTS topup_id INTEGER REFERENCES topup_requests(id);
 CREATE INDEX IF NOT EXISTS idx_topup_receipts_request ON topup_receipts(topup_id);
+
+-- 'cancelled' (2026-09-16) — lets admins clear out abandoned/duplicate invoices (a
+-- master can create several and only pay one) so /admin/receipts doesn't fill up with
+-- ones that will never be paid.
+ALTER TABLE topup_requests DROP CONSTRAINT IF EXISTS topup_requests_status_check;
+ALTER TABLE topup_requests ADD CONSTRAINT topup_requests_status_check
+    CHECK (status IN ('awaiting','received','reviewing','credited','rejected','cancelled'));
 
 -- Requests returned for clarification; additive and safe to reapply.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_reason TEXT;

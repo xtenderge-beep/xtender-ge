@@ -25,5 +25,8 @@ receipts.forEach(t=>{ %><article class="admin-receipt">
 <label>Сумма к зачислению, ₾<input name="amountGel" type="number" min="0.01" max="1000" step="0.01" value="<%= (t.amount_tetri/100).toFixed(2) %>" required></label>
 <label>Комментарий (обязателен, если сумма отличается)<input name="note" maxlength="500" value="<%= t.note || '' %>" placeholder="Например: банк удержал комиссию"></label>
 <button type="submit">Подтвердить оплату и зачислить</button></form>
+<form method="POST" action="/admin/receipts/<%= t.id %>/cancel" class="mt-2" onsubmit="return confirm('Удалить счёт <%= t.reference %>? Исполнитель больше не сможет его оплатить.')">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<button type="submit" class="text-red-700 underline text-sm">Удалить счёт</button></form>
 <% } %></article><% }) %>
 <%- include('./_footer') %>
