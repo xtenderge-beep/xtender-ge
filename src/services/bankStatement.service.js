@@ -44,8 +44,12 @@ async function parseCredits(buffer) {
 
   const dateCol = columns['Date'];
   const creditCol = columns['Credit In Lari'] || columns['Credit'];
-  const textCol = columns['Nomination'] || columns['Entry Comment'] || columns['Additional Info'];
-  if (!dateCol || !creditCol || !textCol) throw new Error('В выписке не хватает нужных колонок (Date, Credit In Lari, Nomination)');
+  // Different exports (and apparently even different rows of the same export) put the
+  // payer's purpose text in different columns — one real statement had the current
+  // reference in "Additional Info" while "Nomination" on the same row still carried an
+  // older, unrelated one. Search all of them rather than betting on just one.
+  const textCols = ['Nomination', 'Entry Comment', 'Additional Info'].map(name => columns[name]).filter(Boolean);
+  if (!dateCol || !creditCol || !textCols.length) throw new Error('В выписке не хватает нужных колонок (Date, Credit In Lari, Nomination)');
 
   const credits = [];
   sheet.eachRow((row) => {
@@ -53,15 +57,12 @@ async function parseCredits(buffer) {
     const values = row.values;
     const amount = cellAmount(values[creditCol]);
     if (!amount || amount <= 0) return;
-    const text = [values[textCol], values[columns['Entry Comment']]].map(cellText).join(' ');
-    const match = text.match(REFERENCE_RE);
-    if (!match) return;
-    credits.push({
-      reference: 'XT-' + match[1].toUpperCase(),
-      amountTetri: Math.round(amount * 100),
-      date: cellText(values[dateCol]),
-      comment: cellText(values[textCol]),
-    });
+    const text = textCols.map(i => cellText(values[i])).join(' ');
+    const references = new Set();
+    for (const m of text.matchAll(new RegExp(REFERENCE_RE.source, 'gi'))) references.add('XT-' + m[1].toUpperCase());
+    for (const reference of references) {
+      credits.push({ reference, amountTetri: Math.round(amount * 100), date: cellText(values[dateCol]), comment: text.trim() });
+    }
   });
   return credits;
 }
