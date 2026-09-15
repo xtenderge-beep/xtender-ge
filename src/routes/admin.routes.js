@@ -39,7 +39,8 @@ router.post('/masters/:id/unban', verifyCsrf, asyncHandler(adminController.unban
 router.post('/masters/:id/balance-correction', verifyCsrf, asyncHandler(adminController.correctBalance));
 
 router.get('/receipts', asyncHandler(adminController.receiptsList));
-router.post('/receipts/:id', verifyCsrf, asyncHandler(adminController.receiptReview));
+router.post('/receipts/:id/review', verifyCsrf, asyncHandler(adminController.receiptReview));
+router.post('/receipts/:id/confirm', verifyCsrf, asyncHandler(adminController.confirmTopup));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));

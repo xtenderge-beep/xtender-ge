@@ -34,27 +34,35 @@ const receipts = require('../src/services/receipt.service');
   const receipt=await receipts.create(1,'receipt.pdf',first.id);
   assert.equal((await topups.get(first.id,1)).status,'received');
   await assert.rejects(()=>receipts.create(1,'duplicate.pdf',first.id));
-  await receipts.review(receipt.id,'rejected',null,'Please send readable receipt');
+  await receipts.review(receipt.id,'rejected','Please send readable receipt');
   const replacement=await receipts.create(1,'clear.pdf',first.id);
-  await assert.rejects(()=>receipts.review(receipt.id,'reviewing',null,''));
-  await receipts.review(replacement.id,'reviewing',null,'Checking');
-  await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason) VALUES(2,1250,'topup'),(1,1250,'promo'),(1,1200,'topup')");
-  await assert.rejects(()=>receipts.review(replacement.id,'credited',1,''));
-  await assert.rejects(()=>receipts.review(replacement.id,'credited',2,''));
-  await assert.rejects(()=>receipts.review(replacement.id,'credited',3,''));
-  await receipts.review(replacement.id,'credited',3,'Received 12.00 GEL instead of 12.50');
+  await assert.rejects(()=>receipts.review(receipt.id,'reviewing',''));
+  await receipts.review(replacement.id,'reviewing','Checking');
+  // Confirming a top-up is the only place that actually moves money now.
+  await assert.rejects(()=>receipts.confirmPayment(999,1250,''));
+  await assert.rejects(()=>receipts.confirmPayment(first.id,0,''));
+  await assert.rejects(()=>receipts.confirmPayment(first.id,1200,'')); // mismatch needs a note
+  await receipts.confirmPayment(first.id,1200,'Received 12.00 GEL instead of 12.50');
   const paid=await topups.get(first.id,1);
   assert.equal(paid.status,'credited');assert.equal(paid.credited_tetri,1200);
+  assert.equal((await pool.query('SELECT balance_tetri FROM masters WHERE id=1')).rows[0].balance_tetri,1200);
   await assert.rejects(()=>receipts.create(1,'paid.pdf',first.id));
-  await assert.rejects(()=>receipts.review(replacement.id,'credited',3,''));
+  await assert.rejects(()=>receipts.confirmPayment(first.id,1200,''));
   const another=await topups.create(1,1200,crypto.randomUUID());const anotherReceipt=await receipts.create(1,'second.pdf',another.id);
-  await assert.rejects(()=>receipts.review(anotherReceipt.id,'credited',3,''));
   assert.equal((await topups.get(another.id,1)).status,'received');
-  // Verification links an existing bank credit; it does not add money again.
-  assert.equal((await pool.query('SELECT balance_tetri FROM masters WHERE id=1')).rows[0].balance_tetri,0);
+  await receipts.confirmPayment(another.id,1200,'');
+  assert.equal((await topups.get(another.id,1)).status,'credited');
+  assert.equal((await pool.query('SELECT balance_tetri FROM masters WHERE id=1')).rows[0].balance_tetri,2400);
+  // The invoice list surfaces every top-up, including ones without an uploaded receipt,
+  // and attaches the latest receipt so admin can confirm payment straight from it.
+  const noReceipt=await topups.create(1,1000,crypto.randomUUID());
+  const invoices=await receipts.list();
+  assert.equal(invoices.find(i=>i.id===noReceipt.id).receipt,null);
+  assert.equal(invoices.find(i=>i.id===another.id).receipt.id,anotherReceipt.id);
+  assert.equal(invoices.find(i=>i.id===first.id).receipt.id,replacement.id);
   if (process.env.RENDER_PAYMENT_FIXTURES === '1') {
     const output=path.join(__dirname,'../output/pdf');fs.mkdirSync(output,{recursive:true});
     for(const lang of ['ka','ru','en'])fs.writeFileSync(path.join(output,`payment-${lang}.pdf`),await require('../src/services/topup-pdf.service').generate({...first,status:'awaiting'},lang));
   }
-  console.log('PASS: amount and IBAN checks; idempotency; ownership; immutable details; upload/review transitions; replacement receipt; wrong credit and mismatch; duplicate credit; no extra balance mutation.');
+  console.log('PASS: amount and IBAN checks; idempotency; ownership; immutable details; upload/review transitions; replacement receipt; confirmPayment credits balance, rejects mismatch without note, double-confirm and unknown top-up; invoice list surfaces receipt-less top-ups.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

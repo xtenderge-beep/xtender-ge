@@ -539,15 +539,25 @@ async function updateCatalogCallPrice(req, res) {
 }
 
 async function receiptsWithPurpose() {
-  const receipts = await receiptService.list();
-  return receipts.map(r => ({ ...r, purposeText: r.reference ? topupService.purpose({ reference: r.reference, master_id: r.master_id, amount_tetri: r.requested_tetri, created_at: r.topup_created_at }) : null }));
+  const topups = await receiptService.list();
+  return topups.map(t => ({ ...t, purposeText: topupService.purpose(t) }));
 }
 async function receiptsList(req, res) {
   res.render('admin/receipts', { receipts: await receiptsWithPurpose(), error: null });
 }
 async function receiptReview(req, res) {
   try {
-    await receiptService.review(Number(req.params.id), req.body.status, Number(req.body.transactionId), String(req.body.note || '').trim().slice(0, 500));
+    await receiptService.review(Number(req.params.id), req.body.status, String(req.body.note || '').trim().slice(0, 500));
+    res.redirect('/admin/receipts');
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
+  }
+}
+async function confirmTopup(req, res) {
+  try {
+    const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
+    if (!Number.isFinite(amountGel) || amountGel <= 0 || amountGel > 1000) throw new Error('Укажите сумму от 0 до 1000 ₾');
+    await receiptService.confirmPayment(Number(req.params.id), Math.round(amountGel * 100), req.body.note);
     res.redirect('/admin/receipts');
   } catch (error) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
@@ -580,7 +590,7 @@ module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
-  receiptsList, receiptReview,
+  receiptsList, receiptReview, confirmTopup,
   showLogin,
   login,
   verify2fa,
