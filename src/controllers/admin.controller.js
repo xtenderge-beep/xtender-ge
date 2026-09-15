@@ -550,18 +550,32 @@ async function receiptsList(req, res) {
     const needle = q.toLowerCase();
     receipts = receipts.filter(t => [t.reference, t.name, t.phone].some(v => String(v || '').toLowerCase().includes(needle)));
   }
-  res.render('admin/receipts', { receipts, error: null, q, statementSummary: null });
+  res.render('admin/receipts', { receipts, error: null, q, statementSummary: null, unmatchedCredits: [] });
 }
 async function importStatement(req, res) {
   try {
     if (!req.file) throw new Error('Прикрепите файл выписки (.xlsx)');
     const credits = await bankStatementService.parseCredits(req.file.buffer);
-    const { topups, matched, totalCredits } = bankStatementService.matchCredits(await receiptService.list(), credits);
+    const { topups, matched, totalCredits, unmatched } = bankStatementService.matchCredits(await receiptService.list(), credits);
     // Surface matches first — that's the whole point of uploading the statement.
     topups.sort((a, b) => (b.statementMatch ? 1 : 0) - (a.statementMatch ? 1 : 0));
-    res.render('admin/receipts', { receipts: await receiptsWithPurpose(topups), error: null, q: '', statementSummary: { matched, totalCredits } });
+    res.render('admin/receipts', { receipts: await receiptsWithPurpose(topups), error: null, q: '', statementSummary: { matched, totalCredits, unmatched: unmatched.length }, unmatchedCredits: unmatched });
   } catch (error) {
-    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null });
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null, unmatchedCredits: [] });
+  }
+}
+async function assignStatementCredit(req, res) {
+  try {
+    const topupId = Number(req.body.topupId);
+    if (!topupId) throw new Error('Выберите счёт для привязки платежа');
+    const amountTetri = Number(req.body.amountTetri);
+    const date = String(req.body.date || '').trim().slice(0, 40);
+    const comment = String(req.body.comment || '').trim().slice(0, 300);
+    const note = `Вручную привязано из выписки${date ? ' (' + date + ')' : ''}: ${comment}`.trim();
+    await receiptService.confirmPayment(topupId, amountTetri, note);
+    res.redirect('/admin/receipts');
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null, unmatchedCredits: [] });
   }
 }
 async function receiptReview(req, res) {
@@ -617,7 +631,7 @@ module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
-  receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement,
+  receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement, assignStatementCredit,
   showLogin,
   login,
   verify2fa,

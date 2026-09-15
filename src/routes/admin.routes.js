@@ -53,6 +53,7 @@ router.post('/receipts/:id/review', verifyCsrf, asyncHandler(adminController.rec
 router.post('/receipts/:id/confirm', verifyCsrf, asyncHandler(adminController.confirmTopup));
 router.post('/receipts/:id/cancel', verifyCsrf, asyncHandler(adminController.cancelTopup));
 router.post('/receipts/import-statement', statementUpload.single('statement'), verifyCsrf, asyncHandler(adminController.importStatement));
+router.post('/receipts/assign-statement-credit', verifyCsrf, asyncHandler(adminController.assignStatementCredit));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));

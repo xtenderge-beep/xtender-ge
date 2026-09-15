@@ -34,19 +34,20 @@ function row({ date = '16.09.2026', credit = null, nomination = '', additionalIn
     // Real statement: same row had a DIFFERENT reference in "Nomination" than in
     // "Additional Info" (a stale one left over next to the current one) — both must
     // be picked up, not just whichever column happens to be checked first.
-    row({ date: '15.09.2026', credit: 50, nomination: 'balansis shevseba, opherta № XT-622D25271A12, 2026-09-14, tankha 50.00 GEL', additionalInfo: 'balansis shevseba, opherta № XT-E249D9E0F0E7, 2026-09-15, tankha 50.00 GEL' }),
+    row({ date: '15.09.2026', credit: 50, nomination: 'balansis shevseba, opherta № XT-B1B1B1B1B1B1, 2026-09-14, tankha 50.00 GEL', additionalInfo: 'balansis shevseba, opherta № XT-E249D9E0F0E7, 2026-09-15, tankha 50.00 GEL' }),
   ]);
 
   const garbageBuffer = await buildGarbage();
   const credits = await parseCredits(buffer);
-  assert.equal(credits.length, 4);
-  assert.equal(credits[0].reference, 'XT-622D25271A12');
-  assert.equal(credits[0].amountTetri, 500);
-  assert.equal(credits[0].date, '16.09.2026');
-  assert.equal(credits[1].reference, 'XT-AAAAAAAAAAAA'); // normalized to uppercase
-  const lastRowRefs = credits.slice(2).map(c => c.reference).sort();
-  assert.deepEqual(lastRowRefs, ['XT-622D25271A12', 'XT-E249D9E0F0E7']);
-  assert.ok(credits.slice(2).every(c => c.amountTetri === 5000));
+  assert.equal(credits.length, 5); // the no-reference row is now kept, not dropped
+  const generic = credits.find(c => c.reference === null);
+  assert.equal(generic.amountTetri, 3000);
+  const referenced = credits.filter(c => c.reference);
+  assert.equal(referenced.length, 4);
+  assert.equal(referenced.find(c => c.amountTetri === 500).reference, 'XT-622D25271A12');
+  assert.equal(referenced.find(c => c.amountTetri === 1250).reference, 'XT-AAAAAAAAAAAA'); // normalized to uppercase
+  const lastRowRefs = referenced.filter(c => c.amountTetri === 5000).map(c => c.reference).sort();
+  assert.deepEqual(lastRowRefs, ['XT-B1B1B1B1B1B1', 'XT-E249D9E0F0E7']);
 
   await assert.rejects(() => parseCredits(garbageBuffer), /Date/);
 
@@ -54,19 +55,24 @@ function row({ date = '16.09.2026', credit = null, nomination = '', additionalIn
     { id: 1, reference: 'XT-622D25271A12', amount_tetri: 1000, status: 'awaiting' },
     { id: 2, reference: 'XT-AAAAAAAAAAAA', amount_tetri: 1250, status: 'received' },
     { id: 3, reference: 'XT-622D25271A12', amount_tetri: 1000, status: 'credited' }, // same reference, already paid — must not re-match
-    { id: 4, reference: 'XT-NOMATCH00000', amount_tetri: 500, status: 'awaiting' },
+    { id: 4, reference: 'XT-NOMATCH00000', amount_tetri: 500, status: 'awaiting' }, // never mentioned in the statement at all
     { id: 5, reference: 'XT-E249D9E0F0E7', amount_tetri: 5000, status: 'awaiting' }, // the reference that was hiding in "Additional Info"
   ];
   const result = matchCredits(topups, credits);
-  assert.equal(result.totalCredits, 4);
+  assert.equal(result.totalCredits, 5);
   assert.equal(result.matched, 3);
   assert.equal(result.topups.find(t => t.id === 1).statementMatch.amountTetri, 500);
   assert.equal(result.topups.find(t => t.id === 2).statementMatch.amountTetri, 1250);
   assert.equal(result.topups.find(t => t.id === 3).statementMatch, undefined);
   assert.equal(result.topups.find(t => t.id === 4).statementMatch, undefined);
   assert.equal(result.topups.find(t => t.id === 5).statementMatch.amountTetri, 5000);
+  // Unmatched: the generic no-reference payment, plus XT-B1B1B1B1B1B1 which doesn't
+  // correspond to any invoice at all — both need a human to assign them by hand.
+  assert.equal(result.unmatched.length, 2);
+  assert.ok(result.unmatched.some(c => c.reference === null && c.amountTetri === 3000));
+  assert.ok(result.unmatched.some(c => c.reference === 'XT-B1B1B1B1B1B1' && c.amountTetri === 5000));
 
-  console.log('PASS bank statement: extracts credit rows with a reference (ignores debits, no-reference and case), normalizes reference case, rejects a file with no header row, matches against pending top-ups only.');
+  console.log('PASS bank statement: extracts credit rows with a reference (ignores debits, no-reference and case), normalizes reference case, rejects a file with no header row, matches against pending top-ups only, surfaces unmatched rows for manual assignment.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 
 async function buildGarbage() {

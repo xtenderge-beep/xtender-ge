@@ -1,5 +1,5 @@
 <%- include('./_header', { active: 'receipts' }) %>
-<% const query = typeof q === 'string' ? q : ''; const summary = typeof statementSummary !== 'undefined' ? statementSummary : null; %>
+<% const query = typeof q === 'string' ? q : ''; const summary = typeof statementSummary !== 'undefined' ? statementSummary : null; const unmatched = typeof unmatchedCredits !== 'undefined' ? unmatchedCredits : []; %>
 <h1 class="text-2xl font-black">Проверка пополнений</h1>
 <p class="text-sm text-stone-600 mt-3">Здесь показан каждый созданный исполнителем счёт на пополнение — включая те, к которым ещё не приложен чек. Проверьте перевод в банке и нажмите «Подтвердить оплату» — сумма сразу зачислится на баланс исполнителя.</p>
 <form method="GET" class="admin-filter"><input name="q" value="<%= query %>" placeholder="Номер счёта, имя, телефон"><button>Найти</button><% if (query) { %><a href="/admin/receipts">Сбросить</a><% } %></form>
@@ -7,7 +7,22 @@
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 <label>Выписка банка (.xlsx)<input type="file" name="statement" accept=".xlsx" required></label>
 <button type="submit">Загрузить и найти совпадения</button></form>
-<% if (summary) { %><p class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-3">Из выписки: платежей со ссылкой на счёт — <%= summary.totalCredits %>, совпало с ожидающими счетами — <%= summary.matched %>.<% if (!summary.matched) { %> Ни один счёт не найден — проверьте, что в назначении платежа сохранился номер вида XT-XXXXXXXXXXXX.<% } %></p><% } %>
+<% if (summary) { %><p class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-3">Из выписки: платежей всего — <%= summary.totalCredits %>, совпало со счетами автоматически — <%= summary.matched %>, не распознано — <%= summary.unmatched %>.<% if (!summary.matched && !summary.unmatched) { %> Ни одного зачисления в выписке не найдено.<% } %></p><% } %>
+<% if (unmatched.length) { %><div class="admin-receipt">
+<h2>Не распознанные платежи (<%= unmatched.length %>)</h2>
+<p class="text-sm text-stone-600">В назначении платежа не нашёлся номер счёта, либо такого счёта нет в системе. Выберите вручную, к какому счёту отнести платёж.</p>
+<% unmatched.forEach((c, i) => { %><div class="mt-3 pt-3 border-t border-stone-200">
+<p><strong><%= (c.amountTetri/100).toFixed(2) %> ₾</strong> · <%= c.date %><% if (c.reference) { %> · номер в назначении: <%= c.reference %> (не найден среди счетов)<% } %></p>
+<p class="text-xs text-stone-500"><%= c.comment %></p>
+<form class="admin-filter" method="POST" action="/admin/receipts/assign-statement-credit">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<input type="hidden" name="amountTetri" value="<%= c.amountTetri %>">
+<input type="hidden" name="date" value="<%= c.date %>">
+<input type="hidden" name="comment" value="<%= c.comment %>">
+<label>Привязать к счёту<select name="topupId" aria-label="Выберите счёт" required><option value="">Выберите счёт…</option><% receipts.filter(t=>t.status!=='credited').forEach(t=>{ %><option value="<%= t.id %>"><%= t.reference %> · <%= t.name %> · <%= (t.amount_tetri/100).toFixed(2) %> ₾</option><% }) %></select></label>
+<button type="submit">Привязать и зачислить</button></form>
+</div><% }) %>
+</div><% } %>
 <% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-3"><%= error %></p><% } %>
 <% if (!receipts.length) { %><p class="p-6 mt-4 bg-white rounded-xl">Пока нет созданных счетов. Здесь будут появляться новые обращения.</p><% } %>
 <% const statusLabel = {awaiting:'Ожидает оплаты', received:'Чек получен', reviewing:'На проверке', credited:'Зачислено', rejected:'Нужно уточнение'};

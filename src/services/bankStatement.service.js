@@ -57,11 +57,17 @@ async function parseCredits(buffer) {
     const values = row.values;
     const amount = cellAmount(values[creditCol]);
     if (!amount || amount <= 0) return;
-    const text = textCols.map(i => cellText(values[i])).join(' ');
+    const text = textCols.map(i => cellText(values[i])).join(' ').trim();
     const references = new Set();
     for (const m of text.matchAll(new RegExp(REFERENCE_RE.source, 'gi'))) references.add('XT-' + m[1].toUpperCase());
-    for (const reference of references) {
-      credits.push({ reference, amountTetri: Math.round(amount * 100), date: cellText(values[dateCol]), comment: text.trim() });
+    const amountTetri = Math.round(amount * 100);
+    const date = cellText(values[dateCol]);
+    if (references.size) {
+      for (const reference of references) credits.push({ reference, amountTetri, date, comment: text });
+    } else {
+      // People do mistype or clear the payment purpose — keep the row so an admin can
+      // still find and assign it by hand instead of it silently vanishing.
+      credits.push({ reference: null, amountTetri, date, comment: text });
     }
   });
   return credits;
@@ -69,17 +75,23 @@ async function parseCredits(buffer) {
 
 // Pairs statement credits with pending invoices by reference. Never touches already
 // credited or cancelled top-ups — there's nothing actionable left to confirm there.
+// Credits that had no reference, or whose reference didn't land on an actionable
+// invoice (typo'd, or already resolved another way), come back as `unmatched` for
+// manual assignment rather than being dropped.
 function matchCredits(topups, credits) {
   const byReference = new Map();
-  for (const credit of credits) if (!byReference.has(credit.reference)) byReference.set(credit.reference, credit);
+  for (const credit of credits) if (credit.reference && !byReference.has(credit.reference)) byReference.set(credit.reference, credit);
   let matched = 0;
+  const matchedReferences = new Set();
   const withMatches = topups.map(t => {
     const credit = t.status !== 'credited' ? byReference.get(t.reference) : null;
     if (!credit) return t;
     matched++;
+    matchedReferences.add(credit.reference);
     return { ...t, statementMatch: credit };
   });
-  return { topups: withMatches, matched, totalCredits: credits.length };
+  const unmatched = credits.filter(c => !c.reference || !matchedReferences.has(c.reference));
+  return { topups: withMatches, matched, totalCredits: credits.length, unmatched };
 }
 
 module.exports = { parseCredits, matchCredits };
