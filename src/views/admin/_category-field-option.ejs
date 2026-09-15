@@ -1,0 +1,7 @@
+<div data-option class="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-1.5 items-start bg-stone-50 border rounded-lg p-2">
+<input type="hidden" name="fields[<%= fieldIndex %>][options][<%= optIndex %>][value]" value="<%= opt.value || '' %>">
+<input required maxlength="100" placeholder="Вариант на русском" name="fields[<%= fieldIndex %>][options][<%= optIndex %>][name_ru]" value="<%= opt.name_ru || '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm">
+<input maxlength="100" placeholder="На грузинском (необязательно)" name="fields[<%= fieldIndex %>][options][<%= optIndex %>][name_ka]" value="<%= opt.name_ka || '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm">
+<input maxlength="100" placeholder="На английском (необязательно)" name="fields[<%= fieldIndex %>][options][<%= optIndex %>][name_en]" value="<%= opt.name_en || '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm">
+<button type="button" data-remove-option class="text-xs text-red-600 whitespace-nowrap py-1.5">Убрать</button>
+</div>

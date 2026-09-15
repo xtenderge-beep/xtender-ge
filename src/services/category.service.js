@@ -16,8 +16,15 @@ function view(row, lang = 'ru') {
   return { type: row.slug, label: row['name_'+lang] || row.name_ru, icon: row.icon, active: row.is_active,
     fields: row.fields.map(f => ({ ...f, min: f.min ?? null, max: f.max ?? null,
       label: f.labels?.[lang] || f.labels?.ru || t('svc_'+row.slug+'_'+f.key),
-      options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || value})) })) };
+      options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || f.optionLabels?.[value]?.ru || value})) })) };
 }
+// Есть ли у категории хоть одно 'size'-поле (сейчас только van) — единственное, что
+// реально не отдаётся в форму: значение проставляется легаси-колонкой vehicle_size
+// (см. admin/master-detail.ejs), а не этим движком, так что открывать его редактирование
+// сейчас означало бы менять конфиг, который ни на что не влияет. Остальные встроенные
+// категории (movers/tow/bucket_lift/junk) — обычные text/number/bool/enum поля,
+// редактируются через тот же parseFields, что и пользовательские категории.
+function hasLockedField(fields) { return (fields || []).some(f => f.input === 'size'); }
 async function configForView(lang = 'ru') { return (await list()).filter(r=>r.is_active).map(r=>view(r,lang)); }
 async function groups(includeDisabled = false) {
   const result = {};
@@ -46,24 +53,74 @@ function text(value, max, label) {
   if(typeof value !== 'string' || !value.trim() || value.trim().length>max) throw fail(label+': заполните поле (до '+max+' символов).');
   return value.trim();
 }
+// Вариант списка хранит стабильное машинное значение отдельно от подписи (как и само
+// поле) — иначе редактирование подписи или смена языка переприсваивало бы value, а
+// уже сохранённые в master_services.attributes значения переставали бы совпадать ни
+// с одним вариантом. Если админ не трогал вариант — форма шлёт то же value, что и
+// раньше (в т.ч. старые плоские строки от полей, созданных до этого изменения — они
+// тоже считаются «существующими» и не перегенерируются).
+function parseOptions(input, previousOptions) {
+  if (!Array.isArray(input) || input.length < 2 || input.length > 20) throw fail('Укажите от 2 до 20 вариантов списка.');
+  const seenValues = new Set();
+  const options = []; const optionLabels = {};
+  input.forEach(o => {
+    const value = (typeof o.value === 'string' && previousOptions.includes(o.value)) ? o.value : 'o_'+randomBytes(4).toString('hex');
+    if (seenValues.has(value)) throw fail('Некорректный вариант списка.');
+    seenValues.add(value);
+    const nameRu = text(o.name_ru, 100, 'Вариант списка');
+    const labels = { ru: nameRu };
+    ['ka','en'].forEach(lang => {
+      const raw = typeof o['name_'+lang] === 'string' ? o['name_'+lang].trim() : '';
+      if (raw) { if (raw.length > 100) throw fail('Вариант списка: до 100 символов.'); labels[lang] = raw; }
+    });
+    options.push(value); optionLabels[value] = labels;
+  });
+  return { options, optionLabels };
+}
 function parseFields(input, previous) {
   if (!Array.isArray(input) || input.length > 12) throw fail('Можно добавить до 12 характеристик.');
   const seen = new Set();
   return input.map(f=> {
+    // Built-in fields keep their meaningful static keys (crew_size, tow_type, …), which
+    // never matched the f_xxxxxxxx pattern generated for admin-created ones — so the
+    // format check only applies when we're minting a brand-new key; an existing key just
+    // has to actually belong to this category (previous), whatever shape it has.
     const key = f.key || 'f_'+randomBytes(4).toString('hex');
-    if(!/^f_[a-f0-9]{8}$/.test(key) || seen.has(key) || (f.key && !previous.some(p=>p.key===key))) throw fail('Некорректная характеристика.');
+    if (seen.has(key)) throw fail('Некорректная характеристика.');
+    if (f.key) { if (!previous.some(p=>p.key===key)) throw fail('Некорректная характеристика.'); }
+    else if (!/^f_[a-f0-9]{8}$/.test(key)) throw fail('Некорректная характеристика.');
     seen.add(key);
     if(!['text','number','bool','enum'].includes(f.input)) throw fail('Неизвестный тип характеристики.');
+    const prevField = previous.find(p => p.key === key) || null;
     const nameRu=text(f.name_ru,100,'Название характеристики');
     const labels={ru:nameRu};
     ['ka','en'].forEach(lang=>{
       const raw=typeof f['name_'+lang]==='string' ? f['name_'+lang].trim() : '';
       if(raw){ if(raw.length>100) throw fail('Название характеристики: до 100 символов.'); labels[lang]=raw; }
     });
-    const out={key,input:f.input,labels,required:f.required===true,match:'ignore'};
+    // match/filter/optionIcons не выведены в форму (пока не работает движок подбора,
+    // см. docs/service-types.md Фаза 4b) — для уже существующего поля переносим как
+    // было, для нового — те же дефолты, что и раньше у пользовательских категорий.
+    const out={key,input:f.input,labels,required:f.required===true,match:prevField?.match || 'ignore'};
+    if (prevField?.filter) out.filter = true;
+    if (prevField?.optionIcons) out.optionIcons = prevField.optionIcons;
+    if (out.input==='number') {
+      const unit = typeof f.unit==='string' ? f.unit.trim() : '';
+      if (unit) { if (unit.length>16) throw fail('Единица измерения: до 16 символов.'); out.unit=unit; }
+      const min = f.min==='' || f.min==null ? null : Number(f.min);
+      const max = f.max==='' || f.max==null ? null : Number(f.max);
+      if (min!==null) { if(!Number.isFinite(min)) throw fail('Минимум: некорректное число.'); out.min=min; }
+      if (max!==null) { if(!Number.isFinite(max)) throw fail('Максимум: некорректное число.'); out.max=max; }
+      if (out.min!=null && out.max!=null && out.min>out.max) throw fail('Минимум не может быть больше максимума.');
+    } else if (prevField?.unit) {
+      // Число с единицей может прийти и в enum-поле (напр. тоннаж эвакуатора — список
+      // вариантов, но подпись "8 т"). Форма пока не даёт редактировать unit не у number —
+      // просто переносим как было, чтобы не терять его при обычном сохранении.
+      out.unit = prevField.unit;
+    }
     if(out.input==='enum') {
-      out.options=text(f.choices,1000,'Варианты').split('\n').map(s=>s.trim()).filter(Boolean);
-      if(out.options.length<2 || out.options.length>20 || out.options.some(s=>s.length>100) || new Set(out.options).size!==out.options.length) throw fail('Укажите от 2 до 20 разных вариантов, каждый с новой строки.');
+      const parsed = parseOptions(Array.isArray(f.options) ? f.options : [], prevField?.options || []);
+      out.options = parsed.options; out.optionLabels = parsed.optionLabels;
     }
     return out;
   });
@@ -77,7 +134,7 @@ async function save(slug, input) {
     if(icon.length>16) throw fail('Значок слишком длинный.');
     const order=Number(input.sort_order || 100);
     if(!Number.isSafeInteger(order) || order<0 || order>10000) throw fail('Порядок: число от 0 до 10000.');
-    const fields=previous?.is_builtin ? previous.fields : parseFields(input.fields || [],previous?.fields || []);
+    const fields=hasLockedField(previous?.fields) ? previous.fields : parseFields(input.fields || [],previous?.fields || []);
     const active=input.is_active===true;
     if(previous) {
       const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version)]);
@@ -88,4 +145,4 @@ async function save(slug, input) {
     return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order])).rows[0];
   });
 }
-module.exports={list,get,validate,view,configForView,groups,catalogGroups,badges,save,toType,toCategory};
+module.exports={list,get,validate,view,configForView,groups,catalogGroups,badges,save,toType,toCategory,hasLockedField};

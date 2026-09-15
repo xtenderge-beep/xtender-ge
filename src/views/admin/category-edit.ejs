@@ -1,5 +1,12 @@
 <%- include('./_header',{active:'categories'}) %>
-<% const value=submitted || category || {}; const fields=submitted ? submitted.fields : (category?.fields || []).map(f=>({key:f.key,input:f.input,name_ru:f.labels?.ru,name_ka:f.labels?.ka,name_en:f.labels?.en,required:f.required,choices:(f.options || []).join('\n')})); %>
+<%
+  const value=submitted || category || {};
+  const fields=submitted ? submitted.fields : (category?.fields || []).map(f=>({
+    key:f.key, input:f.input, name_ru:f.labels?.ru, name_ka:f.labels?.ka, name_en:f.labels?.en,
+    required:f.required, unit:f.unit, min:f.min, max:f.max,
+    options:(f.options || []).map(v=>({value:v, name_ru:f.optionLabels?.[v]?.ru || v, name_ka:f.optionLabels?.[v]?.ka, name_en:f.optionLabels?.[v]?.en})),
+  }));
+%>
 <a href="/admin/categories" class="text-sm">← Категории услуг</a>
 <h1 class="text-2xl font-bold mt-3"><%= category?'Редактировать категорию':'Новая категория' %></h1>
 <% if(error){ %><p role="alert" class="mt-3 text-red-600"><%= error %></p><% } %>
@@ -10,7 +17,7 @@
 <label class="flex items-center gap-2"><input type="checkbox" name="is_active" <%= value.is_active !== false ? 'checked' : '' %>>Категория активна</label>
 <p class="text-sm text-stone-500">При отключении категория исчезает из новых назначений, каталога и рассылки. Профили и история сохраняются.</p>
 <h2 class="font-bold">Характеристики для модератора</h2>
-<% if(category?.is_builtin){ %><p class="text-sm">Характеристики этой категории связаны с существующими фильтрами техники. Их структура сохраняется.</p><% } else { %>
+<% if(fieldsLocked){ %><p class="text-sm">У этой категории есть поле «Размер», которое всё ещё проставляется старым способом (в профиле исполнителя, а не здесь) — пока это не объединили, характеристики этой категории не редактируются, чтобы форма не показывала то, что реально ни на что не влияет.</p><% } else { %>
 <p class="text-sm text-stone-500">Добавьте поля, которые модератор заполнит в анкете исполнителя. Они описывают услуги; рассылка подбирает исполнителей по категории.</p>
 <div id="categoryFields" class="space-y-3">
 <% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i}) %><% }); %>
@@ -24,7 +31,29 @@
 (() => {
  const container=document.getElementById('categoryFields'); if(!container)return;
  function renumber(){container.querySelectorAll('[data-field]').forEach((row,i)=>row.querySelectorAll('[name]').forEach(input=>input.name=input.name.replace(/fields\[[^\]]+\]/,'fields['+i+']')));}
- container.addEventListener('click',e=>{if(e.target.matches('[data-remove]')){e.target.closest('[data-field]').remove();renumber();}});
+ function renumberOptions(fieldRow){
+  const list=fieldRow.querySelector('[data-options-list]'); if(!list) return;
+  list.querySelectorAll('[data-option]').forEach((row,j)=>row.querySelectorAll('[name]').forEach(input=>input.name=input.name.replace(/\[options\]\[[^\]]+\]/,'[options]['+j+']')));
+ }
+ function addOption(fieldRow){
+  const list=fieldRow.querySelector('[data-options-list]'), tpl=fieldRow.querySelector('[data-option-template]');
+  if(!list || !tpl || list.children.length>=20) return;
+  list.appendChild(tpl.content.cloneNode(true));
+  renumberOptions(fieldRow);
+ }
+ container.addEventListener('click',e=>{
+  if(e.target.matches('[data-remove]')){e.target.closest('[data-field]').remove();renumber();return;}
+  if(e.target.matches('[data-remove-option]')){const fieldRow=e.target.closest('[data-field]');e.target.closest('[data-option]').remove();renumberOptions(fieldRow);return;}
+  if(e.target.matches('[data-add-option]')){addOption(e.target.closest('[data-field]'));return;}
+ });
+ container.addEventListener('change',e=>{
+  if(!e.target.matches('[data-field-input]')) return;
+  const fieldRow=e.target.closest('[data-field]');
+  fieldRow.querySelector('[data-number-block]').classList.toggle('hidden', e.target.value!=='number');
+  const optionsBlock=fieldRow.querySelector('[data-options-block]');
+  optionsBlock.classList.toggle('hidden', e.target.value!=='enum');
+  if(e.target.value==='enum' && fieldRow.querySelector('[data-options-list]').children.length===0){addOption(fieldRow);addOption(fieldRow);}
+ });
  document.getElementById('addCategoryField').addEventListener('click',()=>{if(container.children.length>=12)return;container.append(document.getElementById('categoryFieldTemplate').content.cloneNode(true));renumber();});
 })();
 </script>

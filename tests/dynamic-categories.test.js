@@ -44,7 +44,7 @@ const definition={name_ru:'Сантехник',name_ka:'სანტექნი
  await telegram.refreshCategories({...order,status:'closed'},'100',200);assert.deepEqual(calls.at(-1).body.reply_markup.inline_keyboard,[]);
  const ejs=require('ejs'),views=path.join(__dirname,'../src/views/admin');
  for(const file of ['categories.ejs','category-edit.ejs']) {
-  const html=ejs.render(fs.readFileSync(path.join(views,file),'utf8'),{categories:await categories.list(),category:on,submitted:null,error:null,csrfToken:'csrf'},{filename:path.join(views,file),includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+  const html=ejs.render(fs.readFileSync(path.join(views,file),'utf8'),{categories:await categories.list(),category:on,submitted:null,error:null,csrfToken:'csrf',fieldsLocked:categories.hasLockedField(on.fields)},{filename:path.join(views,file),includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
   for(const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  }
  await assert.rejects(categories.save(null,{...definition,name_ru:''}),{status:400});
