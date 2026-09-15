@@ -53,6 +53,23 @@
           <% } %>
         </div>
 
+        <% if (order.status !== 'closed' && typeof createdMinutesAgo === 'number') {
+          const agoLabel = createdMinutesAgo < 60
+            ? t('time_minutes_short').replace('{n}', createdMinutesAgo)
+            : t('time_hours_short').replace('{n}', Math.round(createdMinutesAgo / 60));
+        %>
+          <div class="text-xs text-stone-400 -mt-2"><%= t('order_created_ago').replace('{time}', agoLabel) %></div>
+          <% if (masterAccount && createdMinutesAgo <= 15) { %>
+            <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold flex items-start gap-2">
+              <i class="fa-solid fa-bolt mt-0.5"></i><span><%= t('order_response_fast') %></span>
+            </div>
+          <% } else if (masterAccount && createdMinutesAgo > 60) { %>
+            <div class="p-3 rounded-2xl bg-red-50 border border-red-200 text-xs text-red-800 font-semibold flex items-start gap-2">
+              <i class="fa-solid fa-clock mt-0.5"></i><span><%= t('order_response_late').replace('{time}', agoLabel) %></span>
+            </div>
+          <% } %>
+        <% } %>
+
         <% if (masterAccount && masterAccount.leadsLeft < 5) { %>
           <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-semibold flex items-start gap-2">
             <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>

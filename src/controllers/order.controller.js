@@ -23,6 +23,13 @@ function buildWhatsappText(order) {
   return translate(lang)('order_wa_template').replace('{text}', order.description || '');
 }
 
+// Сколько прошло с момента создания заявки, для плашки на странице заявки:
+// «создана N назад» всем + для исполнителя на его личной ссылке — подсказка,
+// быстро или поздно он открыл лид (см. tasks.md, запрос владельца 2026-09-15).
+function minutesSince(date) {
+  return Math.max(0, Math.round((Date.now() - new Date(date).getTime()) / 60000));
+}
+
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 // /promo КОД 5 [100] [метка]  — код, сумма GEL, необяз. лимит, необяз. метка (агент/канал)
 const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?(?:\s+(.+))?$/;
@@ -690,6 +697,7 @@ async function show(req, res) {
     masterId,
     funnel,
     masterAccount,
+    createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(req.lang),
   });
@@ -738,6 +746,7 @@ async function showByOwnerToken(req, res) {
     masterId: null,
     funnel,
     masterAccount: null,
+    createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(ownerLang),
   });
