@@ -79,6 +79,26 @@ details > summary::-webkit-details-marker { display: none; }
   body.compose-active #attachmentsPreview { padding: 0 16px 8px; }
 }
 
+/* Provider signup: local steps inside the existing registration card. */
+.provider-join .provider-join-grid { margin-top:28px; }
+.provider-signup-header { padding:22px 24px 0; }
+.provider-signup-count { color:#647269; font-size:12px; }
+.provider-signup-progress { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0 22px; list-style:none; }
+.provider-signup-progress li { display:flex; align-items:center; gap:7px; font-size:12px; color:#647269; line-height:1.4; }
+.provider-signup-progress li > span { display:grid; place-items:center; width:26px; height:26px; flex-shrink:0; border-radius:50%; background:#f0f4eb; color:#234e35; }
+.provider-signup-progress [aria-current="step"] { color:#193d31; font-weight:700; }
+.provider-signup-progress [aria-current="step"] > span { background:#059669; color:#fff; }
+.provider-signup-progress .is-complete > span { background:#e0e9dc; }
+#signupCard { scroll-margin-top:20px; min-width:0; }
+#signupCard [hidden] { display:none !important; }
+.provider-signup-actions { display:flex; align-items:center; gap:12px; padding-top:8px; }
+.provider-signup-actions button { min-height:48px; display:inline-flex; justify-content:center; align-items:center; gap:9px; font-size:14px; font-weight:700; border-radius:12px; padding:12px 16px; }
+.provider-signup-back { background:#f0f4eb; color:#193d31; }
+.provider-signup-next { flex:1; background:#059669; color:#fff; }
+.provider-signup-next:hover { background:#047857; }
+#signupCard button:disabled { opacity:.6; cursor:wait; }
+@media(max-width:639px) { .provider-signup-header { padding:20px 20px 0; } .provider-signup-progress { gap:6px; } .provider-signup-progress li { flex-direction:column; align-items:flex-start; font-size:11px; gap:5px; } .provider-signup-actions button { padding:12px; } }
+
 /* Desktop presentation only; mobile keeps its existing layout and animations. */
 .home-desktop-lead, .home-example-outcome, .provider-demo-lead, .provider-demo-next { display:none; }
 @media (min-width:761px) {
