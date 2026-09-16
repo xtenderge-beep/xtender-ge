@@ -98,7 +98,10 @@ async function reviewGet(managerId, masterId) {
 // код, если см не переданы. Для прочих обязательных характеристик, которых тут нет в
 // списке полей категории, просим открыть полную карточку в /admin, а не строим тут
 // дублирующую форму под все типы услуг (см. category.service — поля per-category).
-async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null) {
+// Внутреннее ядро, без журналирования события — используется и «только категория»,
+// и первым шагом «категория и одобрить», а событие в manager_portal_events у них
+// разное (assign_category vs approve), поэтому пишет его каждый вызывающий сам.
+async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
@@ -126,6 +129,20 @@ async function approvePending(managerId, masterId, category, attributes = {}, ve
     if (e.code === 'INVALID_SERVICE') throw fail('Эта категория требует дополнительных характеристик — заполните их в полной карточке в админке.', 422);
     throw e;
   }
+  return master.id;
+}
+
+// Две кнопки в review.ejs: «Только категория» (закрепляет заявку и характеристики,
+// не одобряя) и «Категория и одобрить» (то же самое + сразу approveMaster) — вместо
+// единственного пути, из-за которого приходилось уходить в общий список
+// /admin/masters, чтобы отдельно одобрить уже закреплённую заявку.
+async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null) {
+  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions);
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'assign_category',$3)", [managerId, masterId, 'Назначена категория (без одобрения): ' + category]);
+  return id;
+}
+async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null) {
+  await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions);
   const approved = await require('./master.service').approveMaster(masterId);
   if (!approved) throw fail('Не удалось одобрить — проверьте данные в полной карточке в админке.', 422);
   await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'approve',$3)", [managerId, masterId, 'Быстрое одобрение, категория: ' + category]);
@@ -181,7 +198,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,reviewGet,approvePending,
+  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

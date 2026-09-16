@@ -257,6 +257,14 @@ async function updateMaster(req, res) {
     throw err;
   }
 
+  // "Сохранить и одобрить" — второй submit-button той же формы (name=thenApprove).
+  // Раньше приходилось отдельно ходить в общий список /admin/masters, чтобы одобрить
+  // уже сохранённую заявку — теперь можно одним действием с карточки специалиста.
+  if (req.body.thenApprove === '1') {
+    const approved = await masterService.approveMaster(id);
+    if (!approved) return res.redirect(`/admin/masters/${id}?error=service_required`);
+  }
+
   res.redirect(`/admin/masters/${id}`);
 }
 

@@ -125,7 +125,12 @@
             <textarea name="description" rows="2" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500"><%= master.description || '' %></textarea>
         </div>
         <%- include('./_master-service-fields', { master, serviceConfig }) %>
-        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить</button>
+        <div class="flex flex-wrap gap-2">
+            <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить</button>
+            <% if (!master.is_active && !master.is_banned) { %>
+              <button type="submit" name="thenApprove" value="1" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">Сохранить и одобрить</button>
+            <% } %>
+        </div>
     </form>
 </div>
 

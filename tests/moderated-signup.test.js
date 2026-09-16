@@ -33,7 +33,7 @@ const masters=require('../src/services/master.service');
  assert.ok(!join.includes('serviceType'));assert.ok(!join.includes('collectAttributes'));
  for(const lang of ['ka','ru','en']) {
   const script=join.match(/<script>([\s\S]*?)<\/script>/)[1];
-  const rendered=ejs.render(script,{clientStrings:i18n.clientStrings(lang),consent:{language:lang,digest:'test'}});
+  const rendered=ejs.render(script,{clientStrings:i18n.clientStrings(lang),consent:{language:lang,digest:'test'},t:i18n.translate(lang)});
   new (require('vm').Script)(rendered);
   assert.ok(i18n.clientStrings(lang).join_services_description);
  }

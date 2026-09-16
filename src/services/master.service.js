@@ -86,6 +86,13 @@ async function registerMaster({
     }
     await require('./partner.service').bindNew(master, isNew, referralToken, referralPromoCode, client);
     master.welcomeBonusTetri = isNew ? welcomeBonusTetri : 0;
+    // bindNew пишет referral_manager_id в БД, но не в этот JS-объект — а он уходит
+    // сразу в telegramService.notifyModeratorNewMaster(master) (см. master.controller),
+    // где нужно показать модератору, по чьей ссылке/промокоду пришла регистрация.
+    const referral = (await client.query(
+      'SELECT mgr.name FROM masters m LEFT JOIN managers mgr ON mgr.id = m.referral_manager_id WHERE m.id = $1', [master.id]
+    )).rows[0];
+    master.referral_manager_name = referral?.name || null;
 
     if (serviceType) await client.query(
       `INSERT INTO master_services (master_id, service_type, attributes, is_primary)

@@ -50,7 +50,10 @@
       <% } %>
     </div>
   <% }); %>
-  <button type="submit" style="width:100%">Одобрить</button>
+  <div style="display:flex;gap:8px">
+    <button type="submit" formaction="/manager/review/<%= master.id %>/assign" style="flex:1;background:white;color:#19232d;border:1px solid #bbc9c5">Только категория</button>
+    <button type="submit" formaction="/manager/review/<%= master.id %>/approve" style="flex:1">Категория и одобрить</button>
+  </div>
 </form>
 
 <p><small>Другой случай (поправить телефон, имя, необязательные характеристики) — <a href="/admin/masters/<%= master.id %>">полная карточка в админке</a>.</small></p>

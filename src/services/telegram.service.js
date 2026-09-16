@@ -187,6 +187,7 @@ async function notifyModeratorNewMaster(master) {
   ];
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
+  lines.push(master.referral_manager_name ? `🔗 По ссылке: ${master.referral_manager_name}` : '🔗 Без реферальной ссылки (органика)');
   const text = lines.join('\n');
   const btnText = '📝 Проверить анкету и назначить категорию';
   const adminMarkup = { inline_keyboard: [[{ text: btnText, url: getBaseUrl() + '/admin/masters/' + master.id }]] };

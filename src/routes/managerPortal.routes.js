@@ -38,11 +38,23 @@ router.use(wrap(async(req,res,next) => {
 }));
 router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[service.COOKIE]); res.clearCookie(service.COOKIE,service.cookieOptions);res.redirect('/manager/login'); }));
 router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',await service.reviewGet(req.managerSession.id,req.params.id))));
-router.post('/review/:id/approve',wrap(async(req,res) => {
+function reviewFormInput(req) {
   const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));
   const cargoDimensions = req.body.cargoLength || req.body.cargoWidth || req.body.cargoHeight
     ? { length: req.body.cargoLength, width: req.body.cargoWidth, height: req.body.cargoHeight } : null;
-  await service.approvePending(req.managerSession.id,req.params.id,req.body.category,attributes,req.body.vehicleSize,cargoDimensions);
+  return [req.body.category, attributes, req.body.vehicleSize, cargoDimensions];
+}
+// Два действия одной формы (review.ejs, кнопки с разным formaction): «Только
+// категория» закрепляет заявку и сохраняет характеристики, не одобряя — модератор
+// не всегда готов одобрить сразу (не хватает опциональных полей и т.п.); «Категория
+// и одобрить» делает то же самое и сразу одобряет — раньше это был единственный
+// путь, и отдельно назначить категорию без немедленного одобрения было нельзя.
+router.post('/review/:id/assign',wrap(async(req,res) => {
+  await service.assignCategory(req.managerSession.id,req.params.id,...reviewFormInput(req));
+  res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
+}));
+router.post('/review/:id/approve',wrap(async(req,res) => {
+  await service.approvePending(req.managerSession.id,req.params.id,...reviewFormInput(req));
   res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
 }));
 const crm=require('../controllers/crm.controller');

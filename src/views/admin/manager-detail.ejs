@@ -84,6 +84,6 @@
 
 <div class="bg-white rounded-2xl border border-stone-200 p-4 mt-6">
   <h2 class="font-extrabold">Журнал веб-кабинета · последние 100 событий</h2>
-  <% portalEvents.forEach(e=>{ %><div class="border-b py-3"><p class="text-xs text-stone-500"><%= new Date(e.created_at).toLocaleString('ru-RU',{timeZone:'Asia/Tbilisi'}) %> · <%= ({note:'Заметка',ban:'Блокировка',unban:'Разблокировка',access_changed:'Изменение доступа'})[e.action] || e.action %> <% if(e.master_id){ %> · <a href="/admin/masters/<%= e.master_id %>">Специалист #<%= e.master_id %></a><% } %></p><p class="whitespace-pre-wrap break-words"><%= e.body %></p></div><% }) %>
+  <% portalEvents.forEach(e=>{ %><div class="border-b py-3"><p class="text-xs text-stone-500"><%= new Date(e.created_at).toLocaleString('ru-RU',{timeZone:'Asia/Tbilisi'}) %> · <%= ({note:'Заметка',ban:'Блокировка',unban:'Разблокировка',access_changed:'Изменение доступа',approve:'Быстрое одобрение',assign_category:'Назначена категория'})[e.action] || e.action %> <% if(e.master_id){ %> · <a href="/admin/masters/<%= e.master_id %>">Специалист #<%= e.master_id %></a><% } %></p><p class="whitespace-pre-wrap break-words"><%= e.body %></p></div><% }) %>
 </div>
 <%- include('./_footer') %>
