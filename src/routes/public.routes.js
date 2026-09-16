@@ -100,7 +100,21 @@ router.get('/z/:token', asyncHandler(async (req, res) => {
   res.redirect(`${locale}/#post-section`);
 }));
 
+// Ссылка /join в нужном языковом варианте: ru/en получают префикс, ka — явную метку
+// ?lang=ka (без неё голый /join, если в куке остался ru/en с прошлого визита БРАУЗЕРА,
+// тут же уведёт обратно — см. redirectToCookieLocale/lang-switch.ejs). Без hint — как
+// раньше: решает кука посетителя, а если её нет, дефолт ka.
+function joinUrl(ref, lang) {
+  const qs = 'ref=' + encodeURIComponent(ref);
+  if (lang === 'ru' || lang === 'en') return `/${lang}/join?${qs}`;
+  if (lang === 'ka') return `/join?${qs}&lang=ka`;
+  return `/join?${qs}`;
+}
+
 // Public referral alias; the manager ID prevents collisions between token prefixes.
+// ?lang=ru|ka|en — менеджер знает язык получателя и явно выбирает вариант ссылки
+// (см. /admin/managers/:id и /manager — три варианта вместо одной ссылки), это
+// надёжнее, чем гадать по куке браузера получателя (её обычно вообще нет — первый визит).
 router.get('/p/:code', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const match = /^([1-9a-z][0-9a-z]{0,6})-([a-f0-9]{8})$/.exec(req.params.code);
@@ -108,7 +122,8 @@ router.get('/p/:code', asyncHandler(async (req, res) => {
   if (!id || id > 2147483647 || id.toString(36) !== match[1]) return res.status(404).send('Ссылка не найдена');
   const manager = await require('../services/partner.service').getManager(id);
   if (!manager?.is_active || !manager.referral_token || manager.referral_token.slice(0, 8) !== match[2]) return res.status(404).send('Ссылка не найдена');
-  res.redirect('/join?ref=' + encodeURIComponent(manager.referral_token));
+  const lang = ['ru', 'ka', 'en'].includes(req.query.lang) ? req.query.lang : null;
+  res.redirect(joinUrl(manager.referral_token, lang));
 }));
 
 router.get('/join', asyncHandler(async (req, res) => {
