@@ -23,13 +23,34 @@
 //   filter    true → фильтр в каталоге + кнопка в рассылке модератору
 //   required  true → обязательное поле при регистрации
 
+// Тиры кузова van/transport — единственный источник правды (раньше S/L/XL/XXL и их
+// см-подсказки были продублированы по отдельности в 6+ местах: schema.sql, эта
+// функция, ALLOWED_SIZES в admin/order контроллерах, dispatch.service, SIZE_LABELS/
+// SIZE_SPECS в telegram.service — добавить M пришлось бы в каждом; теперь один массив).
+// Минимумы по каждому измерению — тариф «Грузовой» Яндекса (alfa-park-fleet.ru):
+// кузов S от 170×100×90, M от 260×130×150, L от 380×180×180, XL от 400×190×200,
+// XXL от 500×200×200 (см). По возрастанию — используется и для сравнения gte
+// (см. category.service validate: match:'gte' сравнивает по индексу в options).
+const VAN_SIZES = [
+  { code: 'S', length: 170, width: 100, height: 90 },
+  { code: 'M', length: 260, width: 130, height: 150 },
+  { code: 'L', length: 380, width: 180, height: 180 },
+  { code: 'XL', length: 400, width: 190, height: 200 },
+  { code: 'XXL', length: 500, width: 200, height: 200 },
+];
+const VAN_SIZE_ORDER = VAN_SIZES.map(s => s.code);
+function vanSizeSpec(code) {
+  const s = VAN_SIZES.find(v => v.code === code);
+  return s ? `${s.length}×${s.width}×${s.height} см` : '';
+}
+
 const SERVICE_TYPES = {
   van: {
     icon: '🚚',
     catalogGroup: true,
     catalogColor: 'bg-amber-100 text-amber-900 border-amber-200',
     fields: [
-      { key: 'size', input: 'size', options: ['S', 'L', 'XL', 'XXL'], match: 'gte', filter: true },
+      { key: 'size', input: 'size', options: VAN_SIZE_ORDER, match: 'gte', filter: true },
       {
         key: 'body', input: 'enum', options: ['closed', 'flatbed'], match: 'exact', filter: true, required: true,
         optionIcons: { closed: 'fa-truck', flatbed: 'fa-truck-pickup' },
@@ -72,25 +93,19 @@ const SERVICE_TYPES = {
 // Порядок в UI (форма, каталог, кнопки рассылки).
 const SERVICE_TYPE_ORDER = ['van', 'movers', 'tow', 'bucket_lift'];
 
-// Тир кузова из внутренних габаритов (см). Исполнитель вводит размеры (или выбирает
-// машину из списка — Фаза 2), система присваивает S/L/XL/XXL. Пороги — первый прикид
-// по тбилисскому парку, при желании владельца правятся здесь одним местом.
-//   S   — легковая, каблук (Berlingo, Doblo, Caddy)
-//   L   — средний фургон (Transit, Vito)
-//   XL  — макси-фургон (Sprinter Maxi, Transit L4H3), Газель-тент
-//   XXL — Газель 4м+, грузовик
+// Тир кузова из внутренних габаритов (см) по тем же порогам, что и таблица выше:
+// проходим от самого крупного тира вниз, отдаём первый, для которого фургон проходит
+// по всем трём измерениям сразу (как считает сам Яндекс — не по объёму).
 function deriveVanSize(lengthCm, widthCm, heightCm) {
   const l = Number(lengthCm) || 0;
   const w = Number(widthCm) || 0;
   const h = Number(heightCm) || 0;
   if (!l || !w || !h) return null; // «любой размер» — как раньше при пустых габаритах
-  const volume = (l * w * h) / 1e6; // м³
-  // Ориентиры: Transit L2H2 ≈ 10 м³ → L; Sprinter Maxi ≈ 15 м³ → XL; Газель-фургон 4м ≈ 18 → XXL.
-  // Длина отдельно — длинный бортовой с низкими бортами по объёму мал, но грузит крупное.
-  if (volume >= 17 || l >= 450) return 'XXL';
-  if (volume >= 12 || l >= 400) return 'XL';
-  if (volume >= 4) return 'L';
-  return 'S';
+  for (let i = VAN_SIZES.length - 1; i >= 0; i--) {
+    const t = VAN_SIZES[i];
+    if (l >= t.length && w >= t.width && h >= t.height) return t.code;
+  }
+  return 'S'; // меньше минимума даже для S — не завышаем тир
 }
 
 function isKnownType(type) {
@@ -234,6 +249,9 @@ function attributeBadges(type, attrs, t) {
 module.exports = {
   SERVICE_TYPES,
   SERVICE_TYPE_ORDER,
+  VAN_SIZES,
+  VAN_SIZE_ORDER,
+  vanSizeSpec,
   deriveVanSize,
   isKnownType,
   fieldsFor,

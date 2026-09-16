@@ -44,7 +44,7 @@ const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 // transport/movers/junk/flatbed — старые; tow/bucket_lift — спецтехника (у мастеров
 // masters.category = сам тип, см. serviceTypes.legacyColumnsFor). Кнопки — telegram.service.
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'flatbed', 'tow', 'bucket_lift']);
-const ALLOWED_SIZES = new Set(['S', 'L', 'XL', 'XXL']);
+const ALLOWED_SIZES = new Set(require('../config/serviceTypes').VAN_SIZE_ORDER);
 const MY_ORDERS_COOKIE = 'my_orders';
 const MY_ORDERS_MAX = 20;
 

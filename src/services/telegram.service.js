@@ -4,9 +4,12 @@ const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
 
 const API_BASE = 'https://api.telegram.org/bot';
-const SIZE_LABELS = { S: 'S', L: 'L', XL: 'XL', XXL: 'XXL' };
-const SIZE_SPECS = { S: 'легковая / каблук', L: '180×180×380', XL: '200×190×400', XXL: '200×200×500' };
-const SIZE_ORDER = ['S', 'L', 'XL', 'XXL'];
+// Единственный источник данных по тирам кузова — src/config/serviceTypes.js (там же
+// добавлять новый тир или менять см-пороги, здесь только читаем).
+const { VAN_SIZE_ORDER, vanSizeSpec } = require('../config/serviceTypes');
+const SIZE_LABELS = Object.fromEntries(VAN_SIZE_ORDER.map(code => [code, code]));
+const SIZE_SPECS = Object.fromEntries(VAN_SIZE_ORDER.map(code => [code, vanSizeSpec(code)]));
+const SIZE_ORDER = VAN_SIZE_ORDER;
 const CATEGORY_LABELS = {
   transport: '🚚 Перевозки',
   movers: '💪 Грузчики',

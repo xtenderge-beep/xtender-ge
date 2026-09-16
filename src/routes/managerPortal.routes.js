@@ -40,7 +40,7 @@ router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[
 router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',await service.reviewGet(req.managerSession.id,req.params.id))));
 router.post('/review/:id/approve',wrap(async(req,res) => {
   const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));
-  await service.approvePending(req.managerSession.id,req.params.id,req.body.category,attributes);
+  await service.approvePending(req.managerSession.id,req.params.id,req.body.category,attributes,req.body.vehicleSize);
   res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
 }));
 const crm=require('../controllers/crm.controller');

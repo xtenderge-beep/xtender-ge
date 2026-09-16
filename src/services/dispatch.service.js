@@ -3,7 +3,7 @@ const settingsService = require('./settings.service');
 const pool = require('../config/db');
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
-  if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !['S','L','XL','XXL'].includes(size)))) throw new Error('Некорректная группа рассылки');
+  if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !require('../config/serviceTypes').VAN_SIZE_ORDER.includes(size)))) throw new Error('Некорректная группа рассылки');
 }
 async function preview(token, category, size) {
   await validate(category, size);

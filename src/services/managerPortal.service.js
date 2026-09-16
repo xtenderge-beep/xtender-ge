@@ -80,15 +80,18 @@ async function reviewGet(managerId, masterId) {
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
   const categories = await require('./category.service').configForView('ru');
-  return { master, categories };
+  const { VAN_SIZE_ORDER, vanSizeSpec } = require('../config/serviceTypes');
+  const vanSizes = VAN_SIZE_ORDER.map(code => ({ code, spec: vanSizeSpec(code) }));
+  return { master, categories, vanSizes };
 }
 
 // Одобрение из быстрой карточки: закрепляет исполнителя за модератором (если ещё
-// ничей), проставляет категорию и пробует одобрить. Категории с обязательными
-// характеристиками (например «транспорт» — размер кузова) здесь не заполнить —
-// в этом случае просим открыть полную карточку в /admin, а не строим тут дублирующую
-// форму под все типы услуг (см. category.service — конфигурируемые поля per-category).
-async function approvePending(managerId, masterId, category, attributes = {}) {
+// ничей), проставляет категорию и пробует одобрить. Для van/transport форма сама
+// присылает vehicleSize (см. review.ejs — гид по см из тарифа «Грузовой» Яндекса);
+// для прочих обязательных характеристик, которых тут нет в списке полей категории,
+// просим открыть полную карточку в /admin, а не строим тут дублирующую форму под
+// все типы услуг (см. category.service — конфигурируемые поля per-category).
+async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
@@ -101,7 +104,7 @@ async function approvePending(managerId, masterId, category, attributes = {}) {
   try {
     await require('./master.service').updateMasterProfile(masterId, {
       name: master.name, phone: master.phone, category,
-      vehicleType: master.vehicle_type, vehicleSize: master.vehicle_size, isFlatbed: master.is_flatbed,
+      vehicleType: master.vehicle_type, vehicleSize: vehicleSize || master.vehicle_size, isFlatbed: master.is_flatbed,
       priceText: master.price_text, description: master.description, serviceAttributes: attributes,
     });
   } catch (e) {

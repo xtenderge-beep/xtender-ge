@@ -18,8 +18,20 @@
   <h2>2. <span id="approveStepLabel"></span></h2>
   <% categories.forEach(function (c) { %>
     <% var required = c.fields.filter(function (f) { return f.required; }); %>
+    <% var tailLift = c.type === 'van' ? c.fields.find(function (f) { return f.key === 'tail_lift'; }) : null; %>
     <div data-fields-for="<%= c.type %>" hidden>
-      <% if (!required.length) { %><p class="muted">Для этой категории дополнительных характеристик не требуется — можно сразу одобрять.</p><% } %>
+      <% if (!required.length && c.type !== 'van') { %><p class="muted">Для этой категории дополнительных характеристик не требуется — можно сразу одобрять.</p><% } %>
+      <% if (c.type === 'van') { %>
+        <label>Размер кузова — как в тарифе «Грузовой» Яндекса, от указанных см
+          <select name="vehicleSize" required>
+            <option value="" disabled selected>Выберите размер</option>
+            <option value="any">Любой размер (не ограничивать рассылку)</option>
+            <% vanSizes.forEach(function (s) { %>
+              <option value="<%= s.code %>"><%= s.code %> — от <%= s.spec %></option>
+            <% }); %>
+          </select>
+        </label>
+      <% } %>
       <% required.forEach(function (f) { %>
         <label><%= f.label %>
           <% if (f.input === 'enum') { %>
@@ -35,6 +47,9 @@
           <% } %>
         </label>
       <% }); %>
+      <% if (tailLift) { %>
+        <label><input type="checkbox" name="attr_<%= tailLift.key %>" value="true"> <%= tailLift.label %></label>
+      <% } %>
     </div>
   <% }); %>
   <button type="submit" style="width:100%">Одобрить</button>

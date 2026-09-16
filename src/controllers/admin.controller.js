@@ -22,7 +22,7 @@ const { toE164 } = require('../config/phone');
 // junk оставлен для легаси-профилей; tow/bucket_lift — чтобы редактирование профиля
 // нового типа в админке не сбрасывало category (полноценная форма из конфига — Фаза 5).
 const ALLOWED_CATEGORIES = new Set(['transport', 'movers', 'junk', 'tow', 'bucket_lift']);
-const ALLOWED_SIZES = new Set(['S', 'L', 'XL', 'XXL']);
+const ALLOWED_SIZES = new Set(require('../config/serviceTypes').VAN_SIZE_ORDER);
 
 const LOGIN_RATE_LIMIT_MAX = 10; // на один IP
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
@@ -205,8 +205,10 @@ async function masterDetail(req, res) {
   const managers = await managerService.list();
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
   const partnerReferrer = master.referral_manager_id ? await require('../services/partner.service').getManager(master.referral_manager_id) : null;
+  const { VAN_SIZE_ORDER, vanSizeSpec } = require('../config/serviceTypes');
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
+    vanSizes: VAN_SIZE_ORDER.map(code => ({ code, spec: vanSizeSpec(code) })),
     master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }

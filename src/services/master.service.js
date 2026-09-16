@@ -377,7 +377,7 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   if (type !== definition?.slug || checked.errors.length) {
     const error = new Error('Заполните категорию и обязательные характеристики'); error.code = 'INVALID_SERVICE'; throw error;
   }
-  if (type === 'van' && ['S','L','XL','XXL'].includes(vehicleSize)) checked.attributes.size = vehicleSize;
+  if (type === 'van' && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
   const legacy = config.legacyColumnsFor(type, checked.attributes);
   return pool.withTransaction(async client => {
     await client.query('SELECT id FROM masters WHERE id = $1 FOR UPDATE', [id]);
