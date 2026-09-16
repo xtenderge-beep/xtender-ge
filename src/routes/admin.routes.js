@@ -27,6 +27,7 @@ router.get('/categories/new', asyncHandler(categories.form));
 router.get('/categories/:slug', asyncHandler(categories.form));
 router.post('/categories', verifyCsrf, asyncHandler(categories.save));
 router.post('/categories/:slug', verifyCsrf, asyncHandler(categories.save));
+router.post('/categories/:slug/delete', verifyCsrf, asyncHandler(categories.remove));
 router.post('/orders/:token/refresh-categories', verifyCsrf, asyncHandler(categories.refreshOrder));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',asyncHandler(crm.show));

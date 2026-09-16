@@ -145,4 +145,22 @@ async function save(slug, input) {
     return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order])).rows[0];
   });
 }
-module.exports={list,get,validate,view,configForView,groups,catalogGroups,badges,save,toType,toCategory,hasLockedField};
+// Полное удаление — только если категорией никто не пользуется: иначе профили
+// специалистов останутся с category/service_type, которого больше нет в
+// service_categories (validate/get на него больше не найдут строку), а это ломает
+// повторное одобрение, каталог и рассылку по этому типу. В остальных случаях
+// предлагаем «Категория активна» = false — она уже скрывается из новых назначений,
+// каталога и рассылки, но профили и история не трогаются (см. подсказку в форме).
+async function remove(slug) {
+  return pool.withTransaction(async client => {
+    const row = await get(slug, client);
+    if (!row) throw fail('Категория не найдена.', 404);
+    const mastersCount = Number((await client.query('SELECT COUNT(*)::int AS n FROM masters WHERE category=$1', [toCategory(slug)])).rows[0].n);
+    const servicesCount = Number((await client.query('SELECT COUNT(*)::int AS n FROM master_services WHERE service_type=$1', [toType(slug)])).rows[0].n);
+    if (mastersCount > 0 || servicesCount > 0) {
+      throw fail(`Нельзя удалить: категорию используют специалисты (${Math.max(mastersCount, servicesCount)}). Сначала переназначьте им категорию в их профиле или снимите отметку «Категория активна» — она скроется из новых назначений, а профили и история сохранятся.`, 409);
+    }
+    await client.query('DELETE FROM service_categories WHERE slug=$1', [slug]);
+  });
+}
+module.exports={list,get,validate,view,configForView,groups,catalogGroups,badges,save,remove,toType,toCategory,hasLockedField};
