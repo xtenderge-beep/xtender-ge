@@ -239,7 +239,7 @@ async function register(req, res) {
   });
   smsService.sendOrderNotification(
     phone,
-    `Xtender: заявка на регистрацию принята. Ваш баланс: ${link}`,
+    clientStrings(req.lang).sms_registration_accepted.replace('{link}', link),
     { masterId: master.id, purpose: OTP_PURPOSE, meta: requestMeta(req) }
   ).catch((err) => {
     console.error('Failed to send registration confirmation SMS:', err.message);

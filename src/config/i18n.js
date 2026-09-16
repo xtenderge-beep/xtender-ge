@@ -310,8 +310,6 @@ const dictionaries = {
     join_success_title: 'განაცხადი გაგზავნილია!',
     join_success_desc: 'მოდერატორი გადაამოწმებს თქვენს მონაცემებს უახლოეს დროში. შეკვეთების მისაღებად საჭიროა ბალანსის შევსება.',
     join_payment_title: 'როგორ მუშაობს',
-    join_payment_desc: 'მოდერატორის დამტკიცების შემდეგ მიიღებთ წვდომას პირად კაბინეტში — იქ არის მიმდინარე ტარიფები კატეგორიების მიხედვით, ბალანსი და შევსების რეკვიზიტები. ფული მობილურის ანგარიშიდან არასდროს იჭრება.',
-    join_payment_contact: 'ბალანსის შესავსებად დაგვიკავშირდით: ',
     join_err_name_required: 'შეიყვანეთ სახელი',
     join_err_category_required: 'აირჩიეთ კატეგორია',
 
@@ -821,8 +819,6 @@ const dictionaries = {
     join_success_title: 'Заявка отправлена!',
     join_success_desc: 'Модератор проверит ваши данные в ближайшее время. Для получения заявок нужно будет пополнить баланс.',
     join_payment_title: 'Как это работает',
-    join_payment_desc: 'После одобрения модератором вы получите доступ в личный кабинет — там актуальные тарифы по категориям, баланс и реквизиты для пополнения. С телефонного счёта деньги не снимаются никогда.',
-    join_payment_contact: 'Для пополнения баланса свяжитесь с нами: ',
     join_err_name_required: 'Введите имя',
     join_err_category_required: 'Выберите категорию',
 
@@ -1332,8 +1328,6 @@ const dictionaries = {
     join_success_title: 'Application submitted!',
     join_success_desc: "A moderator will review your details shortly. You'll need to top up your balance to start receiving requests.",
     join_payment_title: 'How it works',
-    join_payment_desc: "Once approved by a moderator, you'll get access to your dashboard — with current tariffs by category, your balance, and top-up details. Nothing is ever charged to your mobile phone account.",
-    join_payment_contact: 'To top up your balance, contact us: ',
     join_err_name_required: 'Enter your name',
     join_err_category_required: 'Select a category',
 
