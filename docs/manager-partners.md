@@ -15,7 +15,11 @@ Railway сообщил `success`; страница /admin/login вернула H
 
 1. `/admin/managers` → добавить менеджера или открыть существующего.
 2. Блок «Партнёрская программа» → «Создать реферальную ссылку специалиста».
-3. Скопировать постоянную ссылку `/join?ref=<token>` и передать менеджеру.
+3. Скопировать нужный языковой вариант постоянной ссылки (`/p/<id>-<token8>?lang=ka|ru|en`
+   → редиректит на `/join?ref=<token>` в соответствующей локали, 2026-09-17, см.
+   `public.routes.js`) и передать менеджеру. Менеджер может обойтись и без админки —
+   все 3 варианта видны у него в кабинете `/manager` и по команде `/link` (без номера)
+   боту в Telegram.
 4. Здесь же настроить процент. Старые комиссии сохраняют исходную ставку.
 5. `/admin/partner-payouts` → выбрать месяц → открыть менеджера.
 6. После реального перевода денег указать сумму и банковское подтверждение.
@@ -86,7 +90,9 @@ Railway сообщил `success`; страница /admin/login вернула H
 - `src/controllers/partner.controller.js`, `src/routes/admin.routes.js` — админка.
 - `src/services/master.service.js` — регистрация и атомарное начисление с topup.
 - `src/routes/public.routes.js`, `src/controllers/master.controller.js` — реферальный переход.
-- `src/views/admin/_partner-settings.ejs`, `partner-payouts.ejs` — интерфейс.
+- `src/views/admin/_partner-settings.ejs`, `partner-payouts.ejs`, `src/views/manager/dashboard.ejs` —
+  интерфейс (3-языковые варианты ссылки, 2026-09-17).
+- `src/controllers/order.controller.js` `handleManagerCommand` — бот, `/link` (без номера).
 - `schema.sql`: поля managers/masters; manager_commissions, manager_payouts, partner_audit.
 
 Схема добавочная и идемпотентная. Миграция не делает реальных выплат, не меняет
