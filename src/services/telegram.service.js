@@ -4,11 +4,12 @@ const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
 
 const API_BASE = 'https://api.telegram.org/bot';
-// Единственный источник данных по тирам кузова — src/config/serviceTypes.js (там же
-// добавлять новый тир или менять см-пороги, здесь только читаем).
+// Буквы и их порядок — src/config/serviceTypes.js (фиксированы, см. CHECK-констрейнты
+// в schema.sql). Что каждая буква значит в см — settings.service.getVanSizeThresholds
+// (админ может поменять из /admin/categories/van без деплоя), поэтому SIZE_SPECS
+// считаем за запрос в buildKeyboardWithCounts, а не тут константой при старте.
 const { VAN_SIZE_ORDER, vanSizeSpec } = require('../config/serviceTypes');
 const SIZE_LABELS = Object.fromEntries(VAN_SIZE_ORDER.map(code => [code, code]));
-const SIZE_SPECS = Object.fromEntries(VAN_SIZE_ORDER.map(code => [code, vanSizeSpec(code)]));
 const SIZE_ORDER = VAN_SIZE_ORDER;
 const CATEGORY_LABELS = {
   transport: '🚚 Перевозки',
@@ -63,6 +64,8 @@ async function buildKeyboardWithCounts(token, page = 0) {
   const transportSizes = counts
     .filter((row) => row.category === 'transport' && row.vehicle_size)
     .sort((a, b) => SIZE_ORDER.indexOf(a.vehicle_size) - SIZE_ORDER.indexOf(b.vehicle_size));
+  const sizeThresholds = transportSizes.length ? await require('./settings.service').getVanSizeThresholds() : [];
+  const sizeSpec = (code) => vanSizeSpec(code, sizeThresholds);
 
   const groups = await require('./category.service').groups();
   const entries = Object.entries(groups);
@@ -74,7 +77,7 @@ async function buildKeyboardWithCounts(token, page = 0) {
     transportSizes.forEach((row) => {
       rows.push([
         {
-          text: `🚚 ${row.vehicle_size} ${SIZE_SPECS[row.vehicle_size] || ''} (${row.count})`,
+          text: `🚚 ${row.vehicle_size} ${sizeSpec(row.vehicle_size)} (${row.count})`,
           callback_data: `cat:${token}:transport:${row.vehicle_size}`,
         },
       ]);

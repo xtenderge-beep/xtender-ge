@@ -39,8 +39,14 @@ const VAN_SIZES = [
   { code: 'XXL', length: 500, width: 200, height: 200 },
 ];
 const VAN_SIZE_ORDER = VAN_SIZES.map(s => s.code);
-function vanSizeSpec(code) {
-  const s = VAN_SIZES.find(v => v.code === code);
+// Пороги ниже — дефолт/фолбэк. Реальные см-значения теперь настраиваются из админки
+// без деплоя (см. settings.service.getVanSizeThresholds, app_settings ключ
+// van_size_thresholds) — буквы S/M/L/XL/XXL остаются фиксированными (на них завязаны
+// CHECK-констрейнты в schema.sql и валидация в нескольких контроллерах), а вот что
+// значит каждая буква в см — можно поменять. sizes передаётся вызывающей стороной,
+// уже прочитавшей актуальные пороги; без него — эти дефолты.
+function vanSizeSpec(code, sizes = VAN_SIZES) {
+  const s = sizes.find(v => v.code === code) || VAN_SIZES.find(v => v.code === code);
   return s ? `${s.length}×${s.width}×${s.height} см` : '';
 }
 
@@ -96,13 +102,13 @@ const SERVICE_TYPE_ORDER = ['van', 'movers', 'tow', 'bucket_lift'];
 // Тир кузова из внутренних габаритов (см) по тем же порогам, что и таблица выше:
 // проходим от самого крупного тира вниз, отдаём первый, для которого фургон проходит
 // по всем трём измерениям сразу (как считает сам Яндекс — не по объёму).
-function deriveVanSize(lengthCm, widthCm, heightCm) {
+function deriveVanSize(lengthCm, widthCm, heightCm, sizes = VAN_SIZES) {
   const l = Number(lengthCm) || 0;
   const w = Number(widthCm) || 0;
   const h = Number(heightCm) || 0;
   if (!l || !w || !h) return null; // «любой размер» — как раньше при пустых габаритах
-  for (let i = VAN_SIZES.length - 1; i >= 0; i--) {
-    const t = VAN_SIZES[i];
+  for (let i = sizes.length - 1; i >= 0; i--) {
+    const t = sizes[i];
     if (l >= t.length && w >= t.width && h >= t.height) return t.code;
   }
   return 'S'; // меньше минимума даже для S — не завышаем тир

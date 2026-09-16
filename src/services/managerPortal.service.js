@@ -80,8 +80,9 @@ async function reviewGet(managerId, masterId) {
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
   const categories = await require('./category.service').configForView('ru');
-  const { VAN_SIZE_ORDER, vanSizeSpec } = require('../config/serviceTypes');
-  const vanSizes = VAN_SIZE_ORDER.map(code => ({ code, spec: vanSizeSpec(code) }));
+  const { vanSizeSpec } = require('../config/serviceTypes');
+  const thresholds = await require('./settings.service').getVanSizeThresholds();
+  const vanSizes = thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds) }));
   return { master, categories, vanSizes };
 }
 

@@ -46,6 +46,43 @@ async function setCatalogCallPriceTetri(tetri) {
   await setSetting(CATALOG_CALL_PRICE_KEY, tetri);
 }
 
+const VAN_SIZE_THRESHOLDS_KEY = 'van_size_thresholds';
+
+// Пороги S/M/L/XL/XXL в см — по умолчанию из serviceTypes.VAN_SIZES (см. её же
+// комментарий: источник — тариф «Грузовой» Яндекса), но админ может поправить числа
+// из /admin/categories/van без деплоя. Буквы и их порядок не меняются отсюда —
+// только что каждая буква значит в см (см. schema.sql: masters_vehicle_size_check
+// и order_dispatches_vehicle_size_check жёстко перечисляют сами буквы).
+async function getVanSizeThresholds() {
+  const { VAN_SIZES } = require('../config/serviceTypes');
+  const raw = await getSetting(VAN_SIZE_THRESHOLDS_KEY);
+  if (!raw) return VAN_SIZES;
+  try {
+    const saved = JSON.parse(raw);
+    return VAN_SIZES.map(def => {
+      const override = saved[def.code];
+      const valid = override && ['length', 'width', 'height'].every(k => Number.isFinite(Number(override[k])) && Number(override[k]) > 0);
+      return valid ? { code: def.code, length: Number(override.length), width: Number(override.width), height: Number(override.height) } : def;
+    });
+  } catch {
+    return VAN_SIZES; // повреждённое значение в БД — не роняем страницу, просто дефолт
+  }
+}
+
+async function setVanSizeThresholds(thresholds) {
+  const { VAN_SIZE_ORDER } = require('../config/serviceTypes');
+  const clean = {};
+  for (const code of VAN_SIZE_ORDER) {
+    const t = thresholds?.[code];
+    const length = Number(t?.length), width = Number(t?.width), height = Number(t?.height);
+    if (![length, width, height].every(n => Number.isFinite(n) && n >= 1 && n <= 2000)) {
+      throw Object.assign(new Error(`Некорректные размеры для «${code}»: укажите длину/ширину/высоту от 1 до 2000 см.`), { status: 400 });
+    }
+    clean[code] = { length, width, height };
+  }
+  await setSetting(VAN_SIZE_THRESHOLDS_KEY, JSON.stringify(clean));
+}
+
 async function getWelcomeBonusTetri() {
   const value = Number(await getSetting('welcome_bonus_tetri', '0'));
   return Number.isSafeInteger(value) && value >= 0 && value <= 100000 ? value : 0;
@@ -62,6 +99,8 @@ module.exports = {
   setLeadPriceTetri,
   getCatalogCallPriceTetri,
   setCatalogCallPriceTetri,
+  getVanSizeThresholds,
+  setVanSizeThresholds,
   DEFAULT_LEAD_PRICE_TETRI,
   DEFAULT_CATALOG_CALL_PRICE_TETRI,
 };

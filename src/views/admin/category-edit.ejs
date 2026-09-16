@@ -21,8 +21,26 @@
 <div class="flex gap-3"><label class="text-sm">Значок (необязательно)<input name="icon" maxlength="16" value="<%= value.icon || '' %>" class="block w-full border rounded-xl px-3 py-2"></label><label class="text-sm">Порядок в списке<input type="number" name="sort_order" min="0" max="10000" value="<%= value.sort_order ?? 100 %>" class="block w-full border rounded-xl px-3 py-2"></label></div>
 <label class="flex items-center gap-2"><input type="checkbox" name="is_active" <%= value.is_active !== false ? 'checked' : '' %>>Категория активна</label>
 <p class="text-sm text-stone-500">При отключении категория исчезает из новых назначений, каталога и рассылки. Профили и история сохраняются.</p>
+<% if(fieldsLocked){ %>
+<h2 class="font-bold">Размер кузова (S / M / L / XL / XXL)</h2>
+<p class="text-sm text-stone-500">Буквы фиксированы (на них завязана проверка в базе), но что каждая буква значит в сантиметрах — можно менять здесь, без участия разработчика. По умолчанию — минимумы тарифа «Грузовой» Яндекса.</p>
+<% if(sizeError){ %><p role="alert" class="text-sm text-red-600"><%= sizeError %></p><% } %>
+<form method="post" action="/admin/categories/<%= category.slug %>/size-thresholds" class="space-y-2">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<% vanSizeThresholds.forEach(t=>{ %>
+<div class="flex flex-wrap items-end gap-2 border rounded-xl p-2.5">
+  <div class="font-mono font-bold w-10"><%= t.code %></div>
+  <label class="text-xs">Длина, см<input type="number" min="1" max="2000" name="length_<%= t.code %>" value="<%= t.length %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <label class="text-xs">Ширина, см<input type="number" min="1" max="2000" name="width_<%= t.code %>" value="<%= t.width %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <label class="text-xs">Высота, см<input type="number" min="1" max="2000" name="height_<%= t.code %>" value="<%= t.height %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <span class="text-xs text-stone-400"><%= vanSizeSpec(t.code, vanSizeThresholds) %></span>
+</div>
+<% }); %>
+<button class="px-4 py-2 bg-stone-900 text-white rounded-xl text-sm">Сохранить размеры</button>
+</form>
+<% } %>
 <h2 class="font-bold">Характеристики для модератора</h2>
-<% if(fieldsLocked){ %><p class="text-sm">У этой категории есть поле «Размер» — оно проставляется старым способом (в профиле исполнителя, а не здесь) и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
+<% if(fieldsLocked){ %><p class="text-sm">Поле «Размер» само по себе (буквы S/M/L/XL/XXL) настраивается в сантиметрах выше и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
 <p class="text-sm text-stone-500">Добавьте поля, которые модератор заполнит в анкете исполнителя. Они описывают услуги; рассылка подбирает исполнителей по категории.</p>
 <div id="categoryFields" class="space-y-3">
 <% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i}) %><% }); %>
