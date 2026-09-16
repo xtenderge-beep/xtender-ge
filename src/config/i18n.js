@@ -307,9 +307,6 @@ const dictionaries = {
     join_description_placeholder: 'გამოცდილება, სამუშაო საათები და ა.შ.',
     join_otp_confirm_btn: 'დადასტურება',
     join_submit_btn: 'გაგზავნა მოდერაციაზე',
-    join_success_title: 'განაცხადი გაგზავნილია!',
-    join_success_desc: 'მოდერატორი გადაამოწმებს თქვენს მონაცემებს უახლოეს დროში. შეკვეთების მისაღებად საჭიროა ბალანსის შევსება.',
-    join_payment_title: 'როგორ მუშაობს',
     join_err_name_required: 'შეიყვანეთ სახელი',
     join_err_category_required: 'აირჩიეთ კატეგორია',
 
@@ -435,7 +432,6 @@ const dictionaries = {
     join_promo_banner: 'პრომოკოდი {code} — {amount} ₾ ბალანსზე რეგისტრაციისას',
     join_promo_bad: 'პრომოკოდი {code} არ არის აქტიური ან ამოწურულია',
     join_promo_placeholder: 'მაგ: START5',
-    join_promo_applied: 'ბალანსზე დაგერიცხათ {amount} ₾',
 
     terms_page_title: 'xtender.ge — საჯარო ოფერტა',
     terms_headline: 'საჯარო ოფერტა (სარგებლობის პირობები)',
@@ -816,9 +812,6 @@ const dictionaries = {
     join_description_placeholder: 'Опыт, часы работы и т.п.',
     join_otp_confirm_btn: 'Подтвердить',
     join_submit_btn: 'Отправить на модерацию',
-    join_success_title: 'Заявка отправлена!',
-    join_success_desc: 'Модератор проверит ваши данные в ближайшее время. Для получения заявок нужно будет пополнить баланс.',
-    join_payment_title: 'Как это работает',
     join_err_name_required: 'Введите имя',
     join_err_category_required: 'Выберите категорию',
 
@@ -944,7 +937,6 @@ const dictionaries = {
     join_promo_banner: 'Промокод {code} — {amount} ₾ на баланс при регистрации',
     join_promo_bad: 'Промокод {code} недействителен или исчерпан',
     join_promo_placeholder: 'например START5',
-    join_promo_applied: 'На баланс зачислено {amount} ₾',
 
     terms_page_title: 'xtender.ge — Публичная оферта',
     terms_headline: 'Публичная оферта (Условия использования)',
@@ -1325,9 +1317,6 @@ const dictionaries = {
     join_description_placeholder: 'Experience, working hours, etc.',
     join_otp_confirm_btn: 'Confirm',
     join_submit_btn: 'Submit for review',
-    join_success_title: 'Application submitted!',
-    join_success_desc: "A moderator will review your details shortly. You'll need to top up your balance to start receiving requests.",
-    join_payment_title: 'How it works',
     join_err_name_required: 'Enter your name',
     join_err_category_required: 'Select a category',
 
@@ -1453,7 +1442,6 @@ const dictionaries = {
     join_promo_banner: 'Promo code {code} — {amount} ₾ on your balance when you register',
     join_promo_bad: 'Promo code {code} is not active or is used up',
     join_promo_placeholder: 'e.g. START5',
-    join_promo_applied: '{amount} ₾ added to your balance',
 
     terms_page_title: 'xtender.ge — Terms of Service',
     terms_headline: 'Public Terms of Service',

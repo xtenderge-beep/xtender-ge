@@ -176,24 +176,6 @@
                 <button id="otpBack" type="button" onclick="backToDetails()" class="mt-2 w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_back') %></button>
             </div>
 
-            <div id="successStep" class="p-6 hidden text-center space-y-4">
-                <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-2xl mx-auto">
-                    <i class="fa-solid fa-check"></i>
-                </div>
-                <h2 class="text-lg font-black text-stone-900"><%= t('join_success_title') %></h2>
-                <p class="text-sm text-stone-500"><%= t('join_success_desc') %></p>
-
-                <p id="welcomeBonusMsg" class="hidden provider-welcome"></p>
-                <p id="promoBonusMsg" class="hidden text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-3"></p>
-
-                <div class="bg-stone-900 text-white p-4 rounded-2xl text-left space-y-2 text-xs">
-                    <p class="font-bold text-amber-400"><%= t('join_payment_title') %></p>
-                    <p class="text-stone-300 leading-relaxed"><%= t('join_payment_desc') %></p>
-                </div>
-
-                <a id="statusLink" href="#" class="block w-full py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs break-all"></a>
-            </div>
-
             <div role="alert" aria-live="polite" id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
         </div>
     </div></main>
@@ -399,26 +381,10 @@
             data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
 
-            showMsg('');
-            document.getElementById('otpStep').classList.add('hidden');
-            document.getElementById('successStep').classList.remove('hidden');
-            document.getElementById('signupProgress').hidden = true;
-            document.getElementById('signupCard').scrollIntoView({ block: 'start' });
-            if (data.link) {
-                const statusLink = document.getElementById('statusLink');
-                statusLink.href = data.link;
-                statusLink.textContent = T.provider_start_cabinet;
-            }
-            if (data.welcomeBonusGel > 0) {
-                const welcome = document.getElementById('welcomeBonusMsg');
-                welcome.textContent = T.welcome_credited.replace('{amount}', data.welcomeBonusGel.toFixed(2));
-                welcome.classList.remove('hidden');
-            }
-            if (data.promoBonusGel && data.promoBonusGel > 0) {
-                const pb = document.getElementById('promoBonusMsg');
-                pb.textContent = '🎁 ' + T.join_promo_applied.replace('{amount}', data.promoBonusGel.toFixed(2));
-                pb.classList.remove('hidden');
-            }
+            // Профиль на модерации и первые вопросы («как приходят заявки», billing)
+            // теперь отвечает сам кабинет (guide-блок открыт для профиля на проверке) —
+            // отдельный промежуточный экран здесь только откладывал вход в кабинет.
+            window.location.href = data.link;
             } catch (_) {
                 showMsg(T.provider_signup_network, true);
             } finally {
