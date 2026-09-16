@@ -500,6 +500,22 @@ ALTER TABLE topup_requests DROP CONSTRAINT IF EXISTS topup_requests_status_check
 ALTER TABLE topup_requests ADD CONSTRAINT topup_requests_status_check
     CHECK (status IN ('awaiting','received','reviewing','credited','rejected','cancelled'));
 
+-- Remembers every bank-statement row an admin has already dealt with (matched,
+-- manually assigned, or explicitly skipped), keyed by the bank's own document number.
+-- Without this, re-uploading a statement that overlaps a previous one would show the
+-- same unmatched payment again and let it be assigned to a second, different invoice —
+-- the same money credited twice. topup_id is NULL for a row an admin chose to skip.
+CREATE TABLE IF NOT EXISTS bank_statement_credits (
+ id SERIAL PRIMARY KEY,
+ doc_number VARCHAR(50) NOT NULL UNIQUE,
+ statement_date TEXT,
+ amount_tetri INTEGER NOT NULL,
+ comment TEXT,
+ topup_id INTEGER REFERENCES topup_requests(id),
+ created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_bank_statement_credits_topup ON bank_statement_credits(topup_id);
+
 -- Requests returned for clarification; additive and safe to reapply.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_reason TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS revision_requested_at TIMESTAMPTZ;

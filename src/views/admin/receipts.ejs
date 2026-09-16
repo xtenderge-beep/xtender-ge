@@ -7,7 +7,7 @@
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 <label>Выписка банка (.xlsx)<input type="file" name="statement" accept=".xlsx" required></label>
 <button type="submit">Загрузить и найти совпадения</button></form>
-<% if (summary) { %><p class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-3">Из выписки: платежей всего — <%= summary.totalCredits %>, совпало со счетами автоматически — <%= summary.matched %>, не распознано — <%= summary.unmatched %>.<% if (!summary.matched && !summary.unmatched) { %> Ни одного зачисления в выписке не найдено.<% } %></p><% } %>
+<% if (summary) { %><p class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-3">Из выписки: платежей всего — <%= summary.totalCredits %>, совпало со счетами автоматически — <%= summary.matched %>, не распознано — <%= summary.unmatched %><% if (summary.skipped) { %>, уже обработано ранее (пропущено) — <%= summary.skipped %><% } %>.<% if (!summary.matched && !summary.unmatched && !summary.skipped) { %> Ни одного зачисления в выписке не найдено.<% } %></p><% } %>
 <% if (unmatched.length) { %><div class="admin-receipt">
 <h2>Не распознанные платежи (<%= unmatched.length %>)</h2>
 <p class="text-sm text-stone-600">В назначении платежа не нашёлся номер счёта, либо такого счёта нет в системе. Выберите вручную, к какому счёту отнести платёж.</p>
@@ -19,8 +19,17 @@
 <input type="hidden" name="amountTetri" value="<%= c.amountTetri %>">
 <input type="hidden" name="date" value="<%= c.date %>">
 <input type="hidden" name="comment" value="<%= c.comment %>">
+<input type="hidden" name="docNumber" value="<%= c.docNumber || '' %>">
 <label>Привязать к счёту<select name="topupId" aria-label="Выберите счёт" required><option value="">Выберите счёт…</option><% receipts.filter(t=>t.status!=='credited').forEach(t=>{ %><option value="<%= t.id %>"><%= t.reference %> · <%= t.name %> · <%= (t.amount_tetri/100).toFixed(2) %> ₾</option><% }) %></select></label>
 <button type="submit">Привязать и зачислить</button></form>
+<% if (c.docNumber) { %><form class="mt-2" method="POST" action="/admin/receipts/dismiss-statement-credit" onsubmit="return confirm('Пропустить этот платёж? Он больше не будет показан из этой или более поздних выписок.')">
+<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<input type="hidden" name="amountTetri" value="<%= c.amountTetri %>">
+<input type="hidden" name="date" value="<%= c.date %>">
+<input type="hidden" name="comment" value="<%= c.comment %>">
+<input type="hidden" name="docNumber" value="<%= c.docNumber %>">
+<button type="submit" class="text-stone-500 underline text-sm">Пропустить (не относится к нам)</button></form>
+<% } %>
 </div><% }) %>
 </div><% } %>
 <% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-3"><%= error %></p><% } %>
@@ -45,6 +54,7 @@ receipts.forEach(t=>{ %><article class="admin-receipt">
 <% if (t.status === 'credited') { %><p>Подтверждено <%= (t.credited_tetri/100).toFixed(2) %> ₾ · операция #<%= t.balance_transaction_id %><% if (t.note) { %> · <%= t.note %><% } %></p><% } else { %>
 <form class="admin-filter" method="POST" action="/admin/receipts/<%= t.id %>/confirm">
 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<% if (t.statementMatch && t.statementMatch.docNumber) { %><input type="hidden" name="docNumber" value="<%= t.statementMatch.docNumber %>"><input type="hidden" name="statementDate" value="<%= t.statementMatch.date %>"><input type="hidden" name="statementComment" value="<%= t.statementMatch.comment %>"><% } %>
 <label>Сумма к зачислению, ₾<input name="amountGel" type="number" min="0.01" max="1000" step="0.01" value="<%= ((t.statementMatch ? t.statementMatch.amountTetri : t.amount_tetri)/100).toFixed(2) %>" required></label>
 <label>Комментарий (обязателен, если сумма отличается)<input name="note" maxlength="500" value="<%= t.note || (t.statementMatch && t.statementMatch.amountTetri !== t.amount_tetri ? 'По выписке от '+t.statementMatch.date : '') %>" placeholder="Например: банк удержал комиссию"></label>
 <button type="submit">Подтвердить оплату и зачислить</button></form>

@@ -54,6 +54,7 @@ router.post('/receipts/:id/confirm', verifyCsrf, asyncHandler(adminController.co
 router.post('/receipts/:id/cancel', verifyCsrf, asyncHandler(adminController.cancelTopup));
 router.post('/receipts/import-statement', statementUpload.single('statement'), verifyCsrf, asyncHandler(adminController.importStatement));
 router.post('/receipts/assign-statement-credit', verifyCsrf, asyncHandler(adminController.assignStatementCredit));
+router.post('/receipts/dismiss-statement-credit', verifyCsrf, asyncHandler(adminController.dismissStatementCredit));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));

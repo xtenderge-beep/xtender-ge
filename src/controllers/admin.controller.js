@@ -556,10 +556,11 @@ async function importStatement(req, res) {
   try {
     if (!req.file) throw new Error('Прикрепите файл выписки (.xlsx)');
     const credits = await bankStatementService.parseCredits(req.file.buffer);
-    const { topups, matched, totalCredits, unmatched } = bankStatementService.matchCredits(await receiptService.list(), credits);
+    const processedDocNumbers = await bankStatementService.getProcessedDocNumbers(credits.map(c => c.docNumber));
+    const { topups, matched, totalCredits, skipped, unmatched } = bankStatementService.matchCredits(await receiptService.list(), credits, processedDocNumbers);
     // Surface matches first — that's the whole point of uploading the statement.
     topups.sort((a, b) => (b.statementMatch ? 1 : 0) - (a.statementMatch ? 1 : 0));
-    res.render('admin/receipts', { receipts: await receiptsWithPurpose(topups), error: null, q: '', statementSummary: { matched, totalCredits, unmatched: unmatched.length }, unmatchedCredits: unmatched });
+    res.render('admin/receipts', { receipts: await receiptsWithPurpose(topups), error: null, q: '', statementSummary: { matched, totalCredits, skipped, unmatched: unmatched.length }, unmatchedCredits: unmatched });
   } catch (error) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null, unmatchedCredits: [] });
   }
@@ -571,8 +572,23 @@ async function assignStatementCredit(req, res) {
     const amountTetri = Number(req.body.amountTetri);
     const date = String(req.body.date || '').trim().slice(0, 40);
     const comment = String(req.body.comment || '').trim().slice(0, 300);
+    const docNumber = String(req.body.docNumber || '').trim().slice(0, 50) || null;
     const note = `Вручную привязано из выписки${date ? ' (' + date + ')' : ''}: ${comment}`.trim();
     await receiptService.confirmPayment(topupId, amountTetri, note);
+    await bankStatementService.recordProcessed({ docNumber, amountTetri, date, comment, topupId });
+    res.redirect('/admin/receipts');
+  } catch (error) {
+    res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null, unmatchedCredits: [] });
+  }
+}
+async function dismissStatementCredit(req, res) {
+  try {
+    const docNumber = String(req.body.docNumber || '').trim().slice(0, 50);
+    if (!docNumber) throw new Error('У этой строки нет номера документа — пропустить вручную нельзя, обратитесь к разработчику');
+    const amountTetri = Number(req.body.amountTetri);
+    const date = String(req.body.date || '').trim().slice(0, 40);
+    const comment = String(req.body.comment || '').trim().slice(0, 300);
+    await bankStatementService.recordProcessed({ docNumber, amountTetri, date, comment, topupId: null });
     res.redirect('/admin/receipts');
   } catch (error) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message, q: '', statementSummary: null, unmatchedCredits: [] });
@@ -590,7 +606,12 @@ async function confirmTopup(req, res) {
   try {
     const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
     if (!Number.isFinite(amountGel) || amountGel <= 0 || amountGel > 1000) throw new Error('Укажите сумму от 0 до 1000 ₾');
-    await receiptService.confirmPayment(Number(req.params.id), Math.round(amountGel * 100), req.body.note);
+    const amountTetri = Math.round(amountGel * 100);
+    await receiptService.confirmPayment(Number(req.params.id), amountTetri, req.body.note);
+    // Present only when this confirm came from a statement auto-match — records it so a
+    // re-uploaded, overlapping statement doesn't offer the same payment again.
+    const docNumber = String(req.body.docNumber || '').trim().slice(0, 50) || null;
+    if (docNumber) await bankStatementService.recordProcessed({ docNumber, amountTetri, date: req.body.statementDate, comment: req.body.statementComment, topupId: Number(req.params.id) });
     res.redirect('/admin/receipts');
   } catch (error) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
@@ -631,7 +652,7 @@ module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,
-  receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement, assignStatementCredit,
+  receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement, assignStatementCredit, dismissStatementCredit,
   showLogin,
   login,
   verify2fa,
