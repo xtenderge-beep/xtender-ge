@@ -40,7 +40,8 @@
               <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
               <% if (m.is_moderator) { %><span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 ml-2">модератор</span><% } %>
               <% if (m.is_head_moderator) { %><span class="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 ml-2">🎖 главный</span><% } %>
-              <% if (!m.telegram_id) { %><span class="text-[10px] font-bold text-amber-700 ml-2">не привязан</span><% } %>
+              <% if (!m.telegram_id) { %><span class="text-[10px] font-bold text-amber-700 ml-2">Telegram не привязан</span><% } %>
+              <% if (m.is_moderator && !m.web_enabled) { %><span class="text-[10px] font-bold text-red-700 ml-2" title="Уведомления о новой регистрации будут вести в общую /admin, а не в личную карточку — задайте логин/пароль и включите вход в веб-кабинет ниже">⚠️ без веб-доступа — ссылка модератора уйдёт на общую /admin</span><% } %>
               <div class="text-xs text-stone-500 mt-0.5">На сопровождении: <a href="/admin/managers/<%= m.id %>" class="font-bold hover:underline"><%= m.provider_count %></a></div>
           </div>
           <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">

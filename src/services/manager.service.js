@@ -18,7 +18,7 @@ async function create({ name, phone, isModerator = false }) {
 // Список с числом приведённых исполнителей — без коррелированных подзапросов (pg-mem).
 async function list() {
   const { rows } = await pool.query(
-    `SELECT m.id, m.name, m.phone, m.telegram_id, m.is_moderator, m.is_head_moderator, m.is_active, m.created_at,
+    `SELECT m.id, m.name, m.phone, m.telegram_id, m.is_moderator, m.is_head_moderator, m.is_active, m.web_enabled, m.created_at,
             COALESCE(pc.cnt, 0) AS provider_count
      FROM managers m
      LEFT JOIN (
