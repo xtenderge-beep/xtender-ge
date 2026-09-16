@@ -680,7 +680,15 @@ INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_built
 UPDATE service_categories SET fields='[{"key":"volume_m3","input":"enum","options":["2","4","8","15"],"unit":"м³","match":"gte","filter":true,"required":true,"labels":{"ka":"ძარის მოცულობა","ru":"Объём кузова","en":"Cargo volume"},"optionLabels":{"2":{"ka":"2 მ³-მდე","ru":"до 2 м³","en":"up to 2 m³"},"4":{"ka":"4 მ³-მდე","ru":"до 4 м³","en":"up to 4 m³"},"8":{"ka":"8 მ³-მდე","ru":"до 8 м³","en":"up to 8 m³"},"15":{"ka":"15+ მ³","ru":"15+ м³","en":"15+ m³"}}}]'::jsonb,
   name_ka='ნარჩენების გატანა (თვითმცლელით)', name_ru='Вывоз мусора (самосвал)', name_en='Waste removal (dump truck)'
   WHERE slug='junk' AND fields='[]'::jsonb;
-INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_builtin,sort_order) VALUES('junk_manual','ნარჩენების გატანა (ხელით, ტომრებით)','Вывоз мусора (вручную, мешками)','Waste removal (by hand, bags)','🧺','[]',true,6) ON CONFLICT(slug) DO NOTHING;
+-- 'junk_manual' (вывоз мусора мешками, без техники) пересмотрели день в день: это та
+-- же физическая работа без транспорта, что и 'movers' — отдельная категория только
+-- путала выбор при регистрации, не добавляя ничего, чего не покрывают «Грузчики».
+-- Больше не заводим; если один из прошлых деплоев успел её создать — чистим (та же
+-- защита от «уже используют», что и в category.service.remove — не тронет, если кто-то
+-- уже успел зарегистрироваться под ней).
+DELETE FROM service_categories WHERE slug='junk_manual'
+  AND NOT EXISTS (SELECT 1 FROM masters WHERE category='junk_manual')
+  AND NOT EXISTS (SELECT 1 FROM master_services WHERE service_type='junk_manual');
 
 
 -- Parallel technical requests. Existing orders and providers remain production.

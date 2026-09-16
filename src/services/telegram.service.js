@@ -14,7 +14,6 @@ const CATEGORY_LABELS = {
   transport: '🚚 Перевозки',
   movers: '💪 Грузчики',
   junk: '🧹 Вывоз мусора (самосвал)',
-  junk_manual: '🧺 Вывоз мусора (мешками)',
   flatbed: '🚛 Бортовые / стройматериалы',
   tow: '🛻 Эвакуатор',
   bucket_lift: '🏗️ Автовышка',
@@ -168,7 +167,6 @@ const MASTER_CATEGORY_LABELS = {
   movers: '💪 Грузчик / разнорабочий',
   transport: '🚚 Водитель',
   junk: '🧹 Вывоз мусора (самосвал)',
-  junk_manual: '🧺 Вывоз мусора (мешками)',
 };
 
 async function notifyModeratorNewMaster(master) {
