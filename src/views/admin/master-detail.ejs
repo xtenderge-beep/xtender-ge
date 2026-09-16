@@ -102,8 +102,8 @@
                     <% serviceConfig.forEach(svc => { const value = svc.type === 'van' ? 'transport' : svc.type; %><option value="<%= value %>" <%= master.category === value ? 'selected' : '' %>><%= svc.label %></option><% }); %>
                 </select>
             </div>
-            <div>
-                <label class="text-xs font-bold text-stone-500">Размер кузова (только для машин) — тиры и см как в тарифе «Грузовой» Яндекса</label>
+            <div id="vehicleSizeField" hidden>
+                <label class="text-xs font-bold text-stone-500">Размер кузова — тиры и см как в тарифе «Грузовой» Яндекса</label>
                 <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
                     <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Любой размер</option>
                     <% vanSizes.forEach(s => { %>

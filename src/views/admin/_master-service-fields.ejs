@@ -22,6 +22,7 @@
 <script>
 (() => {
  const select = document.getElementById('moderatorCategory');
+ const sizeField = document.getElementById('vehicleSizeField');
  function update() {
   const type = select.value === 'transport' ? 'van' : select.value;
   document.querySelectorAll('[data-service-panel]').forEach(panel => {
@@ -29,6 +30,11 @@
    panel.hidden = !active;
    panel.querySelectorAll('input,select').forEach(input => input.disabled = !active);
   });
+  if (sizeField) {
+   const showSize = select.value === 'transport';
+   sizeField.hidden = !showSize;
+   sizeField.querySelectorAll('select').forEach(input => input.disabled = !showSize);
+  }
  }
  select.addEventListener('change', update); update();
 })();
