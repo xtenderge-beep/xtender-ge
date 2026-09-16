@@ -17,6 +17,15 @@ router.post('/login',wrap(async (req,res) => {
     res.redirect('/manager');
   } catch(e) { if (!e.status) throw e; res.status(e.status).render('manager/login',{csrf,error:e.message}); }
 }));
+// Ссылка из личного Telegram-уведомления модератору — авторизует его самого без
+// пароля и ведёт сразу на карточку одобрения. Должен идти раньше session-guard'а ниже,
+// иначе редиректнёт на /login, не успев поставить сессию (см. issueMagicLink/notifyModeratorNewMaster).
+router.get('/auth/:token',wrap(async(req,res) => {
+  const result = await service.consumeMagicLink(req.params.token);
+  if (!result) return res.status(410).render('manager/login',{csrf:service.token(),error:'Ссылка устарела или уже использована. Войдите обычным способом.'});
+  res.cookie(service.COOKIE,result.sid,{...service.cookieOptions,maxAge:service.TTL*1000});
+  res.redirect('/manager/review/'+encodeURIComponent(result.masterId));
+}));
 router.use(wrap(async(req,res,next) => {
   req.managerSession = await service.session(req.cookies[service.COOKIE]);
   if (!req.managerSession) return res.redirect('/manager/login');
@@ -28,6 +37,12 @@ router.use(wrap(async(req,res,next) => {
   next();
 }));
 router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[service.COOKIE]); res.clearCookie(service.COOKIE,service.cookieOptions);res.redirect('/manager/login'); }));
+router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',await service.reviewGet(req.managerSession.id,req.params.id))));
+router.post('/review/:id/approve',wrap(async(req,res) => {
+  const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));
+  await service.approvePending(req.managerSession.id,req.params.id,req.body.category,attributes);
+  res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
+}));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',wrap(crm.show));
 router.post('/crm',wrap(crm.create));

@@ -70,6 +70,16 @@ async function listActiveModeratorChatIds() {
   return rows.map((r) => r.telegram_id);
 }
 
+// Те же модераторы, но с id и web_enabled — чтобы адресно слать персональные
+// magic-link уведомления (см. telegram.service.notifyModeratorNewMaster) вместо
+// одной рассылки с общей ссылкой на /admin.
+async function listActiveModerators() {
+  const { rows } = await pool.query(
+    `SELECT id, telegram_id, web_enabled FROM managers WHERE is_moderator = true AND is_active = true AND telegram_id IS NOT NULL`
+  );
+  return rows;
+}
+
 async function isActiveModerator(telegramId) {
   const { rows } = await pool.query(
     `SELECT 1 FROM managers WHERE telegram_id = $1 AND is_moderator = true AND is_active = true LIMIT 1`,
@@ -187,6 +197,7 @@ module.exports = {
   linkTelegram,
   update,
   listActiveModeratorChatIds,
+  listActiveModerators,
   isActiveModerator,
   getProviders,
   getStats,

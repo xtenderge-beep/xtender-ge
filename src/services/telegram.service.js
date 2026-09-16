@@ -181,15 +181,47 @@ async function notifyModeratorNewMaster(master) {
   ];
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
+  const text = lines.join('\n');
+  const btnText = '📝 Проверить анкету и назначить категорию';
+  const adminMarkup = { inline_keyboard: [[{ text: btnText, url: getBaseUrl() + '/admin/masters/' + master.id }]] };
 
-  const markup = { inline_keyboard: [[{ text: '📝 Проверить анкету и назначить категорию', url: getBaseUrl() + '/admin/masters/' + master.id }]] };
+  // Каждому модератору с включённым веб-доступом в /manager — личная одноразовая
+  // ссылка: открывает его СОБСТВЕННУЮ сессию без пароля и сразу карточку одобрения
+  // этого исполнителя (см. managerPortal.service.issueMagicLink + /manager/auth/:token).
+  // Кто одобрит через неё — тот и становится manager_id (см. approvePending), поэтому
+  // ссылка должна однозначно определять личность, а не вести в общий /admin.
+  // Без веб-доступа (ещё не выдан логин в /admin/managers/:id) — старая общая ссылка.
   let firstId = null;
-  for (const chatId of await getModeratorChatIds()) {
+  const seenChatIds = new Set();
+  const managerPortalService = require('./managerPortal.service');
+  for (const moderator of await managerService.listActiveModerators()) {
+    const chatId = String(moderator.telegram_id);
+    seenChatIds.add(chatId);
+    let markup = adminMarkup;
+    if (moderator.web_enabled) {
+      try {
+        const magicToken = await managerPortalService.issueMagicLink(moderator.id, master.id);
+        markup = { inline_keyboard: [[{ text: btnText, url: getBaseUrl() + '/manager/auth/' + magicToken }]] };
+      } catch (err) {
+        console.error('notifyModeratorNewMaster -> issueMagicLink:', err.message);
+      }
+    }
     try {
-      const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text: lines.join('\n'), reply_markup: markup });
+      const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text, reply_markup: markup });
       if (!firstId) firstId = data.result.message_id;
     } catch (err) {
       console.error(`notifyModeratorNewMaster -> ${chatId}:`, err.message);
+    }
+  }
+  // env-модератор (TELEGRAM_MODERATOR_CHAT_ID) не привязан к строке managers — для
+  // него личной ссылки не построить, шлём как раньше, на общий /admin.
+  const envChatId = process.env.TELEGRAM_MODERATOR_CHAT_ID ? String(process.env.TELEGRAM_MODERATOR_CHAT_ID) : null;
+  if (envChatId && !seenChatIds.has(envChatId)) {
+    try {
+      const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: envChatId, text, reply_markup: adminMarkup });
+      if (!firstId) firstId = data.result.message_id;
+    } catch (err) {
+      console.error(`notifyModeratorNewMaster -> ${envChatId}:`, err.message);
     }
   }
   return firstId;

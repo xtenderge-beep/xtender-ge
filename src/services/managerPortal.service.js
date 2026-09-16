@@ -45,6 +45,75 @@ async function session(sid) {
   const m = (await pool.query('SELECT id,name,commission_bps,referral_token FROM managers WHERE id=$1 AND web_auth_version=$2 AND web_enabled=true AND is_active=true', [s.id, s.version])).rows[0];
   return m ? { ...s, manager: m } : null;
 }
+// Персональная одноразовая ссылка из Telegram-уведомления модератору: открывает его
+// собственную /manager-сессию без пароля и ведёт сразу на карточку одобрения конкретного
+// исполнителя. Токен живёт 72ч (модератор может открыть уведомление не сразу) и
+// одноразовый — при переходе сразу меняется на обычную сессию (TTL), повторный переход
+// по той же ссылке уже не сработает.
+const MAGIC_TTL = 72 * 60 * 60;
+async function issueMagicLink(managerId, masterId) {
+  const t = token();
+  await redis.set('manager_magic:' + t, JSON.stringify({ managerId, masterId }), 'EX', MAGIC_TTL);
+  return t;
+}
+async function consumeMagicLink(t) {
+  if (!/^[a-f0-9]{64}$/.test(t || '')) return null;
+  const key = 'manager_magic:' + t;
+  const raw = await redis.get(key);
+  if (!raw) return null;
+  await redis.del(key);
+  const { managerId, masterId } = JSON.parse(raw);
+  const m = (await pool.query('SELECT id,web_auth_version FROM managers WHERE id=$1 AND web_enabled=true AND is_active=true', [managerId])).rows[0];
+  if (!m) return null;
+  const sid = token(), session = { id: m.id, version: m.web_auth_version, csrf: token() };
+  await redis.set('manager_session:' + sid, JSON.stringify(session), 'EX', TTL);
+  return { sid, masterId };
+}
+
+// Карточка для быстрого одобрения новой заявки: либо ещё ничья (manager_id IS NULL —
+// органическая регистрация), либо уже своя (реферальная — manager_id проставлен при
+// регистрации в partner.service.bindNew). Чужую пусть смотрит владелец.
+async function reviewGet(managerId, masterId) {
+  const master = (await pool.query(
+    'SELECT id,name,phone,description,avatar_url,category,is_active,is_banned,manager_id,created_at FROM masters WHERE id=$1', [masterId]
+  )).rows[0];
+  if (!master) throw fail('Специалист не найден.', 404);
+  if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
+  const categories = await require('./category.service').configForView('ru');
+  return { master, categories };
+}
+
+// Одобрение из быстрой карточки: закрепляет исполнителя за модератором (если ещё
+// ничей), проставляет категорию и пробует одобрить. Категории с обязательными
+// характеристиками (например «транспорт» — размер кузова) здесь не заполнить —
+// в этом случае просим открыть полную карточку в /admin, а не строим тут дублирующую
+// форму под все типы услуг (см. category.service — конфигурируемые поля per-category).
+async function approvePending(managerId, masterId, category, attributes = {}) {
+  const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
+  if (!master) throw fail('Специалист не найден.', 404);
+  if (master.is_banned) throw fail('Профиль заблокирован.', 409);
+  if (master.is_active) throw fail('Заявка уже одобрена.', 409);
+  if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
+  if (!master.manager_id) {
+    const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
+    if (!claimed.rows[0]) throw fail('Заявку уже забрал другой менеджер.', 409);
+  }
+  try {
+    await require('./master.service').updateMasterProfile(masterId, {
+      name: master.name, phone: master.phone, category,
+      vehicleType: master.vehicle_type, vehicleSize: master.vehicle_size, isFlatbed: master.is_flatbed,
+      priceText: master.price_text, description: master.description, serviceAttributes: attributes,
+    });
+  } catch (e) {
+    if (e.code === 'INVALID_SERVICE') throw fail('Эта категория требует дополнительных характеристик — заполните их в полной карточке в админке.', 422);
+    throw e;
+  }
+  const approved = await require('./master.service').approveMaster(masterId);
+  if (!approved) throw fail('Не удалось одобрить — проверьте данные в полной карточке в админке.', 422);
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'approve',$3)", [managerId, masterId, 'Быстрое одобрение, категория: ' + category]);
+  return approved;
+}
+
 async function detail(managerId, masterId) {
   const master = (await pool.query('SELECT id,name,phone,category,balance_tetri,is_active,is_banned,banned_reason,banned_by_manager_id,is_subscribed,subscription_until,created_at FROM masters WHERE id=$1 AND manager_id=$2', [masterId, managerId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
@@ -93,7 +162,9 @@ async function finances(id, value) {
   const payouts = (await pool.query('SELECT amount_tetri,paid_at,voided_at FROM manager_payouts WHERE manager_id=$1 AND commission_month=$2 ORDER BY paid_at DESC LIMIT 100',[id,month])).rows;
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
-module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances, logout: sid => redis.del('manager_session:'+sid) };
+module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
+  issueMagicLink,consumeMagicLink,reviewGet,approvePending,
+  logout: sid => redis.del('manager_session:'+sid) };
 
 
 
