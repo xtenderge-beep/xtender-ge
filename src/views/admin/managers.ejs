@@ -39,6 +39,7 @@
               <a href="/admin/managers/<%= m.id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= m.name %></a>
               <span class="text-xs text-stone-400 ml-1"><%= m.phone %></span>
               <% if (m.is_moderator) { %><span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 ml-2">модератор</span><% } %>
+              <% if (m.is_head_moderator) { %><span class="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 ml-2">🎖 главный</span><% } %>
               <% if (!m.telegram_id) { %><span class="text-[10px] font-bold text-amber-700 ml-2">не привязан</span><% } %>
               <div class="text-xs text-stone-500 mt-0.5">На сопровождении: <a href="/admin/managers/<%= m.id %>" class="font-bold hover:underline"><%= m.provider_count %></a></div>
           </div>
@@ -46,13 +47,22 @@
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="isModerator" value="<%= m.is_moderator ? 'false' : 'true' %>">
               <input type="hidden" name="isActive" value="<%= m.is_active %>">
+              <input type="hidden" name="isHeadModerator" value="<%= m.is_head_moderator %>">
               <button type="submit" class="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg transition"><%= m.is_moderator ? '− модератор' : '+ модератор' %></button>
           </form>
           <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="isModerator" value="<%= m.is_moderator %>">
               <input type="hidden" name="isActive" value="<%= m.is_active ? 'false' : 'true' %>">
+              <input type="hidden" name="isHeadModerator" value="<%= m.is_head_moderator %>">
               <button type="submit" class="px-2.5 py-1.5 <%= m.is_active ? 'bg-stone-100 hover:bg-stone-200 text-stone-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white' %> text-xs font-bold rounded-lg transition"><%= m.is_active ? 'Выключить' : 'Включить' %></button>
+          </form>
+          <form method="POST" action="/admin/managers/<%= m.id %>/update" class="flex items-center gap-2">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="isModerator" value="<%= m.is_moderator %>">
+              <input type="hidden" name="isActive" value="<%= m.is_active %>">
+              <input type="hidden" name="isHeadModerator" value="<%= m.is_head_moderator ? 'false' : 'true' %>">
+              <button type="submit" title="Получает уведомление о КАЖДОЙ новой регистрации, в дополнение к обычной маршрутизации" class="px-2.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-lg transition"><%= m.is_head_moderator ? '− главный' : '+ главный' %></button>
           </form>
       </div>
     <% }); %>

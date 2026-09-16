@@ -444,6 +444,7 @@ async function managerUpdate(req, res) {
   await managerService.update(id, {
     isModerator: req.body.isModerator === 'true',
     isActive: req.body.isActive === 'true',
+    isHeadModerator: req.body.isHeadModerator === 'true',
   });
   res.redirect('/admin/managers');
 }

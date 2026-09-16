@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const { toE164 } = require('../config/phone');
 const { generateShortId } = require('../config/shortId');
 
-const FIELDS = 'id, name, phone, telegram_id, telegram_linked_at, is_moderator, is_active, created_at, web_login, web_enabled';
+const FIELDS = 'id, name, phone, telegram_id, telegram_linked_at, is_moderator, is_head_moderator, is_active, created_at, web_login, web_enabled';
 
 async function create({ name, phone, isModerator = false }) {
   const { rows } = await pool.query(
@@ -18,7 +18,7 @@ async function create({ name, phone, isModerator = false }) {
 // Список с числом приведённых исполнителей — без коррелированных подзапросов (pg-mem).
 async function list() {
   const { rows } = await pool.query(
-    `SELECT m.id, m.name, m.phone, m.telegram_id, m.is_moderator, m.is_active, m.created_at,
+    `SELECT m.id, m.name, m.phone, m.telegram_id, m.is_moderator, m.is_head_moderator, m.is_active, m.created_at,
             COALESCE(pc.cnt, 0) AS provider_count
      FROM managers m
      LEFT JOIN (
@@ -54,10 +54,10 @@ async function linkTelegram(managerId, telegramId) {
   return rows[0] || null;
 }
 
-async function update(id, { isModerator, isActive }) {
+async function update(id, { isModerator, isActive, isHeadModerator }) {
   const { rows } = await pool.query(
-    `UPDATE managers SET is_moderator = $1, is_active = $2, web_auth_version = web_auth_version + 1 WHERE id = $3 RETURNING ${FIELDS}`,
-    [Boolean(isModerator), Boolean(isActive), id]
+    `UPDATE managers SET is_moderator = $1, is_active = $2, is_head_moderator = $3, web_auth_version = web_auth_version + 1 WHERE id = $4 RETURNING ${FIELDS}`,
+    [Boolean(isModerator), Boolean(isActive), Boolean(isHeadModerator), id]
   );
   return rows[0] || null;
 }
@@ -76,6 +76,17 @@ async function listActiveModeratorChatIds() {
 async function listActiveModerators() {
   const { rows } = await pool.query(
     `SELECT id, telegram_id, web_enabled FROM managers WHERE is_moderator = true AND is_active = true AND telegram_id IS NOT NULL`
+  );
+  return rows;
+}
+
+// Главные модераторы — получают КАЖДУЮ регистрацию в дополнение к обычной
+// маршрутизации (см. telegram.service.notifyModeratorNewMaster). Обязаны быть ещё и
+// обычным активным модератором с привязанным Telegram — иначе слать некуда.
+async function listHeadModerators() {
+  const { rows } = await pool.query(
+    `SELECT id, telegram_id, web_enabled FROM managers
+     WHERE is_head_moderator = true AND is_moderator = true AND is_active = true AND telegram_id IS NOT NULL`
   );
   return rows;
 }
@@ -198,6 +209,7 @@ module.exports = {
   update,
   listActiveModeratorChatIds,
   listActiveModerators,
+  listHeadModerators,
   isActiveModerator,
   getProviders,
   getStats,

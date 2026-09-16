@@ -192,16 +192,37 @@ async function notifyModeratorNewMaster(master) {
   const btnText = '📝 Проверить анкету и назначить категорию';
   const adminMarkup = { inline_keyboard: [[{ text: btnText, url: getBaseUrl() + '/admin/masters/' + master.id }]] };
 
-  // Каждому модератору с включённым веб-доступом в /manager — личная одноразовая
-  // ссылка: открывает его СОБСТВЕННУЮ сессию без пароля и сразу карточку одобрения
-  // этого исполнителя (см. managerPortal.service.issueMagicLink + /manager/auth/:token).
-  // Кто одобрит через неё — тот и становится manager_id (см. approvePending), поэтому
-  // ссылка должна однозначно определять личность, а не вести в общий /admin.
-  // Без веб-доступа (ещё не выдан логин в /admin/managers/:id) — старая общая ссылка.
+  // Маршрутизация: реферальная регистрация (referral_manager_id уже проставлен при
+  // регистрации, см. partner.service.bindNew) идёт ТОЛЬКО владельцу ссылки — остальным
+  // модераторам она не по адресу, нечего им её и показывать. Органическая (без ссылки)
+  // — как раньше, всем активным модераторам (кто первый одобрит, тот и берёт). Если
+  // владелец ссылки сам не может получить Telegram-уведомление (не модератор /
+  // выключен / Telegram не привязан) — не теряем заявку, откатываемся на рассылку всем.
+  // Главные модераторы (is_head_moderator) получают КАЖДУЮ регистрацию дополнительно,
+  // независимо от маршрутизации выше — их не подменяет реферальная адресность.
+  let targets;
+  if (master.referral_manager_id) {
+    const owner = await managerService.getById(master.referral_manager_id);
+    targets = owner && owner.is_moderator && owner.is_active && owner.telegram_id
+      ? [owner]
+      : await managerService.listActiveModerators();
+  } else {
+    targets = await managerService.listActiveModerators();
+  }
+  for (const head of await managerService.listHeadModerators()) {
+    if (!targets.some((m) => m.id === head.id)) targets.push(head);
+  }
+
+  // Каждому — личная одноразовая ссылка: открывает его СОБСТВЕННУЮ сессию без пароля
+  // и сразу карточку одобрения этого исполнителя (см. managerPortal.service.
+  // issueMagicLink + /manager/auth/:token). Кто одобрит через неё — тот и становится
+  // manager_id (см. approvePending), поэтому ссылка должна однозначно определять
+  // личность, а не вести в общий /admin. Без веб-доступа (ещё не выдан логин в
+  // /admin/managers/:id) — старая общая ссылка.
   let firstId = null;
   const seenChatIds = new Set();
   const managerPortalService = require('./managerPortal.service');
-  for (const moderator of await managerService.listActiveModerators()) {
+  for (const moderator of targets) {
     const chatId = String(moderator.telegram_id);
     seenChatIds.add(chatId);
     let markup = adminMarkup;

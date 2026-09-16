@@ -565,6 +565,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_managers_web_login ON managers(web_login);
 ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_password_hash TEXT;
 ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE managers ADD COLUMN IF NOT EXISTS web_auth_version INTEGER NOT NULL DEFAULT 0;
+-- Главный модератор: получает уведомление о КАЖДОЙ новой регистрации в дополнение к
+-- обычной маршрутизации (реферальным заявкам — только владельцу ссылки, органическим —
+-- всем активным модераторам), см. telegram.service.notifyModeratorNewMaster.
+ALTER TABLE managers ADD COLUMN IF NOT EXISTS is_head_moderator BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS banned_by_manager_id INTEGER REFERENCES managers(id);
 CREATE TABLE IF NOT EXISTS manager_portal_events (
  id SERIAL PRIMARY KEY,

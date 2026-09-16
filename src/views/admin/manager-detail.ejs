@@ -6,6 +6,7 @@
     <h1 class="text-2xl font-black text-stone-900"><%= manager.name %></h1>
     <span class="text-sm text-stone-400"><%= manager.phone %></span>
     <% if (manager.is_moderator) { %><span class="text-xs font-bold text-emerald-700">модератор</span><% } %>
+    <% if (manager.is_head_moderator) { %><span class="text-xs font-bold text-amber-800">🎖 главный модератор</span><% } %>
     <% if (!manager.is_active) { %><span class="text-xs font-bold text-stone-400">выключен</span><% } %>
     <% if (!manager.telegram_id) { %><span class="text-xs font-bold text-amber-700">Telegram не привязан</span><% } %>
 </div>
