@@ -1,34 +1,71 @@
-<%- include('_header') %><a href="/manager">← Моя база</a><h1><%= master.name %></h1><p><%= master.phone %> · заявка от <%= date(master.created_at) %><% if (master.category) { %> · текущая категория: <%= master.category %><% } %></p>
+<%- include('_header') %><a href="/manager">← Моя база</a><h1><%= master.name %></h1><p><%= master.phone %> · заявка от <%= date(master.created_at) %></p>
 <% if (master.description) { %><div class="card"><h2>Описание услуг</h2><p class="pre"><%= master.description %></p></div><% } %>
 <% if (master.avatar_url) { %><div class="card"><h2>Фото</h2><img src="<%= master.avatar_url %>" alt="" style="max-width:280px;border-radius:12px;display:block"></div><% } %>
+
 <div class="card">
-  <h2>Выберите категорию и одобрите</h2>
-  <p class="muted">Категория закрепляет заявку за вами и сразу пробует одобрить профиль. Обязательные характеристики — прямо здесь; если чего-то не хватит, попросим открыть полную карточку в админке.</p>
-  <div class="grid">
+  <h2>1. Категория</h2>
+  <p class="muted">Выберите, чем занимается специалист — заявка сразу закрепится за вами, а ниже появятся вопросы именно для этой категории.</p>
+  <div class="grid" id="categoryPicker">
     <% categories.forEach(function (c) { %>
-      <form method="post" action="/manager/review/<%= master.id %>/approve" class="card">
-        <input type="hidden" name="_csrf" value="<%= csrf %>">
-        <input type="hidden" name="category" value="<%= c.type %>">
-        <h3 style="margin:0 0 8px"><%= c.icon ? c.icon + ' ' : '' %><%= c.label %></h3>
-        <% c.fields.filter(function (f) { return f.required; }).forEach(function (f) { %>
-          <label><%= f.label %>
-            <% if (f.input === 'enum') { %>
-              <select name="attr_<%= f.key %>" required>
-                <% f.options.forEach(function (o) { %><option value="<%= o.value %>"><%= o.label %></option><% }); %>
-              </select>
-            <% } else if (f.input === 'number') { %>
-              <input type="number" name="attr_<%= f.key %>" min="<%= f.min %>" max="<%= f.max %>" required>
-            <% } else if (f.input === 'bool') { %>
-              <input type="checkbox" name="attr_<%= f.key %>" value="true">
-            <% } else { %>
-              <input type="text" name="attr_<%= f.key %>" required>
-            <% } %>
-          </label>
-        <% }); %>
-        <button style="width:100%">Одобрить</button>
-      </form>
+      <button type="button" class="category-btn" data-pick="<%= c.type %>"><%= c.icon ? c.icon + ' ' : '' %><%= c.label %></button>
     <% }); %>
   </div>
 </div>
+
+<form method="post" action="/manager/review/<%= master.id %>/approve" id="approveForm" class="card" hidden>
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <input type="hidden" name="category" id="categoryInput">
+  <h2>2. <span id="approveStepLabel"></span></h2>
+  <% categories.forEach(function (c) { %>
+    <% var required = c.fields.filter(function (f) { return f.required; }); %>
+    <div data-fields-for="<%= c.type %>" hidden>
+      <% if (!required.length) { %><p class="muted">Для этой категории дополнительных характеристик не требуется — можно сразу одобрять.</p><% } %>
+      <% required.forEach(function (f) { %>
+        <label><%= f.label %>
+          <% if (f.input === 'enum') { %>
+            <select name="attr_<%= f.key %>" required>
+              <% f.options.forEach(function (o) { %><option value="<%= o.value %>"><%= o.label %></option><% }); %>
+            </select>
+          <% } else if (f.input === 'number') { %>
+            <input type="number" name="attr_<%= f.key %>" min="<%= f.min %>" max="<%= f.max %>" required>
+          <% } else if (f.input === 'bool') { %>
+            <input type="checkbox" name="attr_<%= f.key %>" value="true">
+          <% } else { %>
+            <input type="text" name="attr_<%= f.key %>" required>
+          <% } %>
+        </label>
+      <% }); %>
+    </div>
+  <% }); %>
+  <button type="submit" style="width:100%">Одобрить</button>
+</form>
+
 <p><small>Другой случай (поправить телефон, имя, необязательные характеристики) — <a href="/admin/masters/<%= master.id %>">полная карточка в админке</a>.</small></p>
+
+<style>.category-btn{background:white;color:#19232d;border:1px solid #bbc9c5}.category-btn.active{background:#08765f;color:white;border-color:#08765f}</style>
+<script>
+(function () {
+  var buttons = document.querySelectorAll('#categoryPicker [data-pick]');
+  var form = document.getElementById('approveForm');
+  var categoryInput = document.getElementById('categoryInput');
+  var stepLabel = document.getElementById('approveStepLabel');
+  var fieldBlocks = document.querySelectorAll('[data-fields-for]');
+  buttons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      buttons.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var type = btn.dataset.pick;
+      categoryInput.value = type;
+      stepLabel.textContent = btn.textContent.trim();
+      fieldBlocks.forEach(function (block) {
+        var match = block.getAttribute('data-fields-for') === type;
+        block.hidden = !match;
+        block.querySelectorAll('input,select').forEach(function (el) { el.disabled = !match; });
+      });
+      form.hidden = false;
+      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+})();
+</script>
 </main></body></html>
