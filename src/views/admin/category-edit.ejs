@@ -1,7 +1,12 @@
 <%- include('./_header',{active:'categories'}) %>
 <%
   const value=submitted || category || {};
-  const fields=submitted ? submitted.fields : (category?.fields || []).map(f=>({
+  // 'size' — особый тип: его значение проставляется легаси-колонкой vehicle_size (см.
+  // профиль исполнителя), а не этой формой, и он не входит в допустимые типы полей
+  // здесь (text/number/bool/enum) — поэтому не показываем и не редактируем его тут,
+  // но остальные характеристики категории (если они есть рядом с ним) редактируются
+  // как обычно (см. fieldsLocked ниже — теперь это просто предупреждение, не блокировка).
+  const fields=submitted ? submitted.fields : (category?.fields || []).filter(f=>f.input!=='size').map(f=>({
     key:f.key, input:f.input, name_ru:f.labels?.ru, name_ka:f.labels?.ka, name_en:f.labels?.en,
     required:f.required, unit:f.unit, min:f.min, max:f.max,
     options:(f.options || []).map(v=>({value:v, name_ru:f.optionLabels?.[v]?.ru || v, name_ka:f.optionLabels?.[v]?.ka, name_en:f.optionLabels?.[v]?.en})),
@@ -17,14 +22,13 @@
 <label class="flex items-center gap-2"><input type="checkbox" name="is_active" <%= value.is_active !== false ? 'checked' : '' %>>Категория активна</label>
 <p class="text-sm text-stone-500">При отключении категория исчезает из новых назначений, каталога и рассылки. Профили и история сохраняются.</p>
 <h2 class="font-bold">Характеристики для модератора</h2>
-<% if(fieldsLocked){ %><p class="text-sm">У этой категории есть поле «Размер», которое всё ещё проставляется старым способом (в профиле исполнителя, а не здесь) — пока это не объединили, характеристики этой категории не редактируются, чтобы форма не показывала то, что реально ни на что не влияет.</p><% } else { %>
+<% if(fieldsLocked){ %><p class="text-sm">У этой категории есть поле «Размер» — оно проставляется старым способом (в профиле исполнителя, а не здесь) и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
 <p class="text-sm text-stone-500">Добавьте поля, которые модератор заполнит в анкете исполнителя. Они описывают услуги; рассылка подбирает исполнителей по категории.</p>
 <div id="categoryFields" class="space-y-3">
 <% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i}) %><% }); %>
 </div>
 <button type="button" id="addCategoryField" class="px-3 py-2 border rounded-xl">Добавить характеристику</button>
 <template id="categoryFieldTemplate"><%- include('./_category-field',{field:{},index:'INDEX'}) %></template>
-<% } %>
 <div><button class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Сохранить категорию</button></div>
 </form>
 <% if(category){ %>

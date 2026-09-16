@@ -134,7 +134,12 @@ async function save(slug, input) {
     if(icon.length>16) throw fail('Значок слишком длинный.');
     const order=Number(input.sort_order || 100);
     if(!Number.isSafeInteger(order) || order<0 || order>10000) throw fail('Порядок: число от 0 до 10000.');
-    const fields=hasLockedField(previous?.fields) ? previous.fields : parseFields(input.fields || [],previous?.fields || []);
+    // Поле 'size' (если есть) сохраняем как было — его не отдаём в форму (см.
+    // category-edit.ejs) и не пускаем через parseFields (не входит в допустимые типы),
+    // но остальные характеристики этой же категории редактируются обычным образом.
+    const lockedFields=(previous?.fields || []).filter(f=>f.input==='size');
+    const editableExisting=(previous?.fields || []).filter(f=>f.input!=='size');
+    const fields=[...lockedFields, ...parseFields(input.fields || [],editableExisting)];
     const active=input.is_active===true;
     if(previous) {
       const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version)]);
