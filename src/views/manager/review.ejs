@@ -22,15 +22,13 @@
     <div data-fields-for="<%= c.type %>" hidden>
       <% if (!required.length && c.type !== 'van') { %><p class="muted">Для этой категории дополнительных характеристик не требуется — можно сразу одобрять.</p><% } %>
       <% if (c.type === 'van') { %>
-        <label>Размер кузова — как в тарифе «Грузовой» Яндекса, от указанных см
-          <select name="vehicleSize" required>
-            <option value="" disabled selected>Выберите размер</option>
-            <option value="any">Любой размер (не ограничивать рассылку)</option>
-            <% vanSizes.forEach(function (s) { %>
-              <option value="<%= s.code %>"><%= s.code %> — от <%= s.spec %></option>
-            <% }); %>
-          </select>
-        </label>
+        <p class="muted" style="margin:4px 0 8px">Введите размеры кузова (см) — категория S/M/L/XL/XXL определится сама, как в тарифе «Грузовой» Яндекса.</p>
+        <label>Длина, см<input type="number" name="cargoLength" min="1" max="2000" required data-cargo-input></label>
+        <label>Ширина, см<input type="number" name="cargoWidth" min="1" max="2000" required data-cargo-input></label>
+        <label>Высота, см<input type="number" name="cargoHeight" min="1" max="2000" required data-cargo-input></label>
+        <p><small id="cargoSizePreview" class="muted">Заполните все три поля, чтобы увидеть категорию.</small></p>
+        <label><input type="checkbox" id="anySizeCheck"> Точные размеры неизвестны — не ограничивать рассылку по размеру</label>
+        <input type="hidden" name="vehicleSize" id="anySizeInput" value="any" disabled>
       <% } %>
       <% required.forEach(function (f) { %>
         <label><%= f.label %>
@@ -65,6 +63,43 @@
   var categoryInput = document.getElementById('categoryInput');
   var stepLabel = document.getElementById('approveStepLabel');
   var fieldBlocks = document.querySelectorAll('[data-fields-for]');
+
+  // Пороги S/M/L/XL/XXL — то же самое, что deriveVanSize на сервере (см.
+  // config/serviceTypes.js), только тут для превью до отправки формы: итоговую букву
+  // всё равно определяет сервер, клиенту доверять нельзя.
+  var VAN_SIZES = <%- JSON.stringify(vanSizes) %>;
+  function deriveSize(l, w, h) {
+    if (!l || !w || !h) return null;
+    for (var i = VAN_SIZES.length - 1; i >= 0; i--) {
+      var t = VAN_SIZES[i];
+      if (l >= t.length && w >= t.width && h >= t.height) return t.code;
+    }
+    return 'S';
+  }
+  var cargoInputs = document.querySelectorAll('[data-cargo-input]');
+  var cargoPreview = document.getElementById('cargoSizePreview');
+  var anyCheck = document.getElementById('anySizeCheck');
+  var anyInput = document.getElementById('anySizeInput');
+  function updateCargoPreview() {
+    if (!cargoPreview) return;
+    var l = Number(document.querySelector('[name="cargoLength"]').value);
+    var w = Number(document.querySelector('[name="cargoWidth"]').value);
+    var h = Number(document.querySelector('[name="cargoHeight"]').value);
+    var size = deriveSize(l, w, h);
+    if (!size) { cargoPreview.textContent = 'Заполните все три поля, чтобы увидеть категорию.'; return; }
+    var spec = VAN_SIZES.filter(function (s) { return s.code === size; })[0];
+    cargoPreview.textContent = 'Категория: ' + size + (spec ? ' (' + spec.spec + ')' : '');
+  }
+  function syncAnySize() {
+    if (!anyCheck) return;
+    var any = anyCheck.checked;
+    cargoInputs.forEach(function (el) { el.disabled = any; el.required = !any; });
+    anyInput.disabled = !any;
+    if (cargoPreview) cargoPreview.hidden = any;
+  }
+  cargoInputs.forEach(function (el) { el.addEventListener('input', updateCargoPreview); });
+  if (anyCheck) anyCheck.addEventListener('change', syncAnySize);
+
   buttons.forEach(function (btn) {
     btn.addEventListener('click', function () {
       buttons.forEach(function (b) { b.classList.remove('active'); });
@@ -77,6 +112,7 @@
         block.hidden = !match;
         block.querySelectorAll('input,select').forEach(function (el) { el.disabled = !match; });
       });
+      if (type === 'van') syncAnySize(); // переоткрыли van — восстановить disabled/required по чекбоксу, а не по общему тумблеру выше
       form.hidden = false;
       form.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });

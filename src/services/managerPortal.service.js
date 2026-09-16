@@ -82,17 +82,23 @@ async function reviewGet(managerId, masterId) {
   const categories = await require('./category.service').configForView('ru');
   const { vanSizeSpec } = require('../config/serviceTypes');
   const thresholds = await require('./settings.service').getVanSizeThresholds();
-  const vanSizes = thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds) }));
+  // Полные пороги (не только текст) — чтобы review.ejs мог на клиенте прикинуть букву
+  // по введённым см ещё до отправки формы; итоговую букву всё равно пересчитывает
+  // сервер в approvePending, клиентский расчёт — только превью.
+  const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   return { master, categories, vanSizes };
 }
 
 // Одобрение из быстрой карточки: закрепляет исполнителя за модератором (если ещё
-// ничей), проставляет категорию и пробует одобрить. Для van/transport форма сама
-// присылает vehicleSize (см. review.ejs — гид по см из тарифа «Грузовой» Яндекса);
-// для прочих обязательных характеристик, которых тут нет в списке полей категории,
-// просим открыть полную карточку в /admin, а не строим тут дублирующую форму под
-// все типы услуг (см. category.service — конфигурируемые поля per-category).
-async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null) {
+// ничей), проставляет категорию и пробует одобрить. Для van/transport менеджер вводит
+// см кузова (длина/ширина/высота) — букву S/M/L/XL/XXL сервер определяет сам через
+// deriveVanSize по актуальным порогам (см. settings.service.getVanSizeThresholds),
+// а не доверяет тому, что мог посчитать на клиенте JS (см. review.ejs — там только
+// превью). Явный vehicleSize остаётся как раньше — 'any' (без ограничения) или прямой
+// код, если см не переданы. Для прочих обязательных характеристик, которых тут нет в
+// списке полей категории, просим открыть полную карточку в /admin, а не строим тут
+// дублирующую форму под все типы услуг (см. category.service — поля per-category).
+async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
@@ -102,10 +108,18 @@ async function approvePending(managerId, masterId, category, attributes = {}, ve
     const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
     if (!claimed.rows[0]) throw fail('Заявку уже забрал другой менеджер.', 409);
   }
+  let effectiveSize = vehicleSize;
+  if (category === 'van' && cargoDimensions && cargoDimensions.length && cargoDimensions.width && cargoDimensions.height) {
+    const { deriveVanSize } = require('../config/serviceTypes');
+    const thresholds = await require('./settings.service').getVanSizeThresholds();
+    const derived = deriveVanSize(cargoDimensions.length, cargoDimensions.width, cargoDimensions.height, thresholds);
+    if (!derived) throw fail('Не удалось определить размер по введённым см — проверьте значения.', 400);
+    effectiveSize = derived;
+  }
   try {
     await require('./master.service').updateMasterProfile(masterId, {
       name: master.name, phone: master.phone, category,
-      vehicleType: master.vehicle_type, vehicleSize: vehicleSize || master.vehicle_size, isFlatbed: master.is_flatbed,
+      vehicleType: master.vehicle_type, vehicleSize: effectiveSize || master.vehicle_size, isFlatbed: master.is_flatbed,
       priceText: master.price_text, description: master.description, serviceAttributes: attributes,
     });
   } catch (e) {
