@@ -377,6 +377,36 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   });
 }
 
+// Админ стирает тестовый/мусорный профиль исполнителя целиком, чтобы освободить его
+// номер для повторной регистрации на /join (masters.phone — UNIQUE; бан не освобождает
+// номер, только прячет профиль). master_districts/order_views/balance_transactions/
+// support_messages/master_reviews/master_services/master_cities каскадируются схемой
+// (ON DELETE CASCADE) сами; остальные таблицы на masters(id) — без каскада (RESTRICT
+// по умолчанию), чистим явно, тем же приёмом, что deleteOrder чистит dispatch_*.
+// sms_consent_logs НЕ трогаем — тот же принцип, что в deleteOrder: журнал согласий
+// обязан пережить удаление профиля нарочно (см. schema.postgres.sql,
+// trg_sms_consent_logs_append_only — на проде UPDATE/DELETE там блокирует триггер).
+async function deleteMaster(id, { meta = {} } = {}) {
+  return pool.withTransaction(async client => {
+    const master = (await client.query('SELECT * FROM masters WHERE id = $1 FOR UPDATE', [id])).rows[0];
+    if (!master) return null;
+    await consentLog.recordAction({ eventType: 'MASTER_DELETED', phone: master.phone, masterId: master.id,
+      metadata: { name: master.name, category: master.category, is_technical: master.is_technical }, meta }, client);
+    await client.query('DELETE FROM manager_commissions WHERE master_id = $1', [id]);
+    await client.query(
+      `UPDATE bank_statement_credits SET topup_id = NULL
+       WHERE topup_id IN (SELECT id FROM topup_requests WHERE master_id = $1)`, [id]);
+    await client.query('DELETE FROM topup_receipts WHERE master_id = $1', [id]);
+    await client.query('DELETE FROM topup_requests WHERE master_id = $1', [id]);
+    await client.query('DELETE FROM card_payments WHERE master_id = $1', [id]);
+    await client.query('UPDATE crm_invites SET master_id = NULL WHERE master_id = $1', [id]);
+    await client.query('UPDATE manager_portal_events SET master_id = NULL WHERE master_id = $1', [id]);
+    await client.query('DELETE FROM dispatch_deliveries WHERE master_id = $1', [id]);
+    await client.query('DELETE FROM masters WHERE id = $1', [id]);
+    return master;
+  });
+}
+
 // balance_tetri — только чтобы каталог мог решить, показывать ли кнопку «Показать номер»
 // (см. revealPhoneForCall). Сам номер (m.phone) сюда попадает для server-side рендера
 // каталога; JSON-ручка /api/masters (masterController.list) обязана его вычищать перед
@@ -466,6 +496,7 @@ module.exports = {
   unlinkTelegram,
   approveMaster,
   updateMasterProfile,
+  deleteMaster,
   adjustBalance,
   chargeMastersForLead,
   topUpBalance,

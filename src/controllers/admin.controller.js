@@ -270,6 +270,13 @@ async function unbanMaster(req, res) {
   res.redirect(`/admin/masters/${id}`);
 }
 
+async function deleteMaster(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const master = await masterService.deleteMaster(id, { meta: requestMeta(req) });
+  if (!master) return res.status(404).send('Мастер не найден');
+  res.redirect('/admin/masters?deleted=1');
+}
+
 async function correctBalance(req, res) {
   const id = parseInt(req.params.id, 10);
   const amountGel = parseFloat(String(req.body.amountGel || '').replace(',', '.'));
@@ -665,6 +672,7 @@ module.exports = {
   approveMaster,
   banMaster,
   unbanMaster,
+  deleteMaster,
   correctBalance,
   ordersList,
   orderDetail,
