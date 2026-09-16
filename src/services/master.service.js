@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
 
-const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating';
+const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language';
 
 // Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
 //   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
@@ -16,7 +16,7 @@ const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_s
 async function registerMaster({
   name, phone, description, serviceType, attributes = {}, spokenLanguages = null,
   vehicleTypeText = null, cityId = null, districtIds = [], cityIds = null, photoUrl = null,
-  consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null,
+  consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null, language = null,
 }) {
   const masterToken = generateShortId();
   const legacy = legacyColumnsFor(serviceType, attributes);
@@ -54,6 +54,15 @@ async function registerMaster({
        legacy.is_flatbed, cityId || null, photoUrl || null, masterToken]
     );
     master = rows[0];
+    }
+    // Язык сайта на момент регистрации — источник правды для /master/:token (см.
+    // schema.sql), а не кука `lang`: ссылка на кабинет приходит по SMS и часто
+    // открывается на другом устройстве/браузере без неё. Обновляем и при повторной
+    // регистрации тем же приёмом, что и остальной профиль (см. комментарий выше).
+    if (language) {
+      const normalized = require('../config/i18n').normalizeLang(language);
+      await client.query('UPDATE masters SET language = $1 WHERE id = $2', [normalized, master.id]);
+      master.language = normalized;
     }
     if (spokenLanguages !== null) {
       const languages = require('../config/spokenLanguages').parse(spokenLanguages);
@@ -283,6 +292,11 @@ async function approveMaster(id) {
   });
 }
 
+async function setMasterLanguage(id, language) {
+  const normalized = require('../config/i18n').normalizeLang(language);
+  await pool.query('UPDATE masters SET language = $1 WHERE id = $2', [normalized, id]);
+}
+
 async function getMasterByPhone(phone) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, master_token FROM masters WHERE phone = $1`,
@@ -482,6 +496,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
 
 module.exports = {
   registerMaster,
+  setMasterLanguage,
   getWorkCities,
   getActiveCities,
   getDistrictsByCity,

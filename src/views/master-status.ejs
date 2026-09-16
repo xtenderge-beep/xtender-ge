@@ -42,7 +42,7 @@
                         <button type="submit" class="text-sm font-bold border border-stone-200 rounded-lg px-3 py-2"><%= t('master_logout') %></button>
                     </form>
                     <% } %>
-                    <%- include('partials/lang-switch') %>
+                    <%- include('partials/lang-switch', { masterLangHref: master ? ('/master/' + master.master_token + '/lang/') : null }) %>
                 </div>
             </div>
         </div>

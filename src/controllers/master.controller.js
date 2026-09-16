@@ -14,7 +14,7 @@ const catalogSession = require('../services/catalogSession.service');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
-const { clientStrings } = require('../config/i18n');
+const { clientStrings, normalizeLang, translate } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
 const { TERMS_VERSION } = require('../config/legal');
 const payment = require('../config/payment');
@@ -217,6 +217,7 @@ async function register(req, res) {
     photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
     consentGrant: verified, requestMeta: requestMeta(req),
     referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,
+    language: req.lang,
   });
   await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
 
@@ -255,6 +256,15 @@ async function statusPage(req, res) {
   const sessionToken = await masterSession.token(req);
   const master = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
   if (master && req.params.token && req.params.token !== sessionToken) return res.redirect('/master');
+  // Личный кабинет открывают по ссылке из SMS — часто в другом браузере/устройстве,
+  // без куки `lang` этого сайта (или с чужой, унаследованной куки). Язык мастера,
+  // записанный при регистрации, надёжнее: переключатель в кабинете обновляет именно
+  // его (см. switchLanguage), не общую куку.
+  if (master) {
+    req.lang = normalizeLang(master.language);
+    res.locals.lang = req.lang;
+    res.locals.t = translate(req.lang);
+  }
   const strings = clientStrings(req.lang);
   if (!master) {
     res.clearCookie(MASTER_COOKIE, { path: '/' });
@@ -283,6 +293,18 @@ async function statusPage(req, res) {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
     leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
   });
+}
+
+// Переключатель языка внутри кабинета — в отличие от общего /lang/:code (кука),
+// обновляет сохранённый язык мастера (см. statusPage), чтобы дальше сработало
+// на любом устройстве, а не только в этом браузере.
+async function switchLanguage(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.redirect('/master');
+  const lang = normalizeLang(req.params.code);
+  await masterService.setMasterLanguage(master.id, lang);
+  res.cookie('lang', lang, { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax' });
+  res.redirect('/master/' + req.params.token);
 }
 
 const SUPPORT_RATE_MAX = 15;
@@ -423,6 +445,7 @@ module.exports = {
   verifyOtp,
   register,
   statusPage,
+  switchLanguage,
   logout,
   loginRequestCode,
   loginVerify,

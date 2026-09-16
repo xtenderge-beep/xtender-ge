@@ -1,20 +1,23 @@
 <%
   // Единый переключатель языка (пилюля GE / RU / EN).
   // На страницах с префиксом локали (/, /join, /ru/...) передаём alternates
-  // (seo.alternates) — ссылки ведут на локализованный URL. На остальных
-  // (/order, /master, /o, ...) alternates не передаём — работает /lang/:code
-  // (ставит куку и возвращает на явно переданную локальную страницу).
+  // (seo.alternates) — ссылки ведут на локализованный URL. В кабинете мастера
+  // передаём masterLangHref — ссылка обновляет сохранённый язык мастера (см.
+  // master.controller.js switchLanguage), а не общую куку: кабинет открывают по
+  // ссылке из SMS, часто в другом браузере/устройстве без этой куки. На остальных
+  // (/order, /o, ...) — общий /lang/:code (ставит куку и возвращает на страницу).
   const _langs = [['ka', 'GE'], ['ru', 'RU'], ['en', 'EN']];
   const _hasAlt = typeof alternates !== 'undefined' && alternates;
+  const _masterHref = typeof masterLangHref !== 'undefined' && masterLangHref;
 %>
 <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
   <% _langs.forEach(function (lf) { %>
     <%
       // ?lang=ka — иначе кука ru/en тут же откидывает голый '/' обратно (public.routes.js)
-      const _href = _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0] + '?next=' + encodeURIComponent(typeof currentPath === 'string' ? currentPath : '/'));
+      const _href = _masterHref ? (_masterHref + lf[0]) : _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0] + '?next=' + encodeURIComponent(typeof currentPath === 'string' ? currentPath : '/'));
     %>
     <a href="<%= _href %>" aria-label="<%= lf[1] %>"
-       <% if (!_hasAlt) { %>onclick="const destination = new URL(this.href); destination.searchParams.set('next', location.pathname + location.search + location.hash); this.href = destination.pathname + destination.search;"<% } %>
+       <% if (!_hasAlt && !_masterHref) { %>onclick="const destination = new URL(this.href); destination.searchParams.set('next', location.pathname + location.search + location.hash); this.href = destination.pathname + destination.search;"<% } %>
        class="lang-btn px-2.5 py-1 rounded-lg transition <%= lang === lf[0] ? 'active' : 'hover:bg-white/50' %>"><%= lf[1] %></a>
   <% }); %>
 </div>
