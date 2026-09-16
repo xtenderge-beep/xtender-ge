@@ -47,7 +47,9 @@ const VAN_SIZE_ORDER = VAN_SIZES.map(s => s.code);
 // уже прочитавшей актуальные пороги; без него — эти дефолты.
 function vanSizeSpec(code, sizes = VAN_SIZES) {
   const s = sizes.find(v => v.code === code) || VAN_SIZES.find(v => v.code === code);
-  return s ? `${s.length}×${s.width}×${s.height} см` : '';
+  // Буквы Д/Ш/В перед каждым числом — иначе 400×190×200 не читается однозначно
+  // (что тут длина, а что высота), путаница была замечена в /admin/masters.
+  return s ? `Д${s.length}×Ш${s.width}×В${s.height} см` : '';
 }
 
 const SERVICE_TYPES = {
