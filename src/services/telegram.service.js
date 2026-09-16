@@ -13,7 +13,8 @@ const SIZE_ORDER = VAN_SIZE_ORDER;
 const CATEGORY_LABELS = {
   transport: '🚚 Перевозки',
   movers: '💪 Грузчики',
-  junk: '🧹 Вывоз мусора',
+  junk: '🧹 Вывоз мусора (самосвал)',
+  junk_manual: '🧺 Вывоз мусора (мешками)',
   flatbed: '🚛 Бортовые / стройматериалы',
   tow: '🛻 Эвакуатор',
   bucket_lift: '🏗️ Автовышка',
@@ -166,7 +167,8 @@ async function notifyModerator(order) {
 const MASTER_CATEGORY_LABELS = {
   movers: '💪 Грузчик / разнорабочий',
   transport: '🚚 Водитель',
-  junk: '🧹 Вывоз мусора',
+  junk: '🧹 Вывоз мусора (самосвал)',
+  junk_manual: '🧺 Вывоз мусора (мешками)',
 };
 
 async function notifyModeratorNewMaster(master) {
