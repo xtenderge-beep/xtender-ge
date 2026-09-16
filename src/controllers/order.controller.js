@@ -413,7 +413,8 @@ async function handleContactShared(message) {
     const linked = await managerService.linkTelegram(manager.id, message.from.id);
     const lines = [`✅ Готово, ${linked.name}! Вы менеджер xtender.`, ''];
     lines.push(
-      '/ref 5 Имя — ссылка для регистрации исполнителя (бонус 5 GEL)',
+      '/link — ваши ссылки для регистрации исполнителя (на 3 языках)',
+      '/ref 5 Имя — одноразовая ссылка регистрации с бонусом (5 GEL)',
       '/link +995… — ссылка для заказчика (телефон позвонившего клиента)',
       '/mystats — ваша статистика и воронка'
     );
@@ -454,8 +455,26 @@ async function handleManagerCommand(message, manager) {
 
   if (text === '/link' || text.startsWith('/link ')) {
     const raw = text.slice('/link'.length).trim().replace(/\s+/g, '');
+    // Голое /link (без номера) раньше просто показывало формат и ничего не делало —
+    // используем это под постоянную реферальную ссылку регистрации исполнителя на
+    // 3 языках (та же ссылка, что в /admin/managers/:id и веб-кабинете менеджера, см.
+    // partner.service.createLink — создаёт токен при первом обращении, если ещё нет).
+    // /link +995... (с номером) — прежнее поведение, ссылка для заказчика, не тронуто.
+    if (!raw) {
+      const token = await require('../services/partner.service').createLink(manager.id);
+      const base = manager.id.toString(36) + '-' + token.slice(0, 8);
+      const variants = [['ka', '🇬🇪 Грузинский'], ['ru', '🇷🇺 Русский'], ['en', '🇬🇧 English']]
+        .map(([code, label]) => `${label}:\n${getBaseUrl()}/p/${base}?lang=${code}`)
+        .join('\n\n');
+      await telegramService.sendToChat(
+        chatId,
+        `🔗 Ваши ссылки для регистрации исполнителя — выберите вариант под язык получателя:\n\n${variants}\n\n` +
+          `Ссылка для заказчика по номеру телефона: /link +995XXXXXXXXX`
+      );
+      return;
+    }
     if (!isGeorgianPhone(raw)) {
-      await telegramService.sendToChat(chatId, 'Формат: /link +995XXXXXXXXX\nТелефон позвонившего клиента. В ответ — ссылка, которую отправляете ему.');
+      await telegramService.sendToChat(chatId, 'Формат: /link +995XXXXXXXXX\nТелефон позвонившего клиента. В ответ — ссылка, которую отправляете ему.\n\nПросто /link (без номера) — ваши ссылки для регистрации исполнителя.');
       return;
     }
     const token = await managerService.createClientInvite(manager.id, raw);
@@ -494,7 +513,7 @@ async function handleManagerCommand(message, manager) {
     return;
   }
 
-  await telegramService.sendToChat(chatId, `${manager.name}, команды: /ref 5 Имя · /link +995… · /mystats`);
+  await telegramService.sendToChat(chatId, `${manager.name}, команды: /link · /ref 5 Имя · /link +995… · /mystats`);
 }
 
 // Обычный текст боту от привязанного исполнителя — это вопрос в поддержку.
