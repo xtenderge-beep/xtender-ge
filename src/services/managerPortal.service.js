@@ -42,7 +42,7 @@ async function session(sid) {
   if (!/^[a-f0-9]{64}$/.test(sid || '')) return null;
   const raw = await redis.get('manager_session:' + sid); if (!raw) return null;
   const s = JSON.parse(raw);
-  const m = (await pool.query('SELECT id,name,commission_bps,referral_token FROM managers WHERE id=$1 AND web_auth_version=$2 AND web_enabled=true AND is_active=true', [s.id, s.version])).rows[0];
+  const m = (await pool.query('SELECT id,name,commission_bps,referral_token,is_head_moderator FROM managers WHERE id=$1 AND web_auth_version=$2 AND web_enabled=true AND is_active=true', [s.id, s.version])).rows[0];
   return m ? { ...s, manager: m } : null;
 }
 // Персональная одноразовая ссылка из Telegram-уведомления модератору: открывает его
@@ -87,6 +87,64 @@ async function reviewGet(managerId, masterId) {
   // сервер в approvePending, клиентский расчёт — только превью.
   const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   return { master, categories, vanSizes };
+}
+
+// Свежая проверка из БД (не из закешированной сессии) — на неё завязаны действия с
+// реальными последствиями (правка контактов, отклонение заявки), нельзя доверять
+// значению из momento сессии, если админ только что снял флаг.
+async function requireHeadModerator(managerId) {
+  const row = (await pool.query('SELECT is_head_moderator FROM managers WHERE id=$1 AND is_active=true', [managerId])).rows[0];
+  if (!row?.is_head_moderator) throw fail('Доступно только главному модератору.', 403);
+}
+
+// Правка имени/телефона прямо из карточки одобрения — до сих пор это мог сделать
+// только администратор в /admin/masters/:id; типичный случай — опечатка в номере при
+// регистрации. Доступно только главному модератору (см. requireHeadModerator) и
+// только для ещё не одобренной, не забаненной заявки — после одобрения это уже
+// обычное редактирование профиля через /admin, не задача этой карточки.
+async function updateContact(managerId, masterId, name, phone) {
+  await requireHeadModerator(managerId);
+  const { toE164, isGeorgianPhone } = require('../config/phone');
+  name = String(name || '').trim().slice(0, 120);
+  if (!name) throw fail('Укажите имя.', 400);
+  if (!isGeorgianPhone(phone)) throw fail('Укажите номер в формате +995XXXXXXXXX.', 400);
+  const master = (await pool.query('SELECT id,is_active,is_banned,manager_id FROM masters WHERE id=$1', [masterId])).rows[0];
+  if (!master) throw fail('Специалист не найден.', 404);
+  if (master.is_active) throw fail('Заявка уже одобрена — правьте контакты в полной карточке в админке.', 409);
+  if (master.is_banned) throw fail('Профиль заблокирован.', 409);
+  if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
+  if (!master.manager_id) {
+    const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
+    if (!claimed.rows[0]) throw fail('Заявку уже забрал другой менеджер.', 409);
+  }
+  try {
+    await pool.query('UPDATE masters SET name=$1, phone=$2 WHERE id=$3', [name, toE164(phone), masterId]);
+  } catch (e) {
+    if (e.code === '23505') throw fail('Этот номер телефона уже занят другим специалистом.', 409);
+    throw e;
+  }
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'edit_contact',$3)", [managerId, masterId, `Изменены контакты: ${name}, ${toE164(phone)}`]);
+}
+
+// Отклонение прямо из карточки одобрения (явный спам/дубль/фейк) — раньше у заявки
+// не было третьего исхода кроме «одобрить» или «оставить висеть на модерации
+// навсегда»; отдельная блокировка уже существовала в /manager/masters/:id, но только
+// ПОСЛЕ того, как заявке назначена категория. Доступно только главному модератору.
+async function rejectPending(managerId, masterId, reason) {
+  await requireHeadModerator(managerId);
+  reason = String(reason || '').trim().slice(0, 500);
+  if (!reason) throw fail('Укажите причину отклонения.', 400);
+  const master = (await pool.query('SELECT id,is_active,is_banned,manager_id FROM masters WHERE id=$1', [masterId])).rows[0];
+  if (!master) throw fail('Специалист не найден.', 404);
+  if (master.is_active) throw fail('Заявка уже одобрена — для блокировки активного профиля используйте карточку специалиста.', 409);
+  if (master.is_banned) throw fail('Уже отклонена.', 409);
+  if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
+  if (!master.manager_id) {
+    const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
+    if (!claimed.rows[0]) throw fail('Заявку уже забрал другой менеджер.', 409);
+  }
+  await pool.query('UPDATE masters SET is_banned=true, banned_by_manager_id=$2, banned_reason=$3, banned_at=NOW() WHERE id=$1', [masterId, managerId, reason]);
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'reject',$3)", [managerId, masterId, reason]);
 }
 
 // Одобрение из быстрой карточки: закрепляет исполнителя за модератором (если ещё
@@ -198,7 +256,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,
+  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

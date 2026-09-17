@@ -57,6 +57,18 @@ router.post('/review/:id/approve',wrap(async(req,res) => {
   await service.approvePending(req.managerSession.id,req.params.id,...reviewFormInput(req));
   res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
 }));
+// Главному модератору доступны ещё два действия прямо с карточки одобрения (см.
+// managerPortal.service.requireHeadModerator — проверка на сервере, а не только
+// скрытая в разметке кнопка): поправить опечатку в контактах и явно отклонить
+// заявку (раньше третьего исхода кроме «одобрить»/«висит вечно» не было).
+router.post('/review/:id/contact',wrap(async(req,res) => {
+  await service.updateContact(req.managerSession.id,req.params.id,req.body.name,req.body.phone);
+  res.redirect('/manager/review/'+encodeURIComponent(req.params.id));
+}));
+router.post('/review/:id/reject',wrap(async(req,res) => {
+  await service.rejectPending(req.managerSession.id,req.params.id,req.body.reason);
+  res.redirect('/manager/masters/'+encodeURIComponent(req.params.id));
+}));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',wrap(crm.show));
 router.post('/crm',wrap(crm.create));

@@ -2,6 +2,18 @@
 <% if (master.description) { %><div class="card"><h2>Описание услуг</h2><p class="pre"><%= master.description %></p></div><% } %>
 <% if (master.avatar_url) { %><div class="card"><h2>Фото</h2><img src="<%= master.avatar_url %>" alt="" style="max-width:280px;border-radius:12px;display:block"></div><% } %>
 
+<% if (manager.is_head_moderator) { %>
+<details class="card">
+  <summary>✏️ Поправить имя/телефон (опечатка при регистрации)</summary>
+  <form method="post" action="/manager/review/<%= master.id %>/contact" style="margin-top:10px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Имя<input type="text" name="name" value="<%= master.name %>" maxlength="120" required></label>
+    <label>Телефон<input type="text" name="phone" value="<%= master.phone %>" pattern="\+995[0-9]{9}" placeholder="+995XXXXXXXXX" required></label>
+    <button type="submit">Сохранить контакты</button>
+  </form>
+</details>
+<% } %>
+
 <div class="card">
   <h2>1. Категория</h2>
   <p class="muted">Выберите, чем занимается специалист — заявка сразу закрепится за вами, а ниже появятся вопросы именно для этой категории.</p>
@@ -56,7 +68,18 @@
   </div>
 </form>
 
-<p><small>Другой случай (поправить телефон, имя, необязательные характеристики) — <a href="/admin/masters/<%= master.id %>">полная карточка в админке</a>.</small></p>
+<% if (manager.is_head_moderator) { %>
+<details class="card">
+  <summary style="color:#a53030">🚫 Отклонить заявку (явный спам/дубль/фейк)</summary>
+  <form method="post" action="/manager/review/<%= master.id %>/reject" style="margin-top:10px">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <label>Причина<input type="text" name="reason" maxlength="500" required placeholder="Например: дубль заявки #123 / номер не отвечает / явный спам"></label>
+    <button type="submit" class="danger">Отклонить</button>
+  </form>
+</details>
+<% } %>
+
+<p><small>Другой случай (необязательные характеристики) — <a href="/admin/masters/<%= master.id %>">полная карточка в админке</a>.</small></p>
 
 <style>.category-btn{background:white;color:#19232d;border:1px solid #bbc9c5}.category-btn.active{background:#08765f;color:white;border-color:#08765f}</style>
 <script>
