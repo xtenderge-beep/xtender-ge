@@ -50,7 +50,7 @@
                 <p id="signupStepCount" class="provider-signup-count" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
                 <ol class="provider-signup-progress" aria-label="<%= t('provider_signup_progress') %>">
                     <% ['provider_signup_services','provider_signup_city','provider_signup_languages','provider_signup_contact','provider_signup_terms'].forEach((key, i) => { %>
-                    <li data-signup-indicator="<%= i %>" <%- i === 0 ? 'aria-current="step"' : '' %>><span><%= i + 1 %></span><%= t(key) %></li>
+                    <li data-signup-indicator="<%= i %>" <%- i === 0 ? 'aria-current="step"' : '' %>><span class="provider-signup-progress-num"><%= i + 1 %></span><span class="provider-signup-progress-label"><%= t(key) %></span></li>
                     <% }); %>
                 </ol>
                 <h2 id="signupStepTitle" class="provider-section-title" tabindex="-1"><%= t('provider_services_section') %></h2>

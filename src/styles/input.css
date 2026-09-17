@@ -84,11 +84,12 @@ details > summary::-webkit-details-marker { display: none; }
 .provider-signup-header { padding:22px 24px 0; }
 .provider-signup-count { color:#647269; font-size:12px; }
 .provider-signup-progress { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin:12px 0 22px; list-style:none; }
-.provider-signup-progress li { display:flex; align-items:center; gap:7px; font-size:12px; color:#647269; line-height:1.4; }
-.provider-signup-progress li > span { display:grid; place-items:center; width:26px; height:26px; flex-shrink:0; border-radius:50%; background:#f0f4eb; color:#234e35; }
+.provider-signup-progress li { display:flex; align-items:center; gap:7px; font-size:12px; color:#647269; line-height:1.4; min-width:0; }
+.provider-signup-progress-num { display:grid; place-items:center; width:26px; height:26px; flex-shrink:0; border-radius:50%; background:#f0f4eb; color:#234e35; }
+.provider-signup-progress-label { min-width:0; overflow-wrap:break-word; }
 .provider-signup-progress [aria-current="step"] { color:#193d31; font-weight:700; }
-.provider-signup-progress [aria-current="step"] > span { background:#059669; color:#fff; }
-.provider-signup-progress .is-complete > span { background:#e0e9dc; }
+.provider-signup-progress [aria-current="step"] .provider-signup-progress-num { background:#059669; color:#fff; }
+.provider-signup-progress .is-complete .provider-signup-progress-num { background:#e0e9dc; }
 #signupCard { scroll-margin-top:20px; min-width:0; }
 #signupCard [hidden] { display:none !important; }
 .provider-signup-actions { display:flex; align-items:center; gap:12px; padding-top:8px; }
@@ -97,7 +98,18 @@ details > summary::-webkit-details-marker { display: none; }
 .provider-signup-next { flex:1; background:#059669; color:#fff; }
 .provider-signup-next:hover { background:#047857; }
 #signupCard button:disabled { opacity:.6; cursor:wait; }
-@media(max-width:639px) { .provider-signup-header { padding:20px 20px 0; } .provider-signup-progress { gap:4px; } .provider-signup-progress li { flex-direction:column; align-items:flex-start; font-size:10px; gap:4px; } .provider-signup-progress li > span { width:22px; height:22px; } .provider-signup-actions button { padding:12px; } }
+@media(max-width:639px) {
+  .provider-signup-header { padding:20px 20px 0; }
+  /* Five text labels don't fit narrow columns (Georgian words run long and wrap).
+     Collapse to a slim segmented progress bar; step count + the big step title
+     below already say which step this is, in full readable text. */
+  .provider-signup-progress { grid-template-columns:repeat(5,1fr); gap:5px; margin:12px 0 4px; }
+  .provider-signup-progress li { height:5px; padding:0; border-radius:3px; background:#e5e9e0; overflow:hidden; }
+  .provider-signup-progress .is-complete { background:#a9cdb2; }
+  .provider-signup-progress [aria-current="step"] { background:#059669; }
+  .provider-signup-progress-num, .provider-signup-progress-label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
+  .provider-signup-actions button { padding:12px; }
+}
 
 /* Desktop presentation only; mobile keeps its existing layout and animations. */
 .home-desktop-lead, .home-example-outcome, .provider-demo-lead, .provider-demo-next { display:none; }
