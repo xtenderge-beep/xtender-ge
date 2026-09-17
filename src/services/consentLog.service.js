@@ -192,6 +192,11 @@ async function exportForPhone(rawPhone) {
       consent_language: optIn.consent_language,
       consent_text_shown: optIn.consent_text_snapshot,
       consent_details: optInMeta || null,
+      // null = флоу без этой проверки (регистрация до её внедрения либо не-provider роль);
+      // true/false — реально долистал(а) документ до конца перед тем, как согласиться.
+      terms_scroll_confirmed: optInMeta && Object.prototype.hasOwnProperty.call(optInMeta, 'terms_scroll_confirmed')
+        ? Boolean(optInMeta.terms_scroll_confirmed) : null,
+      terms_scroll_confirmed_at: (optInMeta && optInMeta.terms_scroll_confirmed_at) || null,
       ip_address: optIn.ip_address,
       user_agent: optIn.user_agent,
       x_forwarded_for: optIn.x_forwarded_for,

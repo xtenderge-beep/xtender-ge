@@ -129,10 +129,13 @@
 
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
                 <% consent.notices.forEach(notice => { %><p class="text-xs text-stone-600 leading-relaxed"><%= notice %></p><% }) %>
-                <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
-                    <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
-                    <span><%= consent.termsLabel %> <a href="<%= legalPrefix %>/terms" target="_blank" class="text-emerald-700 underline"><%= t('join_terms_link') %></a></span>
-                </label>
+                <div>
+                    <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
+                        <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
+                        <span><%= consent.termsLabel %> — <button type="button" id="openTermsModalBtn" class="text-emerald-700 underline font-bold"><%= t('join_terms_open_btn') %></button></span>
+                    </label>
+                    <p id="termsAcceptedNote" class="hidden pl-6 mt-1 text-[11px] font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i><%= t('join_terms_accepted_note') %> · <span id="termsAcceptedAt"></span></p>
+                </div>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="privacyCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
                     <span><%= t('join_privacy_label') %> <a href="<%= legalPrefix %>/privacy" target="_blank" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
@@ -181,6 +184,35 @@
           <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
     </div></main>
 
+    <div id="termsModal" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center sm:p-4 bg-stone-900/70 backdrop-blur-sm">
+        <div class="bg-white rounded-none sm:rounded-2xl max-w-lg w-full h-full sm:h-auto max-h-full sm:max-h-[85vh] flex flex-col shadow-2xl">
+            <div class="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-stone-200 shrink-0">
+                <h3 id="termsModalTitle" class="text-sm font-black text-stone-900"><%= t('terms_headline') %> <span class="font-mono font-normal text-stone-400"><%= consent.terms_version %></span></h3>
+                <button type="button" aria-label="<%= t('join_terms_close_btn') %>" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition shrink-0">✕</button>
+            </div>
+            <div class="relative grow min-h-0">
+                <div id="termsModalBody" class="h-full overflow-y-auto px-5 sm:px-6 py-4 text-sm text-stone-700 leading-relaxed">
+                    <%- include('partials/legal-blocks', { blocks: legalDoc.body[lang] || legalDoc.body.ru, reqLabels, reqPending, requisites, lang }) %>
+                </div>
+                <div id="termsScrollFade" class="pointer-events-none absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-white to-transparent transition-opacity duration-300"></div>
+                <div id="termsScrollHintPill" class="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center transition-opacity duration-300">
+                    <span class="flex items-center gap-1.5 bg-stone-900/85 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg animate-bounce">
+                        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i><%= t('join_terms_scroll_pill') %>
+                    </span>
+                </div>
+            </div>
+            <div class="px-5 sm:px-6 py-4 border-t border-stone-200 shrink-0 space-y-2">
+                <p id="termsModalHint" class="text-[11px] text-stone-500 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><%= t('join_terms_modal_hint') %></span>
+                </p>
+                <button type="button" id="termsModalAcceptBtn" disabled onclick="acceptTermsModal()"
+                    class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-stone-200 disabled:text-stone-400 disabled:cursor-not-allowed text-white text-sm font-black transition">
+                    <%= t('join_terms_accept_btn') %>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
         const PROVIDER_NOTIFICATIONS = <%- JSON.stringify(t('provider_notifications_data')) %>;
@@ -221,9 +253,76 @@
                 phone: document.getElementById('phoneInput').value.trim(),
                 promoCode: document.getElementById('promoInput').value.trim(),
                 termsAccepted: document.getElementById('termsCheckbox').checked,
+                termsScrolled: termsScrolled,
                 privacyAccepted: document.getElementById('privacyCheckbox').checked,
             };
         }
+
+        // Чекбокс Оферты нельзя поставить напрямую — только пройдя модалку с полным
+        // текстом документа до конца (юридически чище: не просто галочка рядом со ссылкой,
+        // а доказуемый факт прочтения). termsScrolled едет на сервер и перепроверяется там.
+        let termsScrolled = false;
+        let termsScrolledAt = null;
+        const termsCheckbox = document.getElementById('termsCheckbox');
+        const termsModal = document.getElementById('termsModal');
+        const termsModalBody = document.getElementById('termsModalBody');
+        const termsModalAcceptBtn = document.getElementById('termsModalAcceptBtn');
+        let termsModalReturnFocus = null;
+
+        function openTermsModal() {
+            termsModalReturnFocus = document.activeElement;
+            termsModal.classList.remove('hidden');
+            termsModal.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+            checkTermsScrollEnd();
+            termsModal.focus();
+        }
+        function closeTermsModal() {
+            termsModal.classList.add('hidden');
+            termsModal.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+            if (termsModalReturnFocus && termsModalReturnFocus.isConnected) termsModalReturnFocus.focus();
+        }
+        // Пилюля «прокрутите вниз» + градиент-«затухание» показывают, что текст не
+        // закончился, и обе подсказки убираются насовсем, как только долистали один раз —
+        // не мигают туда-обратно, если потом проскроллят назад перечитать что-то.
+        let termsReachedEnd = false;
+        function checkTermsScrollEnd() {
+            if (termsReachedEnd) return;
+            const atEnd = termsModalBody.scrollTop + termsModalBody.clientHeight >= termsModalBody.scrollHeight - 8;
+            if (!atEnd) return;
+            termsReachedEnd = true;
+            termsModalAcceptBtn.disabled = false;
+            document.getElementById('termsScrollFade').classList.add('opacity-0');
+            document.getElementById('termsScrollHintPill').classList.add('opacity-0');
+            document.getElementById('termsModalHint').innerHTML =
+                '<i class="fa-solid fa-circle-check text-emerald-600" aria-hidden="true"></i><span>' + T.join_terms_modal_hint_done + '</span>';
+        }
+        function acceptTermsModal() {
+            if (termsModalAcceptBtn.disabled) return;
+            termsScrolled = true;
+            termsScrolledAt = new Date().toISOString();
+            termsCheckbox.checked = true;
+            document.getElementById('termsAcceptedNote').classList.remove('hidden');
+            document.getElementById('termsAcceptedAt').textContent = new Date(termsScrolledAt).toLocaleString();
+            closeTermsModal();
+            showMsg('');
+        }
+        document.getElementById('openTermsModalBtn').addEventListener('click', openTermsModal);
+        termsModalBody.addEventListener('scroll', checkTermsScrollEnd);
+        termsCheckbox.addEventListener('click', function (e) {
+            if (termsCheckbox.checked && !termsScrolled) {
+                e.preventDefault();
+                openTermsModal();
+            } else if (!termsCheckbox.checked) {
+                termsScrolled = false;
+                termsScrolledAt = null;
+                document.getElementById('termsAcceptedNote').classList.add('hidden');
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && !termsModal.classList.contains('hidden')) closeTermsModal();
+        });
 
         let signupStep = 0;
         let signupBusy = false;
@@ -271,7 +370,7 @@
             if (step === 2) {
                 if (!payload.name) return signupError(2, T.join_err_name_required, '#nameInput');
                 if (!window.GeorgianPhone.validate(document.getElementById('phoneInput'))) return false;
-                if (!payload.termsAccepted) return signupError(2, T.join_err_terms_required, '#termsCheckbox');
+                if (!payload.termsAccepted) return signupError(2, T.join_err_terms_required, '#openTermsModalBtn');
                 if (!payload.privacyAccepted) return signupError(2, T.join_err_privacy_required, '#privacyCheckbox');
             }
             return true;
@@ -309,7 +408,7 @@
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
+                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, termsScrolled: payload.termsScrolled, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
             });
             const data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);

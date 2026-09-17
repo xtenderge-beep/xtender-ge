@@ -25,15 +25,22 @@ function bundle(role, language) {
   return { ...snapshot, digest, text: [...notices, termsLabel, snapshot.terms_url, privacyLabel, snapshot.privacy_url].join('\n') };
 }
 
-function acceptedRequest(req, role) {
+// opts.requireScroll — исполнитель должен долистать Оферту до конца в модалке на /join
+// (см. join.ejs) до того, как поставить галочку; сервер не доверяет клиенту факт скролла
+// на слово — только булево requireScroll решает, обязателен ли он для этой роли/флоу.
+function acceptedRequest(req, role, opts = {}) {
   const current = bundle(role, req.body.consentLanguage);
   if (req.body.termsAccepted !== true || req.body.privacyAccepted !== true) {
     return { error: copy[current.language].required, status: 400 };
   }
+  if (opts.requireScroll && req.body.termsScrolled !== true) {
+    return { error: copy[current.language].scrollRequired, status: 400 };
+  }
   if (req.body.consentDigest !== current.digest) {
     return { error: copy[current.language].stale, status: 409 };
   }
-  return { consent: current };
+  // Метка времени — серверная (не из тела запроса): часы клиента доверия не заслуживают.
+  return { consent: opts.requireScroll ? { ...current, termsScrolled: true, termsScrolledAt: new Date().toISOString() } : current };
 }
 
 module.exports = { bundle, acceptedRequest, copy };

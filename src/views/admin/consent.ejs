@@ -94,6 +94,9 @@
           <div class="sm:col-span-2"><dt class="text-stone-500 text-xs font-bold uppercase">User-Agent</dt><dd class="font-mono text-xs break-all"><%= oi.user_agent || '—' %></dd></div>
           <div class="sm:col-span-2"><dt class="text-stone-500 text-xs font-bold uppercase">X-Forwarded-For</dt><dd class="font-mono text-xs break-all"><%= oi.x_forwarded_for || '—' %></dd></div>
           <div class="sm:col-span-2"><dt class="text-stone-500 text-xs font-bold uppercase">Текст согласия (снимок)</dt><dd class="text-stone-700"><%= oi.consent_text_shown || '—' %></dd></div>
+          <% if (oi.terms_scroll_confirmed !== null) { %>
+          <div class="sm:col-span-2"><dt class="text-stone-500 text-xs font-bold uppercase">Прокрутка Оферты до конца перед принятием</dt><dd class="font-mono"><%= oi.terms_scroll_confirmed ? ('Да · ' + fmt(oi.terms_scroll_confirmed_at)) : 'Нет' %></dd></div>
+          <% } %>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">ID у SMS-шлюза</dt><dd class="font-mono text-xs"><%= oi.otp_reference_id || '—' %></dd></div>
           <div><dt class="text-stone-500 text-xs font-bold uppercase">SHA-256 кода</dt><dd class="font-mono text-xs break-all"><%= oi.otp_code_sha256 || '—' %></dd></div>
         </dl>

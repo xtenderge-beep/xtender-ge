@@ -124,7 +124,12 @@ async function verifyCode(phone, code, purpose = 'order', context = {}) {
           termsVersion: snapshot ? snapshot.terms_version : context.termsVersion || null,
           language: snapshot ? snapshot.language : context.language || null,
           consentText: snapshot ? snapshot.text : context.consentText || null,
-          metadata: snapshot ? { snapshot, terms_accepted: true, privacy_accepted: true, privacy_version: snapshot.privacy_version } : context.metadata || null,
+          metadata: snapshot ? {
+            snapshot, terms_accepted: true, privacy_accepted: true, privacy_version: snapshot.privacy_version,
+            // Присутствует только для флоу с requireScroll (сейчас — регистрация исполнителя);
+            // для остальных ролей snapshot.termsScrolled === undefined, поле не пишется.
+            ...(snapshot.termsScrolled !== undefined ? { terms_scroll_confirmed: snapshot.termsScrolled, terms_scroll_confirmed_at: snapshot.termsScrolledAt } : {}),
+          } : context.metadata || null,
           providerMessageId: sendMeta.ref || null,
           meta: context.meta || {},
         });

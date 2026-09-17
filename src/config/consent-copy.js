@@ -11,6 +11,7 @@ module.exports = {
     found: 'Нашёл исполнителя', inactive: 'Уже не актуально', reason: 'Причина закрытия',
     required: 'Подтвердите условия платформы и передачу контактов.',
     stale: 'Условия обновились. Обновите страницу и ознакомьтесь с ними перед подтверждением.',
+    scrollRequired: 'Долистайте текст Оферты до конца и подтвердите в открывшемся окне.',
   },
   en: {
     platform: 'Xtender connects customers with independent providers. Xtender does not perform the work or guarantee its quality. Customers and providers agree directly on the price, scope and terms of work. This does not exclude Xtender’s liability for its own breaches.',
@@ -23,6 +24,7 @@ module.exports = {
     found: 'Found a provider', inactive: 'No longer needed', reason: 'Reason for closing',
     required: 'Please accept the platform terms and contact sharing.',
     stale: 'The terms have changed. Refresh this page and read them before confirming.',
+    scrollRequired: 'Scroll the Terms of Service to the end and confirm in the dialog that opens.',
   },
   ka: {
     platform: 'Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან. Xtender არ ასრულებს სამუშაოს და არ იძლევა მისი ხარისხის გარანტიას. ფასს, სამუშაოს მოცულობასა და პირობებს დამკვეთი და შემსრულებელი უშუალოდ ათანხმებენ. ეს არ გამორიცხავს Xtender-ის პასუხისმგებლობას საკუთარ დარღვევებზე.',
@@ -35,5 +37,6 @@ module.exports = {
     found: 'ვიპოვე შემსრულებელი', inactive: 'აღარ არის აქტუალური', reason: 'დახურვის მიზეზი',
     required: 'დაადასტურეთ პლატფორმის პირობები და საკონტაქტო მონაცემების გადაცემა.',
     stale: 'პირობები განახლდა. დადასტურებამდე განაახლეთ გვერდი და გაეცანით მათ.',
+    scrollRequired: 'ჩამოსქროლეთ ოფერტის ტექსტი ბოლომდე და დაადასტურეთ გახსნილ ფანჯარაში.',
   },
 };

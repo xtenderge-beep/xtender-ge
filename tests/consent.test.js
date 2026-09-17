@@ -36,6 +36,8 @@ const otpController = require('../src/controllers/otp.controller');
 const { translate, clientStrings } = require('../src/config/i18n');
 const serviceTypes = require('../src/config/serviceTypes');
 const { buildSeo } = require('../src/config/seo');
+const legalContent = require('../src/config/legal-content');
+const { SERVICE_REQUISITES } = require('../src/config/legal');
 
 function response() {
   return { statusCode: 200, status(n) { this.statusCode=n;return this; }, json(data) { this.data=data;return this; }, cookie(){}, clearCookie(){} };
@@ -137,7 +139,7 @@ async function render(file, locals) {
     const common={lang,t,clientStrings:clientStrings(lang),currentPath:'/',isRememberedProvider:false,csrfToken:'test',seo:buildSeo(lang,'/')};
     const html=await render('index.ejs',{...common,masters:[],catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:consent.bundle('client',lang)});
     assert.ok(html.includes('id="clientSharing"'));assert.ok(!/id="clientSharing"[^>]*checked/.test(html));
-    await render('join.ejs',{...common,consent:consent.bundle('provider',lang),welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
+    await render('join.ejs',{...common,consent:consent.bundle('provider',lang),legalDoc:legalContent.terms,reqLabels:legalContent.REQUISITE_LABELS,reqPending:legalContent.REQUISITE_PENDING,requisites:SERVICE_REQUISITES,welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
     await render('order.ejs',{...common,order:published,files:[],isOwner:true,masterId:null,funnel:null,masterAccount:null,whatsappText:''});
   }
   await render('admin/consent.ejs',{phoneQuery:phone,report,recent:[],csrfToken:'test'});

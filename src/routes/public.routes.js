@@ -152,6 +152,7 @@ router.get('/join', asyncHandler(async (req, res) => {
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
   res.render('join', {
     consent: consentService.bundle('provider', locale),
+    legalDoc: legalContent.terms, ...LEGAL_LOCALS,
     welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
     clientStrings: clientStrings(locale),
     promo,

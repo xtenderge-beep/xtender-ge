@@ -122,7 +122,7 @@ async function sendOtp(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
-  const acceptance = consentService.acceptedRequest(req, 'provider');
+  const acceptance = consentService.acceptedRequest(req, 'provider', { requireScroll: true });
   if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
   const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
   if (!result.success) {
