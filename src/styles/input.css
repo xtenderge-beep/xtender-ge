@@ -125,8 +125,14 @@ details > summary::-webkit-details-marker { display: none; }
   body.signup-started .provider-join-grid { margin-top:0; gap:0; display:block; }
   /* Stand-in for the hidden page header: brand mark + back, so there's still
      a way to get back a step (or home) without the bottom action bar. Not
-     shown during signup-compose-active, which has its own topbar instead. */
-  body.signup-started #signupTopbar { display:flex; }
+     shown during signup-compose-active, which has its own topbar instead.
+     Sticky so it stays reachable while scrolling a long step (terms text,
+     language list) instead of scrolling away with the rest of the card.
+     #signupCard's own overflow:hidden (for its rounded corners) breaks
+     position:sticky on any descendant, so relax it once the card no longer
+     needs corner-clipping for anything (nothing bleeds past the edges here). */
+  body.signup-started #signupCard { overflow:visible; }
+  body.signup-started #signupTopbar { display:flex; position:sticky; top:0; z-index:10; border-radius:1rem 1rem 0 0; }
   body.signup-compose-active #signupTopbar { display:none; }
 
   /* Step 1 (service description) additionally goes full-screen while its
