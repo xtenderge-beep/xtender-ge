@@ -41,7 +41,7 @@ details > summary::-webkit-details-marker { display: none; }
 .star-btn.selected, .star-btn.hovered { color: #f59e0b; }
 
 /* ---- Режим фокуса на мобильном (полноэкранный композер, стиль Facebook) ---- */
-.compose-topbar { display: none; }
+.compose-topbar, #signupTopbar { display: none; }
 @media (max-width: 639px) {
   body.compose-active { overflow: hidden; }
   body.compose-active header,
@@ -123,6 +123,11 @@ details > summary::-webkit-details-marker { display: none; }
   body.signup-started .provider-join-grid > aside { display:none !important; }
   body.signup-started main { padding:0; }
   body.signup-started .provider-join-grid { margin-top:0; gap:0; display:block; }
+  /* Stand-in for the hidden page header: brand mark + back, so there's still
+     a way to get back a step (or home) without the bottom action bar. Not
+     shown during signup-compose-active, which has its own topbar instead. */
+  body.signup-started #signupTopbar { display:flex; }
+  body.signup-compose-active #signupTopbar { display:none; }
 
   /* Step 1 (service description) additionally goes full-screen while its
      textarea is focused - same focused-input pattern as the client request

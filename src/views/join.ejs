@@ -4,6 +4,7 @@
     <%- include('partials/head', {
       title: t('join_page_title'),
       metaDescription: t('meta_description_join'),
+      viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
     }) %>
 
     <link rel="canonical" href="<%= seo.canonical %>">
@@ -46,6 +47,12 @@
         <div class="provider-join-grid">
         <div id="signupCard" class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
+            <div id="signupTopbar" class="hidden items-center gap-3 px-4 py-3 border-b border-stone-200 bg-white shrink-0">
+                <button id="signupTopbarBack" type="button" onclick="changeSignupStep(signupStep - 1)" aria-label="<%= t('otp_back') %>" class="w-9 h-9 -ml-1 flex items-center justify-center rounded-full text-stone-600 hover:bg-stone-100 active:scale-95 transition shrink-0" hidden>
+                    <i class="fa-solid fa-arrow-left text-base"></i>
+                </button>
+                <a href="/" class="flex items-center gap-2"><%- include('partials/brand') %></a>
+            </div>
             <div id="signupProgress" class="provider-signup-header">
                 <p id="signupStepCount" class="provider-signup-count" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
                 <ol class="provider-signup-progress" aria-label="<%= t('provider_signup_progress') %>">
@@ -148,7 +155,7 @@
                 <div class="provider-signup-actions">
                     <button id="signupBack" type="button" onclick="changeSignupStep(signupStep - 1)" class="provider-signup-back" hidden><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><%= t('otp_back') %></button>
                     <button id="signupNext" type="button" onclick="nextSignupStep()" class="provider-signup-next"><%= t('home_next') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
-                    <button id="sendOtpButton" type="button" disabled onclick="sendOtp()" class="provider-signup-next" hidden><%= t('join_submit_btn') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                    <button id="sendOtpButton" type="button" disabled onclick="sendOtp()" class="provider-signup-next" hidden><span id="sendOtpButtonLabel"><%= t('join_terms_scroll_pill') %></span><i id="sendOtpButtonIcon" class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
                 </div>
             </div>
 
@@ -254,6 +261,8 @@
             if (!atEnd) return;
             termsScrolled = true;
             sendOtpButton.disabled = false;
+            document.getElementById('sendOtpButtonLabel').textContent = T.join_submit_btn;
+            document.getElementById('sendOtpButtonIcon').className = 'fa-solid fa-arrow-right';
             document.getElementById('termsScrollFade').classList.add('opacity-0');
             document.getElementById('termsScrollHintPill').classList.add('opacity-0');
             document.getElementById('termsHint').innerHTML =
@@ -283,6 +292,7 @@
             const title = document.getElementById('signupStepTitle');
             title.textContent = signupTitles[step];
             document.getElementById('signupBack').hidden = step === 0;
+            document.getElementById('signupTopbarBack').hidden = step === 0;
             document.getElementById('signupNext').hidden = step === LAST_STEP;
             sendOtpButton.hidden = step !== LAST_STEP;
             if (step === LAST_STEP) checkTermsScrollEnd();
