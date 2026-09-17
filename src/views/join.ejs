@@ -49,7 +49,7 @@
             <div id="signupProgress" class="provider-signup-header">
                 <p id="signupStepCount" class="provider-signup-count" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
                 <ol class="provider-signup-progress" aria-label="<%= t('provider_signup_progress') %>">
-                    <% ['provider_signup_services','provider_signup_area','provider_signup_contact'].forEach((key, i) => { %>
+                    <% ['provider_signup_services','provider_signup_city','provider_signup_languages','provider_signup_contact','provider_signup_terms'].forEach((key, i) => { %>
                     <li data-signup-indicator="<%= i %>" <%- i === 0 ? 'aria-current="step"' : '' %>><span><%= i + 1 %></span><%= t(key) %></li>
                     <% }); %>
                 </ol>
@@ -76,28 +76,28 @@
 
                 </div>
                 <div data-signup-panel="1" class="space-y-4" hidden>
-                    <p class="provider-help"><%= t('provider_signup_area_hint') %></p>
-                    <div id="locationFields">                    <fieldset>
-                        <legend class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_work_cities_label') %> *</legend>
-                        <p class="text-[11px] text-stone-400 mb-1.5"><%= t('join_work_cities_hint') %></p>
+                    <p class="provider-help"><%= t('join_work_cities_hint') %></p>
+                    <fieldset>
+                        <legend class="sr-only"><%= t('join_work_cities_label') %></legend>
                         <div class="flex flex-wrap gap-2">
                         <% cities.forEach(c => { %>
                             <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-stone-200 text-sm"><input type="checkbox" name="cityIds" value="<%= c.id %>"><span><%= c.name %></span></label>
                         <% }); %>
                         </div>
-                    </fieldset></div>
-                <fieldset>
-                    <legend class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_languages_label') %> *</legend>
-                    <p class="provider-help"><%= t('join_languages_hint') %></p>
-                    <div class="grid grid-cols-2 gap-2">
-                    <% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %>
-                        <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-stone-200 text-sm"><input type="checkbox" name="spokenLanguages" value="<%= code %>"><span><%= label %></span></label>
-                    <% }); %>
-                    </div>
-                </fieldset>
-
+                    </fieldset>
                 </div>
                 <div data-signup-panel="2" class="space-y-4" hidden>
+                    <p class="provider-help"><%= t('join_languages_hint') %></p>
+                    <fieldset>
+                        <legend class="sr-only"><%= t('join_languages_label') %></legend>
+                        <div class="grid grid-cols-2 gap-2">
+                        <% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %>
+                            <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-stone-200 text-sm"><input type="checkbox" name="spokenLanguages" value="<%= code %>"><span><%= label %></span></label>
+                        <% }); %>
+                        </div>
+                    </fieldset>
+                </div>
+                <div data-signup-panel="3" class="space-y-4" hidden>
                 <div>
                     <label for="nameInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_name_label') %></label>
                     <input type="text" id="nameInput" autocomplete="name" placeholder="<%= t('join_name_placeholder') %>"
@@ -126,26 +126,34 @@
                     <input type="text" id="promoInput" value="<%= hasPromo ? promo.code : '' %>" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
                         class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
                 </details>
-
+                </div>
+                <div data-signup-panel="4" class="space-y-3" hidden>
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
                 <% consent.notices.forEach(notice => { %><p class="text-xs text-stone-600 leading-relaxed"><%= notice %></p><% }) %>
-                <div>
-                    <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
-                        <input type="checkbox" id="termsCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
-                        <span><%= consent.termsLabel %> — <button type="button" id="openTermsModalBtn" class="text-emerald-700 underline font-bold"><%= t('join_terms_open_btn') %></button></span>
-                    </label>
-                    <p id="termsAcceptedNote" class="hidden pl-6 mt-1 text-[11px] font-bold text-emerald-700"><i class="fa-solid fa-check mr-1"></i><%= t('join_terms_accepted_note') %> · <span id="termsAcceptedAt"></span></p>
+                <p class="text-xs font-semibold text-stone-700 leading-relaxed"><%= consent.termsLabel %></p>
+                <div class="relative rounded-xl border border-stone-200 bg-stone-50 overflow-hidden">
+                    <div id="termsBody" tabindex="-1" class="h-72 sm:h-80 overflow-y-auto px-4 py-3 text-sm text-stone-700 leading-relaxed">
+                        <%- include('partials/legal-blocks', { blocks: legalDoc.body[lang] || legalDoc.body.ru, reqLabels, reqPending, requisites, lang }) %>
+                    </div>
+                    <div id="termsScrollFade" class="pointer-events-none absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-stone-50 to-transparent transition-opacity duration-300"></div>
+                    <div id="termsScrollHintPill" class="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center transition-opacity duration-300">
+                        <span class="flex items-center gap-1.5 bg-stone-900/85 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg animate-bounce">
+                            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i><%= t('join_terms_scroll_pill') %>
+                        </span>
+                    </div>
                 </div>
+                <p id="termsHint" class="text-[11px] text-stone-500 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><%= t('join_terms_modal_hint') %></span>
+                </p>
                 <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
                     <input type="checkbox" id="privacyCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
                     <span><%= t('join_privacy_label') %> <a href="<%= legalPrefix %>/privacy" target="_blank" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
                 </label>
-
                 </div>
                 <div class="provider-signup-actions">
                     <button id="signupBack" type="button" onclick="changeSignupStep(signupStep - 1)" class="provider-signup-back" hidden><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><%= t('otp_back') %></button>
                     <button id="signupNext" type="button" onclick="nextSignupStep()" class="provider-signup-next"><%= t('home_next') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
-                    <button id="sendOtpButton" type="button" onclick="sendOtp()" class="provider-signup-next" hidden><%= t('otp_send') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+                    <button id="sendOtpButton" type="button" disabled onclick="sendOtp()" class="provider-signup-next" hidden><%= t('otp_send') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                 </div>
             </div>
 
@@ -183,35 +191,6 @@
           </div>
           <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
     </div></main>
-
-    <div id="termsModal" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center sm:p-4 bg-stone-900/70 backdrop-blur-sm">
-        <div class="bg-white rounded-none sm:rounded-2xl max-w-lg w-full h-full sm:h-auto max-h-full sm:max-h-[85vh] flex flex-col shadow-2xl">
-            <div class="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-stone-200 shrink-0">
-                <h3 id="termsModalTitle" class="text-sm font-black text-stone-900"><%= t('terms_headline') %> <span class="font-mono font-normal text-stone-400"><%= consent.terms_version %></span></h3>
-                <button type="button" aria-label="<%= t('join_terms_close_btn') %>" onclick="closeTermsModal()" class="w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition shrink-0">✕</button>
-            </div>
-            <div class="relative grow min-h-0">
-                <div id="termsModalBody" class="h-full overflow-y-auto px-5 sm:px-6 py-4 text-sm text-stone-700 leading-relaxed">
-                    <%- include('partials/legal-blocks', { blocks: legalDoc.body[lang] || legalDoc.body.ru, reqLabels, reqPending, requisites, lang }) %>
-                </div>
-                <div id="termsScrollFade" class="pointer-events-none absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-white to-transparent transition-opacity duration-300"></div>
-                <div id="termsScrollHintPill" class="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center transition-opacity duration-300">
-                    <span class="flex items-center gap-1.5 bg-stone-900/85 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg animate-bounce">
-                        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i><%= t('join_terms_scroll_pill') %>
-                    </span>
-                </div>
-            </div>
-            <div class="px-5 sm:px-6 py-4 border-t border-stone-200 shrink-0 space-y-2">
-                <p id="termsModalHint" class="text-[11px] text-stone-500 flex items-center gap-1.5">
-                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><%= t('join_terms_modal_hint') %></span>
-                </p>
-                <button type="button" id="termsModalAcceptBtn" disabled onclick="acceptTermsModal()"
-                    class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-stone-200 disabled:text-stone-400 disabled:cursor-not-allowed text-white text-sm font-black transition">
-                    <%= t('join_terms_accept_btn') %>
-                </button>
-            </div>
-        </div>
-    </div>
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
@@ -252,85 +231,43 @@
                 description: document.getElementById('descriptionInput').value.trim(),
                 phone: document.getElementById('phoneInput').value.trim(),
                 promoCode: document.getElementById('promoInput').value.trim(),
-                termsAccepted: document.getElementById('termsCheckbox').checked,
+                termsAccepted: termsScrolled,
                 termsScrolled: termsScrolled,
                 privacyAccepted: document.getElementById('privacyCheckbox').checked,
             };
         }
 
-        // Чекбокс Оферты нельзя поставить напрямую — только пройдя модалку с полным
-        // текстом документа до конца (юридически чище: не просто галочка рядом со ссылкой,
-        // а доказуемый факт прочтения). termsScrolled едет на сервер и перепроверяется там.
+        // Договор — отдельный последний шаг мастера, не чекбокс рядом со ссылкой: кнопка
+        // «Получить код» внизу шага задизейблена, пока текст не долистан до конца.
+        // termsScrolled едет на сервер и перепроверяется там же (consent.service.js).
         let termsScrolled = false;
-        let termsScrolledAt = null;
-        const termsCheckbox = document.getElementById('termsCheckbox');
-        const termsModal = document.getElementById('termsModal');
-        const termsModalBody = document.getElementById('termsModalBody');
-        const termsModalAcceptBtn = document.getElementById('termsModalAcceptBtn');
-        let termsModalReturnFocus = null;
+        const termsBody = document.getElementById('termsBody');
+        const sendOtpButton = document.getElementById('sendOtpButton');
 
-        function openTermsModal() {
-            termsModalReturnFocus = document.activeElement;
-            termsModal.classList.remove('hidden');
-            termsModal.classList.add('flex');
-            document.body.classList.add('overflow-hidden');
-            checkTermsScrollEnd();
-            termsModal.focus();
-        }
-        function closeTermsModal() {
-            termsModal.classList.add('hidden');
-            termsModal.classList.remove('flex');
-            document.body.classList.remove('overflow-hidden');
-            if (termsModalReturnFocus && termsModalReturnFocus.isConnected) termsModalReturnFocus.focus();
-        }
         // Пилюля «прокрутите вниз» + градиент-«затухание» показывают, что текст не
         // закончился, и обе подсказки убираются насовсем, как только долистали один раз —
         // не мигают туда-обратно, если потом проскроллят назад перечитать что-то.
-        let termsReachedEnd = false;
         function checkTermsScrollEnd() {
-            if (termsReachedEnd) return;
-            const atEnd = termsModalBody.scrollTop + termsModalBody.clientHeight >= termsModalBody.scrollHeight - 8;
+            if (termsScrolled) return;
+            const atEnd = termsBody.scrollTop + termsBody.clientHeight >= termsBody.scrollHeight - 8;
             if (!atEnd) return;
-            termsReachedEnd = true;
-            termsModalAcceptBtn.disabled = false;
+            termsScrolled = true;
+            sendOtpButton.disabled = false;
             document.getElementById('termsScrollFade').classList.add('opacity-0');
             document.getElementById('termsScrollHintPill').classList.add('opacity-0');
-            document.getElementById('termsModalHint').innerHTML =
+            document.getElementById('termsHint').innerHTML =
                 '<i class="fa-solid fa-circle-check text-emerald-600" aria-hidden="true"></i><span>' + T.join_terms_modal_hint_done + '</span>';
         }
-        function acceptTermsModal() {
-            if (termsModalAcceptBtn.disabled) return;
-            termsScrolled = true;
-            termsScrolledAt = new Date().toISOString();
-            termsCheckbox.checked = true;
-            document.getElementById('termsAcceptedNote').classList.remove('hidden');
-            document.getElementById('termsAcceptedAt').textContent = new Date(termsScrolledAt).toLocaleString();
-            closeTermsModal();
-            showMsg('');
-        }
-        document.getElementById('openTermsModalBtn').addEventListener('click', openTermsModal);
-        termsModalBody.addEventListener('scroll', checkTermsScrollEnd);
-        termsCheckbox.addEventListener('click', function (e) {
-            if (termsCheckbox.checked && !termsScrolled) {
-                e.preventDefault();
-                openTermsModal();
-            } else if (!termsCheckbox.checked) {
-                termsScrolled = false;
-                termsScrolledAt = null;
-                document.getElementById('termsAcceptedNote').classList.add('hidden');
-            }
-        });
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && !termsModal.classList.contains('hidden')) closeTermsModal();
-        });
+        termsBody.addEventListener('scroll', checkTermsScrollEnd);
 
         let signupStep = 0;
         let signupBusy = false;
         let lockedSignupFields = [];
-        const signupTitles = [T.provider_services_section, T.provider_signup_area_title, T.provider_contact_section];
+        const signupTitles = [T.provider_services_section, T.provider_signup_city_title, T.provider_signup_languages_title, T.provider_contact_section, T.provider_signup_terms_title];
+        const LAST_STEP = signupTitles.length - 1;
 
         function changeSignupStep(step, focusTitle = true) {
-            if (signupBusy || !Number.isInteger(step) || step < 0 || step > 2) return;
+            if (signupBusy || !Number.isInteger(step) || step < 0 || step > LAST_STEP) return;
             signupStep = step;
             showMsg('');
             document.querySelectorAll('[data-signup-panel]').forEach((panel, index) => { panel.hidden = index !== step; });
@@ -343,8 +280,9 @@
             const title = document.getElementById('signupStepTitle');
             title.textContent = signupTitles[step];
             document.getElementById('signupBack').hidden = step === 0;
-            document.getElementById('signupNext').hidden = step === 2;
-            document.getElementById('sendOtpButton').hidden = step !== 2;
+            document.getElementById('signupNext').hidden = step === LAST_STEP;
+            sendOtpButton.hidden = step !== LAST_STEP;
+            if (step === LAST_STEP) checkTermsScrollEnd();
             if (focusTitle) {
                 document.getElementById('signupCard').scrollIntoView({ block: 'start' });
                 title.focus({ preventScroll: true });
@@ -363,21 +301,25 @@
             if (step === 0 && (!payload.description || payload.description.length > 2000)) {
                 return signupError(0, T.join_services_required, '#descriptionInput');
             }
-            if (step === 1) {
-                if (!payload.cityIds.length) return signupError(1, T.join_work_cities_required, 'input[name="cityIds"]');
-                if (!payload.spokenLanguages.length) return signupError(1, T.join_languages_required, 'input[name="spokenLanguages"]');
+            if (step === 1 && !payload.cityIds.length) {
+                return signupError(1, T.join_work_cities_required, 'input[name="cityIds"]');
             }
-            if (step === 2) {
-                if (!payload.name) return signupError(2, T.join_err_name_required, '#nameInput');
+            if (step === 2 && !payload.spokenLanguages.length) {
+                return signupError(2, T.join_languages_required, 'input[name="spokenLanguages"]');
+            }
+            if (step === 3) {
+                if (!payload.name) return signupError(3, T.join_err_name_required, '#nameInput');
                 if (!window.GeorgianPhone.validate(document.getElementById('phoneInput'))) return false;
-                if (!payload.termsAccepted) return signupError(2, T.join_err_terms_required, '#openTermsModalBtn');
-                if (!payload.privacyAccepted) return signupError(2, T.join_err_privacy_required, '#privacyCheckbox');
+            }
+            if (step === 4) {
+                if (!payload.termsScrolled) return signupError(4, T.join_err_terms_required, '#termsBody');
+                if (!payload.privacyAccepted) return signupError(4, T.join_err_privacy_required, '#privacyCheckbox');
             }
             return true;
         }
 
         function nextSignupStep() {
-            if (!signupBusy && signupStep < 2 && validateSignupStep(signupStep)) changeSignupStep(signupStep + 1);
+            if (!signupBusy && signupStep < LAST_STEP && validateSignupStep(signupStep)) changeSignupStep(signupStep + 1);
         }
 
         document.getElementById('detailsStep').addEventListener('input', function () { showMsg(''); });
@@ -401,7 +343,7 @@
         async function sendOtp() {
             if (signupBusy) return;
             showMsg('');
-            for (const step of [0, 1, 2]) { if (!validateSignupStep(step)) return; }
+            for (let step = 0; step <= LAST_STEP; step++) { if (!validateSignupStep(step)) return; }
             const payload = collectPayload();
             setSignupBusy(true);
             try {
@@ -434,7 +376,7 @@
             showMsg('');
             document.getElementById('otpStep').classList.add('hidden');
             document.getElementById('detailsStep').classList.remove('hidden');
-            changeSignupStep(2);
+            changeSignupStep(LAST_STEP);
         }
 
         async function verifyAndRegister() {
