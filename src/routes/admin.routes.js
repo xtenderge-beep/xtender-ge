@@ -74,6 +74,10 @@ router.post('/reviews/:id/reject', verifyCsrf, asyncHandler(adminController.reje
 router.get('/consent', asyncHandler(adminController.consentLog));
 router.get('/consent/export', asyncHandler(adminController.consentExport));
 
+router.get('/legal', asyncHandler(adminController.legalPage));
+router.post('/legal/terms', verifyCsrf, asyncHandler(adminController.updateLegalTerms));
+router.post('/legal/privacy', verifyCsrf, asyncHandler(adminController.updateLegalPrivacy));
+
 router.get('/support', asyncHandler(adminController.supportList));
 router.get('/support/:masterId', asyncHandler(adminController.supportThread));
 router.post('/support/:masterId/reply', verifyCsrf, asyncHandler(adminController.supportReply));

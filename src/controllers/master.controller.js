@@ -16,7 +16,7 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const { clientStrings, normalizeLang, translate } = require('../config/i18n');
 const { requestMeta } = require('../config/requestMeta');
-const { TERMS_VERSION } = require('../config/legal');
+const legalContentService = require('../services/legalContent.service');
 const payment = require('../config/payment');
 
 const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
@@ -122,7 +122,7 @@ async function sendOtp(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
-  const acceptance = consentService.acceptedRequest(req, 'provider', { requireScroll: true });
+  const acceptance = await consentService.acceptedRequest(req, 'provider', { requireScroll: true });
   if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
   const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
   if (!result.success) {
@@ -150,10 +150,12 @@ async function verifyOtp(req, res) {
   }
 
   // The OTP service uses the immutable snapshot captured when this challenge was sent.
+  // Фолбэк-версия ниже почти всегда перекрыта тем снимком — нужна лишь на случай его отсутствия.
+  const { version: termsVersionFallback } = await legalContentService.getTerms();
   const isValid = await otpService.verifyCode(toE164(rawPhone), code, OTP_PURPOSE, {
     meta: requestMeta(req),
     language: req.lang,
-    termsVersion: TERMS_VERSION,
+    termsVersion: termsVersionFallback,
     strict: true,
     challengeId: req.body.challengeId,
   });
@@ -388,11 +390,14 @@ async function loginVerify(req, res) {
 
   const master = await masterService.getMasterByPhone(phone);
 
+  // Вход не переподтверждает согласие (см. docs/consent-and-legal.md) — снимка
+  // нет вовсе, поэтому здесь фолбэк-версия реально используется, а не перекрывается.
+  const { version: termsVersion } = await legalContentService.getTerms();
   const ok = await otpService.verifyCode(phone, code, MASTER_LOGIN_PURPOSE, {
     meta: requestMeta(req),
     language: req.lang,
     masterId: master && master.id,
-    termsVersion: TERMS_VERSION,
+    termsVersion,
   });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 

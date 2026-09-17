@@ -7,13 +7,13 @@ router.get('/d/:token',wrap(async(req,res)=>{
  const item=await crm.open(req.params.token);if(item.kind==='provider')return res.redirect('/i/'+item.token);
  const csrf=crypto.randomBytes(32).toString('hex');res.cookie('draft_csrf',csrf,{httpOnly:true,secure:req.secure,sameSite:'lax',maxAge:3600000,path:'/'});
  const lang=['ru','en','ka'].includes(req.cookies.lang)?req.cookies.lang:'ka';
- res.render('crm/draft',{item,csrf,consent:consent.bundle('client',lang),draftLang:lang});
+ res.render('crm/draft',{item,csrf,consent:await consent.bundle('client',lang),draftLang:lang});
 }));
 router.post('/api/drafts/:token/send',wrap(async(req,res)=>{
  if(!req.cookies.draft_csrf||req.cookies.draft_csrf!==req.body._csrf)return res.status(403).json({success:false,message:'Обновите страницу / Refresh the page'});
  const item=await crm.publicInvite(req.params.token);if(item.kind==='provider'||item.status!=='unverified')throw crm.fail('Заявка уже отправлена / Request already submitted',409);
  if(!require('../config/phone').isGeorgianPhone(item.phone))return res.status(400).json({success:false,message:require('../config/phone').georgianPhoneError(req.lang)});
- const snapshot=crm.details(req.body),accepted=consent.acceptedRequest(req,'client');if(accepted.error)return res.status(accepted.status).json({success:false,message:accepted.error});
+ const snapshot=crm.details(req.body),accepted=await consent.acceptedRequest(req,'client');if(accepted.error)return res.status(accepted.status).json({success:false,message:accepted.error});
  const order=await require('../services/order.service').getOrderByToken(item.order_token);
  const ownerLink=require('../config/url').getBaseUrl()+'/o/'+order.owner_token;
  const result=await otp.sendCode(item.phone,ownerLink,'order',item.order_id,{meta:require('../config/requestMeta').requestMeta(req),consent:accepted.consent,draftDetails:snapshot});

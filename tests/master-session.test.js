@@ -31,9 +31,13 @@ const { translate, clientStrings } = require('../src/config/i18n');
   const masterService = require('../src/services/master.service');
   const topupService = require('../src/services/topup.service');
   const otp = require('../src/services/otp.service');
+  const legalContentService = require('../src/services/legalContent.service');
   const master = { id: 1, master_token: 'token-a' };
   masterService.getMasterByPhone = async () => master;
   otp.verifyCode = async () => true;
+  // loginVerify reads the current Terms version as a fallback before delegating to
+  // otp.verifyCode (stubbed above) — stub it too so this test stays DB-free like the rest.
+  legalContentService.getTerms = async () => ({ version: 'v-test' });
   otp.clearVerified = async () => {};
   let loginCookie;
   const response = { set(){}, clearCookie(){this.cleared=true;}, redirect(path){this.redirected=path;}, render(view,data){this.data=data;}, json(data){this.data=data;}, cookie(name,value){loginCookie=value;} };

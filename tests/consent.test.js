@@ -44,7 +44,7 @@ function response() {
 }
 const request = body => ({ body, cookies: {}, headers: {}, get:()=> 'localhost', lang: 'ru', protocol: 'http', ip:'127.0.0.1' });
 async function issue(phone, purpose, orderId=null) {
-  const snapshot = consent.bundle(purpose === 'order' ? 'client' : 'provider', 'ru');
+  const snapshot = await consent.bundle(purpose === 'order' ? 'client' : 'provider', 'ru');
   const result = await otp.sendCode(phone, null, purpose, orderId, { consent: snapshot });
   const code = await redis.get(`otp:${purpose}:${phone}`);
   return { snapshot, code, challengeId: result.challengeId };
@@ -63,11 +63,11 @@ async function render(file, locals) {
 }
 
 (async()=>{
-  const bundle=consent.bundle('client','ru');
+  const bundle=await consent.bundle('client','ru');
   const acceptance={termsAccepted:true,privacyAccepted:true,consentLanguage:'ru',consentDigest:bundle.digest};
-  assert.ok(consent.acceptedRequest(request(acceptance),'client').consent);
-  assert.equal(consent.acceptedRequest(request({...acceptance,termsAccepted:'false'}),'client').status,400);
-  assert.equal(consent.acceptedRequest(request({...acceptance,consentDigest:'old'}),'client').status,409);
+  assert.ok((await consent.acceptedRequest(request(acceptance),'client')).consent);
+  assert.equal((await consent.acceptedRequest(request({...acceptance,termsAccepted:'false'}),'client')).status,400);
+  assert.equal((await consent.acceptedRequest(request({...acceptance,consentDigest:'old'}),'client')).status,409);
   let res=response();await otpController.send(request({phone:'+995500000001',description:'Test'}),res);
   assert.equal(res.statusCode,400);assert.equal(sent,0);
 
@@ -137,11 +137,14 @@ async function render(file, locals) {
   for(const lang of ['ru','en','ka']) {
     const t=translate(lang);
     const common={lang,t,clientStrings:clientStrings(lang),currentPath:'/',isRememberedProvider:false,csrfToken:'test',seo:buildSeo(lang,'/')};
-    const html=await render('index.ejs',{...common,masters:[],catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:consent.bundle('client',lang)});
+    const html=await render('index.ejs',{...common,masters:[],catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:await consent.bundle('client',lang)});
     assert.ok(html.includes('id="clientSharing"'));assert.ok(!/id="clientSharing"[^>]*checked/.test(html));
-    await render('join.ejs',{...common,consent:consent.bundle('provider',lang),legalDoc:legalContent.terms,reqLabels:legalContent.REQUISITE_LABELS,reqPending:legalContent.REQUISITE_PENDING,requisites:SERVICE_REQUISITES,welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
+    await render('join.ejs',{...common,consent:await consent.bundle('provider',lang),legalDoc:legalContent.terms,reqLabels:legalContent.REQUISITE_LABELS,reqPending:legalContent.REQUISITE_PENDING,requisites:SERVICE_REQUISITES,welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
     await render('order.ejs',{...common,order:published,files:[],isOwner:true,masterId:null,funnel:null,masterAccount:null,whatsappText:''});
   }
   await render('admin/consent.ejs',{phoneQuery:phone,report,recent:[],csrfToken:'test'});
+  const { renderDocBody } = require('../src/config/legalTextFormat');
+  const toText = (doc) => ({ ka: renderDocBody(doc.body.ka), ru: renderDocBody(doc.body.ru), en: renderDocBody(doc.body.en) });
+  await render('admin/legal.ejs',{terms:legalContent.terms,privacy:legalContent.privacy,termsText:toText(legalContent.terms),privacyText:toText(legalContent.privacy),errorDoc:null,error:null,saved:null,csrfToken:'test'});
   console.log('PASS: consent validation, exact document archive, OTP challenge isolation/replay/attempt limits, strict failure, request binding, transactional publication/closure, forged owner cookie, provider grant reuse, exports and rendered scripts in ru/en/ka. No real SMS or database used.');
 })().catch(err=>{console.error(err);process.exitCode=1;}).finally(()=>redis.disconnect());

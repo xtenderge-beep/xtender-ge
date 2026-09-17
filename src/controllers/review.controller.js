@@ -5,7 +5,7 @@ const redis = require('../config/redis');
 const { clientStrings } = require('../config/i18n');
 const { phoneVariants } = require('../config/phone');
 const { requestMeta } = require('../config/requestMeta');
-const { TERMS_VERSION } = require('../config/legal');
+const legalContentService = require('../services/legalContent.service');
 
 const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
@@ -57,10 +57,11 @@ async function verifyForMaster(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid input' });
   }
 
+  const { version: termsVersion } = await legalContentService.getTerms();
   const ok = await otpService.verifyCode(phone, code, REVIEW_PURPOSE, {
     meta: requestMeta(req),
     language: req.lang,
-    termsVersion: TERMS_VERSION,
+    termsVersion,
   });
   if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
 

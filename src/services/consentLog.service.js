@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { TERMS_VERSION, PRIVACY_VERSION } = require('../config/legal');
+const legalContentService = require('./legalContent.service');
 
 // Журнал согласий на SMS + доставок (Double Opt-In / аудит). Таблица sms_consent_logs
 // строго append-only — здесь только INSERT и SELECT, никаких UPDATE/DELETE.
@@ -159,7 +159,7 @@ async function exportForPhone(rawPhone) {
   }
 
   const ph = variants.map((_, i) => `$${i + 1}`).join(', ');
-  const [logs, masters] = await Promise.all([
+  const [logs, masters, terms, privacy] = await Promise.all([
     pool.query(
       `SELECT * FROM sms_consent_logs WHERE phone_number IN (${ph})
        ORDER BY timestamp_utc ASC, id ASC`,
@@ -170,6 +170,8 @@ async function exportForPhone(rawPhone) {
        FROM masters WHERE phone IN (${ph})`,
       variants
     ),
+    legalContentService.getTerms(),
+    legalContentService.getPrivacy(),
   ]);
 
   const optIn = [...logs.rows].reverse().find((r) => r.event_type === 'CONSENT_SMS_OTP_VERIFIED') || null;
@@ -224,8 +226,8 @@ async function exportForPhone(rawPhone) {
   return {
     report_type: 'sms_consent_audit',
     generated_at_utc: new Date().toISOString(),
-    terms_version_current: TERMS_VERSION,
-    privacy_version_current: PRIVACY_VERSION,
+    terms_version_current: terms.version,
+    privacy_version_current: privacy.version,
     query: { phone: rawPhone, matched_phone_formats: variants },
     subject: {
       profiles: masters.rows.map((p) => ({ ...p, has_explicit_sms_consent: Boolean(optIn) })),

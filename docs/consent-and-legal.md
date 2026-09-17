@@ -47,28 +47,52 @@
 - `v1.2-2026-09-03` — ценз 18+, cookie, монетизация (баланс/аванс, no-pause, no-refund),
   два раздельных чекбокса на `/join`.
 
-### Где лежит текст
+### Где лежит текст — теперь редактируется из админки, без деплоя
 
-| Что | Файл | Что править |
+**`/admin/legal`** (2026-09-17) — основной способ править текст Оферты и Политики.
+Textarea на 3 языка на документ, plain-text формат (`## Заголовок`, `- пункт`,
+`[[REQUISITES]]`, любая другая строка — абзац; пусто — разделитель блоков) —
+парсится/рендерится `src/config/legalTextFormat.js` (`parseDocBody`/`renderDocBody`).
+Хранится в `app_settings` (ключи `legal_terms`/`legal_privacy`, JSON) через
+`src/services/legalContent.service.js` (`getTerms`/`getPrivacy`/`saveTerms`/`savePrivacy`)
+— тот же паттерн, что уже был для цены лида и банковских реквизитов пополнения
+(`settings.service.js`, без in-memory кэша: лишний SELECT дешевле риска рассинхронизации
+digest-блокировки в `consent.service.js` после правки).
+
+**Версия поднимается автоматически на каждое сохранение** (MINOR+1, дата = сегодня,
+MAJOR не трогается) — вручную больше поднимать не нужно, `bumpVersion()` в
+`legalContent.service.js`.
+
+`src/config/legal-content.js` / `legal.js` **не удалены** — это фолбэк/сид: пока в
+`app_settings` нет строки (свежий деплой или ещё ни разу не сохраняли через админку),
+сайт отдаёт ровно то, что в них зашито. Правка этих файлов напрямую в коде больше не
+имеет смысла для текста документов — их переживёт первое же сохранение через `/admin/legal`.
+
+| Что | Где | Что править |
 |---|---|---|
-| Текст Оферты и Политики, ka/ru/en | `src/config/legal-content.js` | массивы `terms.body.{ka,ru,en}` и `privacy.body.{ka,ru,en}`. Блок = `{ h: 'заголовок' }` \| `{ p: 'абзац' }` \| `{ ul: ['пункт', …] }` \| `{ requisites: true }` (сюда подставляются реквизиты) |
-| Даты «последнее обновление» | `src/config/legal-content.js` | `terms.updated`, `privacy.updated` |
-| Подписи полей реквизитов, текст «уточняется…», подписи «Версия / Обновлено» | `src/config/legal-content.js` | `REQUISITE_LABELS`, `REQUISITE_PENDING`, `LABELS` |
-| **Версии документов** | `src/config/legal.js` | `TERMS_VERSION`, `PRIVACY_VERSION` |
-| **Реквизиты юр. лица** | `src/config/legal.js` | `SERVICE_REQUISITES` |
+| Подписи полей реквизитов, текст «уточняется…», подписи «Версия / Обновлено» | `src/config/legal-content.js` | `REQUISITE_LABELS`, `REQUISITE_PENDING`, `LABELS` (код, не через админку) |
+| **Реквизиты юр. лица** (банк, ИП, адрес) | `src/config/legal.js` | `SERVICE_REQUISITES` — в этот проход НЕ вынесены в админку (см. п. «Не хватает» ниже) |
 | Тайтлы / H1 / meta-описания страниц | `src/config/i18n.js` | `terms_page_title`, `terms_headline`, `privacy_page_title`, `privacy_headline`, `meta_description_terms`, `meta_description_privacy` (по разу в блоках ka/ru/en) |
-| Текст чекбоксов на `/join` | `src/config/i18n.js` | `join_terms_label` / `join_terms_link` / `join_err_terms_required` и `join_privacy_*` (по разу в ka/ru/en) |
-| Подзаголовок + текст «Как это работает» на экране «Готово» `/join` | `src/config/i18n.js` | `join_subtitle`, `join_payment_desc` (инфо-блок `join_payment_note` над чекбоксами удалён в v1.3 — цифр цены на регистрации больше нет) |
-| Рендер страниц | `src/views/terms.ejs`, `privacy.ejs` — тонкие обёртки; общий рендер — `src/views/_legal-doc.ejs` |
-| Роуты | `src/routes/public.routes.js` — `GET /terms`, `GET /privacy` (+ локали `/ru/…`, `/en/…`) |
+| Текст чекбоксов на `/join` (Политика) + вступление к шагу «Договор» | `src/config/i18n.js`, `src/config/consent-copy.js` | `join_privacy_label`/`join_terms_label`, `text.provider`/`text.platform`/`text.providerClosing` — не версионируются, см. ниже |
+| Рендер страниц | `src/views/terms.ejs`, `privacy.ejs` — тонкие обёртки; общий рендер — `src/views/_legal-doc.ejs`, блоки — `src/views/partials/legal-blocks.ejs` (тот же partial рендерит шаг «Договор» на `/join`) |
+| Роуты | `src/routes/public.routes.js` — `GET /terms`, `GET /privacy` (+ локали); `src/routes/admin.routes.js` — `GET /admin/legal`, `POST /admin/legal/terms`\|`privacy` |
 | sitemap | `public/sitemap.xml` — по 3 URL на документ |
+
+**Не хватает / на будущее:** `SERVICE_REQUISITES` (`legal.js`) остаётся статикой в коде —
+сознательно не объединяли с `payment_details` (`/admin/settings`, `topup.service.js`) в
+этот проход, хотя обе точки хранят по сути одни и те же банковские данные (это и был
+источник исторического расхождения IBAN). Если понадобится редактировать реквизиты
+внутри самого текста оферты без деплоя — объединить источники, отдельная задача.
 
 ### Правило версий
 
-`TERMS_VERSION` / `PRIVACY_VERSION` (`src/config/legal.js`, формат `vMAJOR.MINOR-YYYY-MM-DD`)
-**поднимать при любом изменении текста соответствующего документа** в `legal-content.js`.
-По этой строке в журнале согласий видно, какую редакцию принял человек. Понизить/
-переиспользовать версию нельзя.
+`TERMS_VERSION` / `PRIVACY_VERSION` — теперь поле `version` в документе, который
+отдаёт `legalContent.service.js` (формат `vMAJOR.MINOR-YYYY-MM-DD` не изменился).
+**Поднимается автоматически** при сохранении через `/admin/legal` — вручную ничего
+поднимать не нужно. Статические константы `TERMS_VERSION`/`PRIVACY_VERSION` в
+`legal.js` остались только как версия фолбэк-документа (пока в БД пусто) — их
+по-прежнему поднимать вручную при правке текста НАПРЯМУЮ в `legal-content.js` (что
+не рекомендуется, см. выше). Понизить/переиспользовать версию нельзя.
 
 Текст чекбоксов на `/join` (`join_terms_label` / `join_privacy_label` в i18n) отдельно
 **не версионируется** — он сохраняется дословно в `consent_text_snapshot` на каждую
@@ -90,8 +114,11 @@
 перерегистрировать ИП на нежилой адрес и обновить поле.
 
 **Не хватает / на будущее:**
-- IBAN в оферте (`GE95…218`) ≠ IBAN в кабинете (`src/config/payment.js` — `GE22…318`,
-  получатель «xtender»). Свести к одному счёту, получателя — на имя ИП.
+- IBAN в статических дефолтах кода (`payment.js` + `legal.js`) уже совпадает —
+  `GE95BG0000000613339218`. Но реальное значение на проде тянется из
+  `app_settings.payment_details` (редактируется на `/admin/settings`) и могло
+  остаться старым (`GE22BG0000000612888318`) — свериться на живом `/admin/settings`,
+  см. чек-лист в `docs/tasks.md`.
 - Карточная оплата пополнения баланса (сейчас только банковский перевод + ручной `/topup`).
 - Юр. вычитка грузинского текста оферты грузинским юристом — до того, как оферта начнёт
   работать «за деньги».

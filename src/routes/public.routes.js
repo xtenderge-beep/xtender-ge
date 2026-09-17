@@ -5,6 +5,7 @@ const serviceTypes = require('../config/serviceTypes');
 const { buildSeo } = require('../config/seo');
 const { SERVICE_REQUISITES } = require('../config/legal');
 const legalContent = require('../config/legal-content');
+const legalContentService = require('../services/legalContent.service');
 const masterService = require('../services/master.service');
 const managerService = require('../services/manager.service');
 const reviewService = require('../services/review.service');
@@ -76,7 +77,7 @@ router.get('/', asyncHandler(async (req, res) => {
   }
 
   res.render('index', {
-    consent: consentService.bundle('client', locale),
+    consent: await consentService.bundle('client', locale),
     masters,
     catalogCallPriceTetri,
     prefillPhone,
@@ -151,8 +152,8 @@ router.get('/join', asyncHandler(async (req, res) => {
   const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
   res.render('join', {
-    consent: consentService.bundle('provider', locale),
-    legalDoc: legalContent.terms, ...LEGAL_LOCALS,
+    consent: await consentService.bundle('provider', locale),
+    legalDoc: await legalContentService.getTerms(), ...LEGAL_LOCALS,
     welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
     clientStrings: clientStrings(locale),
     promo,
@@ -165,16 +166,16 @@ router.get('/r/:code', (req, res) => {
   res.redirect(`/join?promo=${encodeURIComponent((req.params.code || '').toUpperCase())}`);
 });
 
-router.get('/terms', (req, res) => {
+router.get('/terms', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '/terms')) return;
   resolveLocale(req, res, '/terms');
-  res.render('terms', { legalDoc: legalContent.terms, ...LEGAL_LOCALS });
-});
+  res.render('terms', { legalDoc: await legalContentService.getTerms(), ...LEGAL_LOCALS });
+}));
 
-router.get('/privacy', (req, res) => {
+router.get('/privacy', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '/privacy')) return;
   resolveLocale(req, res, '/privacy');
-  res.render('privacy', { legalDoc: legalContent.privacy, ...LEGAL_LOCALS });
-});
+  res.render('privacy', { legalDoc: await legalContentService.getPrivacy(), ...LEGAL_LOCALS });
+}));
 
 module.exports = router;

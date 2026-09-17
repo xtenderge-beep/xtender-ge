@@ -17,6 +17,8 @@ const promoService = require('../services/promo.service');
 const managerService = require('../services/manager.service');
 const consentLogService = require('../services/consentLog.service');
 const settingsService = require('../services/settings.service');
+const legalContentService = require('../services/legalContent.service');
+const { renderDocBody } = require('../config/legalTextFormat');
 const { toE164 } = require('../config/phone');
 
 // junk оставлен для легаси-профилей; tow/bucket_lift — чтобы редактирование профиля
@@ -667,6 +669,36 @@ async function updatePaymentDetails(req,res) {
   try { await topupService.saveDetails(req.body); } catch(error) { return res.redirect('/admin/settings?error=payment'); }
   res.redirect('/admin/settings?saved=payment');
 }
+
+// Оферта/Политика — редактируются как plain text (legalTextFormat.js), хранятся в
+// app_settings через legalContent.service.js. Версия документа поднимается автоматически
+// на каждое сохранение — см. legalContent.service.js bumpVersion().
+async function legalPage(req, res) {
+  const [terms, privacy] = await Promise.all([legalContentService.getTerms(), legalContentService.getPrivacy()]);
+  const toText = (doc) => ({ ka: renderDocBody(doc.body.ka), ru: renderDocBody(doc.body.ru), en: renderDocBody(doc.body.en) });
+  res.render('admin/legal', {
+    terms, privacy,
+    termsText: toText(terms), privacyText: toText(privacy),
+    errorDoc: req.query.doc || null, error: req.query.error || null, saved: req.query.saved || null,
+  });
+}
+async function updateLegalTerms(req, res) {
+  try {
+    await legalContentService.saveTerms({ ka: req.body.ka, ru: req.body.ru, en: req.body.en });
+  } catch (error) {
+    return res.redirect('/admin/legal?doc=terms&error=' + encodeURIComponent(error.message));
+  }
+  res.redirect('/admin/legal?saved=terms');
+}
+async function updateLegalPrivacy(req, res) {
+  try {
+    await legalContentService.savePrivacy({ ka: req.body.ka, ru: req.body.ru, en: req.body.en });
+  } catch (error) {
+    return res.redirect('/admin/legal?doc=privacy&error=' + encodeURIComponent(error.message));
+  }
+  res.redirect('/admin/legal?saved=privacy');
+}
+
 module.exports = {
   updatePaymentDetails,
   updateWelcomeBonus,
@@ -712,4 +744,7 @@ module.exports = {
   settingsPage,
   updateLeadPrice,
   updateCatalogCallPrice,
+  legalPage,
+  updateLegalTerms,
+  updateLegalPrivacy,
 };

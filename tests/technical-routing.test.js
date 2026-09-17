@@ -36,7 +36,7 @@ const crm=require('../src/services/crmMetrics.service');
 const response=()=>({statusCode:200,locals:{},status(code){this.statusCode=code;return this;},json(data){this.data=data;return this;},cookie(){},clearCookie(){},render(view,data){this.view=view;this.data=data;},redirect(url){this.redirectTo=url;}});
 const req=body=>({body,cookies:{},headers:{},get:()=> 'localhost',lang:'ru',protocol:'http',ip:'127.0.0.1'});
 async function websiteOrder(phone, claimedTechnical) {
- const bundle=consent.bundle('client','ru');
+ const bundle=await consent.bundle('client','ru');
  const body={phone,description:'Check the ordinary website request flow',districtName:'Tbilisi',termsAccepted:true,privacyAccepted:true,consentLanguage:'ru',consentDigest:bundle.digest,is_technical:claimedTechnical};
  let res=response();await otpController.send(req(body),res);assert.equal(res.statusCode,200);assert.equal(res.data.success,true);
  const {token,challengeId}=res.data;

@@ -4,7 +4,7 @@ const orderService = require('../services/order.service');
 const managerService = require('../services/manager.service');
 const { getBaseUrl } = require('../config/url');
 const { requestMeta } = require('../config/requestMeta');
-const { TERMS_VERSION } = require('../config/legal');
+const legalContentService = require('../services/legalContent.service');
 
 const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 
@@ -19,7 +19,7 @@ async function send(req, res) {
     return res.status(400).json({ success: false, message: 'Description is required' });
   }
 
-  const acceptance = consentService.acceptedRequest(req, 'client');
+  const acceptance = await consentService.acceptedRequest(req, 'client');
   if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
 
   // Пришёл по ссылке менеджера — привязываем заявку к нему.
@@ -65,10 +65,13 @@ async function verify(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid phone or code' });
   }
 
+  // Фолбэк-версия — почти всегда перекрывается снимком, сохранённым send()'ом
+  // (protectedFlow для purpose='order'); нужна лишь на случай отсутствия снимка.
+  const { version: termsVersion } = await legalContentService.getTerms();
   const isValid = await otpService.verifyCode(phone, code, 'order', {
     meta: requestMeta(req),
     language: req.lang,
-    termsVersion: TERMS_VERSION,
+    termsVersion,
     challengeId: req.body.challengeId, strict: true,
   });
 

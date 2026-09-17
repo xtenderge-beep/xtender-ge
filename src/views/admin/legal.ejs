@@ -1,0 +1,54 @@
+<%- include('./_header', { active: 'legal' }) %>
+
+<h1 class="text-xl font-black text-stone-900">Оферта и Политика конфиденциальности</h1>
+<p class="mt-1 text-sm text-stone-500 max-w-2xl">
+    Правки применяются сразу на живом сайте (<code>/terms</code>, <code>/privacy</code>,
+    шаг «Договор» на <code>/join</code>) и автоматически поднимают версию документа —
+    уже принятые согласия в <a class="text-emerald-700 underline font-bold" href="/admin/consent">журнале</a>
+    не меняются, у каждого свой архивный снимок текста.
+</p>
+
+<%
+  const DOC_LABELS = { ka: 'Грузинский (приоритетный, п. 1.6)', ru: 'Русский', en: 'English' };
+  function docSection(key, title, doc, text, formAction, rows) {
+%>
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+    <div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+        <h2 class="text-sm font-extrabold text-stone-900 uppercase"><%= title %></h2>
+        <span class="text-xs text-stone-400 font-mono">Версия <%= doc.version %> · обновлено <%= doc.updated.ru %></span>
+    </div>
+    <% if (error && errorDoc === key) { %>
+      <p class="mb-3 text-sm text-red-600 font-semibold"><%= error %></p>
+    <% } %>
+    <% if (saved === key) { %>
+      <p class="mb-3 text-sm text-emerald-700 font-semibold">Сохранено, версия документа поднята.</p>
+    <% } %>
+    <form method="POST" action="<%= formAction %>">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <% ['ka', 'ru', 'en'].forEach((lang, i) => { %>
+        <details class="mt-3 border border-stone-200 rounded-xl p-3" <%= i === 0 ? 'open' : '' %>>
+            <summary class="cursor-pointer text-xs font-bold text-stone-700 uppercase"><%= DOC_LABELS[lang] %></summary>
+            <textarea name="<%= lang %>" rows="<%= rows %>" spellcheck="false"
+                class="mt-2 w-full font-mono text-xs leading-relaxed border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500"><%= text[lang] %></textarea>
+        </details>
+        <% }); %>
+        <button type="submit" class="mt-3 px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить «<%= title %>»</button>
+    </form>
+</div>
+<% } %>
+
+<%- docSection('terms', 'Публичная оферта', terms, termsText, '/admin/legal/terms', 24) %>
+<%- docSection('privacy', 'Политика конфиденциальности', privacy, privacyText, '/admin/legal/privacy', 18) %>
+
+<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5 max-w-2xl">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Формат текста</h2>
+    <ul class="text-xs text-stone-500 leading-relaxed list-disc pl-5 space-y-1">
+        <li><code>## Заголовок</code> — заголовок раздела</li>
+        <li><code>- пункт</code> — элемент списка; несколько таких строк подряд объединяются в один список</li>
+        <li><code>[[REQUISITES]]</code> — блок реквизитов (банк, ИП, адрес — редактируется отдельно на <a class="text-emerald-700 underline font-bold" href="/admin/settings">/admin/settings</a>)</li>
+        <li>любая другая непустая строка — отдельный абзац</li>
+        <li>пустая строка разделяет блоки друг от друга</li>
+    </ul>
+</div>
+
+<%- include('./_footer') %>
