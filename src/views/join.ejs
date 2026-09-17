@@ -43,24 +43,7 @@
             <i class="fa-solid fa-right-to-bracket text-emerald-600"></i><%= t('master_login_title') %>
         </a>
 
-        <div class="provider-join-grid"><aside>
-          <% const providerNotifFirst = t('provider_notifications_data')[0]; %>
-          <div class="provider-illustration">
-            <p class="provider-illustration-label"><%= t('provider_illustration_label') %></p>
-            <div class="provider-illustration-track" id="providerIllustrationTrack" aria-hidden="true">
-              <div class="provider-illustration-card is-active">
-                <p class="provider-illustration-category"><span aria-hidden="true"><%= providerNotifFirst.emoji %></span><span><%= providerNotifFirst.notification %></span></p>
-                <p class="provider-illustration-body"><%= providerNotifFirst.body %></p>
-                <div class="provider-illustration-actions is-pulsing">
-                  <span class="provider-illustration-btn provider-illustration-btn--call"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= t('btn_call') %></span>
-                  <span class="provider-illustration-btn provider-illustration-btn--whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><%= t('btn_whatsapp') %></span>
-                </div>
-              </div>
-            </div>
-            <p class="provider-demo-next"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= t('provider_demo_next') %></span></p>
-            <p class="provider-illustration-note"><%= t('provider_illustration_note') %></p>
-          </div>
-          <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
+        <div class="provider-join-grid">
         <div id="signupCard" class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
 
             <div id="signupProgress" class="provider-signup-header">
@@ -178,6 +161,24 @@
 
             <div role="alert" aria-live="polite" id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
         </div>
+        <aside>
+          <% const providerNotifFirst = t('provider_notifications_data')[0]; %>
+          <div class="provider-illustration">
+            <p class="provider-illustration-label"><%= t('provider_illustration_label') %></p>
+            <div class="provider-illustration-track" id="providerIllustrationTrack" aria-hidden="true">
+              <div class="provider-illustration-card is-active">
+                <p class="provider-illustration-category"><span aria-hidden="true"><%= providerNotifFirst.emoji %></span><span><%= providerNotifFirst.notification %></span></p>
+                <p class="provider-illustration-body"><%= providerNotifFirst.body %></p>
+                <div class="provider-illustration-actions is-pulsing">
+                  <span class="provider-illustration-btn provider-illustration-btn--call"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= t('btn_call') %></span>
+                  <span class="provider-illustration-btn provider-illustration-btn--whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><%= t('btn_whatsapp') %></span>
+                </div>
+              </div>
+            </div>
+            <p class="provider-demo-next"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= t('provider_demo_next') %></span></p>
+            <p class="provider-illustration-note"><%= t('provider_illustration_note') %></p>
+          </div>
+          <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
     </div></main>
 
     <script>
