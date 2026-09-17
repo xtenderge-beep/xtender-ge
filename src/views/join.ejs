@@ -69,17 +69,6 @@
                     <textarea id="descriptionInput" required maxlength="2000" rows="3" data-description-examples="<%= JSON.stringify(t('provider_description_examples')) %>" placeholder="<%= t('provider_description_examples')[0] %>"
                         class="w-full text-sm font-medium outline-none transition text-stone-800 resize-none placeholder:text-stone-400 bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
                 </div>
-
-                    <div>
-                        <label class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_photo_label') %></label>
-                        <label for="photoInput" class="flex items-center gap-2.5 cursor-pointer bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl px-3 py-3 text-sm font-bold text-stone-700 transition active:scale-[0.99]">
-                            <i class="fa-regular fa-image text-emerald-600 shrink-0"></i>
-                            <span id="photoName" class="truncate"><%= t('join_photo_btn') %></span>
-                        </label>
-                        <input type="file" id="photoInput" accept="image/*" class="hidden">
-                        <img id="photoPreview" alt="" class="hidden mt-2 w-20 h-20 object-cover rounded-xl border border-stone-200">
-                    </div>
-
                 </div>
                 <div data-signup-panel="1" class="space-y-4" hidden>
                     <p class="provider-help"><%= t('join_work_cities_hint') %></p>
@@ -206,10 +195,16 @@
         //     композер, что и в клиентской заявке на главной — тут тоже
         //     свободный текст, только этот текст длиннее и его удобнее писать
         //     на весь экран, а не в трёхстрочном поле под остальными шагами.
+        //
+        // signup-started ставится один раз и больше не снимается: как только
+        // регистрация реально началась (напечатали описание или ушли дальше
+        // первого шага), шапка/интро/сайдбар с ценами прячутся до конца анкеты —
+        // чтобы они не выныривали заново на каждом шаге после выхода из
+        // полноэкранного режима.
         const descriptionInput = document.getElementById('descriptionInput');
         function enterSignupCompose() {
             if (window.innerWidth >= 640) return;
-            document.body.classList.add('signup-compose-active');
+            document.body.classList.add('signup-started', 'signup-compose-active');
         }
         function exitSignupCompose() {
             if (!document.body.classList.contains('signup-compose-active')) return;
@@ -217,22 +212,6 @@
             if (document.activeElement === descriptionInput) descriptionInput.blur();
         }
         if (descriptionInput) descriptionInput.addEventListener('focus', enterSignupCompose);
-
-        const photoInput = document.getElementById('photoInput');
-        const photoName = document.getElementById('photoName');
-        const photoPreview = document.getElementById('photoPreview');
-        if (photoInput) {
-            photoInput.addEventListener('change', () => {
-                const file = photoInput.files[0];
-                photoName.textContent = file ? file.name : T.join_photo_btn;
-                if (file && file.type.startsWith('image/')) {
-                    photoPreview.src = URL.createObjectURL(file);
-                    photoPreview.classList.remove('hidden');
-                } else {
-                    photoPreview.classList.add('hidden');
-                }
-            });
-        }
 
         function showMsg(text, isError) {
             const el = document.getElementById('formMsg');
@@ -291,6 +270,7 @@
         function changeSignupStep(step, focusTitle = true) {
             if (signupBusy || !Number.isInteger(step) || step < 0 || step > LAST_STEP) return;
             exitSignupCompose();
+            if (step > 0) document.body.classList.add('signup-started');
             signupStep = step;
             showMsg('');
             document.querySelectorAll('[data-signup-panel]').forEach((panel, index) => { panel.hidden = index !== step; });
@@ -439,8 +419,6 @@
             fd.append('promoCode', payload.promoCode);
             fd.append('termsAccepted', String(payload.termsAccepted));
             fd.append('privacyAccepted', String(payload.privacyAccepted));
-            const photo = document.getElementById('photoInput').files[0];
-            if (photo) fd.append('photo', photo);
 
             res = await fetch('/api/masters/register', { method: 'POST', body: fd });
             data = await res.json();

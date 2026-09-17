@@ -110,20 +110,28 @@ details > summary::-webkit-details-marker { display: none; }
   .provider-signup-progress-num, .provider-signup-progress-label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
   .provider-signup-actions button { padding:12px; }
 
-  /* Step 1 (service description): same full-screen focused-input pattern as
-     the client request composer on the homepage, reused for this field since
-     it's the same kind of task (writing a free-text description). Triggered
-     by body.signup-compose-active, set in join.ejs on textarea focus. */
+  /* Once the wizard is actually underway (past step 1, or typing into step 1's
+     textarea), the marketing header/intro/pricing sidebar around the card stop
+     pulling their weight and just add noise to re-read on every step. Hide them
+     for the rest of the flow instead of letting them flash back into view each
+     time a step changes - one calm transition instead of a reveal every step.
+     body.signup-started is set once in join.ejs and never removed. */
+  body.signup-started header,
+  body.signup-started main > h1,
+  body.signup-started main > p,
+  body.signup-started main > a,
+  body.signup-started .provider-join-grid > aside { display:none !important; }
+  body.signup-started main { padding:0; }
+  body.signup-started .provider-join-grid { margin-top:0; gap:0; display:block; }
+
+  /* Step 1 (service description) additionally goes full-screen while its
+     textarea is focused - same focused-input pattern as the client request
+     composer on the homepage, reused since it's the same kind of task
+     (writing a free-text description). Transient: body.signup-compose-active
+     is toggled in join.ejs on textarea focus/blur. */
   body.signup-compose-active { overflow:hidden; }
-  body.signup-compose-active header,
-  body.signup-compose-active main > h1,
-  body.signup-compose-active main > p,
-  body.signup-compose-active main > a,
-  body.signup-compose-active .provider-join-grid > aside,
   body.signup-compose-active #signupProgress,
   body.signup-compose-active .provider-signup-actions { display:none !important; }
-  body.signup-compose-active main { padding:0; }
-  body.signup-compose-active .provider-join-grid { margin-top:0; gap:0; display:block; }
   body.signup-compose-active #signupCard {
     position:fixed; inset:0; z-index:50; margin:0; background:#fff;
     border:0; border-radius:0; box-shadow:none; height:100dvh;
