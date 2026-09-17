@@ -109,6 +109,31 @@ details > summary::-webkit-details-marker { display: none; }
   .provider-signup-progress [aria-current="step"] { background:#059669; }
   .provider-signup-progress-num, .provider-signup-progress-label { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; }
   .provider-signup-actions button { padding:12px; }
+
+  /* Step 1 (service description): same full-screen focused-input pattern as
+     the client request composer on the homepage, reused for this field since
+     it's the same kind of task (writing a free-text description). Triggered
+     by body.signup-compose-active, set in join.ejs on textarea focus. */
+  body.signup-compose-active { overflow:hidden; }
+  body.signup-compose-active header,
+  body.signup-compose-active main > h1,
+  body.signup-compose-active main > p,
+  body.signup-compose-active main > a,
+  body.signup-compose-active .provider-join-grid > aside,
+  body.signup-compose-active #signupProgress,
+  body.signup-compose-active .provider-signup-actions { display:none !important; }
+  body.signup-compose-active main { padding:0; }
+  body.signup-compose-active .provider-join-grid { margin-top:0; gap:0; display:block; }
+  body.signup-compose-active #signupCard {
+    position:fixed; inset:0; z-index:50; margin:0; background:#fff;
+    border:0; border-radius:0; box-shadow:none; height:100dvh;
+    display:flex; flex-direction:column;
+  }
+  body.signup-compose-active #detailsStep { flex:1; min-height:0; display:flex; flex-direction:column; padding:0; }
+  body.signup-compose-active [data-signup-panel="0"] { flex:1; min-height:0; display:flex; flex-direction:column; padding:16px; gap:14px; }
+  body.signup-compose-active .signup-compose-field { flex:1; min-height:0; display:flex; flex-direction:column; }
+  body.signup-compose-active #descriptionInput { flex:1; min-height:0; height:100%; }
+  body.signup-compose-active .compose-topbar { display:flex; }
 }
 
 /* Desktop presentation only; mobile keeps its existing layout and animations. */
