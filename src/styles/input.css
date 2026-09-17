@@ -289,6 +289,10 @@ html[lang="ka"] .home-provider-link { font-size:12px; }
   .home-header-inner { min-height:72px; padding:14px 22px; }
   .home-brand { font-size:27px; }
   .home-hero-layout { grid-template-columns:1fr; gap:30px; padding:38px 0; }
+  /* Mobile: the request form comes first so visitors can start typing right away;
+     the animated examples move below it instead of pushing the form off-screen. */
+  #post-section { order:1; }
+  #seo-hero { order:2; }
   .home-text-link { font-size:13px; }
   .home-page #detailsStep { padding:28px; }
   .home-page .composer-chip { font-size:13px; padding:9px 12px; }
