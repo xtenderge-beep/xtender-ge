@@ -34,6 +34,16 @@ async function groups(includeDisabled = false) {
   }
   return result;
 }
+// Подписи групп по ключам, которыми оперирует заявка (target_categories / masters.category):
+// 'transport', а не slug справочника 'van' (см. toCategory), плюс 'flatbed' — это не строка
+// справочника, а вариант van (как в groups()), его подпись берём из перевода типа кузова.
+// Нужна там, где клиенту показывают категории его заявки; без этого подпись не находилась
+// и клиент видел сырой ключ «transport».
+async function labelMap(lang = 'ru') {
+  const map = Object.fromEntries((await configForView(lang)).map(row => [toCategory(row.type), row.label]));
+  if (map.transport) map.flatbed = translate(lang)('svc_van_body_flatbed');
+  return map;
+}
 async function catalogGroups(lang) {
   return (await list()).filter(r=>r.is_active).map(r=>({key:r.slug,label:r['name_'+lang] || r.name_ru,icon:r.icon,
     color:base.SERVICE_TYPES[r.slug]?.catalogColor || 'bg-stone-100 text-stone-900 border-stone-300',anchor:'group-'+r.slug}));
@@ -168,4 +178,4 @@ async function remove(slug) {
     await client.query('DELETE FROM service_categories WHERE slug=$1', [slug]);
   });
 }
-module.exports={list,get,validate,view,configForView,groups,catalogGroups,badges,save,remove,toType,toCategory,hasLockedField};
+module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,save,remove,toType,toCategory,hasLockedField};

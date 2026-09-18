@@ -89,5 +89,46 @@ const types = (rows) => rows.map(r => r.event_type);
   const open = await dispatchService.preview('cat-tok-5', 'movers', '');
   assert.equal(open.category, 'movers', 'the still-open category can be dispatched');
 
+  // --- Клиентский экран: подписи категорий и кнопки закрытия, все три языка.
+  // Ключи заявки — 'transport'/'flatbed', а справочник знает 'van': раньше клиент видел сырое «transport».
+  const catalog = require('../src/services/category.service');
+  const vanRow = (await catalog.list()).find(r => r.slug === 'van');
+  const ejs = require('ejs');
+  const { translate, clientStrings } = require('../src/config/i18n');
+  const { buildSeo } = require('../src/config/seo');
+  const ownerOrder = await newOrder('cat-tok-ui', ['movers', 'transport']);
+  const renderOrder = (lang, labels, closedCategories) => ejs.renderFile(path.join(__dirname, '../src/views/order.ejs'), {
+    lang, t: translate(lang), clientStrings: clientStrings(lang), currentPath: '/', isRememberedProvider: false, csrfToken: 'test',
+    seo: buildSeo(lang, '/'), order: ownerOrder, files: [], isOwner: true, masterId: null, masterCategory: null,
+    funnel: { view: 0, call: 0, whatsapp: 0 }, masterAccount: null, targetCategories: ['movers', 'transport'],
+    closedCategories, categoryLabels: labels, whatsappText: '', createdMinutesAgo: 1,
+  });
+  // Строки переводов встроены в страницу и в <script> (clientStrings), поэтому ищем текст
+  // именно как содержимое тега: >текст<, а не просто вхождение подстроки.
+  const shown = (html, text) => html.includes('>' + ejs.escapeXML(text) + '<');
+  for (const lang of ['ru', 'ka', 'en']) {
+    const t = translate(lang);
+    const labels = await catalog.labelMap(lang);
+    assert.ok(labels.movers && labels.transport && labels.flatbed, `labelMap(${lang}) resolves movers, transport and flatbed`);
+    assert.notEqual(labels.transport, 'transport', 'transport resolves through the van catalogue row');
+    if (lang === 'ru') assert.equal(labels.transport, vanRow.name_ru);
+
+    const html = await renderOrder(lang, labels, []);
+    assert.ok(shown(html, t('order_close_which')), `${lang}: explains that the request went to several categories`);
+    assert.ok(shown(html, t('order_close_rest_hint')), `${lang}: says the other categories keep receiving the request`);
+    for (const c of ['movers', 'transport']) {
+      assert.ok(shown(html, t('btn_close_only') + ' ' + labels[c]), `${lang}: button says what it closes ("${t('btn_close_only')} ${labels[c]}")`);
+    }
+    assert.ok(!html.includes('>' + t('btn_close_only') + ' transport<'), `${lang}: no raw category key on a button`);
+    assert.ok(/<i class="fa-solid fa-xmark"><\/i><span>/.test(html), `${lang}: close icon is rendered on the buttons`);
+    assert.ok(shown(html, t('btn_close_all_categories')), `${lang}: "close everything" stays available`);
+
+    // Осталась одна открытая категория: прежний единый экран без выбора по категориям.
+    const last = await renderOrder(lang, labels, ['movers']);
+    assert.ok(!last.includes('data-close-category='), `${lang}: no per-category buttons when one category is left`);
+    assert.ok(shown(last, t('btn_close_order')), `${lang}: single close button as before`);
+    assert.ok(!shown(last, t('order_close_which')), `${lang}: no "what to close" heading with nothing to choose`);
+  }
+
   console.log('order-category-close.test.js: all assertions passed');
 })().catch(e => { console.error('TEST FAILED:', e); process.exit(1); });

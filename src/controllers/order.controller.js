@@ -35,8 +35,7 @@ function minutesSince(date) {
 // активные категории попадают в configForView; для неактивной (админ выключил
 // категорию, пока заявка ещё висит) view сам подставит голый slug.
 async function categoryLabelMap(lang) {
-  const rows = await require('../services/category.service').configForView(lang);
-  return Object.fromEntries(rows.map((r) => [r.type, r.label]));
+  return require('../services/category.service').labelMap(lang);
 }
 
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;

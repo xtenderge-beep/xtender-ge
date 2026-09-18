@@ -20,12 +20,12 @@ const OUT = path.join(__dirname, '..', 'public', 'fa');
 // style → список имён иконок (из grep "fa-(solid|regular|brands) fa-*" по src/views + serviceTypes.js)
 const ICONS = {
   solid: [
-    'address-book', 'arrow-left', 'arrow-right', 'bolt', 'briefcase', 'building-columns',
+    'address-book', 'arrow-down', 'arrow-left', 'arrow-right', 'bolt', 'briefcase', 'building-columns',
     'check', 'chevron-down', 'circle-check', 'circle-info', 'clock', 'eye', 'gift',
     'headset', 'helmet-safety', 'key', 'list-check', 'lock', 'mobile-screen',
     'paper-plane', 'paperclip', 'pen', 'phone', 'right-to-bracket', 'shield-halved',
     'square-plus', 'star', 'tag', 'trash-can', 'triangle-exclamation',
-    'truck', 'truck-pickup',
+    'truck', 'truck-pickup', 'xmark',
   ],
   regular: ['copy', 'image'],
   brands: ['telegram', 'whatsapp'],

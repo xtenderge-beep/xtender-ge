@@ -4,6 +4,7 @@
 @font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:400;font-display:block;src:url(/fa/fa-regular.woff2) format("woff2")}
 @font-face{font-family:"Font Awesome 6 Brands";font-style:normal;font-weight:400;font-display:block;src:url(/fa/fa-brands.woff2) format("woff2")}
 .fa-address-book:before{content:"\f2b9"}
+.fa-arrow-down:before{content:"\f063"}
 .fa-arrow-left:before{content:"\f060"}
 .fa-arrow-right:before{content:"\f061"}
 .fa-bolt:before{content:"\f0e7"}
@@ -35,6 +36,7 @@
 .fa-triangle-exclamation:before{content:"\f071"}
 .fa-truck:before{content:"\f0d1"}
 .fa-truck-pickup:before{content:"\f63c"}
+.fa-xmark:before{content:"\f00d"}
 .fa-copy:before{content:"\f0c5"}
 .fa-image:before{content:"\f03e"}
 .fa-telegram:before{content:"\f2c6"}

@@ -229,6 +229,9 @@ const dictionaries = {
     order_closed_notice_category: 'ამ განაცხადის ეს ნაწილი (თქვენი კატეგორია) უკვე დახურულია. სხვა კატეგორიები შეიძლება ჯერ კიდევ აქტიური იყოს.',
     btn_close_order: 'შეკვეთის დახურვა',
     btn_close_all_categories: 'მთლიანად დახურვა',
+    order_close_which: 'თქვენი განაცხადი გაგზავნილია რამდენიმე კატეგორიის შემსრულებლებთან. რისი დახურვა გსურთ?',
+    btn_close_only: 'მხოლოდ დახურვა:',
+    order_close_rest_hint: 'დანარჩენი კატეგორიები კვლავ მიიღებენ თქვენს განაცხადს.',
 
     my_orders_nav: 'ჩემი განაცხადები',
     my_orders_title: 'ჩემი განაცხადები',
@@ -742,6 +745,9 @@ const dictionaries = {
     order_closed_notice_category: 'Эта часть заявки (ваша категория) уже закрыта. Другие категории заявки могут быть ещё активны.',
     btn_close_order: 'Закрыть заказ',
     btn_close_all_categories: 'Закрыть всю заявку',
+    order_close_which: 'Ваша заявка отправлена в несколько категорий. Что закрыть?',
+    btn_close_only: 'Закрыть только:',
+    order_close_rest_hint: 'Остальные категории продолжат получать вашу заявку.',
 
     my_orders_nav: 'Мои заявки',
     my_orders_title: 'Мои заявки',
@@ -1255,6 +1261,9 @@ const dictionaries = {
     order_closed_notice_category: 'This part of the request (your category) has already been closed. Other categories of this request may still be active.',
     btn_close_order: 'Close order',
     btn_close_all_categories: 'Close entire request',
+    order_close_which: 'Your request was sent to several categories. What would you like to close?',
+    btn_close_only: 'Close only:',
+    order_close_rest_hint: 'The other categories will keep receiving your request.',
 
     my_orders_nav: 'My requests',
     my_orders_title: 'My requests',

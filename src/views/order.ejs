@@ -171,13 +171,15 @@
             <option value="no_longer_needed"><%= t('consent_inactive') %></option>
           </select>
           <% if (openCategories.length > 1) { %>
+            <p class="mb-2 text-sm font-bold text-stone-800"><%= t('order_close_which') %></p>
             <div class="space-y-2 mb-2">
               <% openCategories.forEach(function (c) { %>
                 <button type="button" data-close-category="<%= c %>" class="close-category-btn w-full py-3 rounded-2xl bg-stone-900 hover:bg-stone-800 text-white font-bold text-sm shadow transition flex items-center justify-center gap-2">
-                  <i class="fa-solid fa-xmark"></i><span><%= categoryLabels[c] || c %></span>
+                  <i class="fa-solid fa-xmark"></i><span><%= t('btn_close_only') %> <%= categoryLabels[c] || c %></span>
                 </button>
               <% }); %>
             </div>
+            <p class="mb-3 text-xs text-stone-500"><%= t('order_close_rest_hint') %></p>
             <button id="closeBtn" class="w-full py-2.5 mb-3 rounded-2xl bg-white border border-red-200 text-red-600 hover:bg-red-50 font-bold text-xs transition flex items-center justify-center gap-2">
               <i class="fa-solid fa-trash-can"></i><span><%= t('btn_close_all_categories') %></span>
             </button>
