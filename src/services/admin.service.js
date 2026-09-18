@@ -239,6 +239,7 @@ async function getOrderDetailAdmin(token) {
     funnel: funnelStats,
     notifiedMasters: charges.rows,
     closedCategories: closures.rows.map((r) => r.category),
+    funnelByCategory: await require('./order.service').getOrderFunnelByCategory(order.id),
   };
 }
 

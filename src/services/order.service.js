@@ -298,6 +298,63 @@ async function getOrderFunnelStats(orderId) {
   return stats;
 }
 
+// Воронка заявки в разрезе групп исполнителей (masters.category) — чтобы видеть, какая
+// группа откликается (заявка на «грузчики + машина» уходит двум группам сразу).
+// received — мастера, которым лид реально ушёл: dispatch_deliveries.status='accepted', а для
+// заявок до 2026-09-13, когда доставки ещё не писались, — списание lead_charge.
+// contacted — «отклик»: мастер позвонил ИЛИ написал в WhatsApp (просмотр откликом не считаем,
+// как и в crmMetrics). order_views уникален по (заявка, мастер, тип), поэтому view/call/whatsapp
+// уже считают уникальных мастеров; contacted — уникальные мастера из call ∪ whatsapp.
+// Агрегируем в JS, а не в SQL: COUNT(DISTINCT)/FILTER на pg-mem (dev-server) ненадёжны.
+// Группа 'flatbed' — это не masters.category, а подвыборка transport (is_flatbed), поэтому
+// в разрезе она учитывается как transport.
+async function getOrderFunnelByCategory(orderId) {
+  const [dispatched, delivered, charged, events] = await Promise.all([
+    pool.query('SELECT category FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at', [orderId]),
+    pool.query(
+      `SELECT m.id AS master_id, m.category FROM dispatch_deliveries dd
+       JOIN masters m ON m.id = dd.master_id WHERE dd.order_id = $1 AND dd.status = 'accepted'`,
+      [orderId]
+    ),
+    pool.query(
+      `SELECT m.id AS master_id, m.category FROM balance_transactions bt
+       JOIN masters m ON m.id = bt.master_id WHERE bt.order_id = $1 AND bt.reason = 'lead_charge'`,
+      [orderId]
+    ),
+    pool.query(
+      `SELECT m.id AS master_id, m.category, ov.event_type FROM order_views ov
+       JOIN masters m ON m.id = ov.master_id WHERE ov.order_id = $1`,
+      [orderId]
+    ),
+  ]);
+
+  const groups = new Map();
+  const groupFor = (category) => {
+    const key = category || '';
+    if (!groups.has(key)) {
+      groups.set(key, { category: key, received: new Set(), view: new Set(), call: new Set(), whatsapp: new Set() });
+    }
+    return groups.get(key);
+  };
+
+  // Сначала группы, в которые заявку рассылали (в порядке рассылки) — чтобы группа, где ещё
+  // никто не получил лид, тоже была видна нулями, а не пропадала из отчёта.
+  dispatched.rows.forEach((row) => groupFor(row.category === 'flatbed' ? 'transport' : row.category));
+  [...delivered.rows, ...charged.rows].forEach((row) => groupFor(row.category).received.add(row.master_id));
+  events.rows.forEach((row) => {
+    if (EVENT_TYPES.includes(row.event_type)) groupFor(row.category)[row.event_type].add(row.master_id);
+  });
+
+  return [...groups.values()].map((g) => ({
+    category: g.category,
+    received: g.received.size,
+    view: g.view.size,
+    call: g.call.size,
+    whatsapp: g.whatsapp.size,
+    contacted: new Set([...g.call, ...g.whatsapp]).size,
+  }));
+}
+
 function dispatchFilter(category, vehicleSize, isTechnical = false) {
   // Условие по категории/размеру строим один раз — оно нужно и для «кому разослать»
   // (баланс есть), и для «кто подходил, но денег не хватило» (missed). $1 = цена лида.
@@ -445,6 +502,7 @@ module.exports = {
   notifyMasters,
   getMasterCountsByCategory,
   getOrderFunnelStats,
+  getOrderFunnelByCategory,
   logView,
   attachFiles,
   getOrderFiles,

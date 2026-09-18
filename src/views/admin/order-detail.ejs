@@ -56,6 +56,19 @@
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Воронка</h2>
     <p class="text-sm text-stone-700">👀 Просмотров: <%= order.funnel.view %> · Нажатий «Позвонить»: <%= order.funnel.call %> · Нажатий WhatsApp: <%= order.funnel.whatsapp %></p>
+    <% if ((order.funnelByCategory||[]).length) { %>
+      <h3 class="text-xs font-bold text-stone-500 mt-3 mb-1">По группам исполнителей</h3>
+      <ul class="text-sm text-stone-700 space-y-1">
+        <% order.funnelByCategory.forEach(function (row) { %>
+          <li>
+            <span class="font-bold"><%= groups[row.category] || row.category || '—' %></span><% if ((order.closedCategories||[]).includes(row.category)) { %> · <span class="text-stone-400 font-bold">закрыта</span><% } %>
+            — получили <%= row.received %> · 👀 <%= row.view %> · 📞 <%= row.call %> · 💬 <%= row.whatsapp %>
+            <% if (row.received) { %>· <span class="font-bold">отклик <%= row.contacted %> из <%= row.received %> (<%= Math.min(100, Math.round(row.contacted / row.received * 100)) %>%)</span><% } %>
+          </li>
+        <% }); %>
+      </ul>
+      <p class="text-xs text-stone-500 mt-2">«Получили» — мастера, которым лид реально ушёл. Отклик — мастер позвонил или написал в WhatsApp.</p>
+    <% } %>
 </div>
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">

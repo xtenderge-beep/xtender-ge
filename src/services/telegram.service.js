@@ -424,7 +424,17 @@ function formatDispatchLine(category, vehicleSize, masterCount) {
   return `➡️ ${label} — отправлено ${masterCount}`;
 }
 
-function buildMessageText(order, dispatchLines, funnel) {
+// Одна строка воронки по группе исполнителей. «Отклик» = мастер позвонил или написал в
+// WhatsApp, доля — от тех, кто лид получил (см. order.service.getOrderFunnelByCategory).
+function formatFunnelRow(row, labels, closed) {
+  const label = labels[row.category] || row.category || '—';
+  const rate = row.received
+    ? ` · отклик ${row.contacted} из ${row.received} (${Math.min(100, Math.round((row.contacted / row.received) * 100))}%)`
+    : '';
+  return `${label}${closed ? ' 🔒 закрыта' : ''}: получили ${row.received} · 👀 ${row.view} · 📞 ${row.call} · 💬 ${row.whatsapp}${rate}`;
+}
+
+function buildMessageText(order, dispatchLines, funnel, { byCategory = [], labels = {}, closedCategories = [] } = {}) {
   const header =
     order.status === 'closed'
       ? '🔒 Заявка закрыта'
@@ -443,13 +453,24 @@ function buildMessageText(order, dispatchLines, funnel) {
 
   if (dispatchLines.length) {
     lines.push('', ...dispatchLines);
-    lines.push(
-      '',
-      '📊 Воронка:',
-      `👀 Перешли по ссылке: ${funnel.view}`,
-      `📞 Нажали «Позвонить»: ${funnel.call}`,
-      `💬 Нажали «WhatsApp»: ${funnel.whatsapp}`
-    );
+    if (byCategory.length) {
+      lines.push(
+        '',
+        '📊 Воронка по группам:',
+        ...byCategory.map((row) => formatFunnelRow(row, labels, closedCategories.includes(row.category))),
+        '',
+        `Всего: 👀 ${funnel.view} · 📞 ${funnel.call} · 💬 ${funnel.whatsapp}`,
+        '👀 перешли по ссылке · 📞 «Позвонить» · 💬 «WhatsApp» · отклик = звонок или WhatsApp'
+      );
+    } else {
+      lines.push(
+        '',
+        '📊 Воронка:',
+        `👀 Перешли по ссылке: ${funnel.view}`,
+        `📞 Нажали «Позвонить»: ${funnel.call}`,
+        `💬 Нажали «WhatsApp»: ${funnel.whatsapp}`
+      );
+    }
   }
 
   return lines.join('\n');
@@ -471,7 +492,11 @@ async function refreshMessage(order, keyboard) {
   const labels = await require('./category.service').groups(true);
   const dispatchLines = dispatches.map(d => (labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+' — '+d.master_count);
   const funnel = await orderService.getOrderFunnelStats(order.id);
-  const text = buildMessageText(order, dispatchLines, funnel);
+  // Разбивка по группам — дополнение к общей воронке: если её запрос упал, сообщение всё
+  // равно обновится прежней общей воронкой, а не останется устаревшим.
+  const byCategory = await orderService.getOrderFunnelByCategory(order.id).catch(() => []);
+  const closedCategories = await orderService.getClosedCategories(order.id).catch(() => []);
+  const text = buildMessageText(order, dispatchLines, funnel, { byCategory, labels, closedCategories });
 
   for (const m of msgs) {
     await axios
@@ -529,6 +554,7 @@ module.exports = {
   askModerator,
   answerCallback,
   updateMessage,
+  buildMessageText,
   setWebhook,
   sendToChat,
   sendLeadToMaster,
