@@ -257,9 +257,17 @@ async function getMasterBalanceHistory(masterId, limit = 40) {
 // в производной таблице, а не коррелированным подзапросом (pg-mem их не тянет, см. HANDOFF).
 // Дедуп по order_id в JS: мастер с vehicle_size IS NULL может попасть под две рассылки
 // одной заявки (все размеры + конкретный тир) и получить две строки lead_charge.
-async function getMasterLeads(masterId, limit = 100) {
+// masterCategory — категория этого мастера (masters.category); заявка может уходить
+// сразу нескольким категориям (orders.target_categories), и закрыта бывает не вся
+// целиком, а только часть (order_category_closures, см. order.service.closeOrderCategory)
+// — is_closed_for_master учитывает и то, и другое: либо заявка закрыта целиком, либо
+// закрыта именно категория этого мастера. Известное упрощение: сравнение по
+// masters.category (для бортовых это 'transport', как и everywhere else в коде;
+// отдельная синтетическая группа рассылки 'flatbed' тут не различается).
+async function getMasterLeads(masterId, masterCategory = null, limit = 100) {
   const { rows } = await pool.query(
     `SELECT o.id, o.token, o.description, o.status, o.created_at, o.closed_at,
+            (o.status = 'closed' OR occ.category IS NOT NULL) AS is_closed_for_master,
             bt.created_at AS notified_at,
             COALESCE(ev.call_count, 0) AS call_count,
             COALESCE(ev.whatsapp_count, 0) AS whatsapp_count,
@@ -275,10 +283,11 @@ async function getMasterLeads(masterId, limit = 100) {
        WHERE master_id = $1
        GROUP BY order_id
      ) ev ON ev.order_id = o.id
+     LEFT JOIN order_category_closures occ ON occ.order_id = o.id AND occ.category = $3
      WHERE bt.reason = 'lead_charge' AND bt.master_id = $1
      ORDER BY bt.created_at DESC
      LIMIT $2`,
-    [masterId, limit]
+    [masterId, limit, masterCategory]
   );
 
   const seen = new Set();

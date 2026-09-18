@@ -165,7 +165,7 @@
                         <% leads.forEach(function (lead) { %>
                             <%
                                 const contacted = lead.call_count > 0 || lead.whatsapp_count > 0;
-                                const isClosed = lead.status === 'closed';
+                                const isClosed = lead.is_closed_for_master;
                             %>
                             <a href="/order/<%= lead.token %>?master=<%= master.id %>"
                                data-lead-status="<%= isClosed ? 'closed' : 'active' %>"

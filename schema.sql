@@ -738,3 +738,18 @@ CREATE TABLE IF NOT EXISTS card_payments (
  )
 );
 CREATE INDEX IF NOT EXISTS idx_card_payments_master ON card_payments(master_id, created_at);
+
+-- Заявка может уйти нескольким категориям сразу (orders.target_categories,
+-- заполняется по мере рассылки — см. dispatch.service.dispatch). Раньше закрыть
+-- можно было только всю заявку целиком (orders.status). Один ряд здесь — одна
+-- закрытая категория; когда закрыта последняя из target_categories, заявка
+-- целиком переходит в status='closed' как и раньше (order.service.finalizeClose).
+CREATE TABLE IF NOT EXISTS order_category_closures (
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    category VARCHAR(50) NOT NULL,
+    closed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    closed_by VARCHAR(20) NOT NULL,
+    reason VARCHAR(40) NOT NULL,
+    PRIMARY KEY (order_id, category)
+);
+CREATE INDEX IF NOT EXISTS idx_order_category_closures_order ON order_category_closures(order_id);

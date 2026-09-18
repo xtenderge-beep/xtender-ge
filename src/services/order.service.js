@@ -187,18 +187,59 @@ async function markFirstDispatch(token) {
   return Boolean(rows[0]);
 }
 
-async function closeOrder(token, { actor = 'admin', reason = 'admin_closed', meta = {} } = {}) {
+// Общее ядро полного закрытия — вызывается и напрямую (closeOrder), и из
+// closeOrderCategory, когда закрываемая категория оказалась последней открытой
+// (тогда заявка закрывается целиком тем же путём, что и раньше, без отдельной
+// ветки логирования). client обязателен — вызывающий уже открыл транзакцию.
+async function finalizeClose(client, token, { actor = 'admin', reason = 'admin_closed', meta = {} } = {}) {
+  const { rows } = await client.query(
+    "UPDATE orders SET status = 'closed', closed_at = NOW(), closed_by=$2, closing_reason=$3 WHERE token = $1 AND status != 'closed' RETURNING *", [token,actor,reason]);
+  const order = rows[0];
+  if (!order) return null;
+  await consentLog.recordAction({ eventType: 'ORDER_CLOSED', phone: order.phone, orderId: order.id,
+    metadata: { actor, reason, stops_future_contact_sharing: true }, meta }, client);
+  if (actor === 'client') await consentLog.recordAction({ eventType: 'CONTACT_SHARING_WITHDRAWN', phone: order.phone,
+    orderId: order.id, metadata: { actor, reason, scope: 'this_order' }, meta }, client);
+  return order;
+}
+
+async function closeOrder(token, opts = {}) {
+  return pool.withTransaction(client => finalizeClose(client, token, opts));
+}
+
+// Закрытие одной категории многокатегорийной заявки (target_categories), не
+// всей заявки — см. docs про заявку из нескольких категорий (грузчики + машина
+// в одной заявке). Тихий no-op (возвращает order как есть), если заявки нет,
+// она уже закрыта целиком, категория не входит в target_categories или уже
+// закрыта раньше — тот же принцип, что и у повторного closeOrder на закрытой
+// заявке. Когда закрываемая категория — последняя ещё открытая, заявка
+// закрывается целиком через finalizeClose (тот же код пути, что и обычный
+// close), поэтому весь остальной код, читающий orders.status, не меняется.
+async function closeOrderCategory(token, category, { actor = 'admin', reason = 'admin_closed', meta = {} } = {}) {
   return pool.withTransaction(async client => {
-    const { rows } = await client.query(
-      "UPDATE orders SET status = 'closed', closed_at = NOW(), closed_by=$2, closing_reason=$3 WHERE token = $1 AND status != 'closed' RETURNING *", [token,actor,reason]);
-    const order = rows[0];
-    if (!order) return null;
-    await consentLog.recordAction({ eventType: 'ORDER_CLOSED', phone: order.phone, orderId: order.id,
-      metadata: { actor, reason, stops_future_contact_sharing: true }, meta }, client);
+    const order = (await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE', [token])).rows[0];
+    if (!order || order.status === 'closed') return order || null;
+    const targets = order.target_categories || [];
+    if (!targets.includes(category)) return order;
+    const closedRows = await client.query('SELECT category FROM order_category_closures WHERE order_id=$1', [order.id]);
+    const closedSet = new Set(closedRows.rows.map(r => r.category));
+    if (closedSet.has(category)) return order;
+
+    const remaining = targets.filter(c => c !== category && !closedSet.has(c));
+    if (!remaining.length) return finalizeClose(client, token, { actor, reason, meta });
+
+    await client.query('INSERT INTO order_category_closures(order_id,category,closed_by,reason) VALUES($1,$2,$3,$4)', [order.id, category, actor, reason]);
+    await consentLog.recordAction({ eventType: 'ORDER_CATEGORY_CLOSED', phone: order.phone, orderId: order.id,
+      metadata: { actor, reason, category, remaining_categories: remaining }, meta }, client);
     if (actor === 'client') await consentLog.recordAction({ eventType: 'CONTACT_SHARING_WITHDRAWN', phone: order.phone,
-      orderId: order.id, metadata: { actor, reason, scope: 'this_order' }, meta }, client);
+      orderId: order.id, metadata: { actor, reason, scope: 'category:' + category }, meta }, client);
     return order;
   });
+}
+
+async function getClosedCategories(orderId) {
+  const { rows } = await pool.query('SELECT category FROM order_category_closures WHERE order_id=$1', [orderId]);
+  return rows.map(r => r.category);
 }
 
 // Админ удаляет мусорную/тестовую заявку целиком, а не закрывает. dispatch_runs/
@@ -398,6 +439,8 @@ module.exports = {
   recordModerationMessages,
   getModerationMessages,
   closeOrder,
+  closeOrderCategory,
+  getClosedCategories,
   deleteOrder,
   notifyMasters,
   getMasterCountsByCategory,

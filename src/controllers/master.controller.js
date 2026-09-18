@@ -283,7 +283,7 @@ async function statusPage(req, res) {
     reviewService.listApprovedForMasters([master.id]),
     masterService.getMasterActivity(master.id),
     masterService.getMasterBalanceHistory(master.id),
-    masterService.getMasterLeads(master.id),
+    masterService.getMasterLeads(master.id, master.category),
     supportService.listForMaster(master.id),
     receiptService.listForMaster(master.id),
     topupService.list(master.id),

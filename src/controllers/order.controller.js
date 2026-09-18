@@ -30,6 +30,15 @@ function minutesSince(date) {
   return Math.max(0, Math.round((Date.now() - new Date(date).getTime()) / 60000));
 }
 
+// Подписи категорий для страницы заявки, когда категорий больше одной и нужно
+// показать клиенту, что именно закрывать (см. order.ejs) — {slug: label}. Только
+// активные категории попадают в configForView; для неактивной (админ выключил
+// категорию, пока заявка ещё висит) view сам подставит голый slug.
+async function categoryLabelMap(lang) {
+  const rows = await require('../services/category.service').configForView(lang);
+  return Object.fromEntries(rows.map((r) => [r.type, r.label]));
+}
+
 const TOPUP_REGEX = /^\/topup\s+(\+?\d{9,15})\s+([\d.]+)$/;
 // /promo КОД 5 [100] [метка]  — код, сумма GEL, необяз. лимит, необяз. метка (агент/канал)
 const PROMO_REGEX = /^\/promo\s+(\S+)\s+([\d.]+)(?:\s+(\d+))?(?:\s+(.+))?$/;
@@ -682,8 +691,11 @@ async function show(req, res) {
       files: [],
       isOwner: false,
       masterId: null,
+      masterCategory: null,
       funnel: null,
       masterAccount: null,
+      targetCategories: [],
+      closedCategories: [],
       clientStrings: clientStrings(req.lang),
     });
   }
@@ -692,19 +704,27 @@ async function show(req, res) {
   const masterId = req.query.master || null;
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
+  const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
+  const categoryLabels = (order.target_categories || []).length > 1 ? await categoryLabelMap(req.lang) : {};
 
   // Плашка «баланс · мой аккаунт» + предупреждение о низком балансе — только для мастера,
-  // открывшего лид по своей ссылке (?master=<id>), не для владельца заявки.
+  // открывшего лид по своей ссылке (?master=<id>), не для владельца заявки. Категорию
+  // мастера передаём отдельно от masterAccount (тот остаётся null для забаненных) — она
+  // нужна, чтобы понять, закрыта ли именно ЕГО категория заявки, независимо от бана.
   let masterAccount = null;
+  let masterCategory = null;
   if (masterId && !isOwner) {
     const m = await masterService.getMasterById(Number(masterId));
-    if (m && !m.is_banned) {
-      const leadPriceTetri = await settingsService.getLeadPriceTetri();
-      masterAccount = {
-        token: m.master_token,
-        balanceTetri: m.balance_tetri,
-        leadsLeft: Math.floor(m.balance_tetri / leadPriceTetri),
-      };
+    if (m) {
+      masterCategory = m.category;
+      if (!m.is_banned) {
+        const leadPriceTetri = await settingsService.getLeadPriceTetri();
+        masterAccount = {
+          token: m.master_token,
+          balanceTetri: m.balance_tetri,
+          leadsLeft: Math.floor(m.balance_tetri / leadPriceTetri),
+        };
+      }
     }
   }
 
@@ -714,8 +734,12 @@ async function show(req, res) {
     files,
     isOwner,
     masterId,
+    masterCategory,
     funnel,
     masterAccount,
+    targetCategories: order.target_categories || [],
+    closedCategories,
+    categoryLabels,
     createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(req.lang),
@@ -732,8 +756,12 @@ async function showByOwnerToken(req, res) {
       files: [],
       isOwner: false,
       masterId: null,
+      masterCategory: null,
       funnel: null,
       masterAccount: null,
+      targetCategories: [],
+      closedCategories: [],
+      categoryLabels: {},
       clientStrings: clientStrings(req.lang),
     });
   }
@@ -748,6 +776,7 @@ async function showByOwnerToken(req, res) {
 
   const files = await orderService.getOrderFiles(order.id);
   const funnel = await orderService.getOrderFunnelStats(order.id);
+  const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
 
   // Заказчик без явно выбранного языка (нет куки — пришёл из SMS) видит свою заявку на
   // языке, на котором её писал (source_lang). Если флажок в шапке нажимал — уважаем выбор.
@@ -756,6 +785,7 @@ async function showByOwnerToken(req, res) {
     : (['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang);
   res.locals.lang = ownerLang;
   res.locals.t = translate(ownerLang);
+  const categoryLabels = (order.target_categories || []).length > 1 ? await categoryLabelMap(ownerLang) : {};
 
   return res.render('order', {
     ...revisionLocals(order, ownerLang),
@@ -763,8 +793,12 @@ async function showByOwnerToken(req, res) {
     files,
     isOwner: true,
     masterId: null,
+    masterCategory: null,
     funnel,
     masterAccount: null,
+    targetCategories: order.target_categories || [],
+    closedCategories,
+    categoryLabels,
     createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
     clientStrings: clientStrings(ownerLang),
@@ -818,6 +852,52 @@ async function close(req, res) {
   return res.json({ success: true, message: 'Order closed' });
 }
 
+// Закрытие одной категории многокатегорийной заявки (см. order.service.closeOrderCategory) —
+// заявка остаётся активной для остальных категорий, если закрываемая не последняя.
+async function closeCategory(req, res) {
+  const { token } = req.params;
+  const existing = await orderService.getOrderByToken(token);
+  const isOwner = existing && req.cookies[ownerCookieName(token)] === existing.owner_token;
+
+  if (!isOwner) {
+    return res.status(403).json({ success: false, message: 'Not allowed' });
+  }
+
+  const reason = req.body.reason || 'no_longer_needed';
+  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: 'Invalid closing reason' });
+  const category = String(req.body.category || '');
+  if (!(existing.target_categories || []).includes(category)) return res.status(400).json({ success: false, message: 'Invalid category' });
+  if (existing.status === 'closed') return res.json({ success: true, message: 'Order already closed' });
+
+  const order = await orderService.closeOrderCategory(token, category, { actor: 'client', reason, meta: requestMeta(req) });
+  if (!order) {
+    return res.status(404).json({ success: false, message: 'Order not found' });
+  }
+
+  telegramService.updateMessage(order).catch((err) => {
+    console.error('Failed to update Telegram message on category close:', err.message);
+  });
+
+  // Приглашение оценить исполнителя — как и при полном close(), но только когда эта
+  // категория оказалась последней и заявка в итоге закрылась целиком; пока активна
+  // хотя бы одна другая категория, приглашать оценивать рано.
+  if (order.status === 'closed') {
+    reviewService.getEligibleMasters(order.id).then((masters) => {
+      if (!masters.length) return null;
+      const link = `${getBaseUrl()}/review/${order.owner_token}`;
+      return smsService.sendOrderNotification(
+        order.phone,
+        `Xtender: order #${order.id} closed. Rate the provider: ${link}`,
+        { orderId: order.id }
+      );
+    }).catch((err) => {
+      console.error('Failed to send review invite SMS:', err.message);
+    });
+  }
+
+  return res.json({ success: true, closedCategory: category, fullyClosed: order.status === 'closed' });
+}
+
 const ALLOWED_EVENT_TYPES = new Set(['view', 'call', 'whatsapp']);
 
 async function logView(req, res) {
@@ -845,6 +925,7 @@ module.exports = {
   show,
   showByOwnerToken,
   close,
+  closeCategory,
   resubmit,
   logView,
   telegramWebhook,

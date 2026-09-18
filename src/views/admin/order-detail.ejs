@@ -21,12 +21,24 @@
         <% if (order.closed_at) { %> · Закрыта: <%= new Date(order.closed_at).toLocaleString('ru') %><% } %>
     </p>
 
+    <% const multiCategory = (order.target_categories||[]).length > 1; %>
     <div class="mt-3 flex flex-wrap gap-2">
       <% if (order.status !== 'closed') { %>
+        <% if (multiCategory) { %>
+          <% order.target_categories.filter(function(c){ return !(order.closedCategories||[]).includes(c); }).forEach(function(c) { %>
+            <form method="POST" action="/admin/orders/<%= order.token %>/close-category">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <input type="hidden" name="category" value="<%= c %>">
+                <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition">
+                    Закрыть «<%= groups[c] || c %>»
+                </button>
+            </form>
+          <% }); %>
+        <% } %>
         <form method="POST" action="/admin/orders/<%= order.token %>/close">
             <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition">
-                Закрыть заявку (без SMS клиенту)
+            <button type="submit" class="px-3 py-2 <%= multiCategory ? 'bg-white hover:bg-red-50 text-red-600 border border-red-200' : 'bg-stone-900 hover:bg-stone-800 text-white' %> text-xs font-bold rounded-xl transition">
+                <%= multiCategory ? 'Закрыть всю заявку' : 'Закрыть заявку' %> (без SMS клиенту)
             </button>
         </form>
       <% } %>
@@ -53,7 +65,7 @@
     <% } else { %>
       <ul class="text-sm text-stone-700 space-y-1">
           <% order.dispatches.forEach(function (d) { %>
-            <li><%= d.category %><% if (d.vehicle_size) { %> (<%= d.vehicle_size %>)<% } %> — <%= new Date(d.dispatched_at).toLocaleString('ru') %></li>
+            <li><%= d.category %><% if (d.vehicle_size) { %> (<%= d.vehicle_size %>)<% } %> — <%= new Date(d.dispatched_at).toLocaleString('ru') %><% if ((order.closedCategories||[]).includes(d.category)) { %> · <span class="text-stone-400 font-bold">закрыта</span><% } %></li>
           <% }); %>
       </ul>
     <% } %>

@@ -65,6 +65,7 @@ router.post('/orders/:token/dispatch', verifyCsrf, asyncHandler(adminController.
 router.get('/orders/:token', asyncHandler(adminController.orderDetail));
 router.post('/orders/:token/request-revision', verifyCsrf, asyncHandler(adminController.requestOrderRevision));
 router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
+router.post('/orders/:token/close-category', verifyCsrf, asyncHandler(adminController.closeOrderCategory));
 router.post('/orders/:token/delete', verifyCsrf, asyncHandler(adminController.deleteOrder));
 
 router.get('/reviews', asyncHandler(adminController.reviewsQueue));

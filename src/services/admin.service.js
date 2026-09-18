@@ -208,7 +208,7 @@ async function getOrderDetailAdmin(token) {
   const order = rows[0];
   if (!order) return null;
 
-  const [dispatches, funnel, charges] = await Promise.all([
+  const [dispatches, funnel, charges, closures] = await Promise.all([
     pool.query(
       'SELECT category, vehicle_size, dispatched_at FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at',
       [order.id]
@@ -225,6 +225,7 @@ async function getOrderDetailAdmin(token) {
        ORDER BY bt.created_at`,
       [order.id]
     ),
+    pool.query('SELECT category FROM order_category_closures WHERE order_id = $1', [order.id]),
   ]);
 
   const funnelStats = { view: 0, call: 0, whatsapp: 0 };
@@ -237,6 +238,7 @@ async function getOrderDetailAdmin(token) {
     dispatches: dispatches.rows,
     funnel: funnelStats,
     notifiedMasters: charges.rows,
+    closedCategories: closures.rows.map((r) => r.category),
   };
 }
 

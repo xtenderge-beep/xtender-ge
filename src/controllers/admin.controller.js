@@ -353,6 +353,20 @@ async function closeOrder(req, res) {
   res.redirect(`/admin/orders/${token}`);
 }
 
+// Закрытие одной категории многокатегорийной заявки — см. order.service.closeOrderCategory.
+async function closeOrderCategory(req, res) {
+  const { token } = req.params;
+  const category = String(req.body.category || '');
+  const order = await orderService.closeOrderCategory(token, category, { actor: 'admin', reason: 'admin_closed', meta: require('../config/requestMeta').requestMeta(req) });
+  if (!order) return res.status(404).send('Заявка не найдена');
+
+  telegramService.updateMessage(order).catch((err) => {
+    console.error('Failed to update Telegram message on admin category close:', err.message);
+  });
+
+  res.redirect(`/admin/orders/${token}`);
+}
+
 async function deleteOrder(req, res) {
   const { token } = req.params;
   const order = await orderService.deleteOrder(token, { meta: require('../config/requestMeta').requestMeta(req) });
@@ -721,6 +735,7 @@ module.exports = {
   ordersList,
   orderDetail,
   closeOrder,
+  closeOrderCategory,
   deleteOrder,
   requestOrderRevision,
   reviewsQueue,

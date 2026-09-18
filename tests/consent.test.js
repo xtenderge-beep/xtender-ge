@@ -140,7 +140,7 @@ async function render(file, locals) {
     const html=await render('index.ejs',{...common,masters:[],catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:await consent.bundle('client',lang)});
     assert.ok(html.includes('id="clientSharing"'));assert.ok(!/id="clientSharing"[^>]*checked/.test(html));
     await render('join.ejs',{...common,consent:await consent.bundle('provider',lang),legalDoc:legalContent.terms,reqLabels:legalContent.REQUISITE_LABELS,reqPending:legalContent.REQUISITE_PENDING,requisites:SERVICE_REQUISITES,welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
-    await render('order.ejs',{...common,order:published,files:[],isOwner:true,masterId:null,funnel:null,masterAccount:null,whatsappText:''});
+    await render('order.ejs',{...common,order:published,files:[],isOwner:true,masterId:null,masterCategory:null,funnel:null,masterAccount:null,targetCategories:[],closedCategories:[],categoryLabels:{},whatsappText:''});
   }
   await render('admin/consent.ejs',{phoneQuery:phone,report,recent:[],csrfToken:'test'});
   const { renderDocBody } = require('../src/config/legalTextFormat');

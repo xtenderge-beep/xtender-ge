@@ -226,7 +226,9 @@ const dictionaries = {
     order_wa_template: 'გამარჯობა! გწერთ თქვენი განაცხადის შესახებ xtender.ge-დან:\n\n{text}\n\nმზად ვარ დაგეხმაროთ.',
     order_closed_notice: 'ეს შეკვეთა უკვე დახურულია დამკვეთის მიერ.',
     order_closed_notice_late: 'ეს შეკვეთა უკვე დახურულია — შემსრულებელი უკვე მოიძებნა. შემდეგში სცადეთ სწრაფად უპასუხოთ, რომ არ გამოტოვოთ შეკვეთა.',
+    order_closed_notice_category: 'ამ განაცხადის ეს ნაწილი (თქვენი კატეგორია) უკვე დახურულია. სხვა კატეგორიები შეიძლება ჯერ კიდევ აქტიური იყოს.',
     btn_close_order: 'შეკვეთის დახურვა',
+    btn_close_all_categories: 'მთლიანად დახურვა',
 
     my_orders_nav: 'ჩემი განაცხადები',
     my_orders_title: 'ჩემი განაცხადები',
@@ -737,7 +739,9 @@ const dictionaries = {
     order_wa_template: 'Здравствуйте! Пишу по вашей заявке с xtender.ge:\n\n{text}\n\nГотов помочь.',
     order_closed_notice: 'Этот заказ уже закрыт заказчиком.',
     order_closed_notice_late: 'Эта заявка уже закрыта — исполнитель уже найден. В следующий раз старайтесь отвечать быстрее, чтобы не упустить заказ.',
+    order_closed_notice_category: 'Эта часть заявки (ваша категория) уже закрыта. Другие категории заявки могут быть ещё активны.',
     btn_close_order: 'Закрыть заказ',
+    btn_close_all_categories: 'Закрыть всю заявку',
 
     my_orders_nav: 'Мои заявки',
     my_orders_title: 'Мои заявки',
@@ -1248,7 +1252,9 @@ const dictionaries = {
     order_wa_template: 'Hello! I\'m writing about your request on xtender.ge:\n\n{text}\n\nHappy to help.',
     order_closed_notice: 'This order has already been closed by the customer.',
     order_closed_notice_late: 'This request has already been closed — an executor was already found. Try to respond faster next time so you don\'t miss out.',
+    order_closed_notice_category: 'This part of the request (your category) has already been closed. Other categories of this request may still be active.',
     btn_close_order: 'Close order',
+    btn_close_all_categories: 'Close entire request',
 
     my_orders_nav: 'My requests',
     my_orders_title: 'My requests',
