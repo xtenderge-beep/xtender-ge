@@ -9,6 +9,11 @@ async function preview(token, category, size) {
   await validate(category, size);
   const order = await orderService.getOrderByToken(token);
   if (!order || !['pending_review', 'new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
+  // Категорию, которую заказчик или модератор уже закрыл (order_category_closures), нельзя
+  // рассылать снова, даже другим размером транспорта: unique-ключ order_dispatches включает
+  // размер, и без этой проверки исполнители закрытой категории получили бы платный лид по
+  // заявке, которую для них уже закрыли.
+  if ((await orderService.getClosedCategories(order.id)).includes(category)) throw new Error('Эта категория заявки уже закрыта');
   const price = await settingsService.getLeadPriceTetri();
   const recipients = await orderService.getDispatchRecipients(category, size, price, order.is_technical === true);
   const previous = await pool.query(`SELECT id FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
