@@ -75,7 +75,13 @@ router.post('/crm',wrap(crm.create));
 router.get('/crm/:id',wrap(crm.card));
 router.post('/crm/:id/sent',wrap(crm.sent));
 router.post('/crm/:id/note',wrap(crm.note));
-router.get('/',wrap(async(req,res) => res.render('manager/dashboard',await service.dashboard(req.managerSession.id,req.query.q,req.query.page))));
+router.get('/',wrap(async(req,res) => {
+  // Токен создаётся лениво (как и по /link в Telegram-боте) — у менеджеров, которых
+  // ещё не приглашали через CRM и для которых админ не жал «создать ссылку», его
+  // раньше не было вовсе, и блок со ссылкой в кабинете просто не показывался.
+  res.locals.manager.referral_token = await require('../services/partner.service').createLink(req.managerSession.id);
+  res.render('manager/dashboard',await service.dashboard(req.managerSession.id,req.query.q,req.query.page));
+}));
 router.get('/finances',wrap(async(req,res) => res.render('manager/finances',await service.finances(req.managerSession.id,req.query.month))));
 router.get('/masters/:id',wrap(async(req,res) => res.render('manager/detail',await service.detail(req.managerSession.id,req.params.id))));
 router.post('/masters/:id/:action',wrap(async(req,res) => { await service.action(req.managerSession.id,req.params.id,req.params.action,req.body.body);res.redirect('/manager/masters/'+encodeURIComponent(req.params.id)); }));
