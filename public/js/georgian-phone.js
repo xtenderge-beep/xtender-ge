@@ -28,6 +28,19 @@
   // страны. Правим только то, что относится к самому префиксу; остальную валидацию формата
   // (9 цифр и т.п.) по-прежнему делает policy.validate/сервер.
   const PREFIX = '+995';
+  // Автозаполнение (сохранённый контакт из мобильной клавиатуры/менеджера паролей,
+  // как в примере с "mobile 577 052 785" на подсказке над клавиатурой) заменяет всё
+  // значение поля напрямую, не через обычный ввод символов — 'beforeinput'/'paste'
+  // ниже его не видят вовсе. Чиним значение на каждое 'input', в чём бы ни была
+  // причина изменения: если префикса нет — восстанавливаем его перед оставшимися
+  // цифрами, а не поверх них.
+  function repairPrefix(input) {
+    if (input.value.startsWith(PREFIX)) return;
+    let digits = input.value.replace(/\D/g, '');
+    if (digits.startsWith('995')) digits = digits.slice(3);
+    input.value = PREFIX + digits;
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+  }
   function lockPrefix(input) {
     input.addEventListener('beforeinput', function (e) {
       if (e.inputType === 'insertFromPaste') return; // обрабатывается ниже, через 'paste'
@@ -55,8 +68,9 @@
   document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-georgian-phone]').forEach(function (input) {
       input.title = policy.message(document.documentElement.lang);
-      input.addEventListener('input', function () { policy.validate(input, false); });
-      input.addEventListener('blur', function () { policy.validate(input, false); });
+      input.addEventListener('input', function () { repairPrefix(input); policy.validate(input, false); });
+      input.addEventListener('change', function () { repairPrefix(input); policy.validate(input, false); });
+      input.addEventListener('blur', function () { repairPrefix(input); policy.validate(input, false); });
       lockPrefix(input);
     });
   });
