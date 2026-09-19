@@ -13,8 +13,11 @@
 
 1. Клиент пишет заявку, подтверждает SMS-кодом.
 2. **В фоне** (ответ клиенту не ждёт): `translation.service.translateOrder(description)`
-   определяет язык оригинала по алфавиту (грузинский → `ka`, кириллица → `ru`, иначе
-   `en`) и переводит на два других языка **параллельно**. Общий таймаут 7 с.
+   определяет язык оригинала по **преобладающему алфавиту** (`detectLang`: больше всего
+   грузинских букв → `ka`, кириллицы → `ru`, латиницы → `en`; ничья — `ka`, затем `ru`; без
+   букв — `en`) и переводит на два других языка **параллельно**. Общий таймаут 7 с. Считаем
+   буквы, а не ищем «хоть одну»: русский текст с грузинским названием улицы не должен стать
+   «грузинским».
 3. Результат → `orders.description_translations` (JSONB `{ru: "...", en: "..."}`) +
    `orders.source_lang`. `orders.description` не трогаем — это оригинал заказчика.
 4. Сразу после — `telegram.notifyModerator(order)` с уже подставленным переводом.
@@ -33,9 +36,20 @@
 - Бейдж **«🌐 переведено»** — когда показан не `source_lang`.
 - Кнопка **«Копировать»** — всегда копирует **оригинал** (чтобы кинуть в свой переводчик).
 - Кнопка **WhatsApp** ведёт на `wa.me/<номер>?text=...` с заготовкой: приветствие на
-  языке заказчика (`order_wa_template`, `source_lang`) + текст заявки в оригинале.
-- Строка-подсказка **«Заказчик пишет на другом языке — удобнее в WhatsApp»** — когда
-  `source_lang` ≠ язык страницы.
+  языке заявки (`order_wa_template`) + текст заявки в оригинале.
+- Метка **«💬 Язык заявки: русский»** над текстом — всем, кроме владельца заявки. Язык
+  считается **из текста заявки** (`requestLanguage.ofOrder` → `detectLang`), а не из
+  `orders.source_lang`: тот пуст, если перевод не сработал (нет ключа, таймаут) и у заявок
+  до автоперевода, а после правки заявки клиентом (`orderRevision.resubmit`) в него пишется
+  язык страницы, а не текста. Метка говорит «язык заявки», не «язык заказчика»: определение
+  идёт по алфавиту, и армянский или турецкий (латиница) покажутся «английским».
+- Блок-совет над кнопками «Позвонить» / WhatsApp: *«В вашем профиле этого языка нет.
+  Напишите заказчику в WhatsApp на языке заявки: приветствие уже подставлено, а ответ можно
+  перевести в любом переводчике.»* Показывается, только если язык заявки не входит в языки
+  исполнителя — `masters.spoken_languages` (отмечаются на `/join`), а у аккаунтов, где их нет,
+  — `masters.language`. Нужен `?master=` в ссылке: модератор и случайная ссылка получают
+  только метку. Стиль нейтральный (не жёлтое предупреждение): исполнитель и так тревожится
+  из-за платных заявок. Логика — `requestLanguage.needsAdvice`.
 
 ## 3. Что видит модератор в Telegram
 
@@ -66,7 +80,9 @@
 | WhatsApp-заготовка | `order.controller.buildWhatsappText(order)` → в `show`/`showByOwnerToken` как `whatsappText` |
 | Вьюха | `src/views/order.ejs` — блок `label_request`, кнопки, скрипт копирования |
 | Модератор | `src/services/telegram.service.js` — `moderatorDescription` |
-| Строки | `src/config/i18n.js` — `order_translated`, `order_show_original`, `order_copy`, `order_copied`, `order_lang_hint`, `order_wa_template` (ka/ru/en) |
+| Язык заявки и совет исполнителю | `src/config/requestLanguage.js` (`ofOrder`, `readerLanguages`, `needsAdvice`); в `order.controller.show` → `requestLang`, `langAdvice`; `master.service.getMasterById` отдаёт `language`, `spoken_languages` |
+| Строки | `src/config/i18n.js` — `order_translated`, `order_show_original`, `order_copy`, `order_copied`, `order_lang_label`, `order_lang_ka/ru/en`, `order_lang_advice`, `order_wa_template`, `tg_lead_title/hint/open` (ka/ru/en) |
+| Тест | `tests/order-language.test.js` — определитель, логика совета, контроллер, вид на трёх языках, сообщение Telegram-лида |
 | Конфиг | `.env.example` — `OPENROUTER_API_KEY`, `OPENROUTER_TRANSLATION_MODEL` |
 
 ## 6. Не переведено (осознанно)
@@ -78,8 +94,12 @@
 - `my-orders`, SMS.
 - `district_name` в заявке — свободный текст, останется как ввёл клиент (районы станут
   структурными в рамках `docs/service-types.md`).
-- Telegram-лид **исполнителю** (не модератору) — оригинал; перевод исполнитель видит по
-  ссылке на `/order/<token>`.
+- Telegram-лид **исполнителю** (не модератору) — текст заявки остаётся оригиналом; перевод
+  исполнитель видит по ссылке на `/order/<token>`. Рамка сообщения («Заявка #», подсказка,
+  кнопка) — на языке кабинета исполнителя (`masters.language`, без него — русская, как
+  раньше), плюс строка «💬 Язык заявки: …» (`telegram.service.leadMessage`). Остальные
+  Telegram-сообщения исполнителю (напоминания о балансе, `order.service.nudgeLowBalance`)
+  пока только на русском.
 
 ## 7. pg-mem
 

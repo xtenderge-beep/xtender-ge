@@ -184,7 +184,8 @@ async function unlinkTelegram(masterToken) {
 // ответа модератора в поддержке (нужен telegram_id, чтобы пингнуть).
 async function getMasterById(id) {
   const { rows } = await pool.query(
-    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id,
+            language, spoken_languages
      FROM masters WHERE id = $1`,
     [id]
   );

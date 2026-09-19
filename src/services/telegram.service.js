@@ -2,6 +2,8 @@ const axios = require('axios');
 const orderService = require('./order.service');
 const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
+const { translate } = require('../config/i18n');
+const requestLanguage = require('../config/requestLanguage');
 
 const API_BASE = 'https://api.telegram.org/bot';
 // Буквы и их порядок — src/config/serviceTypes.js (фиксированы, см. CHECK-констрейнты
@@ -392,21 +394,33 @@ async function forwardSupportMessage(master, body, replyToMessageId) {
 // момент открытия страницы, не в момент отправки лида) и логирование звонка/WhatsApp/
 // просмотра — доделывать её отдельно под Telegram не нужно, и нечему "утекать" в
 // сообщении после того, как заказчик закроет заявку.
+//
+// Рамка сообщения — на языке кабинета исполнителя (masters.language), текст заявки — оригинал
+// заказчика, поэтому строка «Язык заявки» нужна: исполнитель сразу видит, на каком языке
+// писать заказчику. Без сохранённого языка исполнителя рамка остаётся русской, как раньше.
+function leadMessage(master, order) {
+  const t = translate(master.language || 'ru');
+  const requestLang = requestLanguage.ofOrder(order);
+  const lines = [(order.is_technical ? '🧪 ТЕСТ · ' : '') + t('tg_lead_title').replace('{id}', order.id), '', order.description];
+  if (order.district_name) lines.push('', `📍 ${order.district_name}`);
+  if (requestLang) lines.push('', `💬 ${t('order_lang_label')}: ${t('order_lang_' + requestLang)}`);
+  lines.push('', t('tg_lead_hint'));
+  return { text: lines.join('\n'), openLabel: t('tg_lead_open') };
+}
+
 async function sendLeadToMaster(master, order, link) {
   if (!isEnabled()) {
     console.log(`[TELEGRAM DEV MODE] lead #${order.id} -> master ${master.id} via Telegram (chat ${master.telegram_id})`);
     return true;
   }
 
-  const lines = [(order.is_technical ? '🧪 ТЕСТ · ' : '') + `🆕 Заявка #${order.id}`, '', order.description];
-  if (order.district_name) lines.push('', `📍 ${order.district_name}`);
-  lines.push('', 'Нажмите ниже, чтобы посмотреть детали и позвонить или написать в WhatsApp.');
+  const { text, openLabel } = leadMessage(master, order);
 
   try {
     await axios.post(apiUrl('sendMessage'), {
       chat_id: master.telegram_id,
-      text: lines.join('\n'),
-      reply_markup: { inline_keyboard: [[{ text: '📄 Открыть заявку', url: link }]] },
+      text,
+      reply_markup: { inline_keyboard: [[{ text: openLabel, url: link }]] },
     });
     return true;
   } catch (err) {
@@ -558,6 +572,7 @@ module.exports = {
   setWebhook,
   sendToChat,
   sendLeadToMaster,
+  leadMessage,
   forwardSupportMessage,
   CONTACT_KEYBOARD,
 };

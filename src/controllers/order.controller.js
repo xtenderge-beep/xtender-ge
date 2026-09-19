@@ -15,11 +15,12 @@ const redis = require('../config/redis');
 const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
+const requestLanguage = require('../config/requestLanguage');
 
 // Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
 // (он сам писал заявку) + текст заявки в оригинале. Уходит в wa.me/<номер>?text=...
 function buildWhatsappText(order) {
-  const lang = order.source_lang || 'ru';
+  const lang = requestLanguage.ofOrder(order) || 'ru';
   return translate(lang)('order_wa_template').replace('{text}', order.description || '');
 }
 
@@ -712,8 +713,9 @@ async function show(req, res) {
   // нужна, чтобы понять, закрыта ли именно ЕГО категория заявки, независимо от бана.
   let masterAccount = null;
   let masterCategory = null;
+  let m = null;
   if (masterId && !isOwner) {
-    const m = await masterService.getMasterById(Number(masterId));
+    m = await masterService.getMasterById(Number(masterId));
     if (m) {
       masterCategory = m.category;
       if (!m.is_banned) {
@@ -727,6 +729,10 @@ async function show(req, res) {
     }
   }
 
+  // Язык заявки — метка для всех, кроме владельца; совет «пишите на языке заявки» — только
+  // исполнителю, у которого этого языка нет (см. config/requestLanguage.js).
+  const requestLang = isOwner ? null : requestLanguage.ofOrder(order);
+
   return res.render('order', {
     ...revisionLocals(order, req.lang),
     order,
@@ -736,6 +742,8 @@ async function show(req, res) {
     masterCategory,
     funnel,
     masterAccount,
+    requestLang,
+    langAdvice: requestLanguage.needsAdvice(requestLang, m),
     targetCategories: order.target_categories || [],
     closedCategories,
     categoryLabels,

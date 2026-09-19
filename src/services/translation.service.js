@@ -15,11 +15,17 @@ const CALL_TIMEOUT_MS = 6000;
 const LANGS = ['ka', 'ru', 'en'];
 const LANG_NAME = { ka: 'Georgian', ru: 'Russian', en: 'English' };
 
-// Определение языка оригинала по алфавиту: грузинские буквы → ka, кириллица → ru, иначе en.
+// Определение языка оригинала по преобладающему алфавиту: грузинский → ka, кириллица → ru,
+// латиница → en. Считаем буквы, а не ищем «хоть одну»: русский текст с грузинским названием
+// улицы не должен стать «грузинским». Ничья — в пользу ka, затем ru; без букв — en, как раньше.
 function detectLang(text) {
   const s = String(text || '');
-  if (/[Ⴀ-ჿ]/.test(s)) return 'ka';
-  if (/[Ѐ-ӿ]/.test(s)) return 'ru';
+  const count = (re) => (s.match(re) || []).length;
+  const ka = count(/[Ⴀ-ჿ]/g);
+  const ru = count(/[Ѐ-ӿ]/g);
+  const en = count(/[A-Za-z]/g);
+  if (ka && ka >= ru && ka >= en) return 'ka';
+  if (ru && ru >= en) return 'ru';
   return 'en';
 }
 
