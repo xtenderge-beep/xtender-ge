@@ -4,8 +4,10 @@ Implemented locally on 2026-09-20. Not deployed by this change.
 
 ## Signup
 
-The fifth step shows four short facts and two unchecked consent controls. The
-first covers age, terms and service notifications (excluding advertising); the
+Signup has three steps (services, where you work, profile) and then a phone-code
+screen. Since 2026-09-20 the last step holds full name, phone, four short facts under
+"Before you register" and two unchecked consent controls. The first covers age,
+terms and service notifications (excluding advertising); the
 second covers the privacy notice and publication of provider contact details.
 Full documents open separately, preserving the signup form. The SMS button is
 enabled until a request is in progress. Missing choices show an inline message
@@ -15,6 +17,10 @@ The server still checks explicit boolean choices and the document snapshot diges
 The archived snapshot includes the exact displayed summary, labels, confirmation
 hint, document contents, language and `explicit_checkboxes_and_sms` method.
 Existing historical scroll records are retained without rewriting them.
+
+The `MASTER_REGISTERED` audit event also stores `declared_name`, the full name typed at
+acceptance. Later profile edits or re-registration do not change it. It is not identity
+verification: the SMS code proves control of the number only.
 
 ## Paid features
 
@@ -37,6 +43,9 @@ Top-ups and promotional credits never imply billing acceptance.
 
 Editing either rate through settings creates a fresh revision and invalidates
 current permissions. Restoring an old numeric price does not revive an old consent.
+The `billing_*` strings in `provider-consent-copy.js` are part of that hash. They were
+reworded on 2026-09-20 without changing their substance (no "paid event" wording), which
+invalidates any confirmation given earlier.
 Saving an unchanged price does not revoke consent. The charge path locks the rate
 settings while validating the permission. Changed billing copy also invalidates
 permissions through a hash of the three-language billing text.

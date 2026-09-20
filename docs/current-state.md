@@ -416,6 +416,9 @@ node tests/bank-statement.test.js
 node tests/welcome-bonus.test.js
 node tests/language-switch.test.js
 node tests/master-session.test.js
+node tests/copy-quality.test.js
+node tests/signup-consent-ux.test.js
+node tests/service-messages.test.js
 npm run build
 ```
 
