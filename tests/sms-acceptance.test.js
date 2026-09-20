@@ -10,6 +10,13 @@ const sms=require('../src/services/sms.service');
     reply=data;const result=await sms.sendOrderNotification('+995500000001','test');
     assert.equal(result.ok,true);assert.equal(result.status,'accepted');assert.equal(result.messageBody,'test');
   }
+  // The real gateway reply: status 0000 plus the message id, kept whole as the provider reference.
+  reply='0000-api_6ab02a827ac137.36558917';
+  const real=await sms.sendOrderNotification('+995500000001','test');
+  assert.equal(real.ok,true);assert.equal(real.providerMessageId,'api_6ab02a827ac137.36558917');
+  for(const data of ['0003-api_6ab02ae0e1e866.03149312','0001-api_6ab02a827ac137.36558917','0000-','0000-x','0000','0000 api_6ab02a827ac137.36558917']) {
+    reply=data;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),{code:'SMS_NOT_ACCEPTED'},'only status 0000 with an id is accepted: '+data);
+  }
   for(const data of ['ERROR: 123456','OK: ERROR','OK: -1','<html>failure</html>',0,-1,'0','',null,{ok:false,id:123},{success:false,id:123},{status:'failed',id:123},{id:123},{ok:true},'{invalid']) {
     reply=data;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),{code:'SMS_NOT_ACCEPTED'});
   }

@@ -38,11 +38,17 @@ positive numeric IDs with at least six digits, `OK: <positive numeric ID>` /
 `ok: true`, `success: true`, or an accepted status. Telegram requires `ok: true`
 and `result.message_id`. Requests time out after 15 seconds.
 
-**Deployment check:** the SMS gateway's formal response contract is not available
-in the repository. Verify these formats against a real, redacted successful and
-failed receipt from the operator before deployment. Unknown formats fail closed
-and will also prevent OTP delivery from being treated as successful. Tests use
-mock gateways and do not send real messages.
+**Real gateway format (confirmed 2026-09-20 from the production log):** an accepted
+message returns HTTP 200 with `0000-api_<hex>.<digits>`, for example
+`0000-api_6ab02a827ac137.36558917`. Four digits are the status, `0000` is the only
+accepted one, and the rest is the message id, stored whole as the provider
+reference. A rejected request returns another status and HTTP 501, for example
+`0003-api_...` for a call without parameters. The first fail-closed version did not
+know this format, so from its release at 14:07 until the fix every real acceptance
+was treated as a failure: OTP sending, cabinet and admin login codes, and SMS lead
+notifications were affected. Unknown formats still fail closed. The formal contract of
+the gateway is still not in the repository, so any new status code needs the operator's
+documentation. Tests use mock gateways and do not send real messages.
 
 Gateway acceptance is not handset delivery. No delivery-receipt callback is
 implemented; audit explicitly stores `delivery_status: unknown`. If a provider

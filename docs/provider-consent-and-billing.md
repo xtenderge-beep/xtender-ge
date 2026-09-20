@@ -63,8 +63,9 @@ receive new leads. No notifications to staff or users are sent by this change.
 Use the settings service to change prices; direct database edits bypass its
 revision history and are not a supported rate-change workflow.
 
-See `contact-access-and-charge-evidence.md` for the outstanding SMS response-contract
-check and PostgreSQL concurrency verification. This code has only been tested with
+See `contact-access-and-charge-evidence.md` for the SMS reply format (confirmed from the
+production log on 2026-09-20) and the PostgreSQL concurrency verification that is still
+outstanding. This code has only been tested with
 mock external delivery and pg-mem; it does not establish legal enforceability.
 
 ## Unified evidence export

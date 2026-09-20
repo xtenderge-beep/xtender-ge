@@ -23,6 +23,8 @@ function extractMessageId(data) {
     return id ? String(id) : null;
   }
   const s = String(data).trim();
+  const gateway = s.match(/^0000-([A-Za-z0-9_.-]{4,})$/);
+  if (gateway) return gateway[1];
   const tagged = s.match(/(?:id|msgid|message[_-]?id)\D*(\d{3,})/i);
   if (tagged) return tagged[1];
   const bareNum = s.match(/\b(\d{6,})\b/);
@@ -32,13 +34,19 @@ function extractMessageId(data) {
 
 // Fail closed on errors and undocumented replies. HTTP 200 alone is not an
 // acceptance receipt. This is gateway acceptance, never handset delivery.
+//
+// Real replies of this gateway, seen in the production log on 2026-09-20:
+//   accepted (HTTP 200):            0000-api_6ab02a827ac137.36558917
+//   rejected (HTTP 501, no params): 0003-api_6ab02ae0e1e866.03149312
+// The four digits are the status, "0000" is the only accepted one, and the rest is the message id.
+// The first fail-closed version did not know this format and rejected every real acceptance.
 function acceptedResponse(data) {
   if (typeof data === 'string') {
     const value = data.trim();
     if (value.startsWith('{')) {
       try { return acceptedResponse(JSON.parse(value)); } catch (_) { return false; }
     }
-    return /^OK(?:\s*:\s*|\s+)[1-9]\d*$/i.test(value) || /^[1-9]\d{5,}$/.test(value);
+    return /^OK(?:\s*:\s*|\s+)[1-9]\d*$/i.test(value) || /^[1-9]\d{5,}$/.test(value) || /^0000-[A-Za-z0-9_.-]{4,}$/.test(value);
   }
   if (typeof data === 'number') return Number.isSafeInteger(data) && data >= 100000;
   if (!data || typeof data !== 'object' || data.error || data.ok === false || data.success === false) return false;
