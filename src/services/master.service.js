@@ -141,7 +141,7 @@ async function getDistrictsByCity(cityId) {
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
-            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id
+            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id, is_subscribed, subscription_until
      FROM masters WHERE master_token = $1`,
     [token]
   );
@@ -373,10 +373,11 @@ async function chargeMastersForLead(masterIds, amountTetri, orderId, client = po
       return `($${base + 1}, $${base + 2}, 'lead_charge', $${base + 3})`;
     })
     .join(', ');
-  await client.query(
-    `INSERT INTO balance_transactions (master_id, amount_tetri, reason, order_id) VALUES ${rowPlaceholders}`,
+  const charges = await client.query(
+    `INSERT INTO balance_transactions (master_id, amount_tetri, reason, order_id) VALUES ${rowPlaceholders} RETURNING id, master_id`,
     values
   );
+  return charges.rows;
 }
 
 async function topUpBalance(phone, amountTetri) {
@@ -472,10 +473,13 @@ async function listMasters({ serviceType } = {}) {
     if (!cur || (s.is_primary && !cur.is_primary)) byMaster.set(s.master_id, s);
   }
 
+  const billing = require('./providerBilling.service');
+  const billingIds = await billing.eligibleIds(await billing.pricing());
   const result = rows.map((m) => {
     const s = byMaster.get(m.id);
     return {
       ...m,
+      billing_accepted: billingIds.has(m.id),
       service_type: s ? s.service_type : (m.category === 'movers' ? 'movers' : 'van'),
       attributes: s ? s.attributes || {} : {},
     };
@@ -497,6 +501,12 @@ async function listMasters({ serviceType } = {}) {
 // в этом файле — держим его и здесь, а не только чтобы обойти баг pg-mem.
 async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
   return pool.withTransaction(async (client) => {
+    const found = (await client.query('SELECT * FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
+    if (!found) return null;
+    const billing = require('./providerBilling.service');
+    const rates = await billing.pricing(client, true);
+    const acceptance = await billing.accepted(masterId, rates, client);
+    if (!acceptance || rates.catalogCallPriceTetri !== priceTetri) return null;
     const { rows } = await client.query(
       `UPDATE masters SET balance_tetri = balance_tetri + $1
        WHERE id = $2 AND is_technical = false AND is_active = true AND is_banned = false AND balance_tetri >= $3
@@ -505,10 +515,13 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
     );
     const master = rows[0];
     if (!master) return null;
-    await client.query(
-      `INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'catalog_call', $3)`,
+    const charge = await client.query(
+      `INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'catalog_call', $3) RETURNING id`,
       [master.id, -priceTetri, callerPhone ? `Звонок из каталога: ${callerPhone}` : null]
     );
+    await consentLog.recordAction({ eventType: 'CATALOG_CHARGE_ACCEPTED', phone: master.phone, masterId: master.id,
+      metadata: { amount_tetri: priceTetri, balance_transaction_id: charge.rows[0].id,
+        billing_consent_log_id: acceptance.consent_log_id, pricing_key: rates.key } }, client);
     return master;
   });
 }

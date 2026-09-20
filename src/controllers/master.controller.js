@@ -1,5 +1,6 @@
 const masterSession = require('../services/masterSession.service');
 const consentService = require('../services/consent.service');
+const providerBilling = require('../services/providerBilling.service');
 const topupService = require('../services/topup.service');
 const receiptService = require('../services/receipt.service');
 const masterService = require('../services/master.service');
@@ -276,8 +277,9 @@ async function statusPage(req, res) {
     });
   }
   const payment = await topupService.getDetails();
-  const catalogCallPriceTetri = await settingsService.getCatalogCallPriceTetri();
-  const leadPriceTetri = await settingsService.getLeadPriceTetri();
+  const billingState = await providerBilling.state(master.id, req.lang);
+  const catalogCallPriceTetri = billingState.catalog_call_price_tetri;
+  const leadPriceTetri = billingState.lead_price_tetri;
 
   const [reviews, activity, history, leads, supportMessages, receipts, topups] = await Promise.all([
     reviewService.listApprovedForMasters([master.id]),
@@ -293,7 +295,7 @@ async function statusPage(req, res) {
   master.category_label = category?.['name_'+req.lang] || category?.name_ru || '';
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
-    leadPriceTetri, catalogCallPriceTetri, payment, botUsername: BOT_USERNAME, clientStrings: strings,
+    leadPriceTetri, catalogCallPriceTetri, payment, billingState, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }
 
@@ -444,7 +446,18 @@ async function submitTopupReceipt(req, res) {
   return res.json({ success: true });
 }
 
+async function acceptBilling(req, res) {
+  masterSession.noStore(res);
+  const token = await masterSession.token(req);
+  if (!token || token !== req.params.token) return res.status(401).json({ success: false, message: clientStrings(req.lang).contact_login });
+  if (req.get?.('sec-fetch-site') === 'cross-site') return res.status(403).json({ success: false });
+  const result = await providerBilling.accept(token, req.body, requestMeta(req));
+  return res.status(result.status).json({ success: result.status === 200, code: result.code,
+    message: result.code ? clientStrings(req.body.language || req.lang)[result.code] : null });
+}
+
 module.exports = {
+  acceptBilling,
   list,
   sendOtp,
   verifyOtp,

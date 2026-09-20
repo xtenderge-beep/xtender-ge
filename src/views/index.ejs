@@ -356,7 +356,7 @@
                                       <% } %>
 
                                       <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
-                                          <% if (master.balance_tetri >= catalogCallPriceTetri) { %>
+                                          <% if (master.billing_accepted === true && master.balance_tetri >= catalogCallPriceTetri) { %>
                                             <div class="flex items-center justify-center gap-1.5 text-stone-500 text-xs font-mono mb-2">
                                                 <i class="fa-solid fa-lock text-[9px]"></i>
                                                 <span>+995&nbsp;5&middot;&middot;&nbsp;&middot;&middot;&middot;&nbsp;&middot;&middot;&middot;</span>

@@ -6,7 +6,7 @@ const redis=new(require('ioredis-mock'))();
 const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
 stub('../src/config/db',pool);stub('../src/config/redis',redis);
 let failPhone=null;
-stub('../src/services/sms.service',{sendOtp:async()=>({providerMessageId:'test'}),sendOrderNotification:async(phone)=>{if(phone===failPhone)throw Error('channel unavailable');return {providerMessageId:'test'};}});
+stub('../src/services/sms.service',{sendOtp:async()=>({providerMessageId:'test'}),sendOrderNotification:async(phone)=>{if(phone===failPhone)throw Error('channel unavailable');return {ok:true,providerMessageId:'test'};}});
 stub('../src/services/telegram.service',{notifyModerator:async()=>null,updateMessage:async()=>{},sendLeadToMaster:async()=>false});
 stub('../src/services/translation.service',{translateOrder:async()=>null});
 const crm=require('../src/services/crm.service'),metrics=require('../src/services/crmMetrics.service'),managers=require('../src/services/manager.service'),portal=require('../src/services/managerPortal.service'),orders=require('../src/services/order.service'),partners=require('../src/services/partner.service'),masters=require('../src/services/master.service'),consent=require('../src/services/consent.service');
@@ -51,6 +51,7 @@ const crm=require('../src/services/crm.service'),metrics=require('../src/service
   await crm.savePlan(a.id,report.month,{registrations:10,first_payers:5,payers:8,revenue:'1000'});report=await metrics.report(a.id);assert.equal(report.rows[0].plan.first_payers,5);await assert.rejects(()=>crm.savePlan(a.id,report.month,{registrations:-1,first_payers:5,payers:8,revenue:1000}));
   const receiver=(await pool.query("INSERT INTO masters(name,phone,category,manager_id,is_active,is_banned,balance_tetri) VALUES('Receiver','+995500010007','movers',$1,true,false,10000) RETURNING *",[a.id])).rows[0];
   const failed=(await pool.query("INSERT INTO masters(name,phone,category,manager_id,is_active,is_banned,balance_tetri) VALUES('Failed','+995500010008','movers',$1,true,false,10000) RETURNING *",[b.id])).rows[0];failPhone=failed.phone;
+  await require('./billing-fixture')(pool,receiver.id);await require('./billing-fixture')(pool,failed.id);
   assert.equal(await orders.notifyMasters(await orders.getOrderByToken(challenge.token),'movers',null),1);
   const delivery=(await pool.query("SELECT * FROM dispatch_deliveries WHERE master_id=$1",[receiver.id])).rows[0];
   await pool.query("INSERT INTO order_views(order_id,master_id,event_type,viewed_at) VALUES($1,$2,'call',$3),($1,$2,'whatsapp',$4)",[draft.order_id,receiver.id,new Date(+delivery.created_at+1000),new Date(+delivery.created_at+2000)]);

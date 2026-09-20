@@ -24,7 +24,7 @@ const dispatch=require('../src/services/dispatch.service');
 const telegram=require('../src/services/telegram.service');
 telegram.notifyModerator=async()=>null;telegram.updateMessage=async()=>{};
 let telegramWorks=true;
-telegram.sendLeadToMaster=async(m,o)=>{sent.push({channel:'telegram',masterId:m.id,orderId:o.id,isTechnical:o.is_technical});return telegramWorks;};
+telegram.sendLeadToMaster=async(m,o)=>{sent.push({channel:'telegram',masterId:m.id,orderId:o.id,isTechnical:o.is_technical});return telegramWorks ? {ok:true,providerMessageId:'telegram-test'} : false;};
 telegram.sendToChat=async(id,text)=>sent.push({channel:'nudge',id,text});
 const consent=require('../src/services/consent.service');
 const otpController=require('../src/controllers/otp.controller');
@@ -49,7 +49,8 @@ async function websiteOrder(phone, claimedTechnical) {
 }
 async function insertMaster(name,phone,balance,technicalRole,telegramId=null) {
  const m=(await pool.query("INSERT INTO masters(name,phone,category,is_active,is_subscribed,balance_tetri,is_technical,telegram_id,master_token) VALUES($1,$2,'movers',true,true,$3,$4,$5,$6) RETURNING *",[name,phone,balance,technicalRole,telegramId,'token-'+name])).rows[0];
- await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[m.id]);
+  await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[m.id]);
+  await require('./billing-fixture')(pool,m.id);
  return m;
 }
 (async()=>{
@@ -101,8 +102,8 @@ async function insertMaster(name,phone,balance,technicalRole,telegramId=null) {
  // A stale caller cannot change persisted routing; Telegram failure falls back to
  // the technical phone only, using the same billing and delivery history.
  telegramWorks=false;sent.length=0;
- assert.equal(await orders.notifyMasters({...testOrder,is_technical:false},'movers',''),1);
- assert.ok(sent.some(s=>s.phone===tech.phone&&s.text.includes('[TEST]')));
+ assert.equal(await orders.notifyMasters({...testOrder,is_technical:false},'movers',''),0);
+ assert.equal(sent.length,0,'already charged lead is neither resent nor charged again');
  assert.ok(!sent.some(s=>s.phone===real.phone));
  telegramWorks=true;
  await technical.update('remove_master',tech.id);

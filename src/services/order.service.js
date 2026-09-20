@@ -5,6 +5,7 @@ const smsService = require('./sms.service');
 const masterService = require('./master.service');
 const settingsService = require('./settings.service');
 const technical = require('./technical.service');
+const billing = require('./providerBilling.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 
@@ -381,7 +382,11 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
  const definition = await catalog.get(category);
  if (!definition?.is_active) return [];
  const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
- const { rows } = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ const rates = await billing.pricing();
+ if (rates.leadPriceTetri !== leadPrice) return [];
+ const allowed = await billing.eligibleIds(rates);
+ const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ const rows = result.rows.filter(master => allowed.has(master.id));
  if (!definition.is_builtin && rows.length) {
    const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
    return rows.filter(m=>services.some(s=>s.master_id===m.id && !catalog.validate(definition,s.attributes).errors.length));
@@ -407,28 +412,52 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
    await Promise.all(masters.slice(offset, offset + 4).map(async candidate => {
     let outcome = 'skipped';
     await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
-      const live = (await client.query('SELECT status FROM orders WHERE id=$1', [order.id])).rows[0];
+      const live = (await client.query('SELECT status FROM orders WHERE id=$1 FOR UPDATE', [order.id])).rows[0];
       if (!live || !['pending_review','new'].includes(live.status) || !master.is_active || master.is_banned || !master.is_subscribed ||
           (master.subscription_until && new Date(master.subscription_until) <= new Date()) || master.balance_tetri < leadPrice) return;
+      const closed = await client.query('SELECT category FROM order_category_closures WHERE order_id=$1 AND category=$2', [order.id, category]);
+      if (closed.rows.length) return;
+      // The master lock serializes concurrent attempts, including direct retries
+      // that bypass the dispatch UI. One order can charge this provider once.
+      const charged = await client.query("SELECT id FROM balance_transactions WHERE master_id=$1 AND order_id=$2 AND reason='lead_charge' LIMIT 1", [master.id, order.id]);
+      if (charged.rows.length) return;
+      const rates = await billing.pricing(client, true);
+      const billingConsent = await billing.accepted(master.id, rates, client);
+      if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
       const link = getBaseUrl() + '/order/' + order.token + '?master=' + master.id;
-      let delivered = false;
-      if (master.telegram_id) delivered = await telegramService.sendLeadToMaster(master, order, link).catch(() => false);
-      if (!delivered) {
+      let receipt = null;
+      let channel = 'telegram';
+      if (master.telegram_id) receipt = await telegramService.sendLeadToMaster(master, order, link).catch(() => null);
+      if (!receipt?.ok) {
+        channel = 'sms';
         try {
-          await smsService.sendOrderNotification(master.phone, 'Xtender: ' + (isTechnical ? '[TEST] ' : '') + 'new order #' + order.id + ': ' + link,
+          receipt = await smsService.sendOrderNotification(master.phone, 'Xtender: ' + (isTechnical ? '[TEST] ' : '') + 'new order #' + order.id + ': ' + link,
             { kind: 'lead', masterId: master.id, orderId: order.id });
-          delivered = true;
-        } catch (err) { console.error('Failed to notify master ' + master.id + ':', err.message); }
+        } catch (err) { receipt = null; console.error('Failed to notify master ' + master.id + ':', err.message); }
       }
+      const delivered = receipt?.ok === true;
       outcome = delivered ? 'accepted' : 'failed';
       if (delivered) {
-        await masterService.chargeMastersForLead([master.id], leadPrice, order.id, client);
-        notifiedIds.push(master.id);
-        if (master.balance_tetri >= lowBalanceNudgeTetri && master.balance_tetri - leadPrice < lowBalanceNudgeTetri)
-          await nudgeLowBalance({ ...master, balance_tetri: master.balance_tetri - leadPrice }, telegramService, 'low');
+        // Evidence and debit commit together. A failed audit means no charge.
+        const charges = await masterService.chargeMastersForLead([master.id], leadPrice, order.id, client);
+        await consentLog.recordAction({ eventType: 'LEAD_CHARGE_ACCEPTED', phone: master.phone,
+          masterId: master.id, orderId: order.id, metadata: {
+            balance_transaction_id: charges[0].id,
+            billing_consent_log_id: billingConsent.consent_log_id, pricing_key: rates.key,
+            run_id: run.id, category, amount_tetri: leadPrice, balance_before_tetri: master.balance_tetri,
+            balance_after_tetri: master.balance_tetri - leadPrice, channel,
+            provider_message_id: receipt.providerMessageId || null,
+            provider_response: receipt.providerResponse || null, message_body: receipt.messageBody || null,
+            acceptance_status: 'accepted', delivery_status: 'unknown',
+          } }, client);
       }
       await client.query('UPDATE dispatch_deliveries SET status=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2', [run.id,master.id,outcome]);
     });
+    if (outcome === 'accepted') {
+      notifiedIds.push(candidate.id);
+      if (candidate.balance_tetri >= lowBalanceNudgeTetri && candidate.balance_tetri - leadPrice < lowBalanceNudgeTetri)
+        await nudgeLowBalance({ ...candidate, is_technical: isTechnical, balance_tetri: candidate.balance_tetri - leadPrice }, telegramService, 'low').catch(err => console.error('Low balance reminder failed:', err.message));
+    }
     if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id]);
    }));
   }
@@ -438,6 +467,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     if (notifiedIds.includes(candidate.id)) continue;
     await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
       if (!master.is_active || master.is_banned || !master.is_subscribed || master.balance_tetri >= leadPrice) return;
+      if (!await billing.accepted(master.id, await billing.pricing(client), client)) return;
       await client.query('UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1 WHERE id=$1', [master.id]);
       await nudgeLowBalance(master, telegramService, 'missed');
     });

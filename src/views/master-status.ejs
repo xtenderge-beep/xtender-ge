@@ -129,6 +129,7 @@
             <% } %>
 
             <%- include('partials/provider-overview') %>
+            <% if (typeof billingState !== 'undefined') { %><%- include('partials/provider-billing-consent') %><% } %>
             <%- include('partials/provider-guide') %>
             <nav class="sticky top-16 z-10 bg-stone-50/95 backdrop-blur-md border-b border-stone-200">
                 <div class="flex gap-1 overflow-x-auto no-scrollbar">

@@ -1,6 +1,6 @@
 <%
 const receivingState = master.is_banned || master.is_subscribed === false || (master.subscription_until && new Date(master.subscription_until) <= new Date())
-  ? 'disabled' : !master.is_active ? 'pending' : master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
+  ? 'disabled' : (typeof billingState !== 'undefined' && !billingState.accepted) ? 'billing_pending' : !master.is_active ? 'pending' : master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
 %>
 <section class="provider-overview" data-account-state="<%= receivingState %>">
   <div class="provider-overview-top"><span class="provider-status <%= receivingState %>"><%= t('provider_' + receivingState) %></span><span class="provider-channel"><%= t('provider_channel') %>: <strong><%= master.telegram_id ? 'Telegram' : 'SMS' %></strong></span></div>

@@ -4,7 +4,7 @@ const {Pool}=db.adapters.createPg(),pool=new Pool();
 pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
 const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
 stub('../src/config/db',pool);stub('../src/config/redis',new(require('ioredis-mock'))());
-stub('../src/services/sms.service',{sendOrderNotification:async()=>true});
+stub('../src/services/sms.service',{sendOrderNotification:async()=>({ok:true,providerMessageId:'test'})});
 stub('../src/services/translation.service',{translateOrder:async()=>null});
 const calls=[];stub('axios',{post:async(url,body)=>{calls.push({url,body});return {data:{ok:true,result:{message_id:1}}};}});
 const categories=require('../src/services/category.service'),masters=require('../src/services/master.service'),orders=require('../src/services/order.service'),telegram=require('../src/services/telegram.service'),dispatch=require('../src/services/dispatch.service');
@@ -19,6 +19,7 @@ const definition={name_ru:'Сантехник',name_ka:'სანტექნი
  await assert.rejects(masters.updateMasterProfile(member.id,{...profile,serviceAttributes:{}}),{code:'INVALID_SERVICE'});
  await masters.updateMasterProfile(member.id,profile);await masters.approveMaster(member.id);
  await pool.query('UPDATE masters SET balance_tetri=500 WHERE id=$1',[member.id]);
+ await require('./billing-fixture')(pool,member.id);
  assert.equal((await masters.listMasters({serviceType:key})).length,1);
  const order=(await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('catorder','+995500000908','Plumbing','pending_review') RETURNING *")).rows[0];
  const keyboard=await telegram.buildKeyboardWithCounts(order.token);

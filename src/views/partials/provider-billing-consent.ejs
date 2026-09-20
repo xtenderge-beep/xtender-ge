@@ -1,0 +1,50 @@
+<section id="billingConsent" class="bg-white rounded-2xl border border-stone-200 p-5 space-y-3">
+  <% if (billingState.accepted) { %>
+    <p class="text-sm font-bold text-emerald-700"><i class="fa-solid fa-check" aria-hidden="true"></i> <%= t('billing_accepted') %></p>
+  <% } else { %>
+    <h2 class="text-lg font-bold text-stone-900"><%= billingState.title %></h2>
+    <p class="text-sm text-stone-600"><%= billingState.intro %></p>
+    <ul class="space-y-2 text-sm text-stone-800 list-disc pl-5"><li><%= billingState.lead %></li><li><%= billingState.catalog %></li></ul>
+    <p class="text-xs text-stone-600"><%= billingState.note %></p>
+    <form id="billingConsentForm" class="space-y-3">
+      <label class="flex items-start gap-3 text-sm cursor-pointer">
+        <input id="billingCheckbox" type="checkbox" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0" aria-describedby="billingMessage">
+        <span><%= billingState.checkbox %></span>
+      </label>
+      <p id="billingMessage" class="hidden text-sm text-red-700" role="alert"></p>
+      <button id="billingSubmit" type="submit" class="px-4 py-3 rounded-xl bg-emerald-600 text-white font-bold text-sm"><%= billingState.button %></button>
+    </form>
+    <script>
+      (function () {
+        const form = document.getElementById('billingConsentForm');
+        const checkbox = document.getElementById('billingCheckbox');
+        const button = document.getElementById('billingSubmit');
+        const message = document.getElementById('billingMessage');
+        let busy = false;
+        checkbox.addEventListener('change', () => { checkbox.removeAttribute('aria-invalid'); message.classList.add('hidden'); });
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (busy) return;
+          if (!checkbox.checked) {
+            message.textContent = <%- JSON.stringify(t('billing_required')) %>;
+            message.classList.remove('hidden'); checkbox.setAttribute('aria-invalid', 'true'); checkbox.focus(); return;
+          }
+          busy = true; button.disabled = true; checkbox.disabled = true; form.setAttribute('aria-busy', 'true');
+          message.classList.add('hidden');
+          try {
+            const response = await fetch('/api/master/<%= master.master_token %>/billing/accept', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ accepted: true, digest: <%- JSON.stringify(billingState.digest) %>, language: <%- JSON.stringify(billingState.language) %> }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || <%- JSON.stringify(t('billing_error')) %>);
+            window.location.reload();
+          } catch (error) {
+            message.textContent = error.message || <%- JSON.stringify(t('billing_error')) %>;
+            message.classList.remove('hidden');
+          } finally { busy = false; button.disabled = false; checkbox.disabled = false; form.removeAttribute('aria-busy'); }
+        });
+      })();
+    </script>
+  <% } %>
+</section>

@@ -356,6 +356,15 @@ CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_event  ON sms_consent_logs (even
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ts     ON sms_consent_logs (timestamp_utc);
 CREATE INDEX IF NOT EXISTS idx_sms_consent_logs_ref    ON sms_consent_logs (otp_reference_id);
 
+-- Current permission to incur paid events; immutable evidence stays in the audit.
+-- Existing profiles intentionally start without acceptance. A top-up is not consent.
+CREATE TABLE IF NOT EXISTS master_billing_acceptances (
+    master_id INTEGER PRIMARY KEY REFERENCES masters(id) ON DELETE CASCADE,
+    pricing_key VARCHAR(64) NOT NULL,
+    consent_log_id BIGINT NOT NULL REFERENCES sms_consent_logs(id),
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- One-time application of an OTP consent to its business operation.
 CREATE TABLE IF NOT EXISTS consent_uses (
     consent_log_id BIGINT PRIMARY KEY,
@@ -377,6 +386,7 @@ INSERT INTO app_settings (key, value) VALUES ('lead_price_tetri', '50') ON CONFL
 -- Цена за раскрытие номера в публичном каталоге (клиент, который не постит заявку, а сразу
 -- звонит мастеру из каталога) — отдельный от рассылки канал монетизации, см. HANDOFF 2026-09-05.
 INSERT INTO app_settings (key, value) VALUES ('catalog_call_price_tetri', '50') ON CONFLICT (key) DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('billing_rates_revision', 'initial') ON CONFLICT (key) DO NOTHING;
 
 -- === Города, районы, типы услуг исполнителя — конфиг-движок (2026-09-06) ===
 -- См. src/config/serviceTypes.js (структура типов + правила матчинга) и HANDOFF.md

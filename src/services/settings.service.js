@@ -19,6 +19,16 @@ async function getSetting(key, fallback = null) {
 }
 
 async function setSetting(key, value) {
+  if ([LEAD_PRICE_KEY, CATALOG_CALL_PRICE_KEY].includes(key)) {
+    return pool.withTransaction(async client => {
+      // Match billing consent/charge locks; every price edit gets a fresh revision,
+      // even when an old numerical rate is later restored.
+      const current = await client.query("SELECT key,value FROM app_settings WHERE key IN ('lead_price_tetri','catalog_call_price_tetri','billing_rates_revision') ORDER BY key FOR UPDATE");
+      if (current.rows.find(row => row.key === key)?.value === String(value)) return;
+      await client.query('INSERT INTO app_settings(key,value,updated_at) VALUES($1,$2,NOW()) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()', [key,String(value)]);
+      await client.query("INSERT INTO app_settings(key,value) VALUES('billing_rates_revision',$1) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value,updated_at=NOW()", [require('node:crypto').randomUUID()]);
+    });
+  }
   await pool.query(
     `INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2, NOW())
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
