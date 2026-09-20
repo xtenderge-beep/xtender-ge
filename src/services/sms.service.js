@@ -116,7 +116,7 @@ async function send(phone, text, context = {}) {
 // хэша, purpose и метаданные запроса).
 function sendOtp(phone, code, context = {}) {
   if (!isGeorgianPhone(phone)) throw new Error('OTP is available only for Georgian numbers (+995 and 9 digits)');
-  return send(phone, require('../config/service-message-copy')('code', context.language || 'en', { code }), { ...context, log: false });
+  return send(phone, require('../config/service-message-copy').sms('code', { code }), { ...context, log: false });
 }
 
 function sendOrderNotification(phone, text, context = {}) {

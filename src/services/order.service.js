@@ -25,12 +25,13 @@ async function nudgeLowBalance(master, telegramService, reason) {
 
   const link = `${getBaseUrl()}/master/${master.master_token}`;
   const gel = (master.balance_tetri / 100).toFixed(2);
-  const text = serviceMessage(reason === 'missed' ? 'balanceMissed' : 'balanceLow', master.language, { amount: gel, link });
+  const messageKey = reason === 'missed' ? 'balanceMissed' : 'balanceLow';
   try {
     if (master.telegram_id) {
-      await telegramService.sendToChat(master.telegram_id, text);
+      // Telegram carries the provider's language; the SMS body stays Latin (see service-message-copy.js).
+      await telegramService.sendToChat(master.telegram_id, serviceMessage(messageKey, master.language, { amount: gel, link }));
     } else {
-      await smsService.sendOrderNotification(master.phone, text, { masterId: master.id });
+      await smsService.sendOrderNotification(master.phone, serviceMessage.sms(messageKey, { amount: gel, link }), { masterId: master.id });
     }
   } catch (err) {
     console.error(`Failed to nudge master ${master.id} about low balance:`, err.message);
@@ -439,7 +440,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       if (!receipt?.ok) {
         channel = 'sms';
         try {
-          receipt = await smsService.sendOrderNotification(master.phone, serviceMessage('lead', master.language, { test: isTechnical ? '[TEST] ' : '', id: order.id, link }),
+          receipt = await smsService.sendOrderNotification(master.phone, serviceMessage.sms('lead', { test: isTechnical ? '[TEST] ' : '', id: order.id, link }),
             { kind: 'lead', masterId: master.id, orderId: order.id });
         } catch (err) { receipt = null; console.error('Failed to notify master ' + master.id + ':', err.message); }
       }

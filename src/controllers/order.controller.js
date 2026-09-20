@@ -861,7 +861,7 @@ async function close(req, res) {
     const link = `${getBaseUrl()}/review/${order.owner_token}`;
     return smsService.sendOrderNotification(
       order.phone,
-      serviceMessage('reviewInvite', await orderService.getCustomerLanguage(order, req.lang), { id: order.id, link }),
+      serviceMessage.sms('reviewInvite', { id: order.id, link }),
       { orderId: order.id }
     );
   }).catch((err) => {
@@ -906,7 +906,7 @@ async function closeCategory(req, res) {
       const link = `${getBaseUrl()}/review/${order.owner_token}`;
       return smsService.sendOrderNotification(
         order.phone,
-        serviceMessage('reviewInvite', await orderService.getCustomerLanguage(order, req.lang), { id: order.id, link }),
+        serviceMessage.sms('reviewInvite', { id: order.id, link }),
         { orderId: order.id }
       );
     }).catch((err) => {

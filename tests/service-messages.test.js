@@ -9,8 +9,12 @@ const pool = new Pool(), redis = new Redis(), sent = [];
 require.cache[require.resolve('../src/config/db')] = {exports: pool};
 require.cache[require.resolve('../src/config/redis')] = {exports: redis};
 require.cache[require.resolve('../src/services/consentLog.service')] = {exports: {recordOtpSent: async () => {}}};
+let failNext = false;
 require.cache[require.resolve('../src/services/sms.service')] = {exports: {
-  sendOtp: async (phone, code, context) => {sent.push({phone,code,context});return {};},
+  sendOtp: async (phone, code, context) => {
+    if (failNext) { failNext = false; const error = new Error('SMS gateway did not confirm acceptance'); error.code = 'SMS_NOT_ACCEPTED'; throw error; }
+    sent.push({phone,code,context});return {};
+  },
   sendOrderNotification: async (phone, body) => {sent.push({phone,body});return {};},
 }};
 const otp = require('../src/services/otp.service');
@@ -20,14 +24,32 @@ const message = require('../src/config/service-message-copy');
   for (const [i,lang] of ['ru','en','ka'].entries()) {
     const phone = '+99550000010' + i;
     await otp.sendCode(phone, null, 'master_login', null, {language:lang});
-    assert.equal(sent.at(-1).context.language, lang);
+    assert.match(sent.at(-1).code, /^[0-9]{4}$/);
     const link = 'https://example.test/o/test';
     await otp.sendCode(phone, link, 'order', i+1, {language:'en',consent:{language:lang}});
     const code = await redis.get('otp:order:' + phone);
-    assert.equal(sent.at(-1).body,message('orderCode',lang,{code,reference:' #'+(i+1),link}));
+    // SMS bodies are identical and Latin in every language: the gateway garbles non-Latin text.
+    assert.equal(sent.at(-1).body,message.sms('orderCode',{code,reference:' #'+(i+1),link}));
+    assert.match(sent.at(-1).body, /^[ -~]+$/);
     assert.ok(!sent.at(-1).body.includes('{'));
-    assert.ok(message('reviewInvite',lang,{id:1,link}).includes(link));
+    // Telegram texts stay localized and keep their link.
+    assert.ok(message('balanceLow',lang,{amount:'1.00',link}).includes(link));
   }
+  // Every SMS template is printable ASCII with all placeholders filled.
+  const sample = {code:'1234',reference:' #7',link:'https://example.test/x',test:'[TEST] ',id:7,amount:'1.00'};
+  for (const key of ['code','orderCode','lead','revision','reviewInvite','balanceLow','balanceMissed']) {
+    const body = message.sms(key, sample);
+    assert.match(body, /^[ -~]+$/, 'SMS "' + key + '" must stay Latin');
+    assert.ok(!body.includes('{'), 'SMS "' + key + '" has an unfilled placeholder');
+  }
+  assert.equal(message.sms('code',{code:'1234'}),'Code: 1234','the login code is a bare code on purpose');
+  // A gateway that does not confirm acceptance must not become an unhandled error, keep a dead code
+  // alive, or use up the person's hourly attempts.
+  const brokenPhone = '+995500000199';
+  failNext = true;
+  assert.deepEqual(await otp.sendCode(brokenPhone, null, 'master_login', null, {}), {success:false, reason:'send_failed'});
+  assert.equal(await redis.get('otp:master_login:' + brokenPhone), null);
+  for (let i = 0; i < 3; i++) assert.equal((await otp.sendCode(brokenPhone, null, 'master_login', null, {})).success, true);
   // Telegram prompts to a provider follow the Telegram app language until a profile with its own language is linked.
   assert.equal(message.telegramLanguage({language_code: 'ka'}), 'ka');
   assert.equal(message.telegramLanguage({language_code: 'en-GB'}), 'en');

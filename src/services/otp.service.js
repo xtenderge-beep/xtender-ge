@@ -46,17 +46,25 @@ async function sendCode(phone, orderLink, purpose = 'order', orderId = null, con
   await redis.set(`otp:${purpose}:${phone}`, code, 'EX', OTP_TTL_SECONDS);
   await redis.del(`otp_attempts:${purpose}:${phone}`);
 
-  const language = context.consent?.language || context.language || 'en';
   let result;
-  if (orderLink) {
-    const ref = orderId ? ` #${orderId}` : '';
-    result = await smsService.sendOrderNotification(
-      phone,
-      serviceMessage('orderCode', language, { code, reference: ref, link: orderLink }),
-      { log: false }
-    );
-  } else {
-    result = await smsService.sendOtp(phone, code, { language });
+  try {
+    if (orderLink) {
+      const ref = orderId ? ` #${orderId}` : '';
+      result = await smsService.sendOrderNotification(
+        phone,
+        serviceMessage.sms('orderCode', { code, reference: ref, link: orderLink }),
+        { log: false }
+      );
+    } else {
+      result = await smsService.sendOtp(phone, code);
+    }
+  } catch (error) {
+    // The gateway did not accept the message, so nobody holds this code. Drop it and give the
+    // attempt back, otherwise a gateway problem would lock people out for an hour.
+    console.error(`OTP SMS was not sent (${purpose}): ${error.message}`);
+    await redis.del(`otp:${purpose}:${phone}`);
+    await redis.decr(`otp_limit:${purpose}:${phone}`).catch(() => {});
+    return { success: false, reason: 'send_failed' };
   }
 
   const providerMessageId = (result && result.providerMessageId) || null;

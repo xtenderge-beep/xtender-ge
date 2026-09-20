@@ -1,10 +1,6 @@
-// Service notifications and recoverable API errors. No marketing or consent text.
+// Telegram messages and recoverable API errors, in the person's language. No marketing or consent text.
+// SMS bodies are NOT here on purpose: see smsMessages below.
 const messages = {
-  lead: ['Xtender: {test}новая заявка №{id}: {link}', 'Xtender: {test}new request #{id}: {link}', 'Xtender: {test}ახალი განაცხადი №{id}: {link}'],
-  revision: ['Xtender: уточните заявку. Комментарий проверки и исправление: {link}', 'Xtender: your request needs more details. View feedback and update it: {link}', 'Xtender: განაცხადს დაზუსტება სჭირდება. ნახეთ კომენტარი და შეასწორეთ: {link}'],
-  code: ['Xtender: код {code}. Никому его не сообщайте.', 'Xtender: code {code}. Do not share it.', 'Xtender: კოდი {code}. არავის გაუზიაროთ.'],
-  orderCode: ['Xtender: код {code}. Ваша заявка{reference}: {link} Здесь можно закрыть заявку.', 'Xtender: code {code}. Your request{reference}: {link} You can close it here.', 'Xtender: კოდი {code}. თქვენი განაცხადი{reference}: {link} აქ შეგიძლიათ განაცხადის დახურვა.'],
-  reviewInvite: ['Xtender: заявка №{id} закрыта. Если исполнитель выполнил работу, оставьте отзыв: {link}', 'Xtender: request #{id} is closed. If a provider did the work, leave a review: {link}', 'Xtender: განაცხადი №{id} დახურულია. თუ შემსრულებელმა სამუშაო შეასრულა, შეაფასეთ: {link}'],
   balanceLow: ['Xtender: на балансе {amount} ₾. Средств осталось мало. Пополнить баланс: {link}', 'Xtender: balance {amount} GEL. Funds are running low. Top up: {link}', 'Xtender: ბალანსზეა {amount} ₾. თანხა იწურება. ბალანსის შევსება: {link}'],
   balanceMissed: ['Xtender: уведомление о заявке не отправлено — недостаточно средств. Пополнить баланс: {link}', 'Xtender: a request notification was not sent due to insufficient funds. Top up: {link}', 'Xtender: განაცხადის შეტყობინება არ გაიგზავნა — თანხა არასაკმარისია. ბალანსის შევსება: {link}'],
   telegramConnected: ['Telegram подключён. Уведомления будут приходить сюда, когда профиль допущен к получению заявок.', 'Telegram connected. Notifications will arrive here when your profile is eligible to receive requests.', 'Telegram დაკავშირებულია. შეტყობინებები აქ მოვა, როდესაც პროფილი განაცხადების მისაღებად მზად იქნება.'],
@@ -35,12 +31,30 @@ const messages = {
   tgQuestionSent: ['✅ Вопрос отправлен модератору. Ответ придёт сюда и в кабинет.', '✅ Your question was sent to the moderator. The reply will arrive here and in your account.', '✅ შეკითხვა მოდერატორს გაეგზავნა. პასუხი აქაც მოვა და კაბინეტშიც.'],
   alreadyReviewed: ['Вы уже оставили отзыв об этом исполнителе.', 'You have already reviewed this provider.', 'თქვენ უკვე შეაფასეთ ეს შემსრულებელი.'],
 };
+// SMS stays Latin. The gateway sends any non-Latin text as UCS-2 (short segments) and has garbled it
+// before, and the login code was cut to a bare "Code: 1234" for that reason (commit 0a86546).
+// Do not localize these bodies unless a real Cyrillic and Georgian test SMS through the production
+// gateway arrives intact and its reply passes sms.service acceptedResponse.
+const smsMessages = {
+  code: 'Code: {code}',
+  orderCode: 'Xtender: code {code}, order{reference}: {link} Close your request here when no longer needed.',
+  lead: 'Xtender: {test}new order #{id}: {link}',
+  revision: 'Xtender: please update your request. Moderator feedback: {link}',
+  reviewInvite: 'Xtender: order #{id} closed. Rate the provider: {link}',
+  balanceLow: 'Xtender: balance low ({amount} GEL). Top up to keep getting orders: {link}',
+  balanceMissed: 'Xtender: an order in your category passed you by (low balance). Top up: {link}',
+};
 const locales = { ru: 0, en: 1, ka: 2 };
 function serviceMessage(key, language, values = {}) {
   if (!Object.hasOwn(messages, key)) throw new Error('Unknown service message: ' + key);
   const text = messages[key][Object.hasOwn(locales, language) ? locales[language] : locales.ka];
   return text.replace(/\{(\w+)\}/g, (placeholder, name) => Object.hasOwn(values, name) ? String(values[name]) : placeholder);
 }
+function smsMessage(key, values = {}) {
+  if (!Object.hasOwn(smsMessages, key)) throw new Error('Unknown SMS message: ' + key);
+  return smsMessages[key].replace(/\{(\w+)\}/g, (placeholder, name) => Object.hasOwn(values, name) ? String(values[name]) : placeholder);
+}
+serviceMessage.sms = smsMessage;
 function telegramLanguage(from) {
   const code = String((from && from.language_code) || '').slice(0, 2).toLowerCase();
   return code === 'ka' || code === 'en' ? code : 'ru';

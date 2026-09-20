@@ -14,9 +14,11 @@ const sms=require('../src/services/sms.service');
     reply=data;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),{code:'SMS_NOT_ACCEPTED'});
   }
   reply = 'OK: 123456';
+  // The login code is a bare Latin "Code: 1234" whatever the person's language: the gateway garbles
+  // non-Latin text (commit 0a86546), and a language argument must not change the body.
   for (const language of ['ru', 'en', 'ka']) {
     const result = await sms.sendOtp('+995500000001', '1234', { language });
-    assert.equal(result.messageBody, require('../src/config/service-message-copy')('code', language, { code: '1234' }));
+    assert.equal(result.messageBody, 'Code: 1234');
   }
   networkFailure=true;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),/timeout/);
   assert.equal(events.at(-1).status,'failed');
