@@ -334,7 +334,7 @@ async function requestOrderRevision(req, res) {
   let notified = true;
   try {
     await require('../services/sms.service').sendOrderNotification(order.phone,
-      'Xtender: please update your request. Moderator feedback: ' + baseUrl(req) + '/o/' + order.owner_token,
+      require('../config/service-message-copy')('revision', await require('../services/order.service').getCustomerLanguage(order), { link: baseUrl(req) + '/o/' + order.owner_token }),
       { orderId: order.id, kind: 'transactional' });
   } catch (error) { notified = false; console.error('Revision SMS failed:', error.message); }
   await telegramService.updateMessage(order).catch(error => console.error('Revision moderation update failed:', error.message));

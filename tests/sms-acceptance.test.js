@@ -13,6 +13,11 @@ const sms=require('../src/services/sms.service');
   for(const data of ['ERROR: 123456','OK: ERROR','OK: -1','<html>failure</html>',0,-1,'0','',null,{ok:false,id:123},{success:false,id:123},{status:'failed',id:123},{id:123},{ok:true},'{invalid']) {
     reply=data;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),{code:'SMS_NOT_ACCEPTED'});
   }
+  reply = 'OK: 123456';
+  for (const language of ['ru', 'en', 'ka']) {
+    const result = await sms.sendOtp('+995500000001', '1234', { language });
+    assert.equal(result.messageBody, require('../src/config/service-message-copy')('code', language, { code: '1234' }));
+  }
   networkFailure=true;await assert.rejects(sms.sendOrderNotification('+995500000001','test'),/timeout/);
   assert.equal(events.at(-1).status,'failed');
   process.env.NODE_ENV='production';delete process.env.SMS_GATEWAY_USERNAME;

@@ -22,7 +22,6 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="<%= t('join_page_title') %>">
     <meta name="twitter:description" content="<%= t('meta_description_join') %>">
-    <script src="/js/provider-description-examples.js" defer></script>
 </head>
 <body class="provider-page provider-join font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
 
@@ -39,13 +38,21 @@
 
     <main class="max-w-4xl mx-auto px-4 py-8">
         <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('provider_intro') %></h1>
-        <p class="text-sm text-stone-500 mt-1"><span class="provider-demo-lead"><%= t('provider_demo_lead') %></span><span class="provider-intro-conditions"><%= t('provider_intro_body') %></span></p>
+        <p class="text-sm text-stone-500 mt-1"><%= t('provider_demo_lead') %></p>
         <a href="/master" class="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-bold transition">
             <i class="fa-solid fa-right-to-bracket text-emerald-600"></i><%= t('master_login_title') %>
         </a>
 
         <div class="provider-join-grid">
         <div id="signupCard" class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
+
+            <% if (welcomeBonusTetri > 0) { %>
+            <section class="provider-welcome provider-welcome-intro">
+                <h2><%= t('welcome_title') %></h2>
+                <strong>+<%= (welcomeBonusTetri / 100).toFixed(2) %> ₾</strong>
+                <p><%= t('welcome_description') %></p>
+            </section>
+            <% } %>
 
             <div id="signupTopbar" class="hidden items-center gap-3 px-4 py-3 border-b border-stone-200 bg-white shrink-0">
                 <button id="signupTopbarBack" type="button" onclick="changeSignupStep(signupStep - 1)" aria-label="<%= t('otp_back') %>" class="w-9 h-9 -ml-1 flex items-center justify-center rounded-full text-stone-600 hover:bg-stone-100 active:scale-95 transition shrink-0" hidden>
@@ -56,7 +63,7 @@
             <div id="signupProgress" class="provider-signup-header">
                 <p id="signupStepCount" class="provider-signup-count" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
                 <ol class="provider-signup-progress" aria-label="<%= t('provider_signup_progress') %>">
-                    <% ['provider_signup_services','provider_signup_city','provider_signup_languages','provider_signup_contact','provider_signup_terms'].forEach((key, i) => { %>
+                    <% ['provider_signup_services','provider_signup_city','provider_signup_profile'].forEach((key, i) => { %>
                     <li data-signup-indicator="<%= i %>" <%- i === 0 ? 'aria-current="step"' : '' %>><span class="provider-signup-progress-num"><%= i + 1 %></span><span class="provider-signup-progress-label"><%= t(key) %></span></li>
                     <% }); %>
                 </ol>
@@ -73,26 +80,25 @@
                     <button type="button" onclick="nextSignupStep()" class="px-3 py-1.5 rounded-lg text-emerald-600 font-extrabold text-sm uppercase tracking-wide hover:bg-emerald-50 active:scale-95 transition shrink-0"><%= t('home_next') %></button>
                 </div>
                 <div class="signup-compose-field">
-                    <label for="descriptionInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_services_description') %> *</label>
-                    <textarea id="descriptionInput" required maxlength="2000" rows="3" data-description-examples="<%= JSON.stringify(t('provider_description_examples')) %>" placeholder="<%= t('provider_description_examples')[0] %>"
+                    <label for="descriptionInput" class="sr-only"><%= t('join_services_description') %></label>
+                    <textarea id="descriptionInput" required maxlength="2000" rows="3" placeholder="<%= t('provider_description_examples')[0] %>"
                         class="w-full text-sm font-medium outline-none transition text-stone-800 resize-none placeholder:text-stone-400 bg-stone-50 border border-stone-200 rounded-xl p-3 focus:border-emerald-500 focus:bg-white"></textarea>
+                    <p class="provider-help mt-2"><%= t('join_services_hint') %></p>
                 </div>
                 </div>
-                <div data-signup-panel="1" class="space-y-4" hidden>
-                    <p class="provider-help"><%= t('join_work_cities_hint') %></p>
+                <div data-signup-panel="1" class="space-y-6" hidden>
                     <fieldset>
-                        <legend class="sr-only"><%= t('join_work_cities_label') %></legend>
+                        <legend class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_work_cities_label') %></legend>
+                        <p class="provider-help mb-2"><%= t('join_work_cities_hint') %></p>
                         <div class="flex flex-wrap gap-2">
                         <% cities.forEach(c => { %>
                             <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-stone-200 text-sm"><input type="checkbox" name="cityIds" value="<%= c.id %>"><span><%= c.name %></span></label>
                         <% }); %>
                         </div>
                     </fieldset>
-                </div>
-                <div data-signup-panel="2" class="space-y-4" hidden>
-                    <p class="provider-help"><%= t('join_languages_hint') %></p>
                     <fieldset>
-                        <legend class="sr-only"><%= t('join_languages_label') %></legend>
+                        <legend class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_languages_label') %></legend>
+                        <p class="provider-help mb-2"><%= t('join_languages_hint') %></p>
                         <div class="grid grid-cols-2 gap-2">
                         <% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %>
                             <label class="flex items-center gap-2 px-3 py-3 rounded-xl border border-stone-200 text-sm"><input type="checkbox" name="spokenLanguages" value="<%= code %>"><span><%= label %></span></label>
@@ -100,7 +106,7 @@
                         </div>
                     </fieldset>
                 </div>
-                <div data-signup-panel="3" class="space-y-4" hidden>
+                <div data-signup-panel="2" class="space-y-4" hidden>
                 <div>
                     <label for="nameInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1"><%= t('join_name_label') %></label>
                     <input type="text" id="nameInput" autocomplete="name" placeholder="<%= t('join_name_placeholder') %>"
@@ -129,12 +135,14 @@
                     <input type="text" id="promoInput" value="<%= hasPromo ? promo.code : '' %>" placeholder="<%= t('join_promo_placeholder') %>" autocomplete="off"
                         class="mt-2 w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none text-sm font-bold uppercase tracking-wider text-stone-900 bg-white placeholder:normal-case placeholder:tracking-normal placeholder:font-medium">
                 </details>
-                </div>
-                <div data-signup-panel="4" class="space-y-3" hidden>
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
-                <ul class="space-y-2 text-sm text-stone-700 list-disc pl-5">
-                    <% consent.notices.forEach(notice => { %><li><%= notice %></li><% }) %>
-                </ul>
+                <section class="rounded-xl border border-stone-200 bg-stone-50 p-3" aria-labelledby="signupBeforeTitle">
+                    <h3 id="signupBeforeTitle" class="block text-[11px] font-bold text-stone-700 uppercase mb-1.5"><%= t('signup_before_title') %></h3>
+                    <ul class="space-y-1.5 text-sm text-stone-700 list-disc pl-5">
+                        <% consent.notices.forEach(notice => { %><li><%= notice %></li><% }) %>
+                    </ul>
+                </section>
+                <div class="space-y-3">
                 <label class="flex items-start gap-3 p-3 rounded-xl border border-stone-200 text-sm cursor-pointer">
                     <input type="checkbox" id="termsCheckbox" aria-describedby="termsError" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0">
                     <span><%= consent.termsLabel %> <a href="<%= legalPrefix %>/terms" target="_blank" rel="noopener" class="text-emerald-700 underline"><%= t('signup_terms_link') %></a></span>
@@ -147,6 +155,7 @@
                 <p id="privacyError" class="hidden text-xs text-red-700" role="alert"></p>
                 <p class="text-xs text-stone-500"><%= consent.confirmationHint %></p>
                 </div>
+                </div>
                 <div class="provider-signup-actions">
                     <button id="signupBack" type="button" onclick="changeSignupStep(signupStep - 1)" class="provider-signup-back" hidden><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><%= t('otp_back') %></button>
                     <button id="signupNext" type="button" onclick="nextSignupStep()" class="provider-signup-next"><%= t('home_next') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
@@ -155,6 +164,8 @@
             </div>
 
             <div id="otpStep" class="p-5 sm:p-6 hidden">
+                <h2 id="otpTitle" class="provider-section-title" tabindex="-1"><%= t('provider_otp_title') %></h2>
+                <p class="text-sm text-stone-600 mt-2 mb-4"><span id="otpSentTo" aria-live="polite"></span> <button id="otpChangeNumber" type="button" onclick="backToDetails()" class="font-bold text-emerald-700 underline underline-offset-2"><%= t('otp_change_number') %></button></p>
                 <label for="codeInput" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                     <i class="fa-solid fa-key text-emerald-600 mr-1"></i><%= t('otp_label') %>
                 </label>
@@ -164,7 +175,7 @@
                     <i class="fa-solid fa-check"></i>
                     <span><%= t('signup_confirm') %></span>
                 </button>
-                <button id="otpBack" type="button" onclick="backToDetails()" class="mt-2 w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_back') %></button>
+                <button id="otpResend" type="button" onclick="sendOtp(true)" class="mt-2 w-full py-3 text-sm font-bold text-stone-600 hover:text-stone-900 disabled:opacity-50 disabled:cursor-not-allowed transition"><%= t('otp_resend') %></button>
             </div>
 
             <div role="alert" aria-live="polite" id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
@@ -173,20 +184,20 @@
           <% const providerNotifFirst = t('provider_notifications_data')[0]; %>
           <div class="provider-illustration">
             <p class="provider-illustration-label"><%= t('provider_illustration_label') %></p>
-            <div class="provider-illustration-track" id="providerIllustrationTrack" aria-hidden="true">
+            <div class="provider-illustration-track" id="providerIllustrationTrack" aria-live="polite">
               <div class="provider-illustration-card is-active">
                 <p class="provider-illustration-category"><span aria-hidden="true"><%= providerNotifFirst.emoji %></span><span><%= providerNotifFirst.notification %></span></p>
                 <p class="provider-illustration-body"><%= providerNotifFirst.body %></p>
-                <div class="provider-illustration-actions is-pulsing">
+                <div class="provider-illustration-actions">
                   <span class="provider-illustration-btn provider-illustration-btn--call"><i class="fa-solid fa-phone" aria-hidden="true"></i><%= t('btn_call') %></span>
                   <span class="provider-illustration-btn provider-illustration-btn--whatsapp"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><%= t('btn_whatsapp') %></span>
                 </div>
               </div>
             </div>
-            <p class="provider-demo-next"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= t('provider_demo_next') %></span></p>
+            <button type="button" id="providerExampleNext" class="example-next"><%= t('example_next') %></button>
             <p class="provider-illustration-note"><%= t('provider_illustration_note') %></p>
           </div>
-          <% if(welcomeBonusTetri > 0) { %><section class="provider-welcome"><h2><%= t('welcome_title') %></h2><strong>+<%= (welcomeBonusTetri/100).toFixed(2) %> ₾</strong><p><%= t('welcome_description') %></p></section><% } %><%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
+          <%- include('partials/provider-pricing') %><%- include('partials/provider-guide') %></aside>
     </div></main>
 
     <script>
@@ -243,12 +254,15 @@
 
         let signupStep = 0;
         let signupBusy = false;
+        let otpVisible = false; // true while the phone-code screen replaces the form
         let lockedSignupFields = [];
-        const signupTitles = [T.provider_services_section, T.provider_signup_city_title, T.provider_signup_languages_title, T.provider_contact_section, T.provider_signup_terms_title];
+        const signupTitles = [T.provider_services_section, T.provider_signup_where_title, T.provider_signup_profile_title];
         const LAST_STEP = signupTitles.length - 1;
 
         function changeSignupStep(step, focusTitle = true) {
             if (signupBusy || !Number.isInteger(step) || step < 0 || step > LAST_STEP) return;
+            // The phone-code screen replaces the form: "back" there means "change the number".
+            if (otpVisible) { backToDetails(); return; }
             exitSignupCompose();
             if (step > 0) document.body.classList.add('signup-started');
             signupStep = step;
@@ -277,7 +291,7 @@
             showMsg(message, true);
             const field = document.querySelector(selector);
             field.focus();
-            if (step === 4) {
+            if (field.id === 'termsCheckbox' || field.id === 'privacyCheckbox') {
                 field.setAttribute('aria-invalid', 'true');
                 const hint = document.getElementById(field.id === 'termsCheckbox' ? 'termsError' : 'privacyError');
                 hint.textContent = message; hint.classList.remove('hidden');
@@ -290,19 +304,15 @@
             if (step === 0 && (!payload.description || payload.description.length > 2000)) {
                 return signupError(0, T.join_services_required, '#descriptionInput');
             }
-            if (step === 1 && !payload.cityIds.length) {
-                return signupError(1, T.join_work_cities_required, 'input[name="cityIds"]');
+            if (step === 1) {
+                if (!payload.cityIds.length) return signupError(1, T.join_work_cities_required, 'input[name="cityIds"]');
+                if (!payload.spokenLanguages.length) return signupError(1, T.join_languages_required, 'input[name="spokenLanguages"]');
             }
-            if (step === 2 && !payload.spokenLanguages.length) {
-                return signupError(2, T.join_languages_required, 'input[name="spokenLanguages"]');
-            }
-            if (step === 3) {
-                if (!payload.name) return signupError(3, T.join_err_name_required, '#nameInput');
+            if (step === 2) {
+                if (!payload.name) return signupError(2, T.join_err_name_required, '#nameInput');
                 if (!window.GeorgianPhone.validate(document.getElementById('phoneInput'))) return false;
-            }
-            if (step === 4) {
-                if (!payload.termsAccepted) return signupError(4, T.signup_terms_required, '#termsCheckbox');
-                if (!payload.privacyAccepted) return signupError(4, T.signup_privacy_required, '#privacyCheckbox');
+                if (!payload.termsAccepted) return signupError(2, T.signup_terms_required, '#termsCheckbox');
+                if (!payload.privacyAccepted) return signupError(2, T.signup_privacy_required, '#privacyCheckbox');
             }
             return true;
         }
@@ -323,7 +333,8 @@
             signupBusy = busy;
             document.getElementById('signupCard').setAttribute('aria-busy', String(busy));
             if (busy) {
-                lockedSignupFields = [...document.querySelectorAll('#signupCard input, #signupCard textarea, #signupCard button')].filter(el => !el.disabled);
+                // The resend button keeps its own cooldown state, so it is not part of the busy lock.
+                lockedSignupFields = [...document.querySelectorAll('#signupCard input, #signupCard textarea, #signupCard button')].filter(el => !el.disabled && el.id !== 'otpResend');
                 lockedSignupFields.forEach(el => { el.disabled = true; });
             } else {
                 lockedSignupFields.forEach(el => { el.disabled = false; });
@@ -335,7 +346,22 @@
         let consentVerified = false;
         const consentLanguage = <%- JSON.stringify(consent.language) %>;
         const consentDigest = <%- JSON.stringify(consent.digest) %>;
-        async function sendOtp() {
+        // A new code can be requested after 30 seconds; the server rate limit still applies.
+        let resendTimer = null;
+        function startResendCooldown() {
+            const button = document.getElementById('otpResend');
+            clearInterval(resendTimer);
+            let left = 30;
+            button.disabled = true;
+            button.textContent = T.otp_resend + ' (' + left + ')';
+            resendTimer = setInterval(function () {
+                left -= 1;
+                if (left <= 0) { clearInterval(resendTimer); button.disabled = false; button.textContent = T.otp_resend; }
+                else button.textContent = T.otp_resend + ' (' + left + ')';
+            }, 1000);
+        }
+
+        async function sendOtp(isResend) {
             if (signupBusy) return;
             showMsg('');
             for (let step = 0; step <= LAST_STEP; step++) { if (!validateSignupStep(step)) return; }
@@ -351,10 +377,14 @@
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
             consentChallenge = data.challengeId; consentVerified = false;
 
-            showMsg('');
+            showMsg(isResend === true ? T.js_ok_code_sent : '', false);
+            document.getElementById('otpSentTo').textContent = T.otp_sent_to.replace('{phone}', payload.phone);
             document.getElementById('detailsStep').classList.add('hidden');
+            otpVisible = true;
+            document.getElementById('signupProgress').classList.add('hidden');
             document.getElementById('otpStep').classList.remove('hidden');
             document.getElementById('codeInput').value = '';
+            startResendCooldown();
             document.getElementById('signupCard').scrollIntoView({ block: 'start' });
             } catch (_) {
                 showMsg(T.provider_signup_network, true);
@@ -368,9 +398,12 @@
             if (signupBusy) return;
             consentChallenge = null;
             consentVerified = false;
+            clearInterval(resendTimer);
+            otpVisible = false;
             showMsg('');
             document.getElementById('otpStep').classList.add('hidden');
             document.getElementById('detailsStep').classList.remove('hidden');
+            document.getElementById('signupProgress').classList.remove('hidden');
             changeSignupStep(LAST_STEP);
         }
 
@@ -429,111 +462,17 @@
 
         (function () {
             const track = document.getElementById('providerIllustrationTrack');
-            if (!track || !Array.isArray(PROVIDER_NOTIFICATIONS) || PROVIDER_NOTIFICATIONS.length < 2) return;
-
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            let paused = false;
-
-            function wait(ms) {
-                return new Promise(function (resolve) {
-                    let remaining = ms;
-                    const iv = setInterval(function () {
-                        if (paused) return;
-                        remaining -= 60;
-                        if (remaining <= 0) { clearInterval(iv); resolve(); }
-                    }, 60);
-                });
-            }
-
-            function typeInto(el, text, speed) {
-                return new Promise(function (resolve) {
-                    if (reduceMotion) { el.textContent = text; return resolve(); }
-                    let i = 0;
-                    el.textContent = '';
-                    const iv = setInterval(function () {
-                        if (paused) return;
-                        i++;
-                        el.textContent = text.slice(0, i);
-                        if (i >= text.length) { clearInterval(iv); resolve(); }
-                    }, speed);
-                });
-            }
-
-            async function playExample(ex) {
-                track.innerHTML = '';
-                const card = document.createElement('div');
-                card.className = 'provider-illustration-card is-active';
-
-                const notif = document.createElement('div');
-                notif.className = 'provider-illustration-notif';
-                const notifIcon = document.createElement('span');
-                notifIcon.className = 'provider-illustration-notif-icon';
-                notifIcon.setAttribute('aria-hidden', 'true');
-                notifIcon.textContent = '🔔';
-                const notifText = document.createElement('div');
-                const notifTitle = document.createElement('p');
-                notifTitle.className = 'provider-illustration-notif-title';
-                notifTitle.textContent = 'Xtender';
-                const notifBody = document.createElement('p');
-                notifBody.className = 'provider-illustration-notif-text';
-                notifBody.textContent = ex.emoji + ' ' + ex.notification;
-                notifText.appendChild(notifTitle);
-                notifText.appendChild(notifBody);
-                notif.appendChild(notifIcon);
-                notif.appendChild(notifText);
-                card.appendChild(notif);
-                track.appendChild(card);
-
-                await wait(reduceMotion ? 500 : 1600);
-
-                card.innerHTML = '';
-                const category = document.createElement('p');
-                category.className = 'provider-illustration-category';
-                const catEmoji = document.createElement('span');
-                catEmoji.setAttribute('aria-hidden', 'true');
-                catEmoji.textContent = ex.emoji;
-                const catText = document.createElement('span');
-                catText.textContent = ex.notification;
-                category.appendChild(catEmoji);
-                category.appendChild(catText);
-                card.appendChild(category);
-
-                const bodyP = document.createElement('p');
-                bodyP.className = 'provider-illustration-body';
-                card.appendChild(bodyP);
-                await typeInto(bodyP, ex.body, 18);
-                await wait(300);
-
-                const actions = document.createElement('div');
-                actions.className = 'provider-illustration-actions is-pulsing';
-                const callBtn = document.createElement('span');
-                callBtn.className = 'provider-illustration-btn provider-illustration-btn--call';
-                callBtn.innerHTML = '<i class="fa-solid fa-phone" aria-hidden="true"></i>';
-                callBtn.appendChild(document.createTextNode(T.btn_call));
-                const waBtn = document.createElement('span');
-                waBtn.className = 'provider-illustration-btn provider-illustration-btn--whatsapp';
-                waBtn.innerHTML = '<i class="fa-brands fa-whatsapp" aria-hidden="true"></i>';
-                waBtn.appendChild(document.createTextNode(T.btn_whatsapp));
-                actions.appendChild(callBtn);
-                actions.appendChild(waBtn);
-                card.appendChild(actions);
-
-                await wait(3200);
-            }
-
-            async function loop() {
-                let index = 0;
-                for (;;) {
-                    await playExample(PROVIDER_NOTIFICATIONS[index]);
-                    index = (index + 1) % PROVIDER_NOTIFICATIONS.length;
-                }
-            }
-            loop();
-
-            track.addEventListener('mouseenter', function () { paused = true; });
-            track.addEventListener('mouseleave', function () { paused = false; });
-            track.addEventListener('focusin', function () { paused = true; });
-            track.addEventListener('focusout', function () { paused = false; });
+            const next = document.getElementById('providerExampleNext');
+            if (!track || !next || !Array.isArray(PROVIDER_NOTIFICATIONS) || PROVIDER_NOTIFICATIONS.length < 2) return;
+            let index = 0;
+            next.addEventListener('click', function () {
+                index = (index + 1) % PROVIDER_NOTIFICATIONS.length;
+                const example = PROVIDER_NOTIFICATIONS[index];
+                const category = track.querySelector('.provider-illustration-category');
+                category.children[0].textContent = example.emoji;
+                category.children[1].textContent = example.notification;
+                track.querySelector('.provider-illustration-body').textContent = example.body;
+            });
         })();
     </script>
 </body>

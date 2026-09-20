@@ -113,13 +113,15 @@ async function recordAction({ eventType, phone, masterId = null, orderId = null,
     ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata }, client);
 }
 
-async function applyConsent(grant, role, subjectId, phone, meta, client) {
+// declared: what the person typed at acceptance time (e.g. declared_name). The profile row can
+// change later, so this snapshot is the only record of who the declared party was when accepting.
+async function applyConsent(grant, role, subjectId, phone, meta, client, declared = {}) {
   // A grant cannot register two profiles or publish two different orders, even with concurrent requests.
   await client.query('INSERT INTO consent_uses (consent_log_id, subject_role, subject_id) VALUES ($1, $2, $3)',
     [grant.consentLogId, role, subjectId]);
   return recordAction({ eventType: role === 'client' ? 'ORDER_PUBLISHED' : 'MASTER_REGISTERED', phone,
     orderId: role === 'client' ? subjectId : null, masterId: role === 'provider' ? subjectId : null,
-    metadata: { consent_log_id: grant.consentLogId, snapshot_digest: grant.snapshot.digest }, meta }, client);
+    metadata: { consent_log_id: grant.consentLogId, snapshot_digest: grant.snapshot.digest, ...declared }, meta }, client);
 }
 
 // --- Точка 2: прочие транзакционные SMS (лид-уведомления, подтверждения, пинки) ---

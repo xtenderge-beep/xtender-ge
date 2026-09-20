@@ -130,6 +130,10 @@ async function render(file, locals) {
   const master=await masters.registerMaster(args);
   await assert.rejects(()=>masters.registerMaster({...args,name:'Replay takeover'}));
   assert.equal((await masters.getMasterById(master.id)).name,'Provider');
+  // The name the person declared when accepting is frozen in the evidence, independent of later profile edits.
+  const registered=(await pool.query("SELECT metadata FROM sms_consent_logs WHERE event_type='MASTER_REGISTERED' AND master_id=$1",[master.id])).rows;
+  assert.equal(registered.length,1);assert.equal(registered[0].metadata.declared_name,'Provider');
+  assert.equal(Number(registered[0].metadata.consent_log_id),Number(providerGrant.consentLogId));
   const report=await log.exportForPhone(phone);
   assert.equal(report.client_consents.length,1);
   assert.ok(report.events.some(e=>e.event_type==='ORDER_PUBLISHED'));

@@ -1,3 +1,4 @@
+const serviceMessage = require('../config/service-message-copy');
 const { requestMeta } = require('../config/requestMeta');
 const orderService = require('../services/order.service');
 const otpService = require('../services/otp.service');
@@ -96,12 +97,12 @@ async function create(req, res) {
 
   const verified = await otpService.getConsentGrant(phone, 'order', req.body.challengeId);
   if (!verified) {
-    return res.status(400).json({ success: false, message: 'Phone not verified' });
+    return res.status(400).json({ success: false, message: serviceMessage('unverified', req.lang) });
   }
 
   const order = await orderService.activateOrder(token, phone, verified, requestMeta(req), req.files);
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   }
   await otpService.clearConsentGrant(phone, 'order', req.body.challengeId);
 
@@ -392,20 +393,21 @@ async function handleMasterApproval(callback) {
 
 // === Исполнитель в боте: привязка Telegram-чата + кнопки на лиде ===
 
-const TG_LINK_PROMPT =
-  'Отправьте свой номер телефона кнопкой ниже — найду ваш профиль исполнителя и подключу уведомления о заявках сюда.';
-const TG_LINK_OK = (name) => `✅ Готово${name ? ', ' + name : ''}! Новые заявки будут приходить сюда, в Telegram.`;
+const TG_LINK_OK = (master) => serviceMessage('telegramConnected', master.language);
 
 async function handleMasterStart(message) {
   const payload = (message.text || '').trim().split(/\s+/)[1];
   if (payload) {
     const master = await masterService.linkTelegram({ masterToken: payload, telegramId: message.from.id });
     if (master) {
-      await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master.name), { remove_keyboard: true });
+      await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master), { remove_keyboard: true });
       return;
     }
   }
-  await telegramService.sendToChat(message.chat.id, TG_LINK_PROMPT, telegramService.CONTACT_KEYBOARD);
+  // Before a profile is linked, the Telegram app language is the only language signal we have.
+  const language = serviceMessage.telegramLanguage(message.from);
+  await telegramService.sendToChat(message.chat.id, serviceMessage('tgLinkPrompt', language),
+    telegramService.contactKeyboard(serviceMessage('tgContactButton', language)));
 }
 
 async function handleContactShared(message) {
@@ -413,7 +415,9 @@ async function handleContactShared(message) {
   // request_contact гарантирует, что это собственный номер отправителя (user_id === from.id);
   // пересланный чужой контакт отсекаем.
   if (!contact.phone_number || contact.user_id !== message.from.id) {
-    await telegramService.sendToChat(message.chat.id, 'Пришлите свой номер кнопкой «📱 Отправить номер».');
+    const language = serviceMessage.telegramLanguage(message.from);
+    await telegramService.sendToChat(message.chat.id,
+      serviceMessage('tgOwnNumber', language, { button: serviceMessage('tgContactButton', language) }));
     return;
   }
   const phone = toE164(contact.phone_number);
@@ -437,11 +441,13 @@ async function handleContactShared(message) {
   // Иначе — исполнитель.
   const master = await masterService.linkTelegram({ phone, telegramId: message.from.id });
   if (master) {
-    await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master.name), { remove_keyboard: true });
+    await telegramService.sendToChat(message.chat.id, TG_LINK_OK(master), { remove_keyboard: true });
   } else {
+    const language = serviceMessage.telegramLanguage(message.from);
+    const joinPath = language === 'ka' ? '/join?lang=ka' : `/${language}/join`;
     await telegramService.sendToChat(
       message.chat.id,
-      `На этот номер не зарегистрирован профиль исполнителя. Регистрация: ${getBaseUrl()}/join`,
+      serviceMessage('tgNotRegistered', language, { link: `${getBaseUrl()}${joinPath}` }),
       { remove_keyboard: true }
     );
   }
@@ -534,7 +540,7 @@ async function handleMasterText(message) {
   const body = message.text.trim().slice(0, 2000);
   if (!body) return;
   await supportService.forwardQuestion(master, body);
-  await telegramService.sendToChat(message.chat.id, '✅ Вопрос отправлен модератору. Ответ придёт сюда и в кабинет.');
+  await telegramService.sendToChat(message.chat.id, serviceMessage('tgQuestionSent', master.language));
 }
 
 async function handleSupportReplyCallback(callback) {
@@ -834,35 +840,35 @@ async function close(req, res) {
   const isOwner = existing && req.cookies[ownerCookieName(token)] === existing.owner_token;
 
   if (!isOwner) {
-    return res.status(403).json({ success: false, message: 'Not allowed' });
+    return res.status(403).json({ success: false, message: serviceMessage('notAllowed', req.lang) });
   }
 
   const reason = req.body.reason || 'no_longer_needed';
-  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: 'Invalid closing reason' });
-  if (existing.status === 'closed') return res.json({ success: true, message: 'Order already closed' });
+  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: serviceMessage('closingReason', req.lang) });
+  if (existing.status === 'closed') return res.json({ success: true, message: serviceMessage('closed', req.lang) });
   const order = await orderService.closeOrder(token, { actor: 'client', reason, meta: requestMeta(req) });
 
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   }
 
   telegramService.updateMessage(order).catch((err) => {
     console.error('Failed to update Telegram message on close:', err.message);
   });
 
-  reviewService.getEligibleMasters(order.id).then((masters) => {
+  reviewService.getEligibleMasters(order.id).then(async (masters) => {
     if (!masters.length) return null;
     const link = `${getBaseUrl()}/review/${order.owner_token}`;
     return smsService.sendOrderNotification(
       order.phone,
-      `Xtender: order #${order.id} closed. Rate the provider: ${link}`,
+      serviceMessage('reviewInvite', await orderService.getCustomerLanguage(order, req.lang), { id: order.id, link }),
       { orderId: order.id }
     );
   }).catch((err) => {
     console.error('Failed to send review invite SMS:', err.message);
   });
 
-  return res.json({ success: true, message: 'Order closed' });
+  return res.json({ success: true, message: serviceMessage('closed', req.lang) });
 }
 
 // Закрытие одной категории многокатегорийной заявки (см. order.service.closeOrderCategory) —
@@ -873,18 +879,18 @@ async function closeCategory(req, res) {
   const isOwner = existing && req.cookies[ownerCookieName(token)] === existing.owner_token;
 
   if (!isOwner) {
-    return res.status(403).json({ success: false, message: 'Not allowed' });
+    return res.status(403).json({ success: false, message: serviceMessage('notAllowed', req.lang) });
   }
 
   const reason = req.body.reason || 'no_longer_needed';
-  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: 'Invalid closing reason' });
+  if (!['found_provider', 'no_longer_needed'].includes(reason)) return res.status(400).json({ success: false, message: serviceMessage('closingReason', req.lang) });
   const category = String(req.body.category || '');
-  if (!(existing.target_categories || []).includes(category)) return res.status(400).json({ success: false, message: 'Invalid category' });
-  if (existing.status === 'closed') return res.json({ success: true, message: 'Order already closed' });
+  if (!(existing.target_categories || []).includes(category)) return res.status(400).json({ success: false, message: serviceMessage('invalidCategory', req.lang) });
+  if (existing.status === 'closed') return res.json({ success: true, message: serviceMessage('closed', req.lang) });
 
   const order = await orderService.closeOrderCategory(token, category, { actor: 'client', reason, meta: requestMeta(req) });
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   }
 
   telegramService.updateMessage(order).catch((err) => {
@@ -895,12 +901,12 @@ async function closeCategory(req, res) {
   // категория оказалась последней и заявка в итоге закрылась целиком; пока активна
   // хотя бы одна другая категория, приглашать оценивать рано.
   if (order.status === 'closed') {
-    reviewService.getEligibleMasters(order.id).then((masters) => {
+    reviewService.getEligibleMasters(order.id).then(async (masters) => {
       if (!masters.length) return null;
       const link = `${getBaseUrl()}/review/${order.owner_token}`;
       return smsService.sendOrderNotification(
         order.phone,
-        `Xtender: order #${order.id} closed. Rate the provider: ${link}`,
+        serviceMessage('reviewInvite', await orderService.getCustomerLanguage(order, req.lang), { id: order.id, link }),
         { orderId: order.id }
       );
     }).catch((err) => {
@@ -923,7 +929,7 @@ async function logView(req, res) {
 
   const order = await orderService.getOrderByToken(token);
   if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
+    return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   }
 
   await orderService.logView(order.id, master.id, 'view');

@@ -1,3 +1,4 @@
+const serviceMessage = require('../config/service-message-copy');
 const orderService = require('../services/order.service');
 const reviewService = require('../services/review.service');
 const otpService = require('../services/otp.service');
@@ -38,12 +39,12 @@ async function requestCode(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
-  const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE, null, { meta: requestMeta(req) });
+  const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
-      return res.status(429).json({ success: false, message: 'Too many requests' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
-    return res.status(500).json({ success: false, message: 'Failed to send code' });
+    return res.status(500).json({ success: false, message: serviceMessage('sendFailed', req.lang) });
   }
   return res.json({ success: true });
 }
@@ -54,7 +55,7 @@ async function verifyForMaster(req, res) {
   const masterId = parseInt(req.body.masterId, 10);
 
   if (!phone || !isGeorgianPhone(phone) || !code || !Number.isInteger(masterId)) {
-    return res.status(400).json({ success: false, message: 'Invalid input' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidInput', req.lang) });
   }
 
   const { version: termsVersion } = await legalContentService.getTerms();
@@ -63,7 +64,7 @@ async function verifyForMaster(req, res) {
     language: req.lang,
     termsVersion,
   });
-  if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+  if (!ok) return res.status(400).json({ success: false, message: serviceMessage('invalidCode', req.lang) });
 
   const variants = phoneVariants(phone);
   const order = await reviewService.findReviewableOrder(variants, masterId);
@@ -81,7 +82,7 @@ async function submit(req, res) {
   const masterIdNum = parseInt(req.body.masterId, 10);
 
   if (!Number.isInteger(masterIdNum) || !Number.isInteger(ratingNum) || ratingNum < 1 || ratingNum > 5) {
-    return res.status(400).json({ success: false, message: 'Invalid input' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidInput', req.lang) });
   }
 
   let orderId;
@@ -89,12 +90,12 @@ async function submit(req, res) {
 
   if (ownerToken) {
     if (!(await checkRateLimit(`token:${ownerToken}`))) {
-      return res.status(429).json({ success: false, message: 'Too many requests' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
     const order = await orderService.getOrderByOwnerToken(ownerToken);
-    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (!order) return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
     if (!(await reviewService.isMasterEligible(order.id, masterIdNum))) {
-      return res.status(403).json({ success: false, message: 'Master not eligible for this order' });
+      return res.status(403).json({ success: false, message: serviceMessage('reviewNotEligible', req.lang) });
     }
     orderId = order.id;
   } else {
@@ -103,13 +104,13 @@ async function submit(req, res) {
       return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
     }
     if (!(await otpService.isPhoneVerified(phone, REVIEW_PURPOSE))) {
-      return res.status(403).json({ success: false, message: 'Phone not verified' });
+      return res.status(403).json({ success: false, message: serviceMessage('unverified', req.lang) });
     }
     if (!(await checkRateLimit(`phone:${phone}`))) {
-      return res.status(429).json({ success: false, message: 'Too many requests' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
     const order = await reviewService.findReviewableOrder(phoneVariants(phone), masterIdNum);
-    if (!order) return res.status(403).json({ success: false, message: 'Not eligible' });
+    if (!order) return res.status(403).json({ success: false, message: serviceMessage('reviewNotEligible', req.lang) });
     orderId = order.id;
     verifiedPhone = phone;
   }
@@ -120,7 +121,7 @@ async function submit(req, res) {
     rating: ratingNum,
     comment: (comment || '').trim().slice(0, 1000),
   });
-  if (!review) return res.status(409).json({ success: false, message: 'Already reviewed' });
+  if (!review) return res.status(409).json({ success: false, message: serviceMessage('alreadyReviewed', req.lang) });
 
   if (verifiedPhone) await otpService.clearVerified(verifiedPhone, REVIEW_PURPOSE);
 

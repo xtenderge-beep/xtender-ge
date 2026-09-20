@@ -4,7 +4,17 @@ const receivingState = master.is_banned || master.is_subscribed === false || (ma
 %>
 <section class="provider-overview" data-account-state="<%= receivingState %>">
   <div class="provider-overview-top"><span class="provider-status <%= receivingState %>"><%= t('provider_' + receivingState) %></span><span class="provider-channel"><%= t('provider_channel') %>: <strong><%= master.telegram_id ? 'Telegram' : 'SMS' %></strong></span></div>
-  <p class="provider-state-hint"><%= t('provider_' + receivingState + '_hint') %></p>
-  <div class="provider-balance-row"><div><span><%= t('provider_balance') %></span><strong><%= (master.balance_tetri / 100).toFixed(2) %> <small>₾</small></strong></div><a href="#balance" data-tab-jump="balance" class="provider-primary"><%= t('provider_balance_action') %></a></div>
+  <%# One status, one next step: before approval the rate-confirmation hint also says that registration is complete. %>
+  <p class="provider-state-hint"><%= t(receivingState === 'billing_pending' && !master.is_active ? 'provider_billing_review_hint' : 'provider_' + receivingState + '_hint') %></p>
+  <div class="provider-balance-row">
+    <div><span><%= t('provider_balance') %></span><strong><%= (master.balance_tetri / 100).toFixed(2) %> <small>₾</small></strong></div>
+    <% if (receivingState === 'billing_pending') { %>
+      <a href="#billingConsent" class="provider-primary"><%= t('provider_rates_action') %></a>
+    <% } else if (receivingState === 'disabled') { %>
+      <a href="#profile" data-tab-jump="profile" class="provider-primary"><%= t('provider_support_action') %></a>
+    <% } else { %>
+      <a href="#balance" data-tab-jump="balance" class="provider-primary"><%= t(receivingState === 'low' ? 'provider_balance_action' : 'provider_balance_view') %></a>
+    <% } %>
+  </div>
   <div class="provider-overview-footer"><span><%= t('provider_lead_price') %>: <b><%= (leadPriceTetri / 100).toFixed(2) %> ₾</b></span><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
 </section>

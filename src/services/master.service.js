@@ -112,7 +112,7 @@ async function registerMaster({
         [master.id, Number(did)]
       );
     }
-    if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client);
+    if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client, { declared_name: name });
     return master;
   });
 }
@@ -194,7 +194,7 @@ async function getMasterById(id) {
 
 async function getMasterByTelegramId(telegramId) {
   const { rows } = await pool.query(
-    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id
+    `SELECT is_technical, id, name, category, master_token, balance_tetri, is_active, is_banned, telegram_id, language
      FROM masters WHERE telegram_id = $1`,
     [telegramId]
   );

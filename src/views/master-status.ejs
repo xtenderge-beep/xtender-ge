@@ -122,10 +122,6 @@
                 <div class="p-3.5 rounded-2xl bg-red-50 border border-red-200 text-sm text-red-800 font-medium">
                     <%= t('master_status_banned_hint') %><% if (master.banned_reason) { %> <span class="text-red-600">(<%= master.banned_reason %>)</span><% } %>
                 </div>
-            <% } else if (!master.is_active) { %>
-                <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
-                    <%= t('master_status_pending_hint').replace('{channel}', master.telegram_id ? 'Telegram' : 'SMS') %>
-                </div>
             <% } %>
 
             <%- include('partials/provider-overview') %>

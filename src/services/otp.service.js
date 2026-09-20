@@ -3,6 +3,7 @@ const redis = require('../config/redis');
 const smsService = require('./sms.service');
 const consentLog = require('./consentLog.service');
 const crypto = require('crypto');
+const serviceMessage = require('../config/service-message-copy');
 
 const OTP_TTL_SECONDS = 300;
 const RATE_LIMIT_TTL_SECONDS = 3600;
@@ -45,16 +46,17 @@ async function sendCode(phone, orderLink, purpose = 'order', orderId = null, con
   await redis.set(`otp:${purpose}:${phone}`, code, 'EX', OTP_TTL_SECONDS);
   await redis.del(`otp_attempts:${purpose}:${phone}`);
 
+  const language = context.consent?.language || context.language || 'en';
   let result;
   if (orderLink) {
     const ref = orderId ? ` #${orderId}` : '';
     result = await smsService.sendOrderNotification(
       phone,
-      `Xtender: code ${code}, order${ref}: ${orderLink} Close your request here when no longer needed.`,
+      serviceMessage('orderCode', language, { code, reference: ref, link: orderLink }),
       { log: false }
     );
   } else {
-    result = await smsService.sendOtp(phone, code);
+    result = await smsService.sendOtp(phone, code, { language });
   }
 
   const providerMessageId = (result && result.providerMessageId) || null;

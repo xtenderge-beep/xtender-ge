@@ -27,11 +27,10 @@ const ADMIN_MENU_KEYBOARD = {
   resize_keyboard: true,
 };
 const FORCE_REPLY = { force_reply: true };
-const CONTACT_KEYBOARD = {
-  keyboard: [[{ text: '📱 Отправить номер', request_contact: true }]],
-  resize_keyboard: true,
-  one_time_keyboard: true,
-};
+function contactKeyboard(label = '📱 Отправить номер') {
+  return { keyboard: [[{ text: label, request_contact: true }]], resize_keyboard: true, one_time_keyboard: true };
+}
+const CONTACT_KEYBOARD = contactKeyboard();
 
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
@@ -578,4 +577,5 @@ module.exports = {
   leadMessage,
   forwardSupportMessage,
   CONTACT_KEYBOARD,
+  contactKeyboard,
 };

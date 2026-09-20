@@ -1,9 +1,4 @@
-<%
-  // Открыт по умолчанию, пока профиль на проверке (первые вопросы «как приходят
-  // заявки», billing — до появления самих заявок), дальше можно свернуть.
-  // На /join этот partial подключается ДО регистрации — master ещё не существует.
-%>
-<details class="provider-guide" <% if (typeof master === 'undefined' || !master || !master.is_active) { %>open<% } %>>
+<details class="provider-guide">
   <summary><%= t('guide_title') %></summary>
   <ol><% ['guide_receive','guide_translate','guide_contact','guide_agree','guide_result'].forEach(key=>{ %><li><%= t(key) %></li><% }) %></ol>
   <h3><%= t('guide_template_title') %></h3><p><%= t('guide_template_hint') %></p>

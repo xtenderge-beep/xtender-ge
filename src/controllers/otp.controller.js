@@ -1,3 +1,4 @@
+const serviceMessage = require('../config/service-message-copy');
 const consentService = require('../services/consent.service');
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
@@ -16,7 +17,7 @@ async function send(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   if (!description || !description.trim()) {
-    return res.status(400).json({ success: false, message: 'Description is required' });
+    return res.status(400).json({ success: false, message: serviceMessage('descriptionRequired', req.lang) });
   }
 
   const acceptance = await consentService.acceptedRequest(req, 'client');
@@ -49,12 +50,12 @@ async function send(req, res) {
 
   if (!result.success) {
     if (result.reason === 'rate_limited') {
-      return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
-    return res.status(500).json({ success: false, message: 'Failed to send code' });
+    return res.status(500).json({ success: false, message: serviceMessage('sendFailed', req.lang) });
   }
 
-  return res.json({ success: true, message: 'Code sent', token: order.token, challengeId: result.challengeId });
+  return res.json({ success: true, message: serviceMessage('sent', req.lang), token: order.token, challengeId: result.challengeId });
 }
 
 async function verify(req, res) {
@@ -62,7 +63,7 @@ async function verify(req, res) {
   const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
 
   if (!phone || !isGeorgianPhone(phone) || !code) {
-    return res.status(400).json({ success: false, message: 'Invalid phone or code' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidPhoneCode', req.lang) });
   }
 
   // Фолбэк-версия — почти всегда перекрывается снимком, сохранённым send()'ом
@@ -76,10 +77,10 @@ async function verify(req, res) {
   });
 
   if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidCode', req.lang) });
   }
 
-  return res.json({ success: true, message: 'Verified' });
+  return res.json({ success: true, message: serviceMessage('verified', req.lang) });
 }
 
 module.exports = {

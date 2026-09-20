@@ -6,6 +6,11 @@ const consent=require('../src/services/consent.service'),{translate,clientString
 const template=fs.readFileSync(path.join(__dirname,'../src/views/join.ejs'),'utf8');
 (async()=>{
  assert.ok(!template.includes('termsScrolled'));assert.ok(!template.includes('termsBody'));
+ // Three steps (services, where you work, profile) plus the code screen; the short facts sit right above the checkboxes.
+ assert.equal((template.match(/data-signup-panel="[0-9]"/g)||[]).length,3);assert.ok(!template.includes('data-signup-panel="3"'));
+ assert.ok(template.indexOf('signupBeforeTitle')<template.indexOf('id="termsCheckbox"'),'facts come before the consent checkboxes');
+ assert.ok(template.indexOf('id="nameInput"')<template.indexOf('signupBeforeTitle'),'name and phone come before the facts');
+ assert.ok(template.includes('id="otpResend"')&&template.includes('id="otpChangeNumber"')&&template.includes('id="otpSentTo"'));
  assert.ok(!/<button id="sendOtpButton"[^>]*\sdisabled/.test(template));
  for(const lang of ['ka','ru','en']) {
   const snapshot=await consent.bundle('provider',lang);
@@ -22,7 +27,7 @@ const template=fs.readFileSync(path.join(__dirname,'../src/views/join.ejs'),'utf
     setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];},addEventListener(){}});
   ['termsCheckbox','privacyCheckbox'].forEach(el);
   let sends=0;
-  const context=vm.createContext({window:{innerWidth:1000,GeorgianPhone:{validate:()=>true}},
+  const context=vm.createContext({setInterval:()=>1,clearInterval(){},window:{innerWidth:1000,GeorgianPhone:{validate:()=>true}},
     document:{body:el('body'),getElementById:id=>id==='providerIllustrationTrack'?null:el(id),
       querySelector:selector=>el(selector.replace('#','')),querySelectorAll:selector=>selector.includes(':checked')?[{value:'1'}]:[]},
     fetch:async()=>{sends++;return {json:async()=>({success:true,challengeId:'test'})};},
@@ -34,6 +39,15 @@ const template=fs.readFileSync(path.join(__dirname,'../src/views/join.ejs'),'utf
   assert.equal(el('privacyError').textContent,translate(lang)('signup_privacy_required'));
   el('privacyCheckbox').checked=true;await vm.runInContext('sendOtp()',context);assert.equal(sends,1);
   assert.equal(el('sendOtpButton').disabled,false);
+  assert.ok(el('otpSentTo').textContent.includes('test'),'the code screen names the number the code went to');
+  assert.equal(el('otpResend').disabled,true,'resend is on cooldown right after sending');
+  await vm.runInContext('sendOtp(true)',context);assert.equal(sends,2,'resend sends a new code');
+  assert.equal(el('formMsg').textContent,translate(lang)('js_ok_code_sent'));
+  // On the code screen the header back arrow means "change the number": it returns to the profile step.
+  assert.equal(vm.runInContext('otpVisible',context),true);
+  vm.runInContext('changeSignupStep(0)',context);
+  assert.equal(vm.runInContext('otpVisible',context),false);
+  assert.equal(vm.runInContext('signupStep',context),2);
  }
- console.log('PASS: no scroll gate, active CTA, inline unchecked errors, SMS only after explicit consent and stale-document protection in 3 languages');
+ console.log('PASS: three signup steps, no scroll gate, active CTA, resend, inline unchecked errors, SMS only after explicit consent and stale-document protection in 3 languages');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

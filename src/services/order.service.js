@@ -8,6 +8,7 @@ const technical = require('./technical.service');
 const billing = require('./providerBilling.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
+const serviceMessage = require('../config/service-message-copy');
 
 // Цена лида теперь в БД (app_settings, правится в /admin/settings) — settingsService
 // её читает, тут только порог «баланс заканчивается» как множитель цены (~5 лидов).
@@ -24,16 +25,11 @@ async function nudgeLowBalance(master, telegramService, reason) {
 
   const link = `${getBaseUrl()}/master/${master.master_token}`;
   const gel = (master.balance_tetri / 100).toFixed(2);
+  const text = serviceMessage(reason === 'missed' ? 'balanceMissed' : 'balanceLow', master.language, { amount: gel, link });
   try {
     if (master.telegram_id) {
-      const text = reason === 'missed'
-        ? `⚠️ Заявка по вашей категории ушла мимо — не хватило баланса. Пополните, чтобы снова получать заявки: ${link}`
-        : `⚠️ Баланс ${gel} ₾ заканчивается. Пополните, чтобы не пропускать заявки: ${link}`;
       await telegramService.sendToChat(master.telegram_id, text);
     } else {
-      const text = reason === 'missed'
-        ? `Xtender: an order in your category passed you by (low balance). Top up: ${link}`
-        : `Xtender: balance low (${gel} GEL). Top up to keep getting orders: ${link}`;
       await smsService.sendOrderNotification(master.phone, text, { masterId: master.id });
     }
   } catch (err) {
@@ -55,6 +51,18 @@ async function createPendingOrder({ phone, description, districtName, managerId 
 async function getOrderByOwnerToken(ownerToken) {
   const { rows } = await pool.query('SELECT * FROM orders WHERE owner_token = $1', [ownerToken]);
   return rows[0] || null;
+}
+
+// Use the customer's recorded interface language, not the moderator's language
+// or the automatically detected language of the request description.
+async function getCustomerLanguage(order, fallback = 'ka') {
+  const { rows } = await pool.query(`SELECT l.consent_language FROM consent_uses u
+    JOIN sms_consent_logs l ON l.id=u.consent_log_id
+    WHERE u.subject_role='client' AND u.subject_id=$1
+    ORDER BY l.id DESC LIMIT 1`, [order.id]);
+  const language = rows[0]?.consent_language;
+  return ['ka', 'ru', 'en'].includes(language) ? language
+    : ['ka', 'ru', 'en'].includes(fallback) ? fallback : 'ka';
 }
 
 async function activateOrder(token, phone, grant, meta = {}, files = []) {
@@ -385,7 +393,7 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
  const rates = await billing.pricing();
  if (rates.leadPriceTetri !== leadPrice) return [];
  const allowed = await billing.eligibleIds(rates);
- const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id, language FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
  const rows = result.rows.filter(master => allowed.has(master.id));
  if (!definition.is_builtin && rows.length) {
    const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
@@ -431,7 +439,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       if (!receipt?.ok) {
         channel = 'sms';
         try {
-          receipt = await smsService.sendOrderNotification(master.phone, 'Xtender: ' + (isTechnical ? '[TEST] ' : '') + 'new order #' + order.id + ': ' + link,
+          receipt = await smsService.sendOrderNotification(master.phone, serviceMessage('lead', master.language, { test: isTechnical ? '[TEST] ' : '', id: order.id, link }),
             { kind: 'lead', masterId: master.id, orderId: order.id });
         } catch (err) { receipt = null; console.error('Failed to notify master ' + master.id + ':', err.message); }
       }
@@ -511,6 +519,7 @@ async function logView(orderId, masterId, eventType) {
 }
 
 module.exports = {
+  getCustomerLanguage,
   getDispatchRecipients,
   createPendingOrder,
   activateOrder,

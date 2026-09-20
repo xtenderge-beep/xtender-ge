@@ -1,3 +1,4 @@
+const serviceMessage = require('../config/service-message-copy');
 const masterSession = require('../services/masterSession.service');
 const consentService = require('../services/consent.service');
 const providerBilling = require('../services/providerBilling.service');
@@ -55,12 +56,12 @@ async function catalogOtpSend(req, res) {
   if (!rawPhone || !isGeorgianPhone(rawPhone)) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
-  const result = await otpService.sendCode(toE164(rawPhone), null, CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  const result = await otpService.sendCode(toE164(rawPhone), null, CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
-      return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
-    return res.status(500).json({ success: false, message: 'Failed to send code' });
+    return res.status(500).json({ success: false, message: serviceMessage('sendFailed', req.lang) });
   }
   return res.json({ success: true });
 }
@@ -69,11 +70,11 @@ async function catalogOtpVerify(req, res) {
   const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
   if (!rawPhone || !isGeorgianPhone(rawPhone) || !code) {
-    return res.status(400).json({ success: false, message: 'Invalid phone or code' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidPhoneCode', req.lang) });
   }
   const phone = toE164(rawPhone);
   const ok = await otpService.verifyCode(phone, code, CATALOG_OTP_PURPOSE, { meta: requestMeta(req), language: req.lang });
-  if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+  if (!ok) return res.status(400).json({ success: false, message: serviceMessage('invalidCode', req.lang) });
 
   await catalogSession.issue(res, phone);
   return res.json({ success: true });
@@ -105,7 +106,7 @@ async function revealPhone(req, res) {
   const count = await redis.incr(key);
   if (count === 1) await redis.expire(key, CATALOG_REVEAL_RATE_WINDOW_SECONDS);
   if (count > CATALOG_REVEAL_RATE_MAX) {
-    return res.status(429).json({ success: false, message: 'Too many requests' });
+    return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
   }
 
   const price = await settingsService.getCatalogCallPriceTetri();
@@ -128,12 +129,12 @@ async function sendOtp(req, res) {
   const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
-      return res.status(429).json({ success: false, message: 'Too many requests, try again later' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
-    return res.status(500).json({ success: false, message: 'Failed to send code' });
+    return res.status(500).json({ success: false, message: serviceMessage('sendFailed', req.lang) });
   }
 
-  return res.json({ success: true, message: 'Code sent', challengeId: result.challengeId });
+  return res.json({ success: true, message: serviceMessage('sent', req.lang), challengeId: result.challengeId });
 }
 
 async function verifyOtp(req, res) {
@@ -143,11 +144,11 @@ async function verifyOtp(req, res) {
   const privacyAccepted = req.body.privacyAccepted === true;
 
   if (!rawPhone || !isGeorgianPhone(rawPhone) || !code) {
-    return res.status(400).json({ success: false, message: 'Invalid phone or code' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidPhoneCode', req.lang) });
   }
   // Оба согласия обязательны: их же и снимаем в журнал этим подтверждением кода.
   if (!termsAccepted || !privacyAccepted) {
-    return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
+    return res.status(400).json({ success: false, message: serviceMessage('consentRequired', req.lang) });
   }
 
   // The OTP service uses the immutable snapshot captured when this challenge was sent.
@@ -161,10 +162,10 @@ async function verifyOtp(req, res) {
     challengeId: req.body.challengeId,
   });
   if (!isValid) {
-    return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidCode', req.lang) });
   }
 
-  return res.json({ success: true, message: 'Verified' });
+  return res.json({ success: true, message: serviceMessage('verified', req.lang) });
 }
 
 async function register(req, res) {
@@ -184,10 +185,10 @@ async function register(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
   if (!name) {
-    return res.status(400).json({ success: false, message: 'Name is required' });
+    return res.status(400).json({ success: false, message: serviceMessage('nameRequired', req.lang) });
   }
   if (!termsAccepted || !privacyAccepted) {
-    return res.status(400).json({ success: false, message: 'Terms and Privacy Policy must be accepted' });
+    return res.status(400).json({ success: false, message: serviceMessage('consentRequired', req.lang) });
   }
 
   const attributes = {};
@@ -204,7 +205,7 @@ async function register(req, res) {
   const phone = toE164(rawPhone);
   const verified = await otpService.getConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
   if (!verified) {
-    return res.status(400).json({ success: false, message: 'Phone not verified' });
+    return res.status(400).json({ success: false, message: serviceMessage('unverified', req.lang) });
   }
 
   const master = await masterService.registerMaster({
@@ -339,15 +340,15 @@ async function activatePromo(req, res) {
 
 async function sendSupportMessage(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
-  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
 
   const body = (req.body.body || '').trim().slice(0, 2000);
-  if (!body) return res.status(400).json({ success: false, message: 'Empty message' });
+  if (!body) return res.status(400).json({ success: false, message: serviceMessage('emptyMessage', req.lang) });
 
   const key = `support_rate:${master.id}`;
   const count = await redis.incr(key);
   if (count === 1) await redis.expire(key, SUPPORT_RATE_WINDOW_SECONDS);
-  if (count > SUPPORT_RATE_MAX) return res.status(429).json({ success: false, message: 'Too many messages' });
+  if (count > SUPPORT_RATE_MAX) return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
 
   await supportService.forwardQuestion(master, body);
   return res.json({ success: true });
@@ -373,12 +374,12 @@ async function loginRequestCode(req, res) {
     return res.status(404).json({ success: false, message: 'not_registered' });
   }
 
-  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE, null, { meta: requestMeta(req) });
+  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
-      return res.status(429).json({ success: false, message: 'Too many requests' });
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
-    return res.status(500).json({ success: false, message: 'Failed to send code' });
+    return res.status(500).json({ success: false, message: serviceMessage('sendFailed', req.lang) });
   }
   return res.json({ success: true });
 }
@@ -387,7 +388,7 @@ async function loginVerify(req, res) {
   const phone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   const { code } = req.body;
   if (!isGeorgianPhone(phone) || !code) {
-    return res.status(400).json({ success: false, message: 'Invalid input' });
+    return res.status(400).json({ success: false, message: serviceMessage('invalidInput', req.lang) });
   }
 
   const master = await masterService.getMasterByPhone(phone);
@@ -401,7 +402,7 @@ async function loginVerify(req, res) {
     masterId: master && master.id,
     termsVersion,
   });
-  if (!ok) return res.status(400).json({ success: false, message: 'Invalid or expired code' });
+  if (!ok) return res.status(400).json({ success: false, message: serviceMessage('invalidCode', req.lang) });
 
   if (!master || !master.master_token) {
     return res.status(404).json({ success: false, message: 'not_registered' });
@@ -417,21 +418,21 @@ async function loginVerify(req, res) {
 // остаётся ручным: модератор смотрит чек и делает /topup.
 async function unlinkTelegram(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
-  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
   await masterService.unlinkTelegram(req.params.token);
   return res.json({ success: true });
 }
 
 async function submitTopupReceipt(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
-  if (!master) return res.status(404).json({ success: false, message: 'Not found' });
-  if (!req.file) return res.status(400).json({ success: false, message: 'No file' });
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
+  if (!req.file) return res.status(400).json({ success: false, message: serviceMessage('noFile', req.lang) });
 
   const key = `topup_receipt_limit:${master.id}`;
   const count = await redis.incr(key);
   if (count === 1) await redis.expire(key, RECEIPT_RATE_WINDOW_SECONDS);
   if (count > RECEIPT_RATE_MAX) {
-    return res.status(429).json({ success: false, message: 'Too many requests' });
+    return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
   }
 
   const fileUrl = `${getBaseUrl()}/uploads/${req.file.filename}`;

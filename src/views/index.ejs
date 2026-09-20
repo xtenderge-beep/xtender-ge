@@ -80,7 +80,7 @@
             <% const homeExamplesFirst = t('home_examples_data')[0]; %>
             <div class="home-examples home-examples--hero" id="homeExamples">
               <p class="home-examples-label"><%= t('home_examples_label') %></p>
-              <div class="home-examples-track" id="homeExamplesTrack">
+              <div class="home-examples-track" id="homeExamplesTrack" aria-live="polite">
                 <div class="home-example is-active">
                   <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= homeExamplesFirst.emoji %></span><%= homeExamplesFirst.request %></p>
                   <% homeExamplesFirst.responses.forEach(function (resp) { %>
@@ -90,6 +90,7 @@
               </div>
               <p class="home-example-outcome"><i class="fa-solid fa-check" aria-hidden="true"></i><%= t('home_choice') %></p>
               <p class="home-examples-note"><%= t('home_examples_note') %></p>
+              <button type="button" id="homeExampleNext" class="example-next"><%= t('example_next') %></button>
             </div>
             <a href="#masters-section" class="home-text-link"><%= t('home_catalog_link') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
           </section>
@@ -112,6 +113,7 @@
                                   <span class="home-form-overline"><%= t('composer_step') %></span>
                                   <h2 id="home-form-title"><label for="freeformInput"><%= t('home_form_title') %></label></h2>
                                   <p id="home-description-hint"><%= t('home_form_hint') %></p>
+                                  <p class="home-free-note"><%= t('home_free') %></p>
                                 </div>
                                 <div class="composer-chips flex flex-wrap gap-1.5 pb-0.5 mt-2.5 no-scrollbar sm:flex-nowrap sm:overflow-x-auto">
                                     <%
@@ -150,7 +152,6 @@
                                     </div>
                                 </div>
 
-                                <p class="composer-trust-line mt-2 text-[11px] text-stone-500 text-center"><i class="fa-solid fa-lock text-[9px] mr-1"></i><%= t('home_contact_note') %></p>
                             </div>
 
                             <div id="phoneStep" class="p-5 sm:p-6 hidden"><p class="home-phone-hint"><%= t('home_phone_hint') %></p>
@@ -1201,90 +1202,37 @@
 
         (function () {
             const track = document.getElementById('homeExamplesTrack');
-            if (!track || !Array.isArray(HOME_EXAMPLES) || HOME_EXAMPLES.length < 2) return;
-
-            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            let paused = false;
-
-            function wait(ms) {
-                return new Promise(function (resolve) {
-                    let remaining = ms;
-                    const iv = setInterval(function () {
-                        if (paused) return;
-                        remaining -= 60;
-                        if (remaining <= 0) { clearInterval(iv); resolve(); }
-                    }, 60);
-                });
-            }
-
-            function typeInto(el, text, speed) {
-                return new Promise(function (resolve) {
-                    if (reduceMotion) { el.textContent = text; return resolve(); }
-                    let i = 0;
-                    el.textContent = '';
-                    const iv = setInterval(function () {
-                        if (paused) return;
-                        i++;
-                        el.textContent = text.slice(0, i);
-                        if (i >= text.length) { clearInterval(iv); resolve(); }
-                    }, speed);
-                });
-            }
-
-            async function playExample(ex) {
-                track.innerHTML = '';
+            const next = document.getElementById('homeExampleNext');
+            if (!track || !next || !Array.isArray(HOME_EXAMPLES) || HOME_EXAMPLES.length < 2) return;
+            let index = 0;
+            next.addEventListener('click', function () {
+                index = (index + 1) % HOME_EXAMPLES.length;
+                const example = HOME_EXAMPLES[index];
                 const card = document.createElement('div');
                 card.className = 'home-example is-active';
-
-                const reqP = document.createElement('p');
-                reqP.className = 'home-example-request';
-                const reqEmoji = document.createElement('span');
-                reqEmoji.className = 'home-example-emoji';
-                reqEmoji.setAttribute('aria-hidden', 'true');
-                reqEmoji.textContent = ex.emoji;
-                const reqText = document.createElement('span');
-                reqP.appendChild(reqEmoji);
-                reqP.appendChild(reqText);
-                card.appendChild(reqP);
-                track.appendChild(card);
-
-                await typeInto(reqText, ex.request, 22);
-                await wait(500);
-
-                for (const resp of ex.responses) {
-                    const respP = document.createElement('p');
-                    respP.className = 'home-example-response';
+                const request = document.createElement('p');
+                request.className = 'home-example-request';
+                const emoji = document.createElement('span');
+                emoji.className = 'home-example-emoji';
+                emoji.setAttribute('aria-hidden', 'true');
+                emoji.textContent = example.emoji;
+                request.append(emoji, document.createTextNode(example.request));
+                card.appendChild(request);
+                example.responses.forEach(function (response) {
+                    const line = document.createElement('p');
+                    line.className = 'home-example-response';
                     const icon = document.createElement('i');
                     icon.className = 'fa-solid fa-phone';
                     icon.setAttribute('aria-hidden', 'true');
-                    const nameB = document.createElement('b');
-                    nameB.textContent = resp.name + ': ';
-                    const respText = document.createElement('span');
-                    respP.appendChild(icon);
-                    respP.appendChild(nameB);
-                    respP.appendChild(respText);
-                    card.appendChild(respP);
-
-                    await typeInto(respText, resp.text, 16);
-                    await wait(450);
-                }
-
-                await wait(2600);
-            }
-
-            async function loop() {
-                let index = 0;
-                for (;;) {
-                    await playExample(HOME_EXAMPLES[index]);
-                    index = (index + 1) % HOME_EXAMPLES.length;
-                }
-            }
-            loop();
-
-            track.addEventListener('mouseenter', function () { paused = true; });
-            track.addEventListener('mouseleave', function () { paused = false; });
-            track.addEventListener('focusin', function () { paused = true; });
-            track.addEventListener('focusout', function () { paused = false; });
+                    const name = document.createElement('b');
+                    name.textContent = response.name + ': ';
+                    const body = document.createElement('span');
+                    body.textContent = response.text;
+                    line.append(icon, name, body);
+                    card.appendChild(line);
+                });
+                track.replaceChildren(card);
+            });
         })();
     </script>
 </body>
