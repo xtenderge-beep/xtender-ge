@@ -463,3 +463,11 @@ html[lang="ka"] .home-provider-link { font-size:12px; }
 
 /* Transfer instructions are numbered steps, not a paragraph. */
 .payment-steps{margin:10px 0 6px;padding-left:22px;list-style:decimal;font-size:14px;line-height:1.55;color:#33453a}.payment-steps li{margin:5px 0;padding-left:2px}
+
+/* Focused registration: the visitor arrived by a manager link or a promo link, so the page is the form and nothing else. */
+.provider-join-focused main{max-width:36rem}
+.provider-join-focused .provider-join-grid{display:block;margin-top:20px}
+.provider-focus-promo{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid #ccdcb2;background:#eef4e2;color:#234e35;font-size:13px;font-weight:650;line-height:1.45}
+.provider-focus-promo p{margin:0}.provider-focus-promo i{flex:none}
+.provider-focus-promo.is-invalid{background:#fbf3e0;border-bottom-color:#ecd9a6;color:#7a5a12}
+body.signup-compose-active .provider-focus-promo{display:none}

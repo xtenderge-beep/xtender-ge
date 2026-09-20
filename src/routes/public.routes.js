@@ -132,11 +132,12 @@ router.get('/join', asyncHandler(async (req, res) => {
   const locale = resolveLocale(req, res, '/join');
   const partner = require('../services/partner.service');
   const incomingRef = typeof req.query.ref === 'string' ? req.query.ref : '';
-  if (incomingRef && await partner.findReferrer(incomingRef, null)) {
-    const existing = await partner.findReferrer(req.cookies.partner_ref, null);
-    if (!existing) res.cookie('partner_ref', incomingRef, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 30 * 24 * 3600000, path: '/' });
+  const incomingReferrer = incomingRef ? await partner.findReferrer(incomingRef, null) : null;
+  const cookieReferrer = await partner.findReferrer(req.cookies.partner_ref, null);
+  if (incomingReferrer && !cookieReferrer) {
+    res.cookie('partner_ref', incomingRef, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 30 * 24 * 3600000, path: '/' });
   }
-  const codeParam = (req.query.promo || '').trim().toUpperCase().slice(0, 40);
+  const codeParam = (typeof req.query.promo === 'string' ? req.query.promo : '').trim().toUpperCase().slice(0, 40);
   let promo = null;
   if (codeParam) {
     const valid = await promoService.peek(codeParam);
@@ -151,10 +152,19 @@ router.get('/join', asyncHandler(async (req, res) => {
 
   const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();
+  // Someone who arrives by a manager's referral link or a promo link already knows why they came.
+  // For them the page is the registration form and nothing else. Organic visitors keep the full page.
+  const focused = Boolean(incomingReferrer || cookieReferrer || codeParam);
+  // The language switcher points at clean URLs, so the link parameters are carried explicitly.
+  // Otherwise a language change would drop the promo code and the focused mode.
+  const carried = new URLSearchParams();
+  if (incomingReferrer) carried.set('ref', incomingRef);
+  if (codeParam) carried.set('promo', codeParam);
   res.render('join', {
     consent: await consentService.bundle('provider', locale),
     legalDoc: await legalContentService.getTerms(), ...LEGAL_LOCALS,
     welcomeBonusTetri, leadPriceTetri, catalogCallPriceTetri,
+    focused, switchQuery: carried.toString(),
     clientStrings: clientStrings(locale),
     promo,
     cities: cities.map((c) => ({ id: c.id, name: c[nameKey] || c.name_ka })),

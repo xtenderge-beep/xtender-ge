@@ -14,7 +14,9 @@
   <% _langs.forEach(function (lf) { %>
     <%
       // ?lang=ka — иначе кука ru/en тут же откидывает голый '/' обратно (public.routes.js)
-      const _href = _masterHref ? (_masterHref + lf[0]) : _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' : '')) : ('/lang/' + lf[0] + '?next=' + encodeURIComponent(typeof currentPath === 'string' ? currentPath : '/'));
+      // switchQuery: parameters that must survive the language change (join page: ref and promo).
+      const _q = typeof switchQuery === 'string' ? switchQuery : '';
+      const _href = _masterHref ? (_masterHref + lf[0]) : _hasAlt ? (alternates[lf[0]] + (lf[0] === 'ka' ? '?lang=ka' + (_q ? '&' + _q : '') : (_q ? '?' + _q : ''))) : ('/lang/' + lf[0] + '?next=' + encodeURIComponent(typeof currentPath === 'string' ? currentPath : '/'));
     %>
     <a href="<%= _href %>" aria-label="<%= lf[1] %>"
        <% if (!_hasAlt && !_masterHref) { %>onclick="const destination = new URL(this.href); destination.searchParams.set('next', location.pathname + location.search + location.hash); this.href = destination.pathname + destination.search;"<% } %>
