@@ -5,7 +5,7 @@ const consentLog = require('./consentLog.service');
 const SMS_GATEWAY_URL = process.env.SMS_GATEWAY_URL || 'http://212.72.155.180:2375/api/sendmsg.php';
 
 function isDevMode() {
-  return process.env.NODE_ENV === 'development' || !process.env.SMS_GATEWAY_USERNAME;
+  return process.env.NODE_ENV === 'development' || (process.env.NODE_ENV !== 'production' && !process.env.SMS_GATEWAY_USERNAME);
 }
 
 function normalizePhone(phone) {
@@ -30,6 +30,24 @@ function extractMessageId(data) {
   return s && s.length <= 64 ? s : null;
 }
 
+// Fail closed on errors and undocumented replies. HTTP 200 alone is not an
+// acceptance receipt. This is gateway acceptance, never handset delivery.
+function acceptedResponse(data) {
+  if (typeof data === 'string') {
+    const value = data.trim();
+    if (value.startsWith('{')) {
+      try { return acceptedResponse(JSON.parse(value)); } catch (_) { return false; }
+    }
+    return /^OK(?:\s*:\s*|\s+)[1-9]\d*$/i.test(value) || /^[1-9]\d{5,}$/.test(value);
+  }
+  if (typeof data === 'number') return Number.isSafeInteger(data) && data >= 100000;
+  if (!data || typeof data !== 'object' || data.error || data.ok === false || data.success === false) return false;
+  const status = String(data.status || '').toLowerCase();
+  if (status && !['ok', 'accepted', 'queued', 'success'].includes(status)) return false;
+  const id = data.id || data.message_id || data.messageId || data.msgid || data.smsid || data.sms_id;
+  return Boolean(id && (data.ok === true || data.success === true || status));
+}
+
 // context:
 //   { kind }              — 'lead' | 'transactional' (по умолчанию 'transactional')
 //   { purpose }           — otp purpose, если применимо
@@ -48,7 +66,9 @@ async function send(phone, text, context = {}) {
       providerResponse = { dev: true };
       ok = true;
     } else {
+      if (!process.env.SMS_GATEWAY_USERNAME || !process.env.SMS_GATEWAY_PASSWORD) throw new Error('SMS gateway credentials are not configured');
       const response = await axios.get(SMS_GATEWAY_URL, {
+        timeout: 15000,
         params: {
           username: process.env.SMS_GATEWAY_USERNAME,
           password: process.env.SMS_GATEWAY_PASSWORD,
@@ -59,17 +79,22 @@ async function send(phone, text, context = {}) {
       });
       console.log(`[SMS GATEWAY] to=${normalizePhone(phone)} response=${JSON.stringify(response.data)}`);
       providerResponse = response.data;
+      if (!acceptedResponse(providerResponse)) {
+        const error = new Error('SMS gateway did not confirm acceptance');
+        error.code = 'SMS_NOT_ACCEPTED';
+        throw error;
+      }
       providerMessageId = extractMessageId(response.data);
       ok = true;
     }
   } catch (err) {
-    providerResponse = { error: err.message };
+    providerResponse = providerResponse ?? { error: err.message };
     console.error(`[SMS GATEWAY] to=${normalizePhone(phone)} failed: ${err.message}`);
     if (context.log !== false) {
       consentLog.recordSmsDelivery({
         phone: e164, kind: context.kind, purpose: context.purpose || null, body: text,
         masterId: context.masterId || null, orderId: context.orderId || null,
-        providerMessageId, providerResponse, meta: context.meta || {},
+        providerMessageId, providerResponse, meta: context.meta || {}, status: 'failed',
       }).catch(() => {});
     }
     throw err; // прежнее поведение: ошибка отправки всплывает наверх
@@ -84,7 +109,7 @@ async function send(phone, text, context = {}) {
     }).catch(() => {});
   }
 
-  return { ok, providerMessageId, providerResponse };
+  return { ok, status: 'accepted', providerMessageId, providerResponse, messageBody: text };
 }
 
 // Код авторизации. `log: false` — строку журнала пишет otp.service (там есть код для
@@ -99,6 +124,7 @@ function sendOrderNotification(phone, text, context = {}) {
 }
 
 module.exports = {
+  acceptedResponse,
   sendOtp,
   sendOrderNotification,
 };

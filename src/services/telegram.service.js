@@ -410,19 +410,22 @@ function leadMessage(master, order) {
 
 async function sendLeadToMaster(master, order, link) {
   if (!isEnabled()) {
+    if (process.env.NODE_ENV === 'production') return false;
     console.log(`[TELEGRAM DEV MODE] lead #${order.id} -> master ${master.id} via Telegram (chat ${master.telegram_id})`);
-    return true;
+    return { ok: true, status: 'accepted', providerResponse: { dev: true }, messageBody: leadMessage(master, order).text };
   }
 
   const { text, openLabel } = leadMessage(master, order);
 
   try {
-    await axios.post(apiUrl('sendMessage'), {
+    const response = await axios.post(apiUrl('sendMessage'), {
       chat_id: master.telegram_id,
       text,
       reply_markup: { inline_keyboard: [[{ text: openLabel, url: link }]] },
-    });
-    return true;
+    }, { timeout: 15000 });
+    if (response.data?.ok !== true || !response.data.result?.message_id) return false;
+    return { ok: true, status: 'accepted', providerMessageId: String(response.data.result.message_id),
+      providerResponse: response.data, messageBody: text };
   } catch (err) {
     console.error(
       `Failed to send lead #${order.id} to master ${master.id} on Telegram:`,

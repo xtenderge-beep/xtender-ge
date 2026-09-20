@@ -125,10 +125,10 @@ async function applyConsent(grant, role, subjectId, phone, meta, client) {
 // --- Точка 2: прочие транзакционные SMS (лид-уведомления, подтверждения, пинки) ---
 // Вызывается из sms.service на каждую отправку не-OTP SMS. best-effort.
 async function recordSmsDelivery({ phone, kind = 'transactional', body = null, purpose = null,
-  masterId = null, orderId = null, providerMessageId = null, providerResponse = null, meta = {} }) {
+  masterId = null, orderId = null, providerMessageId = null, providerResponse = null, meta = {}, status = 'accepted' }) {
   try {
     return await insertRow({
-      event_type: kind === 'lead' ? 'LEAD_SMS_SENT' : 'TX_SMS_SENT',
+      event_type: status === 'failed' ? 'SMS_SEND_FAILED' : kind === 'lead' ? 'LEAD_SMS_SENT' : 'TX_SMS_SENT',
       phone_number: phone,
       master_id: masterId,
       order_id: orderId,
@@ -140,7 +140,7 @@ async function recordSmsDelivery({ phone, kind = 'transactional', body = null, p
       provider: PROVIDER,
       provider_response: providerResponse,
       message_body_hash: body ? sha256(body) : null,
-      metadata: meta.extra || null,
+      metadata: { ...(meta.extra || {}), acceptance_status: status, delivery_status: 'unknown' },
     });
   } catch (err) {
     console.error('consentLog.recordSmsDelivery failed:', err.message);
