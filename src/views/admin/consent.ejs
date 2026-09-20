@@ -2,6 +2,12 @@
 
 <%
   const EVENT_META = {
+    PROVIDER_BILLING_ACCEPTED: { label: 'Тарифы приняты', cls: 'bg-emerald-100 text-emerald-800' },
+    LEAD_CHARGE_ACCEPTED: { label: 'Списание за уведомление', cls: 'bg-sky-100 text-sky-800' },
+    CATALOG_CHARGE_ACCEPTED: { label: 'Списание за каталог', cls: 'bg-sky-100 text-sky-800' },
+    ORDER_CONTACT_RELEASED: { label: 'Контакт выдан', cls: 'bg-sky-100 text-sky-800' },
+    ORDER_CONTACT_DENIED: { label: 'В выдаче контакта отказано', cls: 'bg-stone-100 text-stone-600' },
+    SMS_SEND_FAILED: { label: 'Отправка SMS не подтверждена', cls: 'bg-stone-100 text-stone-600' },
     CLIENT_CONSENT_OTP_VERIFIED: { label: 'Согласие · клиент', cls: 'bg-emerald-100 text-emerald-800' },
     MASTER_REGISTERED: { label: 'Профиль создан / обновлён', cls: 'bg-sky-100 text-sky-800' },
     ORDER_PUBLISHED: { label: 'Заявка опубликована', cls: 'bg-sky-100 text-sky-800' },
@@ -42,7 +48,7 @@
   <% if (phoneQuery && report && !report.error) { %>
     <a href="/admin/consent/export?phone=<%= encodeURIComponent(phoneQuery) %>"
        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">
-      Скачать JSON (для регулятора)
+      Скачать пакет доказательств (JSON)
     </a>
   <% } %>
 </form>
@@ -82,6 +88,18 @@
       <% } %>
     </div>
 
+    <% if (report.provider_evidence) { const evidence = report.provider_evidence; %>
+      <section class="mt-4 bg-white rounded-2xl border border-stone-200 p-5 space-y-2">
+        <h2 class="text-sm font-bold">Доказательства по исполнителю</h2>
+        <p class="text-sm">Принятия тарифов: <b><%= evidence.billing_acceptance_events.length %></b> · операций баланса: <b><%= evidence.transactions.length %></b> · событий выдачи контакта: <b><%= evidence.contact_events.length %></b></p>
+        <p class="text-xs text-stone-500">В JSON включены тарифные согласия, списания, результаты отправок и хронология закрытия заявок. Принятие сообщения шлюзом не доказывает доставку на телефон. Выдача контакта не доказывает звонок.</p>
+        <details><summary class="text-sm font-bold cursor-pointer">Хронология событий (<%= evidence.timeline.length %>)</summary>
+          <div class="overflow-x-auto"><table class="w-full text-xs mt-2"><thead><tr><th class="text-left">Время UTC</th><th class="text-left">Событие</th><th class="text-left">Заявка</th><th class="text-left">Запись</th></tr></thead><tbody>
+            <% evidence.timeline.forEach(event => { %><tr><td class="py-2"><%= new Date(event.timestamp_utc).toISOString() %></td><td><%= (EVENT_META[event.event_type] || {}).label || event.event_type %></td><td><%= event.order_id || '—' %></td><td><%= event.id %></td></tr><% }); %>
+          </tbody></table></div>
+        </details>
+      </section>
+    <% } %>
     <% var oi = report.subject.double_opt_in || {}; %>
     <% if (oi.status === 'VERIFIED') { %>
       <div class="mt-4 bg-emerald-50 rounded-2xl border border-emerald-200 p-5">

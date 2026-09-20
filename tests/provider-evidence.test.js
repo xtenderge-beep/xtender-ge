@@ -1,0 +1,38 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),ejs=require('ejs');
+const db=require('pg-mem').newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg(),pool=new Pool();pool.withTransaction=async fn=>{const before=db.backup();try{return await fn(pool);}catch(e){before.restore();throw e;}};
+require.cache[require.resolve('../src/config/db')]={exports:pool};
+const redis=new(require('ioredis-mock'))();require.cache[require.resolve('../src/config/redis')]={exports:redis};
+const audit=require('../src/services/consentLog.service');
+const contacts=require('../src/services/orderContact.service');
+const orders=require('../src/services/order.service');
+(async()=>{
+ const master=(await pool.query("INSERT INTO masters(name,phone,master_token,category,is_active) VALUES('Evidence','+995500000711','private-master-token','transport',true) RETURNING *")).rows[0];
+ await pool.query('UPDATE masters SET is_flatbed=true WHERE id=$1',[master.id]);
+ const order=(await pool.query("INSERT INTO orders(token,owner_token,phone,description,status,target_categories) VALUES('private-order-token','private-owner-token','+995500000712','Load timber','new',ARRAY['flatbed','movers']) RETURNING *")).rows[0];
+ const consent=await require('./billing-fixture')(pool,master.id);
+ const debit=(await pool.query("INSERT INTO balance_transactions(master_id,order_id,amount_tetri,reason) VALUES($1,$2,-50,'lead_charge') RETURNING id",[master.id,order.id])).rows[0];
+ await audit.recordAction({eventType:'LEAD_CHARGE_ACCEPTED',phone:master.phone,masterId:master.id,orderId:order.id,metadata:{category:'flatbed',amount_tetri:50,billing_consent_log_id:consent.consentLogId,balance_transaction_id:debit.id}});
+ assert.equal((await contacts.reveal(order.token,master.master_token,'call')).status,200,'flatbed recipients use the category actually sold');
+ await orders.closeOrderCategory(order.token,'flatbed',{actor:'client',reason:'found_provider'});
+ assert.equal((await contacts.reveal(order.token,master.master_token,'whatsapp')).status,409);
+ await orders.closeOrder(order.token,{actor:'client',reason:'not_needed'});
+ const report=await audit.exportForMaster(master.id);
+ assert.equal(report.report_version,2);assert.equal(report.provider_evidence.billing_acceptance_events.length,1);
+ assert.equal(report.provider_evidence.transactions.length,1);assert.equal(report.provider_evidence.charge_events.length,1);
+ assert.equal(report.provider_evidence.contact_events.length,2);assert.equal(report.provider_evidence.current_orders[0].status,'closed');
+ assert.equal(report.provider_evidence.category_closures[0].category,'flatbed');
+ const types=report.provider_evidence.timeline.map(e=>e.event_type);
+ for(const type of ['PROVIDER_BILLING_ACCEPTED','LEAD_CHARGE_ACCEPTED','ORDER_CONTACT_RELEASED','ORDER_CONTACT_DENIED','ORDER_CLOSED','ORDER_CATEGORY_CLOSED','CONTACT_SHARING_WITHDRAWN'])assert.ok(types.includes(type),type);
+ const ids=report.provider_evidence.timeline.map(e=>String(e.id));assert.equal(new Set(ids).size,ids.length);
+ const text=JSON.stringify(report);for(const secret of ['private-master-token','private-order-token','private-owner-token'])assert.ok(!text.includes(secret));
+ const clientReport=await audit.exportForPhone(order.phone);assert.equal(clientReport.provider_evidence,null,'customer contact events do not grant a provider financial export');
+ const html=await ejs.renderFile(path.join(__dirname,'../src/views/admin/consent.ejs'),{phoneQuery:master.phone,report,recent:[],csrfToken:'test'});
+ assert.ok(html.includes('Доказательства по исполнителю'));assert.ok(html.includes('Тарифы приняты'));
+ // Removing a profile cannot remove the previously archived acceptance and charge.
+ await audit.recordAction({eventType:'MASTER_DELETED',phone:master.phone,masterId:master.id,metadata:{name:master.name}});
+ await pool.query('DELETE FROM masters WHERE id=$1',[master.id]);
+ const deleted=await audit.exportForPhone(master.phone);assert.equal(deleted.provider_evidence.billing_acceptance_events.length,1);
+ assert.equal(deleted.provider_evidence.charge_events.length,1);assert.equal(deleted.provider_evidence.transactions.length,0);
+ console.log('PASS: unified evidence, category/contact closure timeline, tariff/debit links, no access tokens, customer/provider isolation and deleted-profile audit');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

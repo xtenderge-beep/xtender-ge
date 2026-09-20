@@ -524,6 +524,7 @@ async function consentLog(req, res) {
 // Та же выгрузка, что отдаёт scripts/export-consent-log.js — скачивается файлом
 // для официального ответа регулятору (PDPS) или SMS-оператору.
 async function consentExport(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
   const phoneQuery = (req.query.phone || '').trim();
   if (!phoneQuery) return res.status(400).send('phone query param required');
 

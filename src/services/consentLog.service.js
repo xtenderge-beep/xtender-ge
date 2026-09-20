@@ -225,6 +225,7 @@ async function exportForPhone(rawPhone) {
 
   return {
     report_type: 'sms_consent_audit',
+    report_version: 2,
     generated_at_utc: new Date().toISOString(),
     terms_version_current: terms.version,
     privacy_version_current: privacy.version,
@@ -236,6 +237,7 @@ async function exportForPhone(rawPhone) {
     event_count: logs.rows.length,
     events: logs.rows,
     client_consents: logs.rows.filter(r => r.event_type === 'CLIENT_CONSENT_OTP_VERIFIED'),
+    provider_evidence: await require('./providerEvidence.service').collect(masters.rows, logs.rows),
   };
 }
 
