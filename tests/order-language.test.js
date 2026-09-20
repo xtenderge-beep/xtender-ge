@@ -54,9 +54,13 @@ const EN_TEXT = 'Need a move from Vake to Saburtalo, 2-bedroom apartment';
   orderService.getClosedCategories = async () => [];
   orderService.getOrderFunnelStats = async () => ({ view: 0, call: 0, whatsapp: 0 });
   masterService.getMasterById = async () => master;
+  masterService.getMasterByToken = async () => master;
+  const masterSession = require('../src/services/masterSession.service');
+  masterSession.token = async req => req.cookies.testSession ? 'mt-5' : null;
   settingsService.getLeadPriceTetri = async () => 50;
   const call = async (query, cookies = {}) => {
-    const res = { render(view, data) { this.data = data; return this; } };
+    const res = { set() {}, render(view, data) { this.data = data; return this; } };
+    if (query.master) cookies = { ...cookies, testSession: true };
     await controller.show({ params: { token: order.token }, query, cookies, lang: 'ka' }, res);
     return res.data;
   };

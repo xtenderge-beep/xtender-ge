@@ -202,16 +202,17 @@
             </div>
           <% } %>
           <div class="flex gap-2.5">
-            <a id="callBtn" href="tel:<%= order.phone %>" class="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
+            <button type="button" id="callBtn" class="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2">
               <i class="fa-solid fa-phone"></i><span><%= t('btn_call') %></span>
-            </a>
-            <a id="whatsappBtn" href="https://wa.me/<%= order.phone.replace(/\D/g, '') %>?text=<%= encodeURIComponent(whatsappText) %>" target="_blank" rel="noopener" class="flex-1 py-3.5 rounded-2xl bg-[#25d366] hover:brightness-95 text-white font-black text-sm shadow-lg transition flex items-center justify-center gap-2">
+            </button>
+            <button type="button" id="whatsappBtn" class="flex-1 py-3.5 rounded-2xl bg-[#25d366] hover:brightness-95 text-white font-black text-sm shadow-lg transition flex items-center justify-center gap-2">
               <i class="fa-brands fa-whatsapp"></i><span><%= t('btn_whatsapp') %></span>
-            </a>
+            </button>
           </div>
         <% } %>
 
         <div id="msg" class="hidden p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold"></div>
+        <a id="contactLogin" href="/master" class="hidden text-sm font-bold underline"><%= t('contact_signin') %></a>
       </div>
 
       <script>
@@ -269,8 +270,38 @@
 
         const callBtn = document.getElementById('callBtn');
         const whatsappBtn = document.getElementById('whatsappBtn');
-        if (callBtn) callBtn.addEventListener('click', () => logEvent('call'));
-        if (whatsappBtn) whatsappBtn.addEventListener('click', () => logEvent('whatsapp'));
+        let contactBusy = false;
+        async function requestContact(channel) {
+          if (contactBusy) return;
+          contactBusy = true;
+          const buttons = [callBtn, whatsappBtn].filter(Boolean);
+          buttons.forEach(b => { b.disabled = true; b.setAttribute('aria-busy', 'true'); });
+          msg.classList.add('hidden');
+          document.getElementById('contactLogin').classList.add('hidden');
+          try {
+            const response = await fetch('/api/orders/' + token + '/contact', {
+              method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ channel }),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+              msg.textContent = data.message || T.contact_invalid;
+              msg.classList.remove('hidden');
+              if (response.status === 401) document.getElementById('contactLogin').classList.remove('hidden');
+              return;
+            }
+            // Never store the returned number in the DOM or reuse it on a later click.
+            window.location.href = data.url;
+          } catch (_) {
+            msg.textContent = T.contact_network;
+            msg.classList.remove('hidden');
+          } finally {
+            contactBusy = false;
+            buttons.forEach(b => { b.disabled = false; b.removeAttribute('aria-busy'); });
+          }
+        }
+        if (callBtn) callBtn.addEventListener('click', () => requestContact('call'));
+        if (whatsappBtn) whatsappBtn.addEventListener('click', () => requestContact('whatsapp'));
 
         const closeBtn = document.getElementById('closeBtn');
         if (closeBtn) {

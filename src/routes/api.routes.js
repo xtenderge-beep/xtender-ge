@@ -16,6 +16,7 @@ router.post('/orders/:token/resubmit', asyncHandler(orderController.resubmit));
 router.post('/orders/:token/close', asyncHandler(orderController.close));
 router.post('/orders/:token/close-category', asyncHandler(orderController.closeCategory));
 router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
+router.post('/orders/:token/contact', asyncHandler(orderController.revealContact));
 
 router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));

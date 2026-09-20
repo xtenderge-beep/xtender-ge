@@ -11,6 +11,8 @@ const managerService = require('../services/manager.service');
 const settingsService = require('../services/settings.service');
 const translationService = require('../services/translation.service');
 const catalogSession = require('../services/catalogSession.service');
+const masterSession = require('../services/masterSession.service');
+const orderContact = require('../services/orderContact.service');
 const redis = require('../config/redis');
 const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
@@ -682,6 +684,7 @@ async function resubmit(req, res) {
 }
 
 async function show(req, res) {
+  masterSession.noStore(res);
   const { token } = req.params;
   const order = await orderService.getOrderByToken(token);
 
@@ -701,7 +704,9 @@ async function show(req, res) {
   }
 
   const isOwner = req.cookies[ownerCookieName(token)] === order.owner_token;
-  const masterId = req.query.master || null;
+  const sessionToken = await masterSession.token(req);
+  const sessionMaster = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
+  const masterId = !isOwner && sessionMaster ? sessionMaster.id : null;
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
   const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
@@ -715,7 +720,7 @@ async function show(req, res) {
   let masterCategory = null;
   let m = null;
   if (masterId && !isOwner) {
-    m = await masterService.getMasterById(Number(masterId));
+    m = sessionMaster;
     if (m) {
       masterCategory = m.category;
       if (!m.is_banned) {
@@ -754,6 +759,7 @@ async function show(req, res) {
 }
 
 async function showByOwnerToken(req, res) {
+  masterSession.noStore(res);
   const { ownerToken } = req.params;
   const order = await orderService.getOrderByOwnerToken(ownerToken);
 
@@ -905,29 +911,40 @@ async function closeCategory(req, res) {
   return res.json({ success: true, closedCategory: category, fullyClosed: order.status === 'closed' });
 }
 
-const ALLOWED_EVENT_TYPES = new Set(['view', 'call', 'whatsapp']);
 
 async function logView(req, res) {
+  masterSession.noStore(res);
   const { token } = req.params;
-  const { masterId, eventType } = req.body;
-
-  if (!masterId) {
-    return res.status(400).json({ success: false, message: 'masterId is required' });
-  }
+  const sessionToken = await masterSession.token(req);
+  const master = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
+  if (!master || master.is_banned) return res.status(401).json({ success: false });
+  // Contact actions are recorded only by the server when it actually releases a contact.
+  if (req.body.eventType !== 'view') return res.status(400).json({ success: false });
 
   const order = await orderService.getOrderByToken(token);
   if (!order) {
     return res.status(404).json({ success: false, message: 'Order not found' });
   }
 
-  const type = ALLOWED_EVENT_TYPES.has(eventType) ? eventType : 'view';
-  await orderService.logView(order.id, masterId, type);
+  await orderService.logView(order.id, master.id, 'view');
   telegramService.updateMessage(order).catch(() => {});
 
   return res.json({ success: true });
 }
 
+async function revealContact(req, res) {
+  masterSession.noStore(res);
+  const result = await orderContact.reveal(req.params.token, await masterSession.token(req), req.body.channel, requestMeta(req));
+  if (result.status !== 200) return res.status(result.status).json({ success: false, code: result.code,
+    message: clientStrings(req.lang)['contact_' + result.code] });
+  const phone = toE164(result.order.phone);
+  const url = req.body.channel === 'call' ? `tel:${phone}`
+    : `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(buildWhatsappText(result.order))}`;
+  return res.json({ success: true, url });
+}
+
 module.exports = {
+  revealContact,
   create,
   show,
   showByOwnerToken,
