@@ -126,8 +126,8 @@ async function verifyCode(phone, code, purpose = 'order', context = {}) {
           consentText: snapshot ? snapshot.text : context.consentText || null,
           metadata: snapshot ? {
             snapshot, terms_accepted: true, privacy_accepted: true, privacy_version: snapshot.privacy_version,
-            // Присутствует только для флоу с requireScroll (сейчас — регистрация исполнителя);
-            // для остальных ролей snapshot.termsScrolled === undefined, поле не пишется.
+            // Historical challenges may contain this flag. New signup uses explicit
+            // checkboxes; never invent a scroll event for a newer acceptance.
             ...(snapshot.termsScrolled !== undefined ? { terms_scroll_confirmed: snapshot.termsScrolled, terms_scroll_confirmed_at: snapshot.termsScrolledAt } : {}),
           } : context.metadata || null,
           providerMessageId: sendMeta.ref || null,

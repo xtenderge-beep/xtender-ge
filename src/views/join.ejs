@@ -132,31 +132,25 @@
                 </div>
                 <div data-signup-panel="4" class="space-y-3" hidden>
                 <% const legalPrefix = lang === 'ka' ? '' : '/' + lang; %>
-                <% consent.notices.forEach(notice => { %><p class="text-xs text-stone-600 leading-relaxed"><%= notice %></p><% }) %>
-                <p class="text-xs font-semibold text-stone-700 leading-relaxed"><%= consent.termsLabel %></p>
-                <div class="relative rounded-xl border border-stone-200 bg-stone-50 overflow-hidden">
-                    <div id="termsBody" tabindex="-1" class="h-72 sm:h-80 overflow-y-auto px-4 py-3 text-sm text-stone-700 leading-relaxed">
-                        <%- include('partials/legal-blocks', { blocks: legalDoc.body[lang] || legalDoc.body.ru, reqLabels, reqPending, requisites, lang }) %>
-                    </div>
-                    <div id="termsScrollFade" class="pointer-events-none absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-stone-50 to-transparent transition-opacity duration-300"></div>
-                    <div id="termsScrollHintPill" class="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center transition-opacity duration-300">
-                        <span class="flex items-center gap-1.5 bg-stone-900/85 text-white text-[11px] font-bold px-3 py-1.5 rounded-full shadow-lg animate-bounce">
-                            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i><%= t('join_terms_scroll_pill') %>
-                        </span>
-                    </div>
-                </div>
-                <p id="termsHint" class="text-[11px] text-stone-500 flex items-center gap-1.5">
-                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><%= t('join_terms_modal_hint') %></span>
-                </p>
-                <label class="flex items-start gap-2.5 text-xs text-stone-600 leading-snug cursor-pointer">
-                    <input type="checkbox" id="privacyCheckbox" class="mt-0.5 w-4 h-4 accent-emerald-600 shrink-0">
-                    <span><%= t('join_privacy_label') %> <a href="<%= legalPrefix %>/privacy" target="_blank" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
+                <ul class="space-y-2 text-sm text-stone-700 list-disc pl-5">
+                    <% consent.notices.forEach(notice => { %><li><%= notice %></li><% }) %>
+                </ul>
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-stone-200 text-sm cursor-pointer">
+                    <input type="checkbox" id="termsCheckbox" aria-describedby="termsError" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><%= consent.termsLabel %> <a href="<%= legalPrefix %>/terms" target="_blank" rel="noopener" class="text-emerald-700 underline"><%= t('signup_terms_link') %></a></span>
                 </label>
+                <p id="termsError" class="hidden text-xs text-red-700" role="alert"></p>
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-stone-200 text-sm cursor-pointer">
+                    <input type="checkbox" id="privacyCheckbox" aria-describedby="privacyError" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><%= consent.privacyLabel %> <a href="<%= legalPrefix %>/privacy" target="_blank" rel="noopener" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
+                </label>
+                <p id="privacyError" class="hidden text-xs text-red-700" role="alert"></p>
+                <p class="text-xs text-stone-500"><%= consent.confirmationHint %></p>
                 </div>
                 <div class="provider-signup-actions">
                     <button id="signupBack" type="button" onclick="changeSignupStep(signupStep - 1)" class="provider-signup-back" hidden><i class="fa-solid fa-arrow-left" aria-hidden="true"></i><%= t('otp_back') %></button>
                     <button id="signupNext" type="button" onclick="nextSignupStep()" class="provider-signup-next"><%= t('home_next') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
-                    <button id="sendOtpButton" type="button" disabled onclick="sendOtp()" class="provider-signup-next" hidden><span id="sendOtpButtonLabel"><%= t('join_terms_scroll_pill') %></span><i id="sendOtpButtonIcon" class="fa-solid fa-arrow-down" aria-hidden="true"></i></button>
+                    <button id="sendOtpButton" type="button" onclick="sendOtp()" class="provider-signup-next" hidden><span id="sendOtpButtonLabel"><%= t('signup_code') %></span><i id="sendOtpButtonIcon" class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
                 </div>
             </div>
 
@@ -168,7 +162,7 @@
                     class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none font-mono text-lg font-black tracking-[0.3em] text-center text-stone-900 bg-white">
                 <button id="verifyOtpButton" type="button" onclick="verifyAndRegister()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                     <i class="fa-solid fa-check"></i>
-                    <span><%= t('join_otp_confirm_btn') %></span>
+                    <span><%= t('signup_confirm') %></span>
                 </button>
                 <button id="otpBack" type="button" onclick="backToDetails()" class="mt-2 w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_back') %></button>
             </div>
@@ -240,36 +234,12 @@
                 description: document.getElementById('descriptionInput').value.trim(),
                 phone: document.getElementById('phoneInput').value.trim(),
                 promoCode: document.getElementById('promoInput').value.trim(),
-                termsAccepted: termsScrolled,
-                termsScrolled: termsScrolled,
+                termsAccepted: document.getElementById('termsCheckbox').checked,
                 privacyAccepted: document.getElementById('privacyCheckbox').checked,
             };
         }
 
-        // Договор — отдельный последний шаг мастера, не чекбокс рядом со ссылкой: кнопка
-        // «Получить код» внизу шага задизейблена, пока текст не долистан до конца.
-        // termsScrolled едет на сервер и перепроверяется там же (consent.service.js).
-        let termsScrolled = false;
-        const termsBody = document.getElementById('termsBody');
         const sendOtpButton = document.getElementById('sendOtpButton');
-
-        // Пилюля «прокрутите вниз» + градиент-«затухание» показывают, что текст не
-        // закончился, и обе подсказки убираются насовсем, как только долистали один раз —
-        // не мигают туда-обратно, если потом проскроллят назад перечитать что-то.
-        function checkTermsScrollEnd() {
-            if (termsScrolled) return;
-            const atEnd = termsBody.scrollTop + termsBody.clientHeight >= termsBody.scrollHeight - 8;
-            if (!atEnd) return;
-            termsScrolled = true;
-            sendOtpButton.disabled = false;
-            document.getElementById('sendOtpButtonLabel').textContent = T.join_submit_btn;
-            document.getElementById('sendOtpButtonIcon').className = 'fa-solid fa-arrow-right';
-            document.getElementById('termsScrollFade').classList.add('opacity-0');
-            document.getElementById('termsScrollHintPill').classList.add('opacity-0');
-            document.getElementById('termsHint').innerHTML =
-                '<i class="fa-solid fa-circle-check text-emerald-600" aria-hidden="true"></i><span>' + T.join_terms_modal_hint_done + '</span>';
-        }
-        termsBody.addEventListener('scroll', checkTermsScrollEnd);
 
         let signupStep = 0;
         let signupBusy = false;
@@ -296,7 +266,6 @@
             document.getElementById('signupTopbarBack').hidden = step === 0;
             document.getElementById('signupNext').hidden = step === LAST_STEP;
             sendOtpButton.hidden = step !== LAST_STEP;
-            if (step === LAST_STEP) checkTermsScrollEnd();
             if (focusTitle) {
                 document.getElementById('signupCard').scrollIntoView({ block: 'start' });
                 title.focus({ preventScroll: true });
@@ -306,7 +275,13 @@
         function signupError(step, message, selector) {
             changeSignupStep(step, false);
             showMsg(message, true);
-            document.querySelector(selector).focus();
+            const field = document.querySelector(selector);
+            field.focus();
+            if (step === 4) {
+                field.setAttribute('aria-invalid', 'true');
+                const hint = document.getElementById(field.id === 'termsCheckbox' ? 'termsError' : 'privacyError');
+                hint.textContent = message; hint.classList.remove('hidden');
+            }
             return false;
         }
 
@@ -326,8 +301,8 @@
                 if (!window.GeorgianPhone.validate(document.getElementById('phoneInput'))) return false;
             }
             if (step === 4) {
-                if (!payload.termsScrolled) return signupError(4, T.join_err_terms_required, '#termsBody');
-                if (!payload.privacyAccepted) return signupError(4, T.join_err_privacy_required, '#privacyCheckbox');
+                if (!payload.termsAccepted) return signupError(4, T.signup_terms_required, '#termsCheckbox');
+                if (!payload.privacyAccepted) return signupError(4, T.signup_privacy_required, '#privacyCheckbox');
             }
             return true;
         }
@@ -336,7 +311,13 @@
             if (!signupBusy && signupStep < LAST_STEP && validateSignupStep(signupStep)) changeSignupStep(signupStep + 1);
         }
 
-        document.getElementById('detailsStep').addEventListener('input', function () { showMsg(''); });
+        document.getElementById('detailsStep').addEventListener('input', function () {
+            showMsg('');
+            ['terms', 'privacy'].forEach(key => {
+                document.getElementById(key + 'Checkbox').removeAttribute('aria-invalid');
+                document.getElementById(key + 'Error').classList.add('hidden');
+            });
+        });
 
         function setSignupBusy(busy) {
             signupBusy = busy;
@@ -364,7 +345,7 @@
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, termsScrolled: payload.termsScrolled, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
+                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
             });
             const data = await res.json();
             if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
