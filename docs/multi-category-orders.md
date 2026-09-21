@@ -20,8 +20,9 @@
 - `orders.target_categories TEXT[]` — растёт по мере рассылки: каждый запуск
   `dispatch.service.dispatch` добавляет категорию (`order.service.addTargetCategories`).
   Заявка уходит категориям **по очереди**, а не одним действием.
-- `order_dispatches (order_id, category, vehicle_size)` с `UNIQUE` на все три
-  колонки — защита от повторной рассылки той же группе.
+- `order_dispatches (order_id, category, vehicle_size, language)` с уникальным индексом на все
+  четыре колонки — защита от повторной рассылки той же группе. `language` — кому направлена
+  рассылка: пусто — всем, иначе код языка ([dispatch-by-language.md](dispatch-by-language.md)).
 - `dispatch_runs` / `dispatch_deliveries` — кому именно ушёл лид
   (`status='accepted'` — доставлено и списано). Пишутся с 13.09.2026.
 - `order_views (order_id, master_id, event_type)` — клики мастера по заявке
@@ -77,7 +78,7 @@ reason)`, `PRIMARY KEY (order_id, category)` — одна строка на за
 
 `dispatch.service.preview` (а значит и `dispatch`) отказывает с
 «Эта категория заявки уже закрыта». Без этого была дыра: уникальный ключ
-`order_dispatches` включает размер транспорта, поэтому после закрытия
+`order_dispatches` включает размер транспорта и язык рассылки, поэтому после закрытия
 `transport` можно было запустить `transport/XL` после `transport/L`, и
 исполнители уже закрытой категории получили бы **платный** лид по заявке,
 которую для них закрыли. Закрытые категории также скрыты из формы рассылки в
