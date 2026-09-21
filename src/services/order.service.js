@@ -9,6 +9,7 @@ const billing = require('./providerBilling.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 const serviceMessage = require('../config/service-message-copy');
+const { speaks } = require('../config/spokenLanguages');
 
 // Цена лида теперь в БД (app_settings, правится в /admin/settings) — settingsService
 // её читает, тут только порог «баланс заканчивается» как множитель цены (~5 лидов).
@@ -137,12 +138,12 @@ async function getOrdersByTokens(tokens) {
   return rows;
 }
 
-async function recordDispatch(orderId, category, vehicleSize, revision = null) {
+async function recordDispatch(orderId, category, vehicleSize, revision = null, language = '') {
   try {
     return await pool.withTransaction(async client => {
       const claimed = await client.query("UPDATE orders SET status = 'new', first_dispatched_at = COALESCE(first_dispatched_at, NOW()) WHERE id = $1 AND status IN ('pending_review','new') AND ($2::integer IS NULL OR revision_version = $2) RETURNING id", [orderId, revision]);
       if (!claimed.rows.length) return false;
-      await client.query('INSERT INTO order_dispatches (order_id, category, vehicle_size) VALUES ($1, $2, $3)', [orderId, category, vehicleSize || '']);
+      await client.query('INSERT INTO order_dispatches (order_id, category, vehicle_size, language) VALUES ($1, $2, $3, $4)', [orderId, category, vehicleSize || '', language || '']);
       return true;
     });
   } catch (err) {
@@ -153,7 +154,7 @@ async function recordDispatch(orderId, category, vehicleSize, revision = null) {
 
 async function getOrderDispatches(orderId) {
   const { rows: dispatches } = await pool.query(
-    `SELECT category, vehicle_size FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at`,
+    `SELECT category, vehicle_size, language FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at`,
     [orderId]
   );
   if (!dispatches.length) return [];
@@ -167,11 +168,26 @@ async function getOrderDispatches(orderId) {
     return row ? row.count : 0;
   };
 
-  return dispatches.map((d) => ({
+  // Для рассылки по языку считаем тех же исполнителей, что получили бы её сейчас (та же выборка,
+  // что у dispatchFilter), но только говорящих на этом языке.
+  const leadPrice = dispatches.some((d) => d.language) ? await settingsService.getLeadPriceTetri() : 0;
+  const speakersFor = async (d) => {
+    const { activeWhere, catParams, catClause } = dispatchFilter(d.category, d.vehicle_size || null, order?.is_technical === true);
+    const { rows } = await pool.query(`SELECT spoken_languages FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+    return rows.filter((row) => speaks(row, d.language)).length;
+  };
+  return Promise.all(dispatches.map(async (d) => ({
     category: d.category,
     vehicle_size: d.vehicle_size,
-    master_count: d.vehicle_size ? sizedFor(d.category, d.vehicle_size) : totalFor(d.category),
-  }));
+    language: d.language,
+    master_count: d.language ? await speakersFor(d) : d.vehicle_size ? sizedFor(d.category, d.vehicle_size) : totalFor(d.category),
+  })));
+}
+
+// Кому по этой заявке уже ушёл платный лид (по списанию lead_charge) — им повторно не платят и не шлют.
+async function getChargedMasterIds(orderId) {
+  const { rows } = await pool.query("SELECT master_id FROM balance_transactions WHERE order_id = $1 AND reason = 'lead_charge'", [orderId]);
+  return new Set(rows.map((row) => row.master_id));
 }
 
 async function addTargetCategories(token, categories) {
@@ -386,7 +402,8 @@ function dispatchFilter(category, vehicleSize, isTechnical = false) {
 
  return { activeWhere, catParams, catClause };
 }
-async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false) {
+// language: '' — все исполнители группы, иначе только отметившие этот язык при регистрации.
+async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '') {
  const catalog = require('./category.service');
  const definition = await catalog.get(category);
  if (!definition?.is_active) return [];
@@ -394,15 +411,15 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
  const rates = await billing.pricing();
  if (rates.leadPriceTetri !== leadPrice) return [];
  const allowed = await billing.eligibleIds(rates);
- const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id, language FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
- const rows = result.rows.filter(master => allowed.has(master.id));
+ const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id, language, spoken_languages FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
+ const rows = result.rows.filter(master => allowed.has(master.id) && (!language || speaks(master, language)));
  if (!definition.is_builtin && rows.length) {
    const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
    return rows.filter(m=>services.some(s=>s.master_id===m.id && !catalog.validate(definition,s.attributes).errors.length));
  }
  return rows;
 }
-async function notifyMasters(order, category, vehicleSize, confirmedPrice = null) {
+async function notifyMasters(order, category, vehicleSize, confirmedPrice = null, language = '') {
   if (!order) return 0;
   // Always use persisted routing, never a flag supplied by a caller or old preview.
   order = await getOrderByToken(order.token);
@@ -411,7 +428,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const telegramService = require('./telegram.service');
   const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
   const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
-  const masters = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical);
+  const masters = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical, language);
   const run = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id', [order.id])).rows[0];
   for (const master of masters) await pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id) VALUES($1,$2,$3,$4)', [run.id,order.id,master.id,master.manager_id]);
   const notifiedIds = [];
@@ -471,9 +488,14 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
    }));
   }
   const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
-  const { rows: broke } = await pool.query('SELECT id FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1' + catClause, [leadPrice, ...catParams]);
+  // Прежние отправки этой же группы (другой язык): кого они уже учли, тому «упущенный лид» второй раз не засчитываем.
+  const { rows: earlier } = await pool.query('SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3 AND language <> $4', [order.id, category, vehicleSize || '', language || '']);
+  const { rows: broke } = await pool.query('SELECT id, spoken_languages FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1' + catClause, [leadPrice, ...catParams]);
   for (const candidate of broke) {
     if (notifiedIds.includes(candidate.id)) continue;
+    // Рассылка по языку не касается тех, кто на нём не говорит.
+    if (language && !speaks(candidate, language)) continue;
+    if (earlier.some((e) => !e.language || speaks(candidate, e.language))) continue;
     await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
       if (!master.is_active || master.is_banned || !master.is_subscribed || master.balance_tetri >= leadPrice) return;
       if (!await billing.accepted(master.id, await billing.pricing(client), client)) return;
@@ -529,6 +551,7 @@ module.exports = {
   getOrdersByTokens,
   addTargetCategories,
   recordDispatch,
+  getChargedMasterIds,
   getOrderDispatches,
   markFirstDispatch,
   setModerationMessageId,

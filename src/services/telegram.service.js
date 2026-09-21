@@ -4,6 +4,7 @@ const managerService = require('./manager.service');
 const { getBaseUrl } = require('../config/url');
 const { translate } = require('../config/i18n');
 const requestLanguage = require('../config/requestLanguage');
+const { speakLabels, dispatchChoices } = require('../config/spokenLanguages');
 
 const API_BASE = 'https://api.telegram.org/bot';
 // Буквы и их порядок — src/config/serviceTypes.js (фиксированы, см. CHECK-констрейнты
@@ -73,13 +74,13 @@ async function buildKeyboardWithCounts(token, page = 0) {
   const pages = Math.max(1, Math.ceil(entries.length / 20));
   page = Number.isSafeInteger(page) ? Math.max(0, Math.min(page, pages - 1)) : 0;
   const visible = entries.slice(page * 20, (page + 1) * 20);
-  const rows = visible.map(([key,label]) => [{text: label+' ('+total(key)+')', callback_data: 'cat:'+token+':'+key}]);
+  const rows = visible.map(([key,label]) => [{text: label+' ('+total(key)+')', callback_data: 'pick:'+token+':'+key}]);
   if (visible.some(([key])=>key==='transport') && transportSizes.length) {
     transportSizes.forEach((row) => {
       rows.push([
         {
           text: `🚚 ${row.vehicle_size} ${sizeSpec(row.vehicle_size)} (${row.count})`,
-          callback_data: `cat:${token}:transport:${row.vehicle_size}`,
+          callback_data: `pick:${token}:transport:${row.vehicle_size}`,
         },
       ]);
     });
@@ -101,6 +102,35 @@ async function buildKeyboardWithCounts(token, page = 0) {
   rows.push([{ text: '🔄 Обновить категории', callback_data: 'cats_refresh:'+token }]);
   rows.push([{ text: '✏️ Проверить / вернуть на доработку', url: getBaseUrl() + '/admin/orders/' + encodeURIComponent(token) }]);
   return { inline_keyboard: rows };
+}
+
+// Второй шаг рассылки: после нажатия на категорию модератор выбирает, кому отправить — всем или тем,
+// кто отметил нужный язык. Числа — сколько исполнителей получат заявку сейчас (те же, что в
+// предпросмотре в админке: без уже получивших эту заявку и с достаточным балансом). Кнопка выбора
+// шлёт `cat:<token>:<группа>:<размер>:<версия>:<язык>`; `all` — всем, как раньше.
+async function buildLanguageKeyboard(order, category, sizeCode = '') {
+  const plan = await require('./dispatch.service').preview(order.token, category, sizeCode || '', '');
+  const revision = order.revision_version || 0;
+  const pick = (language) => ['cat', order.token, category, sizeCode || '', revision, language].join(':');
+  const labels = await require('./category.service').groups(true);
+  const label = (language, text, count) => (plan.sentLanguages.includes(language) ? `✅ ${text} · отправлено` : `${text} (${count})`);
+  const rows = [
+    [{ text: `${labels[category] || category}${sizeCode ? ' · ' + sizeCode : ''} — кому отправить?`, callback_data: 'pick_head:' + order.token }],
+    [{ text: label('', '👥 Все', plan.count), callback_data: pick('all') }],
+    ...dispatchChoices.map((code) => [{ text: label(code, `🗣 Говорят ${speakLabels[code]}`, plan.languages.byLanguage[code] || 0), callback_data: pick(code) }]),
+  ];
+  // Кто не отметил языки, при выборе языка заявку не получит — показываем, сколько таких.
+  if (plan.languages.none) rows.push([{ text: `❔ Язык не указан: ${plan.languages.none}`, callback_data: `lang_info:${order.token}:${plan.languages.none}` }]);
+  rows.push([{ text: '← К категориям', callback_data: 'cats_refresh:' + order.token }]);
+  return { inline_keyboard: rows };
+}
+
+async function showLanguagePicker(order, chatId, messageId, category, sizeCode = '') {
+  if (!isEnabled()) return;
+  const keyboard = await buildLanguageKeyboard(order, category, sizeCode);
+  try {
+    await axios.post(apiUrl('editMessageReplyMarkup'), { chat_id: chatId, message_id: messageId, reply_markup: keyboard });
+  } catch (error) { if (!String(error.response?.data?.description || '').includes('not modified')) throw error; }
 }
 
 // Модератору показываем русский перевод (если заявка не на русском) + строку оригинала.
@@ -129,7 +159,7 @@ async function notifyModerator(order) {
     `📞 ${order.phone}`,
     `🔗 ${base}/order/${order.token}`,
     '',
-    'Можно нажимать несколько кнопок — каждая шлёт заявку своей категории.',
+    'Нажмите категорию, затем выберите, кому отправить: всем или тем, кто говорит на нужном языке. Можно отправить несколько категорий.',
   ].join('\n');
   const keyboard = await buildKeyboardWithCounts(order.token);
 
@@ -434,9 +464,10 @@ async function sendLeadToMaster(master, order, link) {
   }
 }
 
-function formatDispatchLine(category, vehicleSize, masterCount) {
+function formatDispatchLine(category, vehicleSize, masterCount, language = '') {
   let label = CATEGORY_LABELS[category] || category;
   if (vehicleSize) label += ` (${SIZE_LABELS[vehicleSize] || vehicleSize})`;
+  if (language) label += ` · говорят ${speakLabels[language] || language}`;
   return `➡️ ${label} — отправлено ${masterCount}`;
 }
 
@@ -506,7 +537,7 @@ async function refreshMessage(order, keyboard) {
 
   const dispatches = await orderService.getOrderDispatches(order.id).catch(() => []);
   const labels = await require('./category.service').groups(true);
-  const dispatchLines = dispatches.map(d => (labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+' — '+d.master_count);
+  const dispatchLines = dispatches.map(d => (labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+(d.language ? ' · говорят '+(speakLabels[d.language] || d.language) : '')+' — '+d.master_count);
   const funnel = await orderService.getOrderFunnelStats(order.id);
   // Разбивка по группам — дополнение к общей воронке: если её запрос упал, сообщение всё
   // равно обновится прежней общей воронкой, а не останется устаревшим.
@@ -560,6 +591,8 @@ async function setWebhook() {
 module.exports = {
   isEnabled,
   buildKeyboardWithCounts,
+  buildLanguageKeyboard,
+  showLanguagePicker,
   refreshCategories,
   notifyModerator,
   notifyModeratorNewMaster,

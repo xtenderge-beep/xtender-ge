@@ -150,7 +150,44 @@ async function listMastersAdmin() {
               m.banned_reason, m.balance_tetri, m.created_at, lt.last_topup_at
      ORDER BY m.id`
   );
-  return rows;
+  // Языки — отдельным запросом и склейкой в JS, как master_services в каталоге: jsonb в GROUP BY pg-mem не тянет.
+  const langRows = await pool.query('SELECT id, registration_language, spoken_languages FROM masters');
+  const langs = new Map(langRows.rows.map(r => [r.id, r]));
+  return rows.map(m => {
+    const l = langs.get(m.id) || {};
+    return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null };
+  });
+}
+
+// Сколько исполнителей говорит на каждом языке и с какого языка сайта они регистрировались.
+// Считаем тех, кто вообще может получать заявки: без технических тестовых аккаунтов и забаненных.
+function languageSummary(masters) {
+  const spoken = Object.create(null);
+  const site = Object.create(null);
+  let total = 0, spokenNone = 0, siteNone = 0;
+  for (const m of masters) {
+    if (m.is_technical || m.is_banned) continue;
+    total++;
+    const langs = m.spoken_languages || [];
+    if (!langs.length) spokenNone++;
+    for (const code of langs) spoken[code] = (spoken[code] || 0) + 1;
+    if (m.registration_language) site[m.registration_language] = (site[m.registration_language] || 0) + 1;
+    else siteNone++;
+  }
+  return { total, spoken, spokenNone, site, siteNone };
+}
+
+// lang — язык, на котором исполнитель говорит; site — язык сайта при регистрации. Для обоих
+// 'none' = «не указано / не записано». Пустое значение — фильтр выключен.
+function filterByLanguage(masters, { lang = '', site = '' } = {}) {
+  return masters.filter(m => {
+    const spoken = m.spoken_languages || [];
+    if (lang === 'none' && spoken.length) return false;
+    if (lang && lang !== 'none' && !spoken.includes(lang)) return false;
+    if (site === 'none' && m.registration_language) return false;
+    if (site && site !== 'none' && m.registration_language !== site) return false;
+    return true;
+  });
 }
 
 async function getMasterDetail(id) {
@@ -210,7 +247,7 @@ async function getOrderDetailAdmin(token) {
 
   const [dispatches, funnel, charges, closures] = await Promise.all([
     pool.query(
-      'SELECT category, vehicle_size, dispatched_at FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at',
+      'SELECT category, vehicle_size, language, dispatched_at FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at',
       [order.id]
     ),
     pool.query(
@@ -248,6 +285,8 @@ module.exports = {
   getStatsForRange,
   getResponseStats,
   listMastersAdmin,
+  languageSummary,
+  filterByLanguage,
   getMasterDetail,
   getMasterBalanceHistory,
   setMasterBanned,

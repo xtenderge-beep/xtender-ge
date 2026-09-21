@@ -35,6 +35,12 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS spoken_languages JSONB NOT NULL DEF
 -- приходит по SMS и часто открывается в другом браузере/устройстве без этой куки.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS language VARCHAR(2) NOT NULL DEFAULT 'ka' CONSTRAINT masters_language_check CHECK (language IN ('ka','ru','en'));
 
+-- Язык сайта при ПЕРВОЙ регистрации. В отличие от `language` выше не меняется: тот исполнитель
+-- переключает в кабинете, его же перезаписывает повторная регистрация. Нужен, чтобы понимать,
+-- откуда человек пришёл (сегментация: кому на каком языке писать). NULL у зарегистрированных
+-- раньше — «не записан» (IS NULL в CHECK явный: pg-mem иначе считает NULL нарушением): у них `language` равен значению по умолчанию 'ka' и ничего не значит.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS registration_language VARCHAR(2) CONSTRAINT masters_registration_language_check CHECK (registration_language IS NULL OR registration_language IN ('ka','ru','en'));
+
 CREATE TABLE IF NOT EXISTS orders (
     id SERIAL PRIMARY KEY,
     district_id INTEGER REFERENCES districts(id) ON DELETE RESTRICT,
@@ -72,7 +78,7 @@ CREATE TABLE IF NOT EXISTS order_dispatches (
     category VARCHAR(50) NOT NULL,
     vehicle_size VARCHAR(20) NOT NULL DEFAULT '',
     dispatched_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (order_id, category, vehicle_size)
+    CONSTRAINT order_dispatches_order_id_category_vehicle_size_key UNIQUE (order_id, category, vehicle_size)
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_files_order_id ON order_files(order_id);
@@ -127,6 +133,15 @@ ALTER TABLE order_dispatches ALTER COLUMN vehicle_size SET NOT NULL;
 ALTER TABLE order_dispatches DROP CONSTRAINT IF EXISTS order_dispatches_vehicle_size_check;
 ALTER TABLE order_dispatches ADD CONSTRAINT order_dispatches_vehicle_size_check
     CHECK (vehicle_size IN ('', 'S', 'M', 'L', 'XL', 'XXL'));
+
+-- Кому направлена рассылка: '' — всем исполнителям группы, иначе код языка (ru/ka/en/…), по
+-- masters.spoken_languages. Язык входит в уникальный ключ: заявку можно сначала отправить тем,
+-- кто говорит по-русски, а потом всем — уже получившие второй раз не платят (см. notifyMasters).
+-- Старый ключ без языка снимаем после создания нового, чтобы ни на миг не остаться без защиты
+-- от дублей; на настоящем Postgres его могли назвать иначе — см. schema.postgres.sql.
+ALTER TABLE order_dispatches ADD COLUMN IF NOT EXISTS language VARCHAR(5) NOT NULL DEFAULT '';
+CREATE UNIQUE INDEX IF NOT EXISTS uq_order_dispatches_group ON order_dispatches (order_id, category, vehicle_size, language);
+ALTER TABLE order_dispatches DROP CONSTRAINT IF EXISTS order_dispatches_order_id_category_vehicle_size_key;
 
 -- Отдельный секретный токен владельца заявки: ссылка в SMS клиенту работает с любого
 -- устройства/браузера без привязки к куке (в отличие от куки, mastera его никогда не видят,

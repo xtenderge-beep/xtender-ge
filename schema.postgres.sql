@@ -51,3 +51,16 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trg_preserve_order_routing ON orders;
 CREATE TRIGGER trg_preserve_order_routing BEFORE UPDATE ON orders
  FOR EACH ROW EXECUTE PROCEDURE preserve_order_routing();
+
+-- Прежний уникальный ключ order_dispatches без языка (order_id, category, vehicle_size). schema.sql
+-- снимает его по ожидаемому имени; если на боевой базе имя получилось другим, находим по составу.
+-- Новый ключ с языком — уникальный индекс uq_order_dispatches_group, он не constraint и сюда не попадает.
+DO $$
+DECLARE old_key text;
+BEGIN
+    FOR old_key IN SELECT conname FROM pg_constraint
+        WHERE conrelid = 'order_dispatches'::regclass AND contype = 'u' AND cardinality(conkey) = 3
+    LOOP
+        EXECUTE format('ALTER TABLE order_dispatches DROP CONSTRAINT %I', old_key);
+    END LOOP;
+END $$;

@@ -194,7 +194,12 @@ async function mastersList(req, res) {
   const masters = await adminService.listMastersAdmin();
   const labels = await require('../services/category.service').groups(true);
   masters.forEach(m=>m.category_label=labels[m.category] || m.category || 'Категория не назначена');
-  res.render('admin/masters', { masters: req.query.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters });
+  const { options, ruNames } = require('../config/spokenLanguages');
+  // Фильтры приходят из адресной строки — принимаем только известные коды.
+  const known = (value, codes) => (typeof value === 'string' && (value === 'none' || codes.includes(value)) ? value : '');
+  const filter = { status: req.query.status === 'pending' ? 'pending' : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
+  const scoped = filter.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters;
+  res.render('admin/masters', { masters: adminService.filterByLanguage(scoped, filter), languageSummary: adminService.languageSummary(masters), languageNames: ruNames, filter });
 }
 
 async function masterDetail(req, res) {
@@ -212,6 +217,7 @@ async function masterDetail(req, res) {
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
     vanSizes: vanSizeThresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
+    languageNames: require('../config/spokenLanguages').ruNames,
     master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
@@ -320,7 +326,7 @@ async function orderDetail(req, res) {
   res.locals.revisionNotice = req.query.revisionNotice === 'failed' ? 'failed' : req.query.revisionNotice === 'sent' ? 'sent' : null;
   const order = await adminService.getOrderDetailAdmin(req.params.token);
   if (!order) return res.status(404).send('Заявка не найдена');
-  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups() });
+  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups(), speakLabels: require('../config/spokenLanguages').speakLabels });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -663,13 +669,13 @@ async function cancelTopup(req, res) {
 }
 async function dispatchPreview(req,res) {
   let plan=null, error=null;
-  try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || ''); } catch(err) { error=err.message; }
-  res.status(error ? 400 : 200).render('admin/dispatch',{token:req.params.token,plan,error,result:null,groups:await require('../services/category.service').groups()});
+  try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || '', req.query.language || ''); } catch(err) { error=err.message; }
+  res.status(error ? 400 : 200).render('admin/dispatch',{token:req.params.token,plan,error,result:null,groups:await require('../services/category.service').groups(),speakLabels:require('../config/spokenLanguages').speakLabels,emptyReason:dispatchService.emptyReason});
 }
 async function dispatchOrder(req,res) {
   let result=null,error=null;
-  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision}); } catch(err) { error=err.message; }
-  res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:await require('../services/category.service').groups()});
+  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || ''); } catch(err) { error=err.message; }
+  res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:await require('../services/category.service').groups(),speakLabels:require('../config/spokenLanguages').speakLabels,emptyReason:dispatchService.emptyReason});
 }
 async function updateWelcomeBonus(req, res) {
   const raw = String(req.body.welcomeBonusGel || '').trim();

@@ -9,11 +9,15 @@
 <p><%= plan.order.description %></p>
 <% if(plan.recipients && plan.recipients.length) { %><details><summary>Показать получателей</summary><ul><% plan.recipients.forEach(m=>{ %><li>#<%= m.id %> · <%= m.phone %> · <%= m.telegram_id ? 'Telegram (резерв: SMS)' : 'SMS' %></li><% }) %></ul></details><% } %>
 <p>Группа: <strong><%= groups[plan.category] %><%= plan.size ? ' · '+plan.size : '' %></strong></p>
+<p>Кому: <strong><%= plan.language ? 'говорят ' + speakLabels[plan.language] : 'все исполнители группы' %></strong></p>
+<% const choose = function (language) { return '/admin/orders/' + encodeURIComponent(token) + '/dispatch?category=' + encodeURIComponent(plan.category) + '&size=' + encodeURIComponent(plan.size) + (language ? '&language=' + language : ''); }; %>
+<p class="text-xs">Выбрать другого адресата: <a href="<%= choose('') %>" class="text-emerald-700 underline">все (<%= plan.languages.all %>)</a><% Object.keys(speakLabels).filter(function (code) { return ['ru', 'ka', 'en'].includes(code) || plan.languages.byLanguage[code]; }).forEach(function (code) { %> · <a href="<%= choose(code) %>" class="text-emerald-700 underline">говорят <%= speakLabels[code] %> (<%= plan.languages.byLanguage[code] || 0 %>)</a><% }); %><% if (plan.languages.none) { %> · язык не указан у <%= plan.languages.none %> (получат заявку только при выборе «все»)<% } %></p>
+<% if (plan.alreadyReceived) { %><p class="text-xs">Уже получили эту заявку раньше и повторно не платят: <strong><%= plan.alreadyReceived %></strong>.</p><% } %>
 <p>Получателей с достаточным балансом: <strong><%= plan.count %></strong><br>Тариф каждому: <strong><%= (plan.price/100).toFixed(2) %> ₾</strong><br>Расчётное списание по группе: <strong><%= (plan.count*plan.price/100).toFixed(2) %> ₾</strong></p>
 <p>Рассылка по категории в Тбилиси. Районы профиля не ограничивают эту группу. Используется Telegram, при его отсутствии или ошибке — SMS. Списание за отправленную заявку, независимо от сделки.</p>
 <% if(plan.alreadySent) { %><p>Рассылка этой группе уже запускалась. Повторная отправка заблокирована.</p><% } else if(plan.count) { %>
 <form method="POST" action="/admin/orders/<%= token %>/dispatch" class="admin-filter" onsubmit="this.querySelector('button').disabled=true">
-<input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="revision" value="<%= plan.order.revision_version || 0 %>"><input type="hidden" name="count" value="<%= plan.count %>">
-<button type="submit">Отправить группе и списать баланс</button></form><% } else { %><p>Нет подходящих получателей. Попробуйте другую группу.</p><% } %>
+<input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="language" value="<%= plan.language %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="revision" value="<%= plan.order.revision_version || 0 %>"><input type="hidden" name="count" value="<%= plan.count %>">
+<button type="submit">Отправить группе и списать баланс</button></form><% } else { %><p><%= emptyReason(plan) %>. Попробуйте другого адресата или другую группу.</p><% } %>
 <% } %></section>
 <%- include('./_footer') %>

@@ -19,6 +19,7 @@ const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const requestLanguage = require('../config/requestLanguage');
+const { parseDispatchLanguage } = require('../config/spokenLanguages');
 
 // Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
 // (он сам писал заявку) + текст заявки в оригинале. Уходит в wa.me/<номер>?text=...
@@ -626,6 +627,40 @@ async function telegramWebhook(req, res) {
       await telegramService.answerCallback(callback.id, 'Категории обновлены');
       return res.sendStatus(200);
     }
+    // Заголовок и справка выбора адресата: кнопки без действия, отвечаем подсказкой.
+    if (callback.data.startsWith('pick_head:') || callback.data.startsWith('lang_info:')) {
+      const [kind, , count] = callback.data.split(':');
+      await telegramService.answerCallback(callback.id, kind === 'lang_info'
+        ? `У ${Number(count) || 0} исполнителей язык не указан: они получат заявку только при выборе «Все».`
+        : 'Выберите язык или «Все».');
+      return res.sendStatus(200);
+    }
+
+    // Нажатие на категорию открывает выбор адресата: «Все» или язык. Рассылка ещё не идёт.
+    if (callback.data.startsWith('pick:')) {
+      const pickChat = String(callback.message?.chat?.id || '');
+      const pickAllowed = pickChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
+      if (!pickAllowed) { await telegramService.answerCallback(callback.id, 'Нет доступа'); return res.sendStatus(200); }
+      const [, pickToken, pickCategoryRaw, pickSizeRaw, pickRevisionRaw] = callback.data.split(':');
+      const pickCategory = (await require('../services/category.service').get(pickCategoryRaw))?.is_active ? pickCategoryRaw : null;
+      const pickSize = pickSizeRaw && ALLOWED_SIZES.has(pickSizeRaw) ? pickSizeRaw : null;
+      const pickOrder = await orderService.getOrderByToken(pickToken);
+      if (!pickCategory) { await telegramService.answerCallback(callback.id, 'Некорректная категория'); return res.sendStatus(200); }
+      if (!pickOrder || !['pending_review','new'].includes(pickOrder.status) || Number(pickRevisionRaw || 0) !== Number(pickOrder.revision_version || 0)) {
+        await telegramService.answerCallback(callback.id, 'Заявка закрыта или не найдена');
+        return res.sendStatus(200);
+      }
+      try {
+        await telegramService.showLanguagePicker(pickOrder, pickChat, callback.message.message_id, pickCategory, pickSize || '');
+        await telegramService.answerCallback(callback.id);
+      } catch (err) {
+        console.error('Language picker failed:', err.message);
+        await telegramService.answerCallback(callback.id, err.message);
+        await telegramService.refreshCategories(pickOrder, pickChat, callback.message.message_id).catch(() => {});
+      }
+      return res.sendStatus(200);
+    }
+
     if (!callback.data.startsWith('cat:')) {
       return res.sendStatus(200);
     }
@@ -633,12 +668,18 @@ async function telegramWebhook(req, res) {
     const callbackChat = String(callback.message?.chat?.id || '');
     const allowedModerator = callbackChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
     if (!allowedModerator) { await telegramService.answerCallback(callback.id, 'Нет доступа'); return res.sendStatus(200); }
-    const [, token, categoryRaw, sizeRaw, revisionRaw] = callback.data.split(':');
+    const [, token, categoryRaw, sizeRaw, revisionRaw, languageRaw] = callback.data.split(':');
     const category = (await require('../services/category.service').get(categoryRaw))?.is_active ? categoryRaw : null;
     const vehicleSize = sizeRaw && ALLOWED_SIZES.has(sizeRaw) ? sizeRaw : null;
+    // Кнопки из старых сообщений (до выбора языка) приходят без языка — это «всем», как и раньше.
+    const language = parseDispatchLanguage(languageRaw);
 
     if (!category) {
       await telegramService.answerCallback(callback.id, 'Некорректная категория');
+      return res.sendStatus(200);
+    }
+    if (language === null) {
+      await telegramService.answerCallback(callback.id, 'Некорректный язык рассылки');
       return res.sendStatus(200);
     }
 
@@ -648,17 +689,27 @@ async function telegramWebhook(req, res) {
       return res.sendStatus(200);
     }
 
+    // После успешной рассылки клавиатура вернётся к категориям сама (updateMessage); при отказе
+    // возвращаем её здесь, иначе у модератора остаётся выбор языка.
+    let answered = false;
+    const answer = (text) => { answered = true; return telegramService.answerCallback(callback.id, text); };
+    const restoreCategories = () => telegramService.refreshCategories(order, callbackChat, callback.message?.message_id)
+      .catch(err => console.error('Category keyboard restore failed:', err.message));
     try {
-      const plan = await require('../services/dispatch.service').preview(token, category, vehicleSize);
+      const dispatchService = require('../services/dispatch.service');
+      const plan = await dispatchService.preview(token, category, vehicleSize, language);
       if (plan.alreadySent || !plan.count) {
-        await telegramService.answerCallback(callback.id, plan.alreadySent ? 'Рассылка этой группе уже запускалась' : 'Нет получателей с достаточным балансом');
+        await answer(plan.alreadySent ? 'Рассылка этой группе уже запускалась' : dispatchService.emptyReason(plan));
+        await restoreCategories();
         return res.sendStatus(200);
       }
-      await telegramService.answerCallback(callback.id, 'Запускаем рассылку…');
-      const result = await require('../services/dispatch.service').dispatch(token, category, vehicleSize, { price: plan.price, count: plan.count, revision: Number(revisionRaw || 0) });
+      await answer('Запускаем рассылку…');
+      const result = await dispatchService.dispatch(token, category, vehicleSize, { price: plan.price, count: plan.count, revision: Number(revisionRaw || 0) }, language);
       console.log('Dispatch completed:', token, result.count);
     } catch (err) {
       console.error('Dispatch rejected or incomplete:', err.message);
+      if (!answered) await answer(err.message);
+      await restoreCategories();
     }
 
     return res.sendStatus(200);

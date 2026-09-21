@@ -2,6 +2,33 @@
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Специалисты (<%= masters.length %>)</h1>
 
+<%# Сводка по языкам: то, на чём строится решение «кому какую рассылку». Каждая плашка — фильтр списка. %>
+<% const href = function (over) { const q = Object.assign({}, filter, over); const p = new URLSearchParams(); Object.keys(q).forEach(function (k) { if (q[k]) p.set(k, q[k]); }); const s = p.toString(); return '/admin/masters' + (s ? '?' + s : ''); }; %>
+<% const chip = function (on) { return 'px-3 py-2 text-xs font-bold rounded-xl transition ' + (on ? 'bg-emerald-600 text-white' : 'bg-stone-100 hover:bg-stone-200 text-stone-700'); }; %>
+<% const main = ['ru', 'ka', 'en']; %>
+<% const spokenCodes = main.concat(Object.keys(languageNames).filter(function (c) { return main.indexOf(c) === -1 && languageSummary.spoken[c]; })); %>
+<section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4 space-y-3" aria-label="Языки исполнителей">
+    <div>
+        <p class="text-xs text-stone-500 mb-2">Говорят на языке (отмечено при регистрации)</p>
+        <div class="flex flex-wrap gap-2">
+            <% spokenCodes.forEach(function (code) { %>
+                <a href="<%= href({ lang: filter.lang === code ? '' : code }) %>" class="<%= chip(filter.lang === code) %>"><%= languageNames[code] %> <b><%= languageSummary.spoken[code] || 0 %></b></a>
+            <% }); %>
+            <a href="<%= href({ lang: filter.lang === 'none' ? '' : 'none' }) %>" class="<%= chip(filter.lang === 'none') %>">Не указали <b><%= languageSummary.spokenNone %></b></a>
+        </div>
+    </div>
+    <div>
+        <p class="text-xs text-stone-500 mb-2">Регистрировались с сайта на языке</p>
+        <div class="flex flex-wrap gap-2">
+            <% main.forEach(function (code) { %>
+                <a href="<%= href({ site: filter.site === code ? '' : code }) %>" class="<%= chip(filter.site === code) %>"><%= languageNames[code] %> <b><%= languageSummary.site[code] || 0 %></b></a>
+            <% }); %>
+            <a href="<%= href({ site: filter.site === 'none' ? '' : 'none' }) %>" class="<%= chip(filter.site === 'none') %>">Не записано <b><%= languageSummary.siteNone %></b></a>
+        </div>
+    </div>
+    <p class="text-xs text-stone-500">Считаем <%= languageSummary.total %> исполнителей без 🧪 технических и забаненных. «Не записано» — те, кто зарегистрировался раньше, чем сайт начал запоминать язык.<% if (filter.lang || filter.site) { %> <a href="<%= href({ lang: '', site: '' }) %>" class="font-bold text-emerald-700 hover:text-emerald-800">Сбросить фильтр языка</a><% } %></p>
+</section>
+
 <div class="space-y-3">
     <% masters.forEach(function (m) { %>
       <div class="bg-white rounded-2xl border border-stone-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
@@ -22,6 +49,10 @@
                   · рейтинг <%= m.rating %> (<%= m.review_count %>)
                   · баланс <b class="text-stone-800"><%= (m.balance_tetri / 100).toFixed(2) %> ₾</b>
                   · <%= m.last_topup_at ? 'пополнял ' + new Date(m.last_topup_at).toLocaleDateString('ru') : 'ни разу не пополнял' %>
+              </p>
+              <p class="text-xs text-stone-500 mt-1">
+                  Говорит: <% if (m.spoken_languages.length) { %><b class="text-stone-800"><%= m.spoken_languages.map(function (c) { return languageNames[c] || c; }).join(', ') %></b><% } else { %>не указано<% } %>
+                  · интерфейс при регистрации: <% if (m.registration_language) { %><b class="text-stone-800"><%= languageNames[m.registration_language] || m.registration_language %></b><% } else { %>не записан<% } %>
               </p>
           </div>
           <% if (!m.is_active && !m.is_banned) { %>

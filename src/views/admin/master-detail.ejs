@@ -1,6 +1,6 @@
 <%- include('./_header', { active: 'masters' }) %>
 
-<section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Языки общения</h2><p class="text-sm mt-2"><%= (master.spoken_languages || []).map(code => ({ka:'Грузинский',ru:'Русский',en:'Английский',hy:'Армянский',az:'Азербайджанский',tr:'Турецкий',uk:'Украинский'})[code] || code).join(', ') || 'Не указаны' %></p></section>
+<section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Языки общения</h2><p class="text-sm mt-2"><%= (master.spoken_languages || []).map(code => languageNames[code] || code).join(', ') || 'Не указаны' %></p><p class="text-xs text-stone-500 mt-1">Интерфейс сайта при регистрации: <%= master.registration_language ? (languageNames[master.registration_language] || master.registration_language) : 'не записан' %><% if (master.registration_language && master.language && master.language !== master.registration_language) { %> · сейчас в кабинете: <%= languageNames[master.language] || master.language %><% } %></p></section>
 
 <section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Города работы</h2><p class="text-sm mt-2"><%= (master.work_cities || []).map(c => c.name_ru).join(', ') || 'Не указаны' %></p></section>
 

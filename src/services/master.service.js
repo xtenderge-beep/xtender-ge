@@ -61,8 +61,11 @@ async function registerMaster({
     // регистрации тем же приёмом, что и остальной профиль (см. комментарий выше).
     if (language) {
       const normalized = require('../config/i18n').normalizeLang(language);
-      await client.query('UPDATE masters SET language = $1 WHERE id = $2', [normalized, master.id]);
+      // registration_language пишется один раз (см. schema.sql): повторная регистрация меняет только
+      // `language`, а у аккаунта без записи заполняет пустое.
+      await client.query('UPDATE masters SET language = $1, registration_language = COALESCE(registration_language, $3) WHERE id = $2', [normalized, master.id, normalized]);
       master.language = normalized;
+      master.registration_language = master.registration_language || normalized;
     }
     if (spokenLanguages !== null) {
       const languages = require('../config/spokenLanguages').parse(spokenLanguages);
