@@ -314,6 +314,13 @@ async function approveMaster(id) {
   });
 }
 
+// Обратный ход approveMaster — админ может вернуть уже одобренного специалиста
+// на модерацию (например, если одобрили по ошибке или нужно перепроверить анкету).
+async function unapproveMaster(id) {
+  const { rows } = await pool.query('UPDATE masters SET is_active = false WHERE id = $1 RETURNING *', [id]);
+  return rows[0] || null;
+}
+
 async function setMasterLanguage(id, language) {
   const normalized = require('../config/i18n').normalizeLang(language);
   await pool.query('UPDATE masters SET language = $1 WHERE id = $2', [normalized, id]);
@@ -545,6 +552,7 @@ module.exports = {
   linkTelegram,
   unlinkTelegram,
   approveMaster,
+  unapproveMaster,
   updateMasterProfile,
   deleteMaster,
   adjustBalance,

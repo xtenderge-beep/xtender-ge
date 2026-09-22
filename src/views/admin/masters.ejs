@@ -60,6 +60,11 @@
                 <input type="hidden" name="_csrf" value="<%= csrfToken %>">
                 <button type="submit" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">Одобрить</button>
             </form>
+          <% } else if (m.is_active && !m.is_banned) { %>
+            <form method="POST" action="/admin/masters/<%= m.id %>/unapprove" onsubmit="return confirm('Вернуть специалиста на модерацию? Он перестанет получать заявки, пока его снова не одобрят.')">
+                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                <button type="submit" class="px-3 py-2 bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-200 text-xs font-bold rounded-xl transition">На модерацию</button>
+            </form>
           <% } %>
           <a href="/admin/masters/<%= m.id %>" class="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold rounded-xl transition text-center">Детали</a>
       </div>

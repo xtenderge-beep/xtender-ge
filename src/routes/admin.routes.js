@@ -46,6 +46,7 @@ router.get('/masters', asyncHandler(adminController.mastersList));
 router.get('/masters/:id', asyncHandler(adminController.masterDetail));
 router.post('/masters/:id/update', verifyCsrf, asyncHandler(adminController.updateMaster));
 router.post('/masters/:id/approve', verifyCsrf, asyncHandler(adminController.approveMaster));
+router.post('/masters/:id/unapprove', verifyCsrf, asyncHandler(adminController.unapproveMaster));
 router.post('/masters/:id/ban', verifyCsrf, asyncHandler(adminController.banMaster));
 router.post('/masters/:id/unban', verifyCsrf, asyncHandler(adminController.unbanMaster));
 router.post('/masters/:id/delete', verifyCsrf, asyncHandler(adminController.deleteMaster));

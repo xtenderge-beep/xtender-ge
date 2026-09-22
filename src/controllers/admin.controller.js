@@ -229,6 +229,12 @@ async function approveMaster(req, res) {
   res.redirect('/admin/masters');
 }
 
+async function unapproveMaster(req, res) {
+  const id = parseInt(req.params.id, 10);
+  await masterService.unapproveMaster(id);
+  res.redirect(`/admin/masters/${id}`);
+}
+
 async function updateMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   const name = (req.body.name || '').trim();
@@ -735,6 +741,7 @@ module.exports = {
   masterDetail,
   updateMaster,
   approveMaster,
+  unapproveMaster,
   banMaster,
   unbanMaster,
   deleteMaster,
