@@ -53,9 +53,13 @@ router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
   const locale = resolveLocale(req, res, '/');
   const [masters, catalogCallPriceTetri] = await Promise.all([
-    masterService.listMasters(),
+    masterService.listMasters({ language: locale }),
     settingsService.getCatalogCallPriceTetri(),
   ]);
+  res.set('Cache-Control', 'private, no-store');
+  const callerPhone = await require('../services/catalogSession.service').getPhone(req);
+  const history = new Map((await masterService.contactHistory(callerPhone)).map(h => [h.master_id, h.opened_at]));
+  masters.forEach(m => { m.contact_opened = history.has(m.id); });
   const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
   const reviewsByMaster = new Map();
   reviews.forEach((rv) => {
@@ -174,6 +178,12 @@ router.get('/join', asyncHandler(async (req, res) => {
 // Короткая реферальная ссылка: /r/КОД → форма регистрации с подставленным промокодом.
 router.get('/r/:code', (req, res) => {
   res.redirect(`/join?promo=${encodeURIComponent((req.params.code || '').toUpperCase())}`);
+});
+
+router.get('/guides/request', (req, res) => {
+  if (redirectToCookieLocale(req, res, '/guides/request')) return;
+  const locale = resolveLocale(req, res, '/guides/request');
+  res.render('customer-guide', {guide: require('../config/customer-guide-copy')[locale], home: locale === 'ka' ? '/?lang=ka' : '/' + locale});
 });
 
 router.get('/terms', asyncHandler(async (req, res) => {

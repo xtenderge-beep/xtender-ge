@@ -778,3 +778,12 @@ CREATE TABLE IF NOT EXISTS order_category_closures (
     PRIMARY KEY (order_id, category)
 );
 CREATE INDEX IF NOT EXISTS idx_order_category_closures_order ON order_category_closures(order_id);
+
+-- A customer unlocks all channels of a provider once, without a cache expiry.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS contact_channels JSONB NOT NULL DEFAULT '{}';
+CREATE TABLE IF NOT EXISTS catalog_contact_access (
+  master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  caller_phone TEXT NOT NULL,
+  opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (master_id, caller_phone)
+);

@@ -1,0 +1,29 @@
+<section class="bg-white rounded-2xl border border-stone-200 p-5">
+<h2 class="font-bold mb-2"><%= t('contacts_title') %></h2><p class="text-sm text-stone-500 mb-4"><%= t('contacts_hint') %></p>
+<form id="provider-contacts" class="space-y-4">
+<% const channels = master.contact_channels || {}; ['whatsapp','viber'].forEach(channel => { %>
+<label class="block text-sm font-bold"><%= channel==='whatsapp'?'WhatsApp':'Viber' %><input class="block w-full border rounded-lg p-3 mt-1" type="tel" name="<%= channel %>" value="<%= channels[channel] || '' %>" placeholder="+995…" maxlength="30"></label>
+<button type="button" class="text-sm text-emerald-700" data-use-primary="<%= channel %>" data-phone="<%= master.phone %>"><%= t('contacts_same') %></button>
+<% }); %>
+<label class="block text-sm font-bold">Telegram<input class="block w-full border rounded-lg p-3 mt-1" name="telegram" value="<%= channels.telegram || '' %>" placeholder="@username" maxlength="64"></label>
+<fieldset><legend class="text-sm font-bold mb-2"><%= t('catalog_languages') %></legend><div class="flex flex-wrap gap-3"><% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %><label><input type="checkbox" name="spokenLanguages" value="<%= code %>" <%= (master.spoken_languages || []).includes(code)?'checked':'' %>> <%= label %></label><% }); %></div></fieldset>
+<button class="bg-emerald-600 text-white rounded-lg px-4 py-3 font-bold" type="submit"><%= t('contacts_save') %></button>
+<p id="contacts-result" role="status" class="text-sm"></p>
+</form></section>
+<script>
+(() => {
+ const form = document.getElementById('provider-contacts');
+ form.querySelectorAll('[data-use-primary]').forEach(button => button.addEventListener('click', () => { form.elements[button.dataset.usePrimary].value = button.dataset.phone; }));
+ form.addEventListener('submit', async event => {
+  event.preventDefault(); const button = form.querySelector('[type=submit]'); button.disabled = true;
+  const status = document.getElementById('contacts-result'); status.textContent = '';
+  const data = new FormData(form); const body = Object.fromEntries(data); body.spokenLanguages = data.getAll('spokenLanguages');
+  try {
+   const response = await fetch('/api/master/<%= master.master_token %>/contacts', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const result = await response.json();
+   status.textContent = result.success ? <%- JSON.stringify(t('contacts_saved')) %> : <%- JSON.stringify(t('contacts_invalid')) %>;
+  } catch { status.textContent = <%- JSON.stringify(t('contacts_error')) %>; }
+  finally { button.disabled = false; }
+ });
+})();
+</script>

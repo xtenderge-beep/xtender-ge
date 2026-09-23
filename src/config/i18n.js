@@ -1587,6 +1587,7 @@ const dictionaries = {
   },
 };
 
+for (const locale of LANGS) Object.assign(dictionaries[locale], require('./catalog-copy')[locale]);
 const topupCopy = require('./topup-copy');
 const providerConsentCopy = require('./provider-consent-copy');
 for (const locale of LANGS) Object.assign(dictionaries[locale], providerConsentCopy[locale]);

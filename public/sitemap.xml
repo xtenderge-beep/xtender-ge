@@ -90,4 +90,7 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/privacy"/>
   </url>
 
+<url><loc>https://xtender.ge/guides/request</loc><xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/guides/request"/><xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/guides/request"/><xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/guides/request"/><xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/guides/request"/></url>
+<url><loc>https://xtender.ge/ru/guides/request</loc><xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/guides/request"/><xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/guides/request"/><xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/guides/request"/><xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/guides/request"/></url>
+<url><loc>https://xtender.ge/en/guides/request</loc><xhtml:link rel="alternate" hreflang="ka" href="https://xtender.ge/guides/request"/><xhtml:link rel="alternate" hreflang="ru" href="https://xtender.ge/ru/guides/request"/><xhtml:link rel="alternate" hreflang="en" href="https://xtender.ge/en/guides/request"/><xhtml:link rel="alternate" hreflang="x-default" href="https://xtender.ge/guides/request"/></url>
 </urlset>

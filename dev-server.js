@@ -95,7 +95,18 @@ async function seedMasters() {
   await fakePool.query(
     `UPDATE masters SET city_id = (SELECT id FROM cities WHERE slug = 'tbilisi') WHERE city_id IS NULL`
   );
-  console.log('Seeded 50 demo masters (+ master_services, city_id)');
+  // Synthetic directory fixtures: languages, optional messenger channels and billing.
+  fakePool.withTransaction = async fn => fn(fakePool);
+  const billing = require('./src/services/providerBilling.service');
+  for (const master of (await fakePool.query('SELECT id, phone FROM masters')).rows) {
+    const languages = [['ka','ru'],['en','ka'],['ru','en'],[]][master.id % 4];
+    const channels = master.id % 3 === 0 ? {whatsapp:master.phone,viber:master.phone,telegram:'xtender_demo'} : master.id % 2 === 0 ? {whatsapp:master.phone} : {};
+    const token = 'demo-master-' + master.id;
+    await fakePool.query('UPDATE masters SET spoken_languages=$1::jsonb, contact_channels=$2::jsonb, master_token=$3 WHERE id=$4', [JSON.stringify(languages),JSON.stringify(channels),token,master.id]);
+    const state = await billing.state(master.id,'ru');
+    await billing.accept(token,{accepted:true,language:'ru',digest:state.digest});
+  }
+  console.log('Seeded 50 demo masters (+ languages, contacts and billing)');
 }
 
 seedMasters().then(() => {

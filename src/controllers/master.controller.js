@@ -44,7 +44,7 @@ function isChecked(v) {
 
 async function list(req, res) {
   const serviceType = req.query.serviceType || req.query.category;
-  const masters = await masterService.listMasters({ serviceType });
+  const masters = await masterService.listMasters({ serviceType, language: req.lang });
   // Номер и баланс — только для server-side рендера каталога (index.ejs). Эта JSON-ручка
   // публичная и без неё платный gate «Показать номер» тривиально обходится curl'ом.
   const safe = masters.map(({ phone, balance_tetri, ...rest }) => rest);
@@ -84,6 +84,7 @@ async function catalogOtpVerify(req, res) {
 // подтверждённый телефон звонящего (см. catalogOtpVerify) — если его ещё нет, отдаём
 // needsVerification, а не ошибку: фронт открывает модалку с OTP и повторяет запрос.
 async function revealPhone(req, res) {
+  res.set('Cache-Control', 'no-store');
   const masterId = parseInt(req.params.id, 10);
   if (!Number.isInteger(masterId)) {
     return res.status(400).json({ success: false, message: 'Invalid master id' });
@@ -94,19 +95,14 @@ async function revealPhone(req, res) {
     return res.json({ success: false, needsVerification: true });
   }
 
-  // Этот звонящий уже раскрывал номер этого мастера недавно (перезагрузил страницу,
-  // нажал ещё раз) — отдаём номер повторно, но НЕ списываем деньги второй раз.
-  const dedupeKey = `catalog_revealed:${masterId}:${callerPhone}`;
-  const alreadyRevealed = await redis.get(dedupeKey);
-  if (alreadyRevealed) {
-    return res.json({ success: true, phone: alreadyRevealed });
-  }
-
-  const key = `catalog_reveal_limit:${callerPhone}`;
-  const count = await redis.incr(key);
-  if (count === 1) await redis.expire(key, CATALOG_REVEAL_RATE_WINDOW_SECONDS);
-  if (count > CATALOG_REVEAL_RATE_MAX) {
-    return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
+  const opened = (await masterService.contactHistory(callerPhone)).some(row => row.master_id === masterId);
+  if (!opened) {
+    const key = `catalog_reveal_limit:${callerPhone}`;
+    const count = await redis.incr(key);
+    if (count === 1) await redis.expire(key, CATALOG_REVEAL_RATE_WINDOW_SECONDS);
+    if (count > CATALOG_REVEAL_RATE_MAX) {
+      return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
+    }
   }
 
   const price = await settingsService.getCatalogCallPriceTetri();
@@ -114,8 +110,8 @@ async function revealPhone(req, res) {
   if (!master) {
     return res.json({ success: false, reason: 'unavailable' });
   }
-  await redis.set(dedupeKey, master.phone, 'EX', catalogSession.TTL_SECONDS);
-  return res.json({ success: true, phone: master.phone });
+  res.set('Cache-Control', 'no-store');
+  return res.json({ success: true, phone: master.phone, contacts: require('../config/catalogContacts').links(master), alreadyOpened: master.alreadyOpened });
 }
 
 async function sendOtp(req, res) {
@@ -457,7 +453,17 @@ async function acceptBilling(req, res) {
     message: result.code ? clientStrings(req.body.language || req.lang)[result.code] : null });
 }
 
+async function saveContacts(req, res) {
+  if (req.params.token !== await masterSession.token(req)) return res.status(401).json({ success: false });
+  if (req.get?.('sec-fetch-site') === 'cross-site') return res.status(403).json({ success: false });
+  const contacts = require('../config/catalogContacts').parse(req.body);
+  const languages = require('../config/spokenLanguages').parse(req.body.spokenLanguages);
+  if (!contacts || !languages) return res.status(400).json({ success: false, message: clientStrings(req.lang).contacts_invalid });
+  const saved = await masterService.saveContacts(req.params.token, contacts, languages);
+  return res.status(saved ? 200 : 404).json({ success: Boolean(saved) });
+}
 module.exports = {
+  saveContacts,
   acceptBilling,
   list,
   sendOtp,

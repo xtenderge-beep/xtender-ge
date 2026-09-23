@@ -258,7 +258,15 @@
                           }
                         %>
 
-                        <div class="flex flex-wrap gap-2" id="categoryFilterBar">
+                        <div class="catalog-language-filter">
+<label for="catalog-language"><%= t('catalog_languages') %></label>
+<select id="catalog-language"><% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %><option value="<%= code %>" <%= lang === code ? 'selected' : '' %>><%= label %></option><% }); %></select>
+<label class="catalog-language-only"><input type="checkbox" id="catalog-only-language"> <%= t('catalog_only_language') %></label>
+<p><%= t('catalog_language_priority') %></p>
+</div>
+<p id="catalog-empty" class="hidden" role="status"><%= t('catalog_empty') %></p>
+<aside class="catalog-form-benefit"><h3><%= t('catalog_form_title') %></h3><p><%= t('catalog_form_body') %></p><a href="#post-section"><%= t('catalog_form_cta') %> →</a> · <a href="<%= lang === 'ka' ? '/guides/request?lang=ka' : '/' + lang + '/guides/request' %>"><%= t('catalog_guide_link') %></a></aside>
+<div class="flex flex-wrap gap-2" id="categoryFilterBar">
                             <button type="button" onclick="setCategoryFilter('all')" data-filter-cat="all" class="filter-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition border bg-emerald-600 text-white border-emerald-600">
                                 <%= t('filter_all') %>
                             </button>
@@ -293,11 +301,11 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
 
                                       <% const ratingStars = Math.round(Number(master.rating) || 0); %>
 
-                                      <div class="home-master-heading flex items-start justify-between gap-3"><span class="home-avatar" aria-hidden="true"><%= Array.from(master.name.trim())[0] %></span>
+                                      <div class="home-master-heading flex items-start justify-between gap-3">
                                           <div class="flex-1 min-w-0">
                                               <div class="flex items-center gap-2 flex-wrap">
                                                   <h3 class="font-extrabold text-stone-900 text-sm sm:text-base"><%= master.name %></h3>
@@ -356,25 +364,18 @@
                                         </div>
                                       <% } %>
 
+                                      <div class="catalog-card-languages"><span><%= t('catalog_languages') %></span><div>
+<% const languageNames = {ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}; const spoken = (master.spoken_languages || []).filter(code => languageNames[code]).slice().sort((a,b) => Number(b===lang)-Number(a===lang)); %>
+<% if (!spoken.length) { %><small><%= t('catalog_language_unknown') %></small><% } %>
+<% spoken.forEach(code => { %><span class="catalog-language-badge <%= code===lang?'is-preferred':'' %>" data-language="<%= code %>"><%= languageNames[code] %></span><% }); %>
+</div></div>
                                       <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
-                                          <% if (master.billing_accepted === true && master.balance_tetri >= catalogCallPriceTetri) { %>
-                                            <div class="flex items-center justify-center gap-1.5 text-stone-500 text-xs font-mono mb-2">
-                                                <i class="fa-solid fa-lock text-[9px]"></i>
-                                                <span>+995&nbsp;5&middot;&middot;&nbsp;&middot;&middot;&middot;&nbsp;&middot;&middot;&middot;</span>
-                                            </div>
-                                            <div class="flex gap-2">
-                                                <button type="button" class="reveal-contact-btn flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
-                                                        data-master-id="<%= master.id %>" data-action="call">
-                                                    <i class="fa-solid fa-phone text-[10px]"></i><span><%= t('btn_call') %></span>
-                                                </button>
-                                                <button type="button" class="reveal-contact-btn flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70"
-                                                        data-master-id="<%= master.id %>" data-action="whatsapp">
-                                                    <i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span>
-                                                </button>
-                                            </div>
-                                          <% } else { %>
-                                            <p class="text-[11px] text-stone-500 text-center py-2"><%= t('catalog_master_unavailable') %></p>
-                                          <% } %>
+                                          <% if (master.contact_opened || (master.billing_accepted === true && master.balance_tetri >= catalogCallPriceTetri)) { %>
+<p class="catalog-contact-state"><%= master.contact_opened ? t('catalog_opened') : '' %></p>
+<div class="catalog-contact-actions"><% (master.available_channels || ['call']).forEach(channel => { %>
+<button type="button" class="reveal-contact-btn catalog-contact-button <%= channel==='call'?'is-call':'' %>" data-master-id="<%= master.id %>" data-action="<%= channel %>"><%= ({call:t('btn_call'),whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel] %></button>
+<% }); %></div>
+                                          <% } else { %><p class="text-xs text-stone-500"><%= t('catalog_master_unavailable') %></p><% } %>
                                       </div>
 
                                       <div class="border-t border-stone-100 pt-3">
@@ -595,8 +596,11 @@
                 if (show && activeCategory === 'van' && activeSize !== 'all') {
                     show = card.dataset.size === activeSize;
                 }
+                if (document.getElementById('catalog-only-language').checked && !card.dataset.languages.split(' ').includes(document.getElementById('catalog-language').value)) show = false;
                 card.classList.toggle('hidden', !show);
             });
+            document.querySelectorAll('[data-group]').forEach(group => { group.classList.toggle('hidden', !group.querySelector('.master-card:not(.hidden)')); });
+            document.getElementById('catalog-empty').classList.toggle('hidden', Boolean(document.querySelector('.master-card:not(.hidden)')));
             sizeFilterBar.classList.toggle('hidden', activeCategory !== 'van');
             sizeFilterBar.classList.toggle('flex', activeCategory === 'van');
             catFilterBtns.forEach((btn) => styleFilterBtn(btn, btn.dataset.filterCat === activeCategory));
@@ -1069,17 +1073,18 @@
             document.getElementById('reveal-step-code').classList.toggle('hidden', name !== 'code');
         }
 
-        function showRevealedContact(masterId, phone) {
+        function showRevealedContact(masterId, data) {
             const slot = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]');
             if (!slot) return;
-            const digits = phone.replace(/\D/g, '');
-            slot.innerHTML =
-                '<div class="flex gap-2">' +
-                    '<a href="tel:' + phone + '" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">' +
-                        '<i class="fa-solid fa-phone text-[10px]"></i><span>' + phone + '</span></a>' +
-                    '<a href="https://wa.me/' + digits + '" target="_blank" rel="noopener" class="flex-1 px-3 py-3 min-h-[44px] bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 border border-emerald-200/70">' +
-                        '<i class="fa-brands fa-whatsapp"></i><span>WhatsApp</span></a>' +
-                '</div>';
+            slot.replaceChildren();
+            const status = document.createElement('p'); status.className = 'catalog-contact-state'; status.textContent = T.catalog_opened; slot.append(status);
+            const actions = document.createElement('div'); actions.className = 'catalog-contact-actions'; slot.append(actions);
+            Object.entries(data.contacts).forEach(([channel, href]) => {
+                const link = document.createElement('a'); link.href = href;
+                link.className = 'catalog-contact-button' + (channel === 'call' ? ' is-call' : '');
+                link.textContent = channel === 'call' ? data.phone : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
+                actions.append(link);
+            });
         }
 
         function showRevealUnavailable(masterId) {
@@ -1089,31 +1094,33 @@
 
         // Открываем через клик по <a> (а не location.href) — так браузер отдаёт
         // tel:/wa.me системному обработчику и не «роняет» текущую страницу.
-        function performContactAction(action, phone) {
-            if (!phone) return;
-            const a = document.createElement('a');
-            if (action === 'whatsapp') {
-                a.href = 'https://wa.me/' + phone.replace(/\D/g, '');
-                a.target = '_blank';
-                a.rel = 'noopener';
-            } else {
-                a.href = 'tel:' + phone;
-            }
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
+        function performContactAction(action, contacts) {
+            if (!contacts || !contacts[action]) return;
+            // Same-tab navigation preserves the native app handoff after async OTP.
+            window.location.href = contacts[action];
         }
 
         // { handled, phone } — handled:false = нужна верификация телефона (открыть модалку)
         async function attemptReveal(masterId) {
             const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST' });
             const data = await res.json();
-            if (data.success) { showRevealedContact(masterId, data.phone); return { handled: true, phone: data.phone }; }
+            if (!res.ok) throw new Error(data.message || T.contacts_error);
+            if (data.success) { showRevealedContact(masterId, data); return { handled: true, contacts: data.contacts }; }
             if (data.needsVerification) return { handled: false, phone: null };
             showRevealUnavailable(masterId);
             return { handled: true, phone: null };
         }
 
+        function sortCatalogLanguages() {
+            const language = document.getElementById('catalog-language').value;
+            document.querySelectorAll('.home-master-grid').forEach(grid => {
+                Array.from(grid.children).sort((a,b) => Number(b.dataset.languages.split(' ').includes(language)) - Number(a.dataset.languages.split(' ').includes(language))).forEach(card => grid.append(card));
+            });
+            document.querySelectorAll('.catalog-language-badge').forEach(b => b.classList.toggle('is-preferred', b.dataset.language === language));
+            applyFilters();
+        }
+        document.getElementById('catalog-language').addEventListener('change', sortCatalogLanguages);
+        document.getElementById('catalog-only-language').addEventListener('change', sortCatalogLanguages);
         let revealPendingAction = null;
 
         document.querySelectorAll('.reveal-contact-btn').forEach((btn) => {
@@ -1126,10 +1133,13 @@
                 try {
                     res = await attemptReveal(masterId);
                 } catch (e) {
-                    res = { handled: false, phone: null };
+                    slot.querySelectorAll('.reveal-contact-btn').forEach(b => { b.disabled = false; });
+                    const status = slot.querySelector('.catalog-contact-state');
+                    if (status) { status.textContent = e.message || T.contacts_error; status.setAttribute('role','alert'); }
+                    return;
                 }
                 if (res.handled) {
-                    performContactAction(action, res.phone);
+                    performContactAction(action, res.contacts);
                 } else {
                     slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = false; });
                     revealMasterId = masterId;
@@ -1185,7 +1195,7 @@
                 const rev = await attemptReveal(revealMasterId);
                 if (rev.handled) {
                     closeModal('reveal-modal');
-                    performContactAction(revealPendingAction, rev.phone);
+                    performContactAction(revealPendingAction, rev.contacts);
                     revealPendingAction = null;
                 } else {
                     revealMsg(T.js_err_send_code, true);

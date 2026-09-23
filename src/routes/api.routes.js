@@ -31,6 +31,7 @@ router.post('/catalog/otp/verify', asyncHandler(masterController.catalogOtpVerif
 router.post('/master/login/request-code', asyncHandler(masterController.loginRequestCode));
 router.post('/master/login/verify', asyncHandler(masterController.loginVerify));
 router.use('/master/:token', asyncHandler(require('../services/masterSession.service').requireSession));
+router.post('/master/:token/contacts', asyncHandler(masterController.saveContacts));
 router.post('/master/:token/billing/accept', asyncHandler(masterController.acceptBilling));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));

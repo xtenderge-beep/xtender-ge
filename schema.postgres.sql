@@ -64,3 +64,11 @@ BEGIN
         EXECUTE format('ALTER TABLE order_dispatches DROP CONSTRAINT %I', old_key);
     END LOOP;
 END $$;
+
+-- Preserve paid unlocks from before this migration.
+INSERT INTO catalog_contact_access (master_id, caller_phone, opened_at)
+SELECT master_id, replace(note, 'Звонок из каталога: ', ''), MIN(created_at)
+FROM balance_transactions
+WHERE reason = 'catalog_call' AND note LIKE 'Звонок из каталога: +%'
+GROUP BY master_id, note
+ON CONFLICT (master_id, caller_phone) DO NOTHING;

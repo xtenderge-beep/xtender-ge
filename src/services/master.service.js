@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
 
-const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language';
+const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language, spoken_languages, contact_channels';
 
 // Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
 //   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
@@ -460,7 +460,7 @@ const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicl
 // Каталог группирует по service_type из master_services. Тип и attributes подтягиваем
 // вторым запросом и клеим в JS (а не join + GROUP BY по jsonb — pg-mem не тянет).
 // Один мастер = одна карточка: берём primary-услугу (все мигрированные/новые — primary).
-async function listMasters({ serviceType } = {}) {
+async function listMasters({ serviceType, language } = {}) {
   const { rows } = await pool.query(
     `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating, COUNT(r.id)::int AS review_count
      FROM masters m
@@ -484,35 +484,31 @@ async function listMasters({ serviceType } = {}) {
   }
 
   const billing = require('./providerBilling.service');
+  const profiles = (await pool.query('SELECT id, spoken_languages, contact_channels FROM masters WHERE id IN (' + ph + ')', ids)).rows;
+  const profileMap = new Map(profiles.map(m => [m.id, m]));
   const billingIds = await billing.eligibleIds(await billing.pricing());
   const result = rows.map((m) => {
     const s = byMaster.get(m.id);
     return {
       ...m,
+      spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
+      available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),
       billing_accepted: billingIds.has(m.id),
       service_type: s ? s.service_type : (m.category === 'movers' ? 'movers' : 'van'),
       attributes: s ? s.attributes || {} : {},
     };
   });
   const active = new Set((await require('./category.service').list()).filter(c=>c.is_active).map(c=>c.slug));
-  return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType));
+  return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType)).sort((a,b) => Number(b.spoken_languages.includes(language)) - Number(a.spoken_languages.includes(language)));
 }
 
-// Списание за раскрытие номера в публичном каталоге — атомарно: UPDATE с условием на
-// баланс сам по себе исключает гонку (два одновременных клика не спишут дважды при
-// недостаточном балансе), без явного SELECT ... FOR UPDATE. 0 обновлённых строк =
-// баланса не хватило / мастер уже неактивен/забанен/удалён — вызывающий код трактует
-// null как «недоступен», не как ошибку.
-//
-// ⚠️ `balance_tetri + $1` с ОТРИЦАТЕЛЬНЫМ параметром, а не `balance_tetri - $1` с
-// положительным — на pg-mem вычитание параметра (не литерала) из колонки в SET даёт
-// результат с обратным знаком (баг найден 2026-09-05: `col - $1` считается как `$1 - col`,
-// а `col - 50` — верно). Тот же идиом уже используют adjustBalance/chargeMastersForLead
-// в этом файле — держим его и здесь, а не только чтобы обойти баг pg-mem.
+// Lock the provider before checking the durable access record. Access, debit and audit commit together.
 async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
   return pool.withTransaction(async (client) => {
     const found = (await client.query('SELECT * FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
-    if (!found) return null;
+    if (!found || !callerPhone || !found.is_active || found.is_banned || found.is_technical) return null;
+    const prior = (await client.query('SELECT opened_at FROM catalog_contact_access WHERE master_id=$1 AND caller_phone=$2', [masterId, callerPhone])).rows[0];
+    if (prior) return { ...found, alreadyOpened: true, openedAt: prior.opened_at };
     const billing = require('./providerBilling.service');
     const rates = await billing.pricing(client, true);
     const acceptance = await billing.accepted(masterId, rates, client);
@@ -525,6 +521,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
     );
     const master = rows[0];
     if (!master) return null;
+    await client.query('INSERT INTO catalog_contact_access (master_id, caller_phone) VALUES ($1,$2)', [masterId, callerPhone]);
     const charge = await client.query(
       `INSERT INTO balance_transactions (master_id, amount_tetri, reason, note) VALUES ($1, $2, 'catalog_call', $3) RETURNING id`,
       [master.id, -priceTetri, callerPhone ? `Звонок из каталога: ${callerPhone}` : null]
@@ -532,11 +529,19 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
     await consentLog.recordAction({ eventType: 'CATALOG_CHARGE_ACCEPTED', phone: master.phone, masterId: master.id,
       metadata: { amount_tetri: priceTetri, balance_transaction_id: charge.rows[0].id,
         billing_consent_log_id: acceptance.consent_log_id, pricing_key: rates.key } }, client);
-    return master;
+    return { ...found, ...master, alreadyOpened: false };
   });
 }
 
+async function contactHistory(callerPhone) {
+  if (!callerPhone) return [];
+  return (await pool.query('SELECT master_id, opened_at FROM catalog_contact_access WHERE caller_phone=$1', [callerPhone])).rows;
+}
+async function saveContacts(token, contacts, languages) {
+  return (await pool.query('UPDATE masters SET contact_channels=$1::jsonb, spoken_languages=$2::jsonb WHERE master_token=$3 RETURNING id', [JSON.stringify(contacts), JSON.stringify(languages), token])).rows[0];
+}
 module.exports = {
+  contactHistory, saveContacts,
   registerMaster,
   setMasterLanguage,
   getWorkCities,
