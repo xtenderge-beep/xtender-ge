@@ -4,7 +4,7 @@ const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
 
-const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language, spoken_languages, contact_channels';
+const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language, spoken_languages, contact_channels, display_name_override';
 
 // Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
 //   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
@@ -455,7 +455,7 @@ async function deleteMaster(id, { meta = {} } = {}) {
 // (см. revealPhoneForCall). Сам номер (m.phone) сюда попадает для server-side рендера
 // каталога; JSON-ручка /api/masters (masterController.list) обязана его вычищать перед
 // отдачей клиенту — иначе платный gate на «показать номер» тривиально обходится.
-const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id';
+const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override';
 
 // Каталог группирует по service_type из master_services. Тип и attributes подтягиваем
 // вторым запросом и клеим в JS (а не join + GROUP BY по jsonb — pg-mem не тянет).
@@ -466,7 +466,7 @@ async function listMasters({ serviceType, language } = {}) {
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
      WHERE m.is_technical = false AND m.is_active = true AND m.is_banned = false
-     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id
+     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override
      ORDER BY m.id`
   );
   if (!rows.length) return [];
@@ -491,6 +491,7 @@ async function listMasters({ serviceType, language } = {}) {
     const s = byMaster.get(m.id);
     return {
       ...m,
+      display_name: require('../config/providerName').resolve(m),
       spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
       available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),
       billing_accepted: billingIds.has(m.id),
@@ -540,7 +541,31 @@ async function contactHistory(callerPhone) {
 async function saveContacts(token, contacts, languages) {
   return (await pool.query('UPDATE masters SET contact_channels=$1::jsonb, spoken_languages=$2::jsonb WHERE master_token=$3 RETURNING id', [JSON.stringify(contacts), JSON.stringify(languages), token])).rows[0];
 }
+async function updateMasterWhatsapp(id, whatsapp) {
+  const parsed = require('../config/catalogContacts').parse({ whatsapp, viber: '', telegram: '' });
+  if (!parsed) {
+    const error = new Error('Invalid WhatsApp number'); error.code = 'INVALID_CONTACT'; throw error;
+  }
+  return pool.withTransaction(async client => {
+    const master = (await client.query('SELECT id, contact_channels FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    if (!master) return null;
+    const contacts = { ...(master.contact_channels || {}), whatsapp: parsed.whatsapp };
+    return (await client.query('UPDATE masters SET contact_channels=$1::jsonb WHERE id=$2 RETURNING id', [JSON.stringify(contacts), id])).rows[0];
+  });
+}
+// Empty string clears the override (falls back to automatic transliteration —
+// see providerName.resolve). Admin uses this when the auto-transliteration of a
+// name comes out awkward or wrong.
+async function updateMasterDisplayNameOverride(id, value) {
+  const trimmed = require('../config/providerName').validateOverride(value);
+  if (trimmed === null) {
+    const error = new Error('Display name override too long'); error.code = 'INVALID_DISPLAY_NAME'; throw error;
+  }
+  return (await pool.query('UPDATE masters SET display_name_override=$1 WHERE id=$2 RETURNING id', [trimmed || null, id])).rows[0];
+}
 module.exports = {
+  updateMasterWhatsapp,
+  updateMasterDisplayNameOverride,
   contactHistory, saveContacts,
   registerMaster,
   setMasterLanguage,

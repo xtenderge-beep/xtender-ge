@@ -218,6 +218,10 @@ async function masterDetail(req, res) {
     serviceConfig: await require('../services/category.service').configForView('ru'),
     vanSizes: vanSizeThresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
     languageNames: require('../config/spokenLanguages').ruNames,
+    autoDisplayName: require('../config/providerName').displayName(master.name),
+    publicName: require('../config/providerName').resolve(master),
+    whatsappSaved: req.query.saved === 'whatsapp',
+    displayNameSaved: req.query.saved === 'displayname',
     master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
@@ -280,6 +284,32 @@ async function updateMaster(req, res) {
   }
 
   res.redirect(`/admin/masters/${id}`);
+}
+
+async function updateMasterWhatsapp(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).send('Некорректный ID специалиста');
+  try {
+    const updated = await masterService.updateMasterWhatsapp(id, req.body.whatsapp);
+    if (!updated) return res.status(404).send('Специалист не найден');
+  } catch (error) {
+    if (error.code === 'INVALID_CONTACT') return res.redirect(`/admin/masters/${id}?error=invalid_whatsapp#customer-whatsapp`);
+    throw error;
+  }
+  return res.redirect(`/admin/masters/${id}?saved=whatsapp#customer-whatsapp`);
+}
+
+async function updateMasterDisplayName(req, res) {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).send('Некорректный ID специалиста');
+  try {
+    const updated = await masterService.updateMasterDisplayNameOverride(id, req.body.displayName);
+    if (!updated) return res.status(404).send('Специалист не найден');
+  } catch (error) {
+    if (error.code === 'INVALID_DISPLAY_NAME') return res.redirect(`/admin/masters/${id}?error=invalid_displayname#customer-name`);
+    throw error;
+  }
+  return res.redirect(`/admin/masters/${id}?saved=displayname#customer-name`);
 }
 
 async function banMaster(req, res) {
@@ -727,6 +757,8 @@ async function updateLegalPrivacy(req, res) {
 }
 
 module.exports = {
+  updateMasterWhatsapp,
+  updateMasterDisplayName,
   updatePaymentDetails,
   updateWelcomeBonus,
   dispatchPreview, dispatchOrder,

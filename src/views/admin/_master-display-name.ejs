@@ -1,0 +1,24 @@
+<section id="customer-name" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+  <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Имя в каталоге (транслит)</h2>
+  <p class="text-sm text-stone-500 mb-3">Автоматически: «<%= autoDisplayName %>». Если транслитерация получилась неудачно — впишите свой вариант, клиенты увидят его вместо автоматического. Пустое поле возвращает автоматический вариант.</p>
+  <% if (error === 'invalid_displayname') { %><p role="alert" class="text-sm text-red-600 mb-3">Слишком длинное имя — максимум 120 символов.</p><% } %>
+  <% if (typeof displayNameSaved !== 'undefined' && displayNameSaved) { %><p role="status" class="text-sm text-emerald-700 mb-3">Имя для каталога сохранено.</p><% } %>
+  <form method="POST" action="/admin/masters/<%= master.id %>/display-name" class="space-y-3">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="admin-display-name" class="block text-xs font-bold text-stone-500">Ручной вариант (латиницей)</label>
+    <input id="admin-display-name" type="text" name="displayName" maxlength="120" value="<%= master.display_name_override || '' %>" placeholder="<%= autoDisplayName %>" class="border border-stone-300 rounded-xl px-3 py-2 text-sm w-full">
+    <div class="flex flex-wrap gap-3">
+      <button id="admin-display-name-clear" type="button" class="text-sm text-stone-500">Сбросить на авто</button>
+      <button type="submit" class="px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold">Сохранить</button>
+    </div>
+  </form>
+</section>
+<script>
+(() => {
+  document.getElementById('admin-display-name-clear').addEventListener('click', () => {
+    const input = document.getElementById('admin-display-name');
+    input.value = '';
+    input.focus();
+  });
+})();
+</script>

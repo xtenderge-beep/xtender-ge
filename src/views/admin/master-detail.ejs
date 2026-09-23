@@ -90,11 +90,14 @@
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Редактировать данные</h2>
+    <%- include('./_master-whatsapp') %>
+    <%- include('./_master-display-name') %>
     <form method="POST" action="/admin/masters/<%= master.id %>/update" class="space-y-3">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
                 <label class="text-xs font-bold text-stone-500">Имя</label>
+                <p class="text-xs text-stone-500">В каталоге: <%= typeof publicName !== 'undefined' ? publicName : master.name %><% if (master.display_name_override) { %> (задано вручную)<% } %>.</p>
                 <input type="text" name="name" required value="<%= master.name %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
             </div>
             <div>

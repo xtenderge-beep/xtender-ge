@@ -292,6 +292,7 @@ async function statusPage(req, res) {
   master.category_label = category?.['name_'+req.lang] || category?.name_ru || '';
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
+    publicName: require('../config/providerName').resolve(master),
     leadPriceTetri, catalogCallPriceTetri, payment, billingState, botUsername: BOT_USERNAME, clientStrings: strings,
   });
 }

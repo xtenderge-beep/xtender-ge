@@ -4,7 +4,7 @@ const pool = require('../config/db');
 // позвонил или написал в WhatsApp (просто "view" не считается контактом).
 async function getEligibleMasters(orderId) {
   const { rows } = await pool.query(
-    `SELECT DISTINCT ON (m.id) m.id, m.name, m.category, m.avatar_url,
+    `SELECT DISTINCT ON (m.id) m.id, m.name, m.category, m.avatar_url, m.display_name_override,
             r.id AS review_id, r.rating AS existing_rating
      FROM order_views ov
      JOIN masters m ON m.id = ov.master_id
@@ -13,7 +13,8 @@ async function getEligibleMasters(orderId) {
      ORDER BY m.id`,
     [orderId]
   );
-  return rows;
+  const { resolve } = require('../config/providerName');
+  return rows.map(row => ({ ...row, display_name: resolve(row) }));
 }
 
 async function isMasterEligible(orderId, masterId) {

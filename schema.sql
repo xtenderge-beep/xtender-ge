@@ -781,6 +781,12 @@ CREATE INDEX IF NOT EXISTS idx_order_category_closures_order ON order_category_c
 
 -- A customer unlocks all channels of a provider once, without a cache expiry.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS contact_channels JSONB NOT NULL DEFAULT '{}';
+
+-- RU/KA names are auto-transliterated to Latin for public display
+-- (src/config/providerName.js). This lets an admin override a bad automatic
+-- result by hand without editing the name the provider actually submitted.
+-- NULL/empty means "use the automatic transliteration".
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS display_name_override VARCHAR(120);
 CREATE TABLE IF NOT EXISTS catalog_contact_access (
   master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
   caller_phone TEXT NOT NULL,

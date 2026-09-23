@@ -45,6 +45,8 @@ router.get('/', asyncHandler(adminController.overview));
 router.get('/masters', asyncHandler(adminController.mastersList));
 router.get('/masters/:id', asyncHandler(adminController.masterDetail));
 router.post('/masters/:id/update', verifyCsrf, asyncHandler(adminController.updateMaster));
+router.post('/masters/:id/whatsapp', verifyCsrf, asyncHandler(adminController.updateMasterWhatsapp));
+router.post('/masters/:id/display-name', verifyCsrf, asyncHandler(adminController.updateMasterDisplayName));
 router.post('/masters/:id/approve', verifyCsrf, asyncHandler(adminController.approveMaster));
 router.post('/masters/:id/unapprove', verifyCsrf, asyncHandler(adminController.unapproveMaster));
 router.post('/masters/:id/ban', verifyCsrf, asyncHandler(adminController.banMaster));

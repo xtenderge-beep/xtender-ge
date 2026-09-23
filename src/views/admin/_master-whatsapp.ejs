@@ -1,0 +1,25 @@
+<section id="customer-whatsapp" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+  <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">WhatsApp для заказчиков</h2>
+  <p class="text-sm text-stone-500 mb-3">Укажите номер, подтверждённый специалистом. Он может отличаться от основного телефона для звонков. Пустое поле убирает кнопку WhatsApp из каталога.</p>
+  <% if (error === 'invalid_whatsapp') { %><p role="alert" class="text-sm text-red-600 mb-3">Введите номер в международном формате: +код страны и номер, от 8 до 15 цифр.</p><% } %>
+  <% if (typeof whatsappSaved !== 'undefined' && whatsappSaved) { %><p role="status" class="text-sm text-emerald-700 mb-3">Номер WhatsApp сохранён.</p><% } %>
+  <form method="POST" action="/admin/masters/<%= master.id %>/whatsapp" class="space-y-3">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label for="admin-whatsapp" class="block text-xs font-bold text-stone-500">Номер WhatsApp</label>
+    <input id="admin-whatsapp" type="tel" name="whatsapp" maxlength="30" value="<%= (master.contact_channels || {}).whatsapp || '' %>" placeholder="+995 5XX XX XX XX" class="border border-stone-300 rounded-xl px-3 py-2 text-sm w-full">
+    <div class="flex flex-wrap gap-3">
+      <button id="admin-whatsapp-primary" data-phone="<%= master.phone %>" type="button" class="text-sm font-bold text-emerald-700">Подставить основной: <%= master.phone %></button>
+      <button id="admin-whatsapp-clear" type="button" class="text-sm text-stone-500">Очистить поле</button>
+      <button type="submit" class="px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold">Сохранить WhatsApp</button>
+    </div>
+  </form>
+  <p class="text-xs text-stone-500 mt-3">Номер для звонков, Viber и Telegram не меняются. За повторное открытие контактов тем же заказчиком нового списания нет.</p>
+</section>
+<script>
+(() => {
+  const input = document.getElementById('admin-whatsapp');
+  const primary = document.getElementById('admin-whatsapp-primary');
+  primary.addEventListener('click', () => { input.value = primary.dataset.phone; input.focus(); });
+  document.getElementById('admin-whatsapp-clear').addEventListener('click', () => { input.value = ''; input.focus(); });
+})();
+</script>

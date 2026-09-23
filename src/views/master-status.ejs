@@ -111,7 +111,9 @@
 
             <div class="flex items-start gap-3">
                 <div class="min-w-0 flex-1">
-                    <h1 class="text-lg font-black tracking-tight text-stone-900 truncate"><%= master.name %></h1>
+                    <% const shownName = typeof publicName !== 'undefined' ? publicName : master.name; %>
+                    <h1 class="text-lg font-black tracking-tight text-stone-900 truncate"><%= shownName %></h1>
+                    <% if (shownName !== master.name) { %><p class="text-[11px] text-stone-400 truncate">Так видят клиенты. В профиле: <%= master.name %></p><% } %>
                     <p class="text-xs text-stone-500 truncate">
                         <%= master.category_label || categoryLabels[master.category] || master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
                     </p>
