@@ -246,17 +246,18 @@ async function exportForPhone(rawPhone) {
 // Последние подтверждённые согласия — для landing-страницы /admin/consent.
 // Джойн по phone_number ↔ masters.phone (FK нет, см. schema.sql).
 async function listRecentConsents(limit = 100) {
-  const ph = VERIFIED_EVENT_TYPES.map((_, i) => `$${i + 1}`).join(', ');
+  const recentTypes = [...VERIFIED_EVENT_TYPES, 'MASTER_REGISTERED', 'ORDER_PUBLISHED'];
+  const ph = recentTypes.map((_, i) => `$${i + 1}`).join(', ');
   const { rows } = await pool.query(
     `SELECT l.id, l.event_type, l.phone_number, l.purpose, l.ip_address, l.user_agent,
-            l.terms_version, l.consent_language, l.otp_reference_id, l.timestamp_utc,
+            l.metadata, l.order_id, l.terms_version, l.consent_language, l.otp_reference_id, l.timestamp_utc,
             m.id AS master_id, m.name AS master_name, m.is_active AS master_active
      FROM sms_consent_logs l
      LEFT JOIN masters m ON m.phone = l.phone_number
      WHERE l.event_type IN (${ph})
      ORDER BY l.timestamp_utc DESC, l.id DESC
-     LIMIT $${VERIFIED_EVENT_TYPES.length + 1}`,
-    [...VERIFIED_EVENT_TYPES, limit]
+     LIMIT $${recentTypes.length + 1}`,
+    [...recentTypes, limit]
   );
   return rows;
 }

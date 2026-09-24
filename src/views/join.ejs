@@ -44,14 +44,14 @@
     <main class="max-w-4xl mx-auto px-4 py-8">
         <% if (focusMode) { %>
         <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('join_headline') %></h1>
-        <p class="text-sm text-stone-500 mt-2"><%= t('join_have_profile') %> <a href="/master" class="font-bold text-emerald-700 underline underline-offset-2"><%= t('master_login_nav') %></a></p>
         <% } else { %>
         <h1 class="text-2xl font-black tracking-tight text-stone-900"><%= t('provider_intro') %></h1>
         <p class="text-sm text-stone-500 mt-1"><%= t('provider_demo_lead') %></p>
-        <a href="/master" class="inline-flex items-center gap-2 mt-3 px-4 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-sm font-bold transition">
-            <i class="fa-solid fa-right-to-bracket text-emerald-600"></i><%= t('master_login_title') %>
-        </a>
         <% } %>
+        <div class="signup-login">
+            <span><%= t('join_have_profile') %></span>
+            <a href="/master"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> <%= t('master_login_nav') %></a>
+        </div>
 
         <div class="provider-join-grid">
         <div id="signupCard" class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
@@ -197,6 +197,7 @@
             </div>
 
             <div role="alert" aria-live="polite" id="formMsg" class="hidden text-xs font-bold mx-5 sm:mx-6 mb-5 sm:mb-6 p-3 rounded-xl"></div>
+            <a id="existingProfileLogin" href="/master" hidden class="signup-existing-login"><%= t('master_login_nav') %></a>
         </div>
         <% if (!focusMode) { %>
         <aside>
@@ -382,9 +383,17 @@
             }, 1000);
         }
 
+        function showSignupError(data, fallback) {
+            showMsg(data.message || fallback, true);
+            const link = document.getElementById('existingProfileLogin');
+            link.hidden = data.code !== 'MASTER_ALREADY_REGISTERED';
+            if (!link.hidden) link.focus();
+        }
+
         async function sendOtp(isResend) {
             if (signupBusy) return;
             showMsg('');
+            document.getElementById('existingProfileLogin').hidden = true;
             for (let step = 0; step <= LAST_STEP; step++) { if (!validateSignupStep(step)) return; }
             const payload = collectPayload();
             setSignupBusy(true);
@@ -395,7 +404,7 @@
                 body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
             });
             const data = await res.json();
-            if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
+            if (!data.success) return showSignupError(data, T.js_err_send_code);
             consentChallenge = data.challengeId; consentVerified = false;
 
             showMsg(isResend === true ? T.js_ok_code_sent : '', false);
@@ -411,7 +420,7 @@
                 showMsg(T.provider_signup_network, true);
             } finally {
                 setSignupBusy(false);
-                if (!document.getElementById('otpStep').classList.contains('hidden')) document.getElementById('codeInput').focus({ preventScroll: true });
+                if (document.getElementById('existingProfileLogin').hidden && !document.getElementById('otpStep').classList.contains('hidden')) document.getElementById('codeInput').focus({ preventScroll: true });
             }
         }
 
@@ -468,7 +477,7 @@
 
             res = await fetch('/api/masters/register', { method: 'POST', body: fd });
             data = await res.json();
-            if (!data.success) return showMsg(data.message || T.js_err_send_code, true);
+            if (!data.success) return showSignupError(data, T.js_err_send_code);
 
             // Профиль на модерации и первые вопросы («как приходят заявки», billing)
             // теперь отвечает сам кабинет (guide-блок открыт для профиля на проверке) —

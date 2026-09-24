@@ -480,3 +480,9 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .catalog-form-benefit{padding:18px 20px;border:1px solid #dce5d7;border-radius:14px;background:#fff}.catalog-form-benefit h3{font-weight:750;font-size:16px}.catalog-form-benefit p{font-size:13px;line-height:1.65;color:#647269;margin:7px 0}.catalog-form-benefit a{font-size:13px;font-weight:750;color:#28693e}
 .home-page .master-card .catalog-card-languages{margin-top:auto;min-height:60px}.home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-actions{min-height:96px;align-content:start}.catalog-contact-button:only-child{grid-column:1/-1}.catalog-contact-state{min-height:24px}.catalog-contact-state:empty{visibility:hidden}
 @media(max-width:639px){.catalog-contact-actions{min-height:0}.catalog-contact-state:empty{display:none}}
+
+.signup-login { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:16px 0 24px; padding:16px; border:1px solid #a7d4bf; border-radius:14px; background:#ecfdf5; color:#064e3b; font-size:14px; font-weight:600; }
+.signup-login a,.signup-existing-login { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:12px 20px; border-radius:10px; background:#065f46; color:white; font-weight:700; }
+.signup-existing-login[hidden] { display:none; }
+.signup-existing-login { margin:12px 0; }
+@media(max-width:420px) { .signup-login { flex-direction:column; align-items:stretch; gap:10px; } }

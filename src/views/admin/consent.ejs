@@ -8,13 +8,13 @@
     ORDER_CONTACT_RELEASED: { label: 'Контакт выдан', cls: 'bg-sky-100 text-sky-800' },
     ORDER_CONTACT_DENIED: { label: 'В выдаче контакта отказано', cls: 'bg-stone-100 text-stone-600' },
     SMS_SEND_FAILED: { label: 'Отправка SMS не подтверждена', cls: 'bg-stone-100 text-stone-600' },
-    CLIENT_CONSENT_OTP_VERIFIED: { label: 'Согласие · клиент', cls: 'bg-emerald-100 text-emerald-800' },
+    CLIENT_CONSENT_OTP_VERIFIED: { label: 'Согласие клиента подтверждено', cls: 'bg-emerald-100 text-emerald-800' },
     MASTER_REGISTERED: { label: 'Профиль создан / обновлён', cls: 'bg-sky-100 text-sky-800' },
     ORDER_PUBLISHED: { label: 'Заявка опубликована', cls: 'bg-sky-100 text-sky-800' },
     ORDER_DETAILS_RECORDED: { label: 'Содержание заявки', cls: 'bg-sky-100 text-sky-800' },
     ORDER_CLOSED: { label: 'Заявка закрыта', cls: 'bg-stone-100 text-stone-600' },
     CONTACT_SHARING_WITHDRAWN: { label: 'Передача контактов прекращена', cls: 'bg-stone-100 text-stone-600' },
-    CONSENT_SMS_OTP_VERIFIED: { label: 'Согласие · регистрация', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    CONSENT_SMS_OTP_VERIFIED: { label: 'Согласие специалиста подтверждено', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
     AUTH_SMS_OTP_VERIFIED:    { label: 'Подтверждение · вход',    cls: 'bg-sky-100 text-sky-800 border-sky-200' },
     ORDER_SMS_OTP_VERIFIED:   { label: 'Подтверждение · заявка',  cls: 'bg-sky-100 text-sky-800 border-sky-200' },
     REVIEW_SMS_OTP_VERIFIED:  { label: 'Подтверждение · отзыв',   cls: 'bg-sky-100 text-sky-800 border-sky-200' },
@@ -22,11 +22,13 @@
     LEAD_SMS_SENT:            { label: 'Лид-SMS',                 cls: 'bg-stone-100 text-stone-600 border-stone-200' },
     TX_SMS_SENT:              { label: 'SMS',                     cls: 'bg-stone-100 text-stone-600 border-stone-200' },
   };
-  function evtBadge(type) {
+  function evtBadge(type, metadata) {
     const m = EVENT_META[type] || { label: type, cls: 'bg-stone-100 text-stone-600 border-stone-200' };
-    return `<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${m.cls}">${m.label}</span>`;
+    const label = type === 'MASTER_REGISTERED' && metadata && ['created','updated'].includes(metadata.profile_action)
+      ? (metadata.profile_action === 'created' ? 'Профиль создан' : 'Профиль обновлён') : m.label;
+    return `<span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border ${m.cls}">${label}</span>`;
   }
-  const fmt = (d) => d ? new Date(d).toLocaleString('ru') : '—';
+  const fmt = (d) => d ? new Date(d).toLocaleString('ru', { timeZone: 'UTC' }) : '—';
   const short = (s, n) => !s ? '—' : (String(s).length > n ? String(s).slice(0, n) + '…' : String(s));
 %>
 
@@ -39,6 +41,8 @@
 <p class="text-sm text-stone-500 mt-1">
   Double Opt-In: момент подтверждения кода (IP, User-Agent, версия оферты, текст согласия) + каждая отправленная транзакционная SMS.
   Записи неизменяемы. Поиск — по любому формату номера.
+  Каждая строка — отдельное событие, а не новый пользователь. Подтверждение согласия не означает завершённую регистрацию.
+  Профиль показан по текущему совпадению номера; он мог появиться позже события. Для старых событий создания / обновления точный тип может быть неизвестен.
 </p>
 
 <form method="GET" action="/admin/consent" class="mt-4 flex flex-wrap items-center gap-2">
@@ -154,7 +158,7 @@
               <% report.events.forEach(function (e) { %>
                 <tr class="border-b border-stone-100 align-top">
                   <td class="py-1.5 pr-3 font-mono text-xs whitespace-nowrap"><%= e.timestamp_utc %></td>
-                  <td class="py-1.5 pr-3"><%- evtBadge(e.event_type) %></td>
+                  <td class="py-1.5 pr-3"><%- evtBadge(e.event_type, e.metadata) %></td>
                   <td class="py-1.5 pr-3 font-mono text-xs"><%= e.purpose || '—' %></td>
                   <td class="py-1.5 pr-3 font-mono text-xs"><%= e.ip_address || '—' %></td>
                   <td class="py-1.5 pr-3 font-mono text-xs"><%= short(e.otp_reference_id, 18) %></td>
@@ -172,7 +176,7 @@
 <% } else { %>
 
   <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
-    <div class="text-xs font-bold text-stone-500 uppercase mb-3">Последние подтверждённые согласия</div>
+    <div class="text-xs font-bold text-stone-500 uppercase mb-3">Последние подтверждения и действия</div>
     <% if (!recent.length) { %>
       <p class="text-sm text-stone-500">Пока пусто — журнал ведётся с момента деплоя этой функции.</p>
     <% } else { %>
@@ -183,7 +187,7 @@
               <th class="py-1.5 pr-3">Время (UTC)</th>
               <th class="py-1.5 pr-3">Событие</th>
               <th class="py-1.5 pr-3">Номер</th>
-              <th class="py-1.5 pr-3">Профиль</th>
+              <th class="py-1.5 pr-3">Текущий профиль по номеру</th>
               <th class="py-1.5 pr-3">Оферта</th>
               <th class="py-1.5 pr-3">IP</th>
             </tr>
@@ -191,8 +195,8 @@
           <tbody>
             <% recent.forEach(function (r) { %>
               <tr class="border-b border-stone-100">
-                <td class="py-1.5 pr-3 font-mono text-xs whitespace-nowrap"><%= r.timestamp_utc %></td>
-                <td class="py-1.5 pr-3"><%- evtBadge(r.event_type) %></td>
+                <td class="py-1.5 pr-3 font-mono text-xs whitespace-nowrap"><%= fmt(r.timestamp_utc) %></td>
+                <td class="py-1.5 pr-3"><%- evtBadge(r.event_type, r.metadata) %><div class="text-xs text-stone-500">Событие #<%= r.id %><% if (r.metadata && r.metadata.consent_log_id) { %> · Согласие #<%= r.metadata.consent_log_id %><% } %><% if (r.order_id) { %> · Заявка #<%= r.order_id %><% } %></div></td>
                 <td class="py-1.5 pr-3">
                   <a href="/admin/consent?phone=<%= encodeURIComponent(r.phone_number) %>" class="font-mono text-emerald-700 hover:underline"><%= r.phone_number %></a>
                 </td>

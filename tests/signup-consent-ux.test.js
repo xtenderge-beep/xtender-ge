@@ -48,6 +48,11 @@ const template=fs.readFileSync(path.join(__dirname,'../src/views/join.ejs'),'utf
   vm.runInContext('changeSignupStep(0)',context);
   assert.equal(vm.runInContext('otpVisible',context),false);
   assert.equal(vm.runInContext('signupStep',context),2);
+  // An existing account gets a working login action without advancing to another SMS screen.
+  vm.runInContext("showSignupError({code:'MASTER_ALREADY_REGISTERED',message:'Already registered'}, 'Error')",context);
+  assert.equal(el('existingProfileLogin').hidden,false);
+  assert.equal(el('existingProfileLogin').focused,true);
+  assert.equal(el('formMsg').textContent,'Already registered');
  }
  console.log('PASS: three signup steps, no scroll gate, active CTA, resend, inline unchecked errors, SMS only after explicit consent and stale-document protection in 3 languages');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

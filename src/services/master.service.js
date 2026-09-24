@@ -13,10 +13,11 @@ const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_s
 //   master_districts     — районы, где исполнитель берёт заказы (полная замена)
 // Всё в одной транзакции. ON CONFLICT (phone) — повторная регистрация обновляет профиль
 // и строку услуги того же типа (is_active снова false → снова на модерацию).
+// Public signup passes createOnly: conflicts are rejected before any profile changes.
 async function registerMaster({
   name, phone, description, serviceType, attributes = {}, spokenLanguages = null,
   vehicleTypeText = null, cityId = null, districtIds = [], cityIds = null, photoUrl = null,
-  consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null, language = null,
+  createOnly = false, consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null, language = null,
 }) {
   const masterToken = generateShortId();
   const legacy = legacyColumnsFor(serviceType, attributes);
@@ -32,6 +33,11 @@ async function registerMaster({
        legacy.is_flatbed, cityId || null, photoUrl || null, masterToken, welcomeBonusTetri]);
     let master = inserted.rows.find(row => row.master_token === masterToken);
     const isNew = Boolean(master);
+    if (!master && createOnly) {
+      const error = new Error('Provider already registered');
+      error.code = 'MASTER_ALREADY_REGISTERED';
+      throw error;
+    }
     if (!master) {
     const { rows } = await client.query(
       `INSERT INTO masters (name, phone, description, category, vehicle_type, vehicle_size, is_flatbed,
@@ -115,7 +121,7 @@ async function registerMaster({
         [master.id, Number(did)]
       );
     }
-    if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client, { declared_name: name });
+    if (consentGrant) await consentLog.applyConsent(consentGrant, 'provider', master.id, phone, requestMeta, client, { declared_name: name, profile_action: isNew ? 'created' : 'updated' });
     return master;
   });
 }

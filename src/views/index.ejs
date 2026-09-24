@@ -67,7 +67,7 @@
         </nav>
         <div class="home-header-actions">
           <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
-          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_label') %></span></a>
+          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('master_login_nav') %></span></a>
         </div>
       </div>
     </header>
@@ -429,7 +429,7 @@
 
     </main>
 
-    <nav id="mobileNav" class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-3 transition-transform duration-300 ease-out">
+    <nav id="mobileNav" class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-stone-900/95 backdrop-blur-md border-t border-stone-700/60 grid grid-cols-4 transition-transform duration-300 ease-out">
         <button type="button" onclick="openComposer()" class="flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[44px] text-emerald-400 active:scale-95 transition-transform">
             <i class="fa-solid fa-square-plus text-base"></i>
             <span class="text-[10px] font-bold"><%= t('mobilenav_post') %></span>
@@ -441,6 +441,10 @@
         <a href="/my-orders" class="flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[44px] text-stone-300 active:scale-95 transition-transform">
             <i class="fa-solid fa-list-check text-base"></i>
             <span class="text-[10px] font-bold"><%= t('my_orders_nav') %></span>
+        </a>
+        <a href="/master" class="flex flex-col items-center justify-center gap-0.5 py-2.5 min-h-[44px] text-stone-300 active:scale-95 transition-transform">
+            <i class="fa-solid fa-right-to-bracket text-base" aria-hidden="true"></i>
+            <span class="text-[10px] font-bold"><%= isRememberedProvider ? t('nav_my_cabinet') : t('master_login_nav') %></span>
         </a>
     </nav>
 

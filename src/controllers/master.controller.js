@@ -114,11 +114,18 @@ async function revealPhone(req, res) {
   return res.json({ success: true, phone: master.phone, contacts: require('../config/catalogContacts').links(master), alreadyOpened: master.alreadyOpened });
 }
 
+function existingProfileResponse(req, res) {
+  return res.status(409).json({ success: false, code: 'MASTER_ALREADY_REGISTERED',
+    message: clientStrings(req.lang).join_existing_profile, loginUrl: '/master' });
+}
+
 async function sendOtp(req, res) {
   const rawPhone = (typeof req.body.phone === 'string' ? req.body.phone : '').replace(/\s+/g, '');
   if (!rawPhone || !isGeorgianPhone(rawPhone)) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
+
+  if (await masterService.getMasterByPhone(toE164(rawPhone))) return existingProfileResponse(req, res);
 
   const acceptance = await consentService.acceptedRequest(req, 'provider');
   if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
@@ -204,21 +211,28 @@ async function register(req, res) {
     return res.status(400).json({ success: false, message: serviceMessage('unverified', req.lang) });
   }
 
-  const master = await masterService.registerMaster({
-    name,
-    phone,
-    description,
-    serviceType,
-    attributes,
-    spokenLanguages,
-    vehicleTypeText: null,
-    cityId,
-    cityIds,
-    photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
-    consentGrant: verified, requestMeta: requestMeta(req),
-    referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,
-    language: req.lang,
-  });
+  let master;
+  try {
+    master = await masterService.registerMaster({
+      createOnly: true,
+      name,
+      phone,
+      description,
+      serviceType,
+      attributes,
+      spokenLanguages,
+      vehicleTypeText: null,
+      cityId,
+      cityIds,
+      photoUrl: req.file ? `/uploads/${req.file.filename}` : null,
+      consentGrant: verified, requestMeta: requestMeta(req),
+      referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,
+      language: req.lang,
+    });
+  } catch (err) {
+    if (err.code === 'MASTER_ALREADY_REGISTERED') return existingProfileResponse(req, res);
+    throw err;
+  }
   await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
 
   // Промокод: welcome-бонус на баланс. Ошибка/невалидный код не ломает регистрацию.

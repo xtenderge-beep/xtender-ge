@@ -67,7 +67,7 @@ const settings = require('../src/services/settings.service');
     for (const marker of noise) assert.ok(!referred.html.includes(marker), 'focused page must not contain ' + marker);
     for (const marker of form) assert.ok(referred.html.includes(marker), 'focused page must keep ' + marker);
     assert.equal(heading(referred.html), 'Регистрация исполнителя');
-    assert.ok(referred.html.includes('<p class="text-sm text-stone-500 mt-2">Уже есть профиль?'));
+    assert.ok(referred.html.includes('<span>Уже есть профиль?</span>'));
     assert.ok(referred.setCookie.includes('partner_ref=' + token), 'attribution cookie is still set');
     // The language switcher points at clean URLs, so it must carry the parameters.
     assert.ok(referred.html.includes('/en/join?ref=' + token + '"'));

@@ -134,6 +134,42 @@ async function render(file, locals) {
   const registered=(await pool.query("SELECT metadata FROM sms_consent_logs WHERE event_type='MASTER_REGISTERED' AND master_id=$1",[master.id])).rows;
   assert.equal(registered.length,1);assert.equal(registered[0].metadata.declared_name,'Provider');
   assert.equal(Number(registered[0].metadata.consent_log_id),Number(providerGrant.consentLogId));
+  assert.equal(registered[0].metadata.profile_action,'created');
+  // Public signup must neither send another registration SMS nor modify an existing profile.
+  await pool.query('UPDATE masters SET is_active=true WHERE id=$1',[master.id]);
+  const beforeProfile=await masters.getMasterById(master.id);
+  const beforeEvents=(await pool.query('SELECT * FROM sms_consent_logs')).rows;
+  const beforeSms=sent;
+  for (const lang of ['ru','en','ka']) {
+    const duplicateResponse=response();
+    await masterController.sendOtp({...request({phone:providerPhone}),lang},duplicateResponse);
+    assert.equal(duplicateResponse.statusCode,409);
+    assert.equal(duplicateResponse.data.code,'MASTER_ALREADY_REGISTERED');
+    assert.equal(duplicateResponse.data.message,clientStrings(lang).join_existing_profile);
+    assert.equal(duplicateResponse.data.loginUrl,'/master');
+  }
+  assert.equal(sent,beforeSms);
+  // Covers a profile created after OTP send but before registration: the SQL conflict guard wins.
+  await assert.rejects(()=>masters.registerMaster({...args,createOnly:true,name:'Overwrite attempt'}),
+    {code:'MASTER_ALREADY_REGISTERED'});
+  assert.deepEqual(await masters.getMasterById(master.id),beforeProfile);
+  assert.deepEqual((await pool.query('SELECT * FROM sms_consent_logs')).rows,beforeEvents);
+  const originalRegister=masters.registerMaster;
+  masters.registerMaster=async input=>{assert.equal(input.createOnly,true);const err=new Error('exists');err.code='MASTER_ALREADY_REGISTERED';throw err;};
+  const cities=await masters.getWorkCities();
+  const duplicateResponse=response();
+  await masterController.register(request({phone:providerPhone,name:'Overwrite',description:'Moving',spokenLanguages:['ru'],
+    cityIds:[String(cities[0].id)],termsAccepted:'true',privacyAccepted:'true',challengeId:provider.challengeId}),duplicateResponse);
+  masters.registerMaster=originalRegister;
+  assert.equal(duplicateResponse.statusCode,409);
+  const newProfile=await masters.registerMaster({phone:'+995500000099',name:'New profile',description:'Moving',serviceType:null,createOnly:true});
+  assert.equal(newProfile.name,'New profile');
+  const recent=await log.listRecentConsents();
+  assert.ok(recent.some(row=>row.event_type==='MASTER_REGISTERED' && row.metadata.profile_action==='created'));
+  assert.ok(recent.some(row=>row.event_type==='CLIENT_CONSENT_OTP_VERIFIED' && row.order_id===pending.id));
+  const recentHtml=await render('admin/consent.ejs',{phoneQuery:'',report:null,recent,csrfToken:'test'});
+  assert.ok(recentHtml.includes('Профиль создан'));
+  assert.ok(recentHtml.includes('Текущий профиль по номеру'));
   const report=await log.exportForPhone(phone);
   assert.equal(report.client_consents.length,1);
   assert.ok(report.events.some(e=>e.event_type==='ORDER_PUBLISHED'));
