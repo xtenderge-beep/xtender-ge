@@ -76,6 +76,7 @@ async function buildKeyboardWithCounts(token, page = 0) {
   page = Number.isSafeInteger(page) ? Math.max(0, Math.min(page, pages - 1)) : 0;
   const visible = entries.slice(page * 20, (page + 1) * 20);
   const rows = [];
+  rows.push([{ text: '🔎 Подобрать и отправить в кабинете', url: getBaseUrl() + '/manager/orders/' + encodeURIComponent(token) }]);
   for(const [key,label] of visible) { const plan=await require('./dispatch.service').preview(token,key,'').catch(()=>null); rows.push([{text:label+' · новых: '+(plan?.count || 0),callback_data:'pick:'+token+':'+key}]); }
   if (visible.some(([key])=>key==='transport') && transportSizes.length) {
     for (const row of transportSizes) {

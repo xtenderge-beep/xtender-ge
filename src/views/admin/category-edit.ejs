@@ -8,7 +8,7 @@
   // как обычно (см. fieldsLocked ниже — теперь это просто предупреждение, не блокировка).
   const fields=submitted ? submitted.fields : (category?.fields || []).filter(f=>f.input!=='size').map(f=>({
     key:f.key, input:f.input, name_ru:f.labels?.ru, name_ka:f.labels?.ka, name_en:f.labels?.en,
-    required:f.required, unit:f.unit, min:f.min, max:f.max,
+    required:f.required, match:f.match || 'ignore', filter:f.filter, unit:f.unit, min:f.min, max:f.max,
     options:(f.options || []).map(v=>({value:v, name_ru:f.optionLabels?.[v]?.ru || v, name_ka:f.optionLabels?.[v]?.ka, name_en:f.optionLabels?.[v]?.en})),
   }));
 %>
@@ -41,7 +41,7 @@
 <% } %>
 <h2 class="font-bold">Характеристики для модератора</h2>
 <% if(fieldsLocked){ %><p class="text-sm">Поле «Размер» само по себе (буквы S/M/L/XL/XXL) настраивается в сантиметрах выше и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
-<p class="text-sm text-stone-500">Добавьте поля, которые модератор заполнит в анкете исполнителя. Они описывают услуги; рассылка подбирает исполнителей по категории.</p>
+<p class="text-sm text-stone-500">Поля описывают возможности исполнителя. Для участия в точном подборе выберите правило сравнения с требованием заявки. Поле «Текст» служит только описанием.</p>
 <div id="categoryFields" class="space-y-3">
 <% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i}) %><% }); %>
 </div>
@@ -70,20 +70,31 @@
   list.appendChild(tpl.content.cloneNode(true));
   renumberOptions(fieldRow);
  }
+ function updateRule(fieldRow){
+  const input=fieldRow.querySelector('[data-field-input]'), match=fieldRow.querySelector('[data-match]');
+  const allowed={text:['ignore'],number:['ignore','exact','gte'],bool:['ignore','flag'],enum:['ignore','exact','gte']}[input.value];
+  [...match.options].forEach(option=>option.disabled=!allowed.includes(option.value));
+  if(!allowed.includes(match.value))match.value='ignore';
+  const filter=fieldRow.querySelector('input[name$="[filter]"]');
+  filter.disabled=match.value==='ignore';if(filter.disabled)filter.checked=false;
+ }
  container.addEventListener('click',e=>{
   if(e.target.matches('[data-remove]')){e.target.closest('[data-field]').remove();renumber();return;}
   if(e.target.matches('[data-remove-option]')){const fieldRow=e.target.closest('[data-field]');e.target.closest('[data-option]').remove();renumberOptions(fieldRow);return;}
   if(e.target.matches('[data-add-option]')){addOption(e.target.closest('[data-field]'));return;}
  });
  container.addEventListener('change',e=>{
+  if(e.target.matches('[data-match]')){updateRule(e.target.closest('[data-field]'));return;}
   if(!e.target.matches('[data-field-input]')) return;
   const fieldRow=e.target.closest('[data-field]');
   fieldRow.querySelector('[data-number-block]').classList.toggle('hidden', e.target.value!=='number');
   const optionsBlock=fieldRow.querySelector('[data-options-block]');
   optionsBlock.classList.toggle('hidden', e.target.value!=='enum');
   if(e.target.value==='enum' && fieldRow.querySelector('[data-options-list]').children.length===0){addOption(fieldRow);addOption(fieldRow);}
+  updateRule(fieldRow);
  });
- document.getElementById('addCategoryField').addEventListener('click',()=>{if(container.children.length>=12)return;container.append(document.getElementById('categoryFieldTemplate').content.cloneNode(true));renumber();});
+ document.getElementById('addCategoryField').addEventListener('click',()=>{if(container.children.length>=12)return;container.append(document.getElementById('categoryFieldTemplate').content.cloneNode(true));renumber();updateRule(container.lastElementChild);});
+ container.querySelectorAll('[data-field]').forEach(updateRule);
 })();
 </script>
 <%- include('./_footer') %>

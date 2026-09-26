@@ -369,7 +369,7 @@ async function orderDetail(req, res) {
   order.deliveryRuns = await orderService.getOrderDispatches(order.id);
   order.funnel = await orderService.getOrderFunnelStats(order.id);
   res.locals.dispatchError = req.query.dispatchError || null;
-  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups(), speakLabels: require('../config/spokenLanguages').speakLabels });
+  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -713,17 +713,7 @@ async function cancelTopup(req, res) {
 async function saveOrderNeeds(req,res) {
   const token=req.params.token;
   try {
-    const selected=[...new Set([].concat(req.body.needs || []))];
-    const groups=await require('../services/category.service').groups();
-    const size=req.body.transportSize || '';
-    if(!selected.length || selected.some(c=>typeof c !== 'string' || !Object.hasOwn(groups,c)) || (size && !ALLOWED_SIZES.has(size)) || (size && !selected.includes('transport'))) throw new Error('Выберите потребности и корректный размер транспорта');
-    await require('../config/db').withTransaction(async client=>{
-      const order=(await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
-      if(!order || order.first_dispatched_at || order.status !== 'pending_review') throw new Error('Потребности можно настроить до первой рассылки. После неё можно закрывать отдельные потребности.');
-      await client.query('UPDATE orders SET target_categories=$2,requirements=$3::jsonb,revision_version=revision_version+1 WHERE token=$1',[token,selected,JSON.stringify({configured:true,transport_size:size})]);
-    });
-    const order=await orderService.getOrderByToken(token);
-    await require('../services/telegram.service').updateMessage(order);
+    await require('../services/orderNeeds.service').save(token,req.body.needs,req.body.transportSize,req.body.needAttributes);
     res.redirect('/admin/orders/'+encodeURIComponent(token));
   } catch(e) {res.redirect('/admin/orders/'+encodeURIComponent(token)+'?dispatchError='+encodeURIComponent(e.message));}
 }

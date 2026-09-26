@@ -15,7 +15,7 @@ async function save(req,res) {
  const category=slug ? await categories.get(slug) : null;
  let fields=req.body.fields || [];
  if(!Array.isArray(fields)) fields=[];
- const input={...req.body,is_active:req.body.is_active==='on',fields:fields.map(f=>({...f,required:f.required==='on'}))};
+ const input={...req.body,is_active:req.body.is_active==='on',fields:fields.map(f=>({...f,required:f.required==='on',filter:f.filter==='on'}))};
  try { const saved=await categories.save(slug,input);res.redirect('/admin/categories/'+saved.slug); }
  catch(error) {
    if(!error.status)throw error;

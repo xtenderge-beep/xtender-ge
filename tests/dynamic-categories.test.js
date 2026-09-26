@@ -20,6 +20,7 @@ const definition={name_ru:'Сантехник',name_ka:'სანტექნი
  await masters.updateMasterProfile(member.id,profile);await masters.approveMaster(member.id);
  await pool.query('UPDATE masters SET balance_tetri=500 WHERE id=$1',[member.id]);
  await require('./billing-fixture')(pool,member.id);
+ await assert.rejects(categories.save(key,{...definition,version:category.version,fields:[]}),{status:409});
  assert.equal((await masters.listMasters({serviceType:key})).length,1);
  const order=(await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('catorder','+995500000908','Plumbing','pending_review') RETURNING *")).rows[0];
  const keyboard=await telegram.buildKeyboardWithCounts(order.token);

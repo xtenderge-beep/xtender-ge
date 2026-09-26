@@ -15,6 +15,7 @@ function matches(services, category, size = '', openCategories = [], requirement
   const a = service.attributes || {};
   if (category === 'flatbed' && a.body !== 'flatbed') return false;
   if (size && a.size !== size) return false;
+  if (!require('./serviceRequirements.service').matches(a, requirements?.services?.[category], requirements?.rules?.[category])) return false;
   if (service.requires_own_transport) {
     return openCategories.some(c => ['transport', 'flatbed'].includes(c) && matches(services, c, requirements?.transport_size || '', openCategories, requirements));
   }

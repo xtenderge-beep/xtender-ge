@@ -1,0 +1,6 @@
+<%- include('_header') %>
+<h1>Заявки для рассылки</h1>
+<p>Подбор и отправка доступны главному модератору. Откройте заявку, проверьте каждую потребность и её характеристики до отправки.</p>
+<% if(!orders.length){ %><p>Открытых заявок сейчас нет.</p><% } %>
+<% orders.forEach(order=>{ %><div class="card"><a href="/manager/orders/<%= order.token %>"><strong>Заявка #<%= order.id %></strong></a> · <%= date(order.created_at) %><p class="pre"><%= order.description %></p></div><% }); %>
+</main></body></html>

@@ -87,6 +87,7 @@ router.get('/', asyncHandler(async (req, res) => {
     prefillPhone,
     clientStrings: clientStrings(locale),
     catalogGroups: await categoryService.catalogGroups(locale),
+    catalogServiceConfig: await categoryService.configForView(locale),
   });
 }));
 

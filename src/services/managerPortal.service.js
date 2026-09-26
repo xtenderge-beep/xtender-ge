@@ -259,7 +259,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,
+  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

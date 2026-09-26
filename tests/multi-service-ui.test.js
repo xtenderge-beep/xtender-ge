@@ -56,6 +56,16 @@ let server;
  assert.equal(updated.master.vehicle_size,'M');
  const stranger=(await pool.query("INSERT INTO managers(name,phone) VALUES('Чужой менеджер','+995500009555') RETURNING id")).rows[0].id;
  await assert.rejects(()=>portal.assignCategory(stranger,m.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}}]),{status:403});
+ await assert.rejects(()=>portal.requireHeadModerator(manager.id),{status:403});
+ await pool.query('UPDATE managers SET is_head_moderator=true WHERE id=$1',[manager.id]);
+ await portal.requireHeadModerator(manager.id);
+ const managerHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/order-dispatch.ejs'),{
+  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
+  groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
+  speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
+ });
+ assert.match(managerHtml,/Потребности клиента/);
+ for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');
  if(process.env.PREVIEW_MULTISERVICE){console.log('PREVIEW '+base+'/admin/masters/'+m.id);console.log('ORDER '+base+'/admin/orders/ui-multi');console.log('MANAGER '+base+'/preview-manager');}

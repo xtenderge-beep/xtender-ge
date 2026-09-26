@@ -5,7 +5,7 @@ router.use((req,res,next) => { res.set('Cache-Control','no-store'); next(); });
 router.get('/login', (req,res) => {
   const csrf = service.token();
   res.cookie('manager_login_csrf',csrf,{...service.cookieOptions,maxAge:900000});
-  res.render('manager/login',{csrf,error:null});
+  res.render('manager/login',{csrf,error:null,next:typeof req.query.next==='string' && /^\/manager\/orders\/[a-zA-Z0-9_-]+$/.test(req.query.next) ? req.query.next : ''});
 });
 router.post('/login',wrap(async (req,res) => {
   const csrf = req.cookies.manager_login_csrf;
@@ -14,8 +14,8 @@ router.post('/login',wrap(async (req,res) => {
     const sid = await service.login(req.body.login,req.body.password,req.ip);
     res.cookie(service.COOKIE,sid,{...service.cookieOptions,maxAge:service.TTL*1000});
     res.clearCookie('manager_login_csrf',service.cookieOptions);
-    res.redirect('/manager');
-  } catch(e) { if (!e.status) throw e; res.status(e.status).render('manager/login',{csrf,error:e.message}); }
+    res.redirect(typeof req.body.next==='string' && /^\/manager\/orders\/[a-zA-Z0-9_-]+$/.test(req.body.next) ? req.body.next : '/manager');
+  } catch(e) { if (!e.status) throw e; res.status(e.status).render('manager/login',{csrf,error:e.message,next:req.body.next || ''}); }
 }));
 // Ссылка из личного Telegram-уведомления модератору — авторизует его самого без
 // пароля и ведёт сразу на карточку одобрения. Должен идти раньше session-guard'а ниже,
@@ -28,7 +28,7 @@ router.get('/auth/:token',wrap(async(req,res) => {
 }));
 router.use(wrap(async(req,res,next) => {
   req.managerSession = await service.session(req.cookies[service.COOKIE]);
-  if (!req.managerSession) return res.redirect('/manager/login');
+  if (!req.managerSession) return res.redirect('/manager/login'+(req.method==='GET' && /^\/manager\/orders\/[a-zA-Z0-9_-]+$/.test(req.path) ? '?next='+encodeURIComponent(req.path) : ''));
   res.locals.manager = req.managerSession.manager;
   res.locals.csrf = req.managerSession.csrf;
   res.locals.money = v => (Number(v||0)/100).toFixed(2)+' ₾';
@@ -37,6 +37,44 @@ router.use(wrap(async(req,res,next) => {
   next();
 }));
 router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[service.COOKIE]); res.clearCookie(service.COOKIE,service.cookieOptions);res.redirect('/manager/login'); }));
+const dispatchService=require('../services/dispatch.service');
+const orderService=require('../services/order.service');
+const categoryService=require('../services/category.service');
+const dispatchPage=async(req,res,result=null)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  const order=await orderService.getOrderByToken(req.params.token);
+  if(!order)return res.status(404).send('Заявка не найдена');
+  order.closedCategories=await orderService.getClosedCategories(order.id);
+  let plan=null,error=req.query.error || null;
+  if(req.query.category)try {plan=await dispatchService.preview(order.token,req.query.category,req.query.size || '',req.query.language || '');}catch(e){error=e.message;}
+  res.render('manager/order-dispatch',{order,plan,result,error,groups:await categoryService.groups(),serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
+};
+router.get('/orders',wrap(async(req,res)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  const rows=(await require('../config/db').query("SELECT id,token,description,status,created_at FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT 100")).rows;
+  res.render('manager/orders',{orders:rows});
+}));
+router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
+router.post('/orders/:token/needs',wrap(async(req,res)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
+  catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
+router.post('/orders/:token/dispatch',wrap(async(req,res)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  try {const result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || '',{actor:'manager:'+req.managerSession.id});return dispatchPage(req,res,result);}
+  catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
+router.post('/orders/:token/retry',wrap(async(req,res)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
+  catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
+router.post('/orders/:token/close-category',wrap(async(req,res)=>{
+  await service.requireHeadModerator(req.managerSession.id);
+  try {await orderService.closeOrderCategory(req.params.token,req.body.category,{actor:'manager:'+req.managerSession.id});await require('../services/telegram.service').updateMessage(await orderService.getOrderByToken(req.params.token));res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
+  catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
 router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',await service.reviewGet(req.managerSession.id,req.params.id))));
 function reviewFormInput(req) {
   const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));

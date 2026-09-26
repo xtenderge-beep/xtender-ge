@@ -108,11 +108,12 @@ function parseFields(input, previous) {
       const raw=typeof f['name_'+lang]==='string' ? f['name_'+lang].trim() : '';
       if(raw){ if(raw.length>100) throw fail('Название характеристики: до 100 символов.'); labels[lang]=raw; }
     });
-    // match/filter/optionIcons не выведены в форму (пока не работает движок подбора,
-    // см. docs/service-types.md Фаза 4b) — для уже существующего поля переносим как
-    // было, для нового — те же дефолты, что и раньше у пользовательских категорий.
-    const out={key,input:f.input,labels,required:f.required===true,match:prevField?.match || 'ignore'};
-    if (prevField?.filter) out.filter = true;
+    const allowedMatches = {text:['ignore'],number:['ignore','exact','gte'],bool:['ignore','flag'],enum:['ignore','exact','gte']};
+    const match = f.match || prevField?.match || 'ignore';
+    if (!allowedMatches[f.input].includes(match)) throw fail('Некорректное правило подбора для характеристики.');
+    const out={key,input:f.input,labels,required:f.required===true,match};
+    if (f.filter === true && match === 'ignore') throw fail('Для фильтра каталога задайте правило подбора.');
+    if (f.filter === true || (f.filter === undefined && prevField?.filter)) out.filter = true;
     if (prevField?.optionIcons) out.optionIcons = prevField.optionIcons;
     if (out.input==='number') {
       const unit = typeof f.unit==='string' ? f.unit.trim() : '';
@@ -150,6 +151,15 @@ async function save(slug, input) {
     const lockedFields=(previous?.fields || []).filter(f=>f.input==='size');
     const editableExisting=(previous?.fields || []).filter(f=>f.input!=='size');
     const fields=[...lockedFields, ...parseFields(input.fields || [],editableExisting)];
+    if (previous) {
+      const assignments=(await client.query('SELECT attributes FROM master_services WHERE service_type=$1',[previous.slug])).rows;
+      for (const oldField of editableExisting) {
+        if (!assignments.some(row => row.attributes?.[oldField.key] !== undefined && row.attributes?.[oldField.key] !== null && row.attributes?.[oldField.key] !== '')) continue;
+        const nextField=fields.find(field=>field.key===oldField.key);
+        if (!nextField || nextField.input!==oldField.input) throw fail('Характеристика уже используется исполнителями. Оставьте её в справочнике и добавьте новую.',409);
+        if (oldField.input==='enum' && oldField.options.some((option,index)=>nextField.options[index]!==option)) throw fail('Используемые варианты нельзя удалять или менять местами. Можно добавить новые варианты в конец списка.',409);
+      }
+    }
     const active=input.is_active===true;
     if(previous) {
       const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version)]);

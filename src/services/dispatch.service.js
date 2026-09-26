@@ -29,6 +29,19 @@ async function preview(token, category, size, languageRaw = '') {
   if(category === 'transport' && order.requirements?.transport_size && size && size !== order.requirements.transport_size) throw new Error('Размер не соответствует потребности заявки');
   const price = await settingsService.getLeadPriceTetri();
   const eligible = await orderService.getDispatchRecipients(category, size, price, order.is_technical === true, '', order);
+  const definition = await require('./category.service').get(category);
+  const fields = definition ? require('./category.service').view(definition, 'ru').fields : [];
+  const criteria = Object.entries(order.requirements?.services?.[category] || {}).map(([key,value]) => {
+    const field = fields.find(item => item.key === key);
+    const shown = field?.options?.find(option => option.value === value)?.label || (value === true ? 'Да' : String(value));
+    return {label:field?.label || key,value:shown + (field?.unit && typeof value === 'number' ? ' '+field.unit : '')};
+  });
+  if (size) criteria.unshift({label:'Размер транспорта',value:size});
+  let attributeExcluded = 0;
+  if (Object.keys(order.requirements?.services?.[category] || {}).length) {
+    const broadOrder = {...order,requirements:{...order.requirements,services:{},rules:{}}};
+    attributeExcluded = Math.max(0,(await orderService.getDispatchRecipients(category,size,price,order.is_technical === true,'',broadOrder)).length-eligible.length);
+  }
   const received = await orderService.getChargedMasterIds(order.id);
   const pending=new Set((await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[order.id])).rows.map(d=>d.master_id));
   const fresh = eligible.filter(master => !received.has(master.id) && !pending.has(master.id));
@@ -37,7 +50,7 @@ async function preview(token, category, size, languageRaw = '') {
   const previous = await pool.query(`SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
   const sentLanguages = previous.rows.map(row => row.language);
   return {
-    order, category, size: size || '', language, price, recipients, count: recipients.length,
+    order, category, size: size || '', language, price, recipients, count: recipients.length, criteria, attributeExcluded,
     alreadySent: sentLanguages.includes(language), sentLanguages,
     // Подходящие по группе и языку, но уже получившие эту заявку раньше.
     alreadyReceived: inScope.filter(m=>received.has(m.id)).length,
@@ -50,6 +63,7 @@ async function preview(token, category, size, languageRaw = '') {
 function emptyReason(plan) {
   if (plan.pending > 0) return 'Есть отправки в обработке или с неопределённым результатом. Проверьте результаты';
   if (plan.alreadyReceived > 0) return 'Все подходящие исполнители уже получили эту заявку';
+  if (plan.attributeExcluded > 0) return 'Нет исполнителей, соответствующих выбранным характеристикам заявки';
   if (plan.language) return 'Нет исполнителей с активным профилем и достаточным балансом, которые говорят ' + speakLabels[plan.language];
   return 'Нет исполнителей с активным профилем и достаточным балансом';
 }

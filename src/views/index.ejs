@@ -289,6 +289,15 @@
                             <button type="button" onclick="setSizeFilter('XL')" data-filter-size="XL" class="filter-btn min-w-[42px] text-center px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">XL</button>
                             <button type="button" onclick="setSizeFilter('XXL')" data-filter-size="XXL" class="filter-btn min-w-[42px] text-center px-3 py-1.5 rounded-md font-mono text-[11px] font-bold uppercase tracking-wide transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">XXL</button>
                         </div>
+                        <div id="catalogAttributeFilters" class="mt-3">
+                          <% (typeof catalogServiceConfig === 'undefined' ? [] : catalogServiceConfig).forEach(svc=>{ const fields=svc.fields.filter(f=>f.filter && f.match && f.match!=='ignore' && f.input!=='size' && f.input!=='text'); if(!fields.length)return; %>
+                          <div data-catalog-field-panel="<%= svc.type %>" data-rules="<%= JSON.stringify(fields.map(f=>({key:f.key,input:f.input,match:f.match,options:f.options.map(o=>o.value)}))) %>" hidden class="flex flex-wrap gap-2">
+                            <% fields.forEach(f=>{ %><label class="text-xs font-bold"><%= f.label %>
+                            <% if(f.input==='enum'){ %><select data-catalog-field="<%= f.key %>" class="border rounded-lg p-2"><option value="">Все</option><% f.options.forEach(o=>{ %><option value="<%= o.value %>"><%= o.label %></option><% }); %></select>
+                            <% } else if(f.input==='number'){ %><input data-catalog-field="<%= f.key %>" type="number" step="any" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="От" class="border rounded-lg p-2 w-24"> <%= f.unit || '' %>
+                            <% } else if(f.input==='bool'){ %><input data-catalog-field="<%= f.key %>" type="checkbox"><% } %></label><% }); %>
+                          </div><% }); %>
+                        </div>
 
                     <% groups.forEach(function (group) { %>
                       <% const groupMasters = masters.filter((m) => m.service_type === group.key); %>
@@ -301,7 +310,7 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
 
                                       <% const ratingStars = Math.round(Number(master.rating) || 0); %>
 
@@ -591,6 +600,7 @@
         }
 
         function applyFilters() {
+            document.querySelectorAll('[data-catalog-field-panel]').forEach(panel => { panel.hidden = panel.dataset.catalogFieldPanel !== activeCategory; });
             document.querySelectorAll('[data-group]').forEach((group) => {
                 const show = activeCategory === 'all' || group.dataset.group === activeCategory;
                 group.classList.toggle('hidden', !show);
@@ -601,8 +611,25 @@
                 const target=activeCategory === 'all' ? card.dataset.originalGroup : activeCategory;
                 const container=[...document.querySelectorAll('[data-group]')].find(g=>g.dataset.group === target)?.querySelector('.home-master-grid');
                 if(show && container) container.appendChild(card);
+                const serviceAttributes = JSON.parse(card.dataset.serviceAttributes || '{}');
                 if (show && activeCategory === 'van' && activeSize !== 'all') {
-                    show = card.dataset.size === activeSize;
+                    show = (serviceAttributes.van?.size || card.dataset.size) === activeSize;
+                }
+                const panel = document.querySelector('[data-catalog-field-panel="' + activeCategory + '"]');
+                if (show && panel) {
+                    const rules = JSON.parse(panel.dataset.rules);
+                    const attrs = serviceAttributes[activeCategory] || {};
+                    for (const rule of rules) {
+                        const input = [...panel.querySelectorAll('[data-catalog-field]')].find(el => el.dataset.catalogField === rule.key);
+                        const requested = input.type === 'checkbox' ? input.checked : input.value;
+                        if (requested === '' || requested === false) continue;
+                        const actual = attrs[rule.key];
+                        if (actual === undefined || actual === null || actual === '' ||
+                            rule.match === 'flag' && actual !== true ||
+                            rule.match === 'exact' && (rule.input === 'number' ? Number(actual) !== Number(requested) : actual !== requested) ||
+                            rule.match === 'gte' && rule.input === 'number' && !(Number(actual) >= Number(requested)) ||
+                            rule.match === 'gte' && rule.input === 'enum' && (!rule.options.includes(actual) || rule.options.indexOf(actual) < rule.options.indexOf(requested))) { show = false; break; }
+                    }
                 }
                 if (document.getElementById('catalog-only-language').checked && !card.dataset.languages.split(' ').includes(document.getElementById('catalog-language').value)) show = false;
                 card.classList.toggle('hidden', !show);
@@ -623,6 +650,7 @@
         function setCategoryFilter(cat, anchorId) {
             activeCategory = cat;
             activeSize = 'all';
+            document.querySelectorAll('[data-catalog-field-panel] input,[data-catalog-field-panel] select').forEach(input => { if(input.type === 'checkbox') input.checked = false; else input.value = ''; });
             applyFilters();
             if (anchorId) setTimeout(() => scrollToId(anchorId), 50);
         }
@@ -631,6 +659,7 @@
             activeSize = size;
             applyFilters();
         }
+        document.querySelectorAll('[data-catalog-field-panel] input,[data-catalog-field-panel] select').forEach(input => input.addEventListener('change', applyFilters));
 
         const attachmentsInput = document.getElementById('attachments');
         const attachmentsPreview = document.getElementById('attachmentsPreview');
