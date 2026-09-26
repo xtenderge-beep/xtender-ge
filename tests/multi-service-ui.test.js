@@ -64,7 +64,7 @@ let server;
   groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
   speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
  });
- assert.match(managerHtml,/Потребности клиента/);
+ assert.match(managerHtml,/Что нужно клиенту/);
  for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');

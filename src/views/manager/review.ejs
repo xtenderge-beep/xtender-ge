@@ -17,13 +17,14 @@
 <form method="post" action="/manager/review/<%= master.id %>/approve" class="card">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <input type="hidden" name="servicesForm" value="1">
-  <h2>Услуги исполнителя</h2><p>Можно выбрать несколько услуг. Укажите, принимает ли грузчик отдельные заявки или работает только со своим транспортом.</p>
-  <% categories.forEach(c=>{ %><label><input type="checkbox" name="services" value="<%= c.type %>" <%= (master.services || []).some(s=>s.service_type===c.type) ? 'checked' : '' %>> <%= c.label %></label><% }); %>
+  <h2>1. Выберите услуги</h2><p>Отметьте всё, что исполнитель реально выполняет. Характеристики выбранных услуг появятся ниже.</p>
+  <div class="service-grid"><% categories.forEach(c=>{ %><label class="service-tile"><input type="checkbox" name="services" value="<%= c.type %>" <%= (master.services || []).some(s=>s.service_type===c.type) ? 'checked' : '' %>> <%= c.label %></label><% }); %></div>
+  <h2>2. Уточните возможности</h2><p>Для грузчиков отдельно укажите, берут ли они заявки без своей машины.</p>
   <div id="vehicleSizeField" hidden><label>Размер кузова<select name="vehicleSize"><option value="">Размер неизвестен</option><% vanSizes.forEach(s=>{ %><option value="<%= s.code %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — <%= s.spec %></option><% }); %></select></label>
   <p>Или укажите все три размера в см — размер определится автоматически.</p>
   <label>Длина<input type="number" name="cargoLength" min="1" max="2000"></label><label>Ширина<input type="number" name="cargoWidth" min="1" max="2000"></label><label>Высота<input type="number" name="cargoHeight" min="1" max="2000"></label></div>
   <%- include('../admin/_master-service-fields', {master,serviceConfig:categories}) %>
-  <div style="display:flex;gap:8px"><button type="submit" formaction="/manager/review/<%= master.id %>/assign">Сохранить услуги</button><% if (!master.is_active) { %><button type="submit">Сохранить и одобрить</button><% } %></div>
+  <div class="form-actions"><button type="submit" formaction="/manager/review/<%= master.id %>/assign" class="secondary-action">Сохранить услуги без одобрения</button><% if (!master.is_active) { %><button type="submit">Сохранить и одобрить исполнителя</button><% } %></div>
 </form>
 
 <% if (manager.is_head_moderator && !master.is_active) { %>

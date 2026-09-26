@@ -57,7 +57,7 @@ router.get('/orders',wrap(async(req,res)=>{
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
   await service.requireHeadModerator(req.managerSession.id);
-  try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
+  try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'#dispatch-selection');}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/dispatch',wrap(async(req,res)=>{
