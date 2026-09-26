@@ -1,0 +1,54 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),vm=require('vm');
+const db=require('pg-mem').newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+const {Pool}=db.adapters.createPg(),pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
+stub('../src/config/db',pool);const redis=new(require('ioredis-mock'))();stub('../src/config/redis',redis);
+stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async()=>false});
+stub('../src/services/sms.service',{sendOrderNotification:async()=>({ok:true,providerMessageId:'test'})});
+stub('../src/services/translation.service',{translateOrder:async()=>null});
+process.env.ADMIN_PASSWORD='test-only';process.env.ADMIN_SESSION_SECRET='multi-service-ui-only';
+const auth=require('../src/config/adminAuth'),session=auth.createSessionValue();
+const masters=require('../src/services/master.service'),orders=require('../src/services/order.service');
+let server;
+(async()=>{
+ const m=await masters.registerMaster({name:'Демо исполнитель',phone:'+995500009111',serviceType:null});
+ const o=(await pool.query("INSERT INTO orders(token,owner_token,phone,description,status) VALUES('ui-multi','ui-owner','+995500009222','Переезд: машина и два грузчика','pending_review') RETURNING *")).rows[0];
+ const express=require('express'),app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));
+ app.use(express.urlencoded({extended:false}));app.use(require('cookie-parser')());
+ if(process.env.PREVIEW_MULTISERVICE)app.use((req,res,next)=>{req.cookies.admin_session=session.cookieValue;next();});
+ app.use(express.static(path.join(__dirname,'../public')));
+ app.use('/admin',require('../src/routes/admin.routes'));
+ const manager=(await pool.query("INSERT INTO managers(name,phone,is_moderator) VALUES('Демо менеджер','+995500009333',true) RETURNING *")).rows[0];
+ const pending=await masters.registerMaster({name:'Демо новый исполнитель',phone:'+995500009444',serviceType:null});
+ app.get('/preview-manager',async(req,res,next)=>{try{
+  const locals=await require('../src/services/managerPortal.service').reviewGet(manager.id,pending.id);
+  res.render('manager/review',{...locals,manager,csrf:'test',date:v=>String(v)});
+ }catch(e){next(e);}});
+ app.use((e,req,res,next)=>{console.error(e);res.status(500).send(e.message);});
+ server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ const cookie='admin_session='+session.cookieValue;
+ const get=async url=>{const response=await fetch(base+url,{headers:{cookie}});assert.equal(response.status,200);const html=await response.text();for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);return html;};
+ const post=async(url,pairs)=>fetch(base+url,{method:'POST',headers:{cookie,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams([['_csrf',session.csrfToken],...pairs]),redirect:'manual'});
+ assert.match(await get('/admin/masters/'+m.id),/Услуги исполнителя/);
+ assert.equal((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['servicesForm','1'],['services','van'],['services','movers'],['van_body','closed'],['vehicleSize','L'],['movers_crew_size','1'],['moversOwnTransport','on'],['thenApprove','1']])).status,302);
+ assert.equal((await pool.query('SELECT * FROM master_services WHERE master_id=$1',[m.id])).rows.length,2);
+ await pool.query('UPDATE masters SET balance_tetri=5000 WHERE id=$1',[m.id]);await require('./billing-fixture')(pool,m.id);
+ await post('/admin/orders/ui-multi/needs',[['needs','transport'],['needs','movers'],['transportSize','L']]);
+ const configured=await orders.getOrderByToken(o.token);assert.deepEqual(configured.target_categories,['transport','movers']);assert.equal(configured.requirements.transport_size,'L');
+ assert.match(await get('/admin/orders/ui-multi'),/Что нужно клиенту/);
+ assert.match(await get('/admin/orders/ui-multi/dispatch?category=transport&size=L'),/Получателей с достаточным балансом/);
+ const plan=await require('../src/services/dispatch.service').preview(o.token,'transport','L');
+ const sent=await post('/admin/orders/ui-multi/dispatch',[['category','transport'],['size','L'],['price',String(plan.price)],['count',String(plan.count)],['revision',String(configured.revision_version)]]);
+ assert.equal(sent.status,200);assert.match(await sent.text(),/Сообщений принято каналом/);
+ assert.match(await get('/admin/orders/ui-multi'),/Результаты рассылок/);
+ const stale=await post('/admin/orders/ui-multi/needs',[['needs','movers']]);assert.ok(stale.headers.get('location').includes('dispatchError='));
+ assert.match(await get('/preview-manager'),/Сохранить услуги/);
+ const portal=require('../src/services/managerPortal.service');
+ await portal.assignCategory(manager.id,pending.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}},{type:'movers',attributes:{crew_size:2},requiresOwnTransport:true}]);
+ const saved=await portal.reviewGet(manager.id,pending.id);assert.equal(saved.master.services.length,2);
+ console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');
+ if(process.env.PREVIEW_MULTISERVICE){console.log('PREVIEW '+base+'/admin/masters/'+m.id);console.log('ORDER '+base+'/admin/orders/ui-multi');console.log('MANAGER '+base+'/preview-manager');}
+ else {await new Promise(resolve=>server.close(resolve));redis.disconnect();}
+})().catch(async e=>{console.error(e);process.exitCode=1;if(server)await new Promise(resolve=>server.close(resolve));redis.disconnect();});

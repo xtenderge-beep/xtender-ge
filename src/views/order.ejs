@@ -161,7 +161,7 @@
           <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
             <%= t('order_pending_review_notice') %>
           </div>
-        <% } else if (!isOwner && masterCategory && closedCategories.includes(masterCategory)) { %>
+        <% } else if (!isOwner && (typeof noMatchingNeeds !== 'undefined' ? noMatchingNeeds : masterCategory && closedCategories.includes(masterCategory))) { %>
           <div class="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-sm text-stone-600 font-medium">
             <%= t('order_closed_notice_category') %>
           </div>

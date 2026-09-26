@@ -271,7 +271,7 @@
                                 <%= t('filter_all') %>
                             </button>
                             <% groups.forEach(function (group) { %>
-                              <% if (masters.some((m) => m.service_type === group.key)) { %>
+                              <% if (masters.some((m) => m.service_type === group.key || (m.services || []).some(s=>s.service_type === group.key))) { %>
                                 <button type="button" onclick="setCategoryFilter('<%= group.key %>')" data-filter-cat="<%= group.key %>" class="filter-btn px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition border bg-white text-stone-600 border-stone-200 hover:brightness-95">
                                     <%= group.icon %> <%= group.label %>
                                 </button>
@@ -292,7 +292,7 @@
 
                     <% groups.forEach(function (group) { %>
                       <% const groupMasters = masters.filter((m) => m.service_type === group.key); %>
-                      <% if (groupMasters.length) { %>
+                      <% if (masters.some(m=>m.service_type === group.key || (m.services || []).some(s=>s.service_type === group.key))) { %>
                         <div id="<%= group.anchor %>" data-group="<%= group.key %>" class="scroll-mt-24">
                             <h3 class="text-sm font-extrabold text-stone-800 flex items-center gap-2 mb-3">
                                 <span class="text-lg"><%= group.icon %></span>
@@ -301,7 +301,7 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
 
                                       <% const ratingStars = Math.round(Number(master.rating) || 0); %>
 
@@ -596,7 +596,11 @@
                 group.classList.toggle('hidden', !show);
             });
             document.querySelectorAll('.master-card').forEach((card) => {
-                let show = activeCategory === 'all' || card.dataset.category === activeCategory;
+                const types=card.dataset.services.split(' ');
+                let show = activeCategory === 'all' || types.includes(activeCategory);
+                const target=activeCategory === 'all' ? card.dataset.originalGroup : activeCategory;
+                const container=[...document.querySelectorAll('[data-group]')].find(g=>g.dataset.group === target)?.querySelector('.home-master-grid');
+                if(show && container) container.appendChild(card);
                 if (show && activeCategory === 'van' && activeSize !== 'all') {
                     show = card.dataset.size === activeSize;
                 }

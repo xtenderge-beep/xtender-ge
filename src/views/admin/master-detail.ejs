@@ -105,16 +105,17 @@
                 <input type="text" name="phone" required value="<%= master.phone %>" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500">
             </div>
             <div>
-                <label class="text-xs font-bold text-stone-500">Категория</label>
-                <select id="moderatorCategory" name="category" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
-                    <option value="" <%= !serviceConfig.some(svc => (svc.type === 'van' ? 'transport' : svc.type) === master.category) ? 'selected' : '' %>>Назначьте категорию</option>
-                    <% serviceConfig.forEach(svc => { const value = svc.type === 'van' ? 'transport' : svc.type; %><option value="<%= value %>" <%= master.category === value ? 'selected' : '' %>><%= svc.label %></option><% }); %>
-                </select>
+                <label class="text-xs font-bold text-stone-500">Услуги исполнителя</label>
+                <input type="hidden" name="servicesForm" value="1">
+                <p class="text-xs">Можно выбрать несколько. Профиль и баланс остаются общими.</p>
+                <% serviceConfig.forEach(svc => { const selected = (master.services || []).some(s=>s.service_type === svc.type); %>
+                  <label class="service-choice text-sm"><input type="checkbox" name="services" value="<%= svc.type %>" <%= selected ? 'checked' : '' %>> <%= svc.label %></label>
+                <% }); %>
             </div>
             <div id="vehicleSizeField" hidden>
                 <label class="text-xs font-bold text-stone-500">Размер кузова — тиры и см как в тарифе «Грузовой» Яндекса</label>
                 <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
-                    <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Любой размер</option>
+                    <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Размер неизвестен</option>
                     <% vanSizes.forEach(s => { %>
                     <option value="<%= s.code %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option>
                     <% }); %>

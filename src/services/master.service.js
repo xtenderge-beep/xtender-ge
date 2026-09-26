@@ -301,7 +301,13 @@ async function getMasterLeads(masterId, masterCategory = null, limit = 100) {
   );
 
   const seen = new Set();
-  return rows.filter((row) => (seen.has(row.id) ? false : seen.add(row.id)));
+  const leads=rows.filter((row) => (seen.has(row.id) ? false : seen.add(row.id)));
+  const master=(await pool.query('SELECT * FROM masters WHERE id=$1',[masterId])).rows[0];
+  for(const lead of leads) {
+    const order=(await pool.query('SELECT * FROM orders WHERE id=$1',[lead.id])).rows[0];
+    lead.is_closed_for_master=!master || !(await require('./serviceMatching.service').openMatches(master,order)).length;
+  }
+  return leads;
 }
 
 async function approveMaster(id) {
@@ -312,9 +318,12 @@ async function approveMaster(id) {
     const type = master.category === 'transport' ? 'van' : master.category;
     const config = require('./category.service');
     const definition = await config.get(type,client);
-    const services = await client.query('SELECT * FROM master_services WHERE master_id = $1 AND service_type = $2', [id, type]);
-    const service = services.rows[0];
-    if (!service || config.validate(definition, service.attributes).errors.length) return null;
+    const services = await client.query('SELECT * FROM master_services WHERE master_id=$1', [id]);
+    if (!services.rows.length) return null;
+    for (const service of services.rows) {
+      if (config.validate(await config.get(service.service_type,client), service.attributes).errors.length) return null;
+      if (service.requires_own_transport && !services.rows.some(s=>s.service_type === 'van')) return null;
+    }
     const { rows } = await client.query('UPDATE masters SET is_active = true WHERE id = $1 RETURNING *', [id]);
     return rows[0];
   });
@@ -404,25 +413,33 @@ async function topUpBalance(phone, amountTetri) {
 // category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
 // остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
 // мастера до одного тира).
-async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, isFlatbed, priceText, description, serviceAttributes = {} }) {
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services }) {
   const config = require('../config/serviceTypes');
-  const type = category === 'transport' ? 'van' : category;
   const categories = require('./category.service');
-  const definition = await categories.get(type);
-  const checked = categories.validate(definition, serviceAttributes);
-  if (type !== definition?.slug || checked.errors.length) {
-    const error = new Error('Заполните категорию и обязательные характеристики'); error.code = 'INVALID_SERVICE'; throw error;
+  const selected = services || [{ type: category === 'transport' ? 'van' : category, attributes: serviceAttributes }];
+  const invalid = () => Object.assign(new Error('Выберите услуги и заполните обязательные характеристики'), { code: 'INVALID_SERVICE' });
+  if (!Array.isArray(selected) || !selected.length || new Set(selected.map(s=>s.type)).size !== selected.length) throw invalid();
+  const normalized = [];
+  for (const item of selected) {
+    const definition = await categories.get(item.type);
+    const checked = categories.validate(definition, item.attributes);
+    if (definition?.slug !== item.type || checked.errors.length) throw invalid();
+    if (item.type === 'van' && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
+    const requiresOwnTransport = item.requiresOwnTransport === true;
+    if (requiresOwnTransport && (item.type !== 'movers' || !selected.some(s=>s.type === 'van'))) throw invalid();
+    normalized.push({ type: item.type, attributes: checked.attributes, requiresOwnTransport });
   }
-  if (type === 'van' && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
-  const legacy = config.legacyColumnsFor(type, checked.attributes);
+  const primary = normalized.find(s=>s.type === 'van') || normalized[0];
+  const legacy = config.legacyColumnsFor(primary.type, primary.attributes);
   return pool.withTransaction(async client => {
-    await client.query('SELECT id FROM masters WHERE id = $1 FOR UPDATE', [id]);
+    await client.query('SELECT id FROM masters WHERE id=$1 FOR UPDATE', [id]);
     const { rows } = await client.query(
       'UPDATE masters SET name=$1, phone=$2, category=$3, vehicle_type=$4, vehicle_size=$5, is_flatbed=$6, price_text=$7, description=$8 WHERE id=$9 RETURNING *',
       [name, phone, legacy.category, vehicleType || null, legacy.vehicle_size, legacy.is_flatbed, priceText || null, description || null, id]);
     if (!rows[0]) return null;
     await client.query('DELETE FROM master_services WHERE master_id=$1', [id]);
-    await client.query('INSERT INTO master_services (master_id, service_type, attributes, is_primary) VALUES ($1,$2,$3::jsonb,true)', [id,type,JSON.stringify(checked.attributes)]);
+    for (const service of normalized) await client.query('INSERT INTO master_services(master_id,service_type,attributes,is_primary,requires_own_transport) VALUES($1,$2,$3::jsonb,$4,$5)',
+      [id,service.type,JSON.stringify(service.attributes),service === primary,service.requiresOwnTransport]);
     return rows[0];
   });
 }
@@ -480,13 +497,16 @@ async function listMasters({ serviceType, language } = {}) {
   const ids = rows.map((r) => r.id);
   const ph = ids.map((_, i) => `$${i + 1}`).join(', ');
   const { rows: services } = await pool.query(
-    `SELECT master_id, service_type, attributes, is_primary FROM master_services WHERE master_id IN (${ph})`,
+    `SELECT master_id, service_type, attributes, is_primary, requires_own_transport FROM master_services WHERE master_id IN (${ph})`,
     ids
   );
+  const active = new Set((await require('./category.service').list()).filter(c=>c.is_active).map(c=>c.slug));
   const byMaster = new Map();
   for (const s of services) {
+    if(!active.has(s.service_type) || s.requires_own_transport) continue;
     const cur = byMaster.get(s.master_id);
-    if (!cur || (s.is_primary && !cur.is_primary)) byMaster.set(s.master_id, s);
+    if (s.requires_own_transport && serviceType === 'movers') continue;
+    if (!cur || (serviceType ? s.service_type === serviceType : (s.is_primary && !cur.is_primary))) byMaster.set(s.master_id, s);
   }
 
   const billing = require('./providerBilling.service');
@@ -501,11 +521,11 @@ async function listMasters({ serviceType, language } = {}) {
       spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
       available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),
       billing_accepted: billingIds.has(m.id),
-      service_type: s ? s.service_type : (m.category === 'movers' ? 'movers' : 'van'),
+      service_type: s ? s.service_type : (services.some(row=>row.master_id === m.id) ? null : (m.category === 'transport' ? 'van' : m.category)),
       attributes: s ? s.attributes || {} : {},
+      services: services.filter(s=>s.master_id === m.id && !s.requires_own_transport && active.has(s.service_type)),
     };
   });
-  const active = new Set((await require('./category.service').list()).filter(c=>c.is_active).map(c=>c.slug));
   return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType)).sort((a,b) => Number(b.spoken_languages.includes(language)) - Number(a.spoken_languages.includes(language)));
 }
 

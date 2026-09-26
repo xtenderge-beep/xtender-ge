@@ -793,3 +793,18 @@ CREATE TABLE IF NOT EXISTS catalog_contact_access (
   opened_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (master_id, caller_phone)
 );
+
+-- Multiple provider services and immutable dispatch context.
+ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS category VARCHAR(80);
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS vehicle_size VARCHAR(10) NOT NULL DEFAULT '';
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS language VARCHAR(5) NOT NULL DEFAULT '';
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS initiated_by VARCHAR(100);
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS revision INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS channel VARCHAR(20);
+ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS reason VARCHAR(100);
+ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS matched_categories JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS service_snapshot JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS retry_of INTEGER;
+ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS retry_run_id INTEGER;

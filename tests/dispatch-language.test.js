@@ -115,7 +115,7 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
 
   // Строки истории рассылки: язык виден, число — тех, кто говорит на нём.
   const history = await orders.getOrderDispatches(order2.id);
-  assert.deepEqual(history.map(d => [d.category, d.language, d.master_count]), [['movers', 'ka', 1], ['movers', '', 4]]);
+  assert.deepEqual(history.map(d => [d.category, d.language, d.master_count]), [['movers', 'ka', 1], ['movers', '', 3]]);
 
   // Telegram: кнопки категорий открывают выбор адресата, а не рассылают сразу.
   process.env.TELEGRAM_BOT_TOKEN = 'test-only';
@@ -135,7 +135,7 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
   assert.equal(flat.at(-1).callback_data, 'cats_refresh:langord3');
   flat.forEach(b => assert.ok(Buffer.byteLength(b.callback_data) <= 64));
   const done = (await telegram.buildLanguageKeyboard(order1, 'movers')).inline_keyboard.flat().map(b => b.text);
-  assert.ok(done.includes('✅ 👥 Все · отправлено') && done.includes('✅ 🗣 Говорят по-русски · отправлено'));
+  assert.ok(done.includes('↩ 👥 Все · запускалась') && done.includes('↩ 🗣 Говорят по-русски · запускалась'));
   assert.ok(done.includes('🗣 Говорят по-грузински (0)'));
 
   calls.length = 0;
@@ -195,8 +195,8 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
   calls.length = 0;
   await realUpdateMessage(await orders.getOrderByToken(order3.token));
   const text = calls.find(c => c.url.endsWith('editMessageText')).body.text;
-  assert.match(text, /Грузчики · говорят по-грузински — 1/);
-  assert.match(text, /Грузчики · говорят по-русски — 2/);
+  assert.match(text, /Грузчики · говорят по-грузински\nВыбрано: 1 · принято: 1/);
+  assert.match(text, /Грузчики · говорят по-русски\nВыбрано: 2 · принято: 2/);
 
   // Форма и предпросмотр в админке.
   const ejs = require('ejs');

@@ -46,6 +46,7 @@ const EN_TEXT = 'Need a move from Vake to Saburtalo, 2-bedroom apartment';
   const masterService = require('../src/services/master.service');
   const settingsService = require('../src/services/settings.service');
   const controller = require('../src/controllers/order.controller');
+  require('../src/services/serviceMatching.service').openMatches = async()=>['movers'];
   let order = { id: 7, token: 'lang-tok-1', owner_token: 'owner-x', phone: '+995500000010', description: RU_TEXT, status: 'new',
     district_name: '', target_categories: ['movers'], source_lang: null, description_translations: {}, created_at: new Date() };
   let master = { id: 5, name: 'Гела', category: 'movers', master_token: 'mt-5', balance_tetri: 500, is_banned: false, spoken_languages: ['ka'], language: 'ka' };

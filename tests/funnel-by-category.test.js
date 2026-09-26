@@ -25,7 +25,10 @@ const order = async (token, status = 'new') => (await pool.query(
   [token, status, ['movers', 'transport']]
 )).rows[0];
 const dispatched = (orderId, category, size = '') => pool.query('INSERT INTO order_dispatches(order_id,category,vehicle_size) VALUES($1,$2,$3)', [orderId, category, size]);
-const delivery = async (runId, orderId, masterId, status) => pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,status) VALUES($1,$2,$3,$4)', [runId, orderId, masterId, status]);
+const delivery = async (runId, orderId, masterId, status) => {
+  const category=(await pool.query('SELECT category FROM masters WHERE id=$1',[masterId])).rows[0].category;
+  return pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,status,matched_categories) VALUES($1,$2,$3,$4,$5::jsonb)',[runId,orderId,masterId,status,JSON.stringify([category])]);
+};
 const event = (orderId, masterId, type) => pool.query('INSERT INTO order_views(order_id,master_id,event_type) VALUES($1,$2,$3)', [orderId, masterId, type]);
 const rowFor = (rows, category) => rows.find(r => r.category === category);
 
@@ -61,7 +64,7 @@ const rowFor = (rows, category) => rows.find(r => r.category === category);
   assert.equal(rows.reduce((s, r) => s + r.call, 0), totals.call);
   assert.equal(rows.reduce((s, r) => s + r.whatsapp, 0), totals.whatsapp);
 
-  // --- Заявка до появления dispatch_deliveries: «получили» берётся из списания lead_charge.
+  // --- Заявка до появления dispatch_deliveries: «уведомлены» берётся из списания lead_charge.
   const o2 = await order('fun-tok-2');
   await dispatched(o2.id, 'movers');
   await pool.query("INSERT INTO balance_transactions(master_id,order_id,amount_tetri,reason) VALUES($1,$2,-50,'lead_charge')", [m1, o2.id]);
@@ -69,7 +72,7 @@ const rowFor = (rows, category) => rows.find(r => r.category === category);
   const legacy = await orderService.getOrderFunnelByCategory(o2.id);
   assert.deepEqual(legacy, [{ category: 'movers', received: 1, view: 0, call: 0, whatsapp: 1, contacted: 1 }], 'legacy order falls back to lead_charge');
 
-  // --- И доставка, и списание одного мастера не задваивают «получили».
+  // --- И доставка, и списание одного мастера не задваивают «уведомлены».
   const o3 = await order('fun-tok-3');
   await dispatched(o3.id, 'movers');
   const run3 = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id', [o3.id])).rows[0].id;
@@ -85,7 +88,7 @@ const rowFor = (rows, category) => rows.find(r => r.category === category);
   // --- «Бортовые» — не masters.category, а подвыборка transport: учитывается как transport.
   const o5 = await order('fun-tok-5');
   await dispatched(o5.id, 'flatbed');
-  assert.deepEqual((await orderService.getOrderFunnelByCategory(o5.id)).map(r => r.category), ['transport'], 'flatbed is reported as transport, not a phantom group');
+  assert.deepEqual((await orderService.getOrderFunnelByCategory(o5.id)).map(r => r.category), ['flatbed'], 'flatbed retains its independently closable need');
 
   // --- Заявка без рассылки — пустой отчёт, без ошибок.
   assert.deepEqual(await orderService.getOrderFunnelByCategory((await order('fun-tok-6', 'pending_review')).id), []);
@@ -94,9 +97,9 @@ const rowFor = (rows, category) => rows.find(r => r.category === category);
   const labels = { movers: '💪 Грузчики', transport: '🚚 Перевозки' };
   const dispatchLines = ['💪 Грузчики — 3', '🚚 Перевозки XL — 2'];
   const text = telegram.buildMessageText({ ...o1, description: 'Переезд', district_name: null }, dispatchLines, totals, { byCategory: rows, labels, closedCategories: ['movers'] });
-  assert.match(text, /📊 Воронка по группам:/);
-  assert.match(text, /💪 Грузчики 🔒 закрыта: получили 2 · 👀 2 · 📞 2 · 💬 1 · отклик 2 из 2 \(100%\)/, 'closed group is marked and response rate is shown');
-  assert.match(text, /🚚 Перевозки: получили 2 · 👀 1 · 📞 0 · 💬 0 · отклик 0 из 2 \(0%\)/);
+  assert.match(text, /📊 Действия получателей по предложенным услугам:/);
+  assert.match(text, /💪 Грузчики 🔒 закрыта: уведомлены 2 · 👀 2 · 📞 2 · 💬 1 · нажали контакт 2 из 2 \(100%\)/, 'closed group is marked and response rate is shown');
+  assert.match(text, /🚚 Перевозки: уведомлены 2 · 👀 1 · 📞 0 · 💬 0 · нажали контакт 0 из 2 \(0%\)/);
   assert.match(text, /Всего: 👀 3 · 📞 2 · 💬 1/);
   assert.doesNotMatch(text, /🚚 Перевозки 🔒/, 'the open group is not marked closed');
 
@@ -108,7 +111,7 @@ const rowFor = (rows, category) => rows.find(r => r.category === category);
   // Группа, где лид никто не получил: без процента (нет деления на ноль).
   const zero = telegram.buildMessageText({ ...o1, description: 'x', district_name: null }, dispatchLines, totals,
     { byCategory: [{ category: 'transport', received: 0, view: 0, call: 0, whatsapp: 0, contacted: 0 }], labels });
-  assert.match(zero, /🚚 Перевозки: получили 0 · 👀 0 · 📞 0 · 💬 0(\n|$)/, 'no rate when nobody received the lead');
+  assert.match(zero, /🚚 Перевозки: уведомлены 0 · 👀 0 · 📞 0 · 💬 0(\n|$)/, 'no rate when nobody received the lead');
 
   console.log('funnel-by-category.test.js: all assertions passed');
 })().catch(e => { console.error('TEST FAILED:', e); process.exit(1); });

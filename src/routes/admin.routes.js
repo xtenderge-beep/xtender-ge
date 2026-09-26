@@ -63,6 +63,8 @@ router.post('/receipts/assign-statement-credit', verifyCsrf, asyncHandler(adminC
 router.post('/receipts/dismiss-statement-credit', verifyCsrf, asyncHandler(adminController.dismissStatementCredit));
 
 router.get('/orders', asyncHandler(adminController.ordersList));
+router.post('/orders/:token/needs', verifyCsrf, asyncHandler(adminController.saveOrderNeeds));
+router.post('/orders/:token/retry-dispatch', verifyCsrf, asyncHandler(adminController.retryDispatch));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));
 router.post('/orders/:token/dispatch', verifyCsrf, asyncHandler(adminController.dispatchOrder));
 router.get('/orders/:token', asyncHandler(adminController.orderDetail));

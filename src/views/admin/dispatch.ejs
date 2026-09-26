@@ -3,7 +3,8 @@
 <section class="admin-dispatch">
 <h1 class="text-2xl font-black">Рассылка исполнителям</h1>
 <% if(error) { %><p role="alert" class="text-red-800"><%= error %></p><% } %>
-<% if(result) { %><p role="status">Уведомлений отправлено: <strong><%= result.count %></strong>. Списано: <strong><%= (result.count*result.price/100).toFixed(2) %> ₾</strong>.</p><p>Это подтверждение отправки через канал уведомлений. Просмотры и нажатия контактов доступны в карточке заявки.</p><% } %>
+<% if(result) { %><p role="status">Сообщений принято каналом: <strong><%= result.count %></strong>. Списано: <strong><%= (result.count*result.price/100).toFixed(2) %> ₾</strong>.</p><p>Это подтверждение отправки через канал уведомлений. Просмотры и нажатия контактов доступны в карточке заявки.</p><% } %>
+<% if(result && result.run) { %><p>Выбрано: <%= result.run.selected %> · Telegram: <%= result.run.telegram %> · SMS: <%= result.run.sms %> · Ошибки: <%= result.run.failed %> · Пропущено: <%= result.run.skipped %> · В обработке / неизвестно: <%= result.run.pending %></p><a href="/admin/orders/<%= token %>#dispatch-results">Получатели, причины и повтор ошибок</a><% } %>
 <% if(plan) { %>
 <p class="font-bold"><%= plan.order.is_technical ? '🧪 ТЕСТ — только технические исполнители' : 'Обычная заявка — только реальные исполнители' %></p>
 <p><%= plan.order.description %></p>

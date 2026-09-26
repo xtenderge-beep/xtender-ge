@@ -617,6 +617,37 @@ async function telegramWebhook(req, res) {
       return res.sendStatus(200);
     }
 
+    if (callback.data.startsWith('report:')) {
+      const chat = String(callback.message?.chat?.id || '');
+      const allowed = chat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
+      if (!allowed) { await telegramService.answerCallback(callback.id,'Нет доступа'); return res.sendStatus(200); }
+      const order = await orderService.getOrderByToken(callback.data.split(':')[1]);
+      if (!order) { await telegramService.answerCallback(callback.id,'Заявка не найдена'); return res.sendStatus(200); }
+      await telegramService.answerCallback(callback.id);
+      const runs=await orderService.getOrderDispatches(order.id);
+      const labels=await require('../services/category.service').groups(true);
+      const reasons={need_closed:'потребность закрыта',service_changed:'изменились услуги',eligibility_changed:'изменился допуск или баланс',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'предыдущая попытка не завершена',channel_rejected:'канал отклонил',result_unknown:'результат неизвестен',before_send_error:'ошибка до отправки'};
+      const lines=['Заявка #'+order.id+' · результаты последних рассылок'];
+      for(const run of runs.slice(-3)) {
+        lines.push('',(labels[run.category] || 'Архивная группа')+' · запуск #'+run.id,
+          'Выбрано '+run.selected+' · принято '+run.accepted+' · ошибки '+run.failed+' · пропущено '+run.skipped+' · в обработке / неизвестно '+run.pending);
+        for(const d of run.deliveries.slice(0,25)) lines.push('#'+d.master_id+' · '+({accepted:'принято',failed:'ошибка',pending:'в обработке / неизвестно',skipped:'пропущено'})[d.status]+(d.channel ? ' · '+d.channel : '')+(d.reason ? ' · '+(reasons[d.reason] || d.reason) : ''));
+        if(run.deliveries.length>25) lines.push('…остальные получатели — в карточке заявки');
+      }
+      if(!runs.length)lines.push('Рассылок ещё нет.');
+      await telegramService.sendToChat(chat,lines.join('\n').slice(0,3800));
+      return res.sendStatus(200);
+    }
+    if (callback.data.startsWith('retry:')) {
+      const chat = String(callback.message?.chat?.id || '');
+      const allowed = chat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
+      if (!allowed) { await telegramService.answerCallback(callback.id,'Нет доступа'); return res.sendStatus(200); }
+      const [,token,runId] = callback.data.split(':');
+      await telegramService.answerCallback(callback.id,'Проверяем ошибки и повторяем подходящим получателям…');
+      try { await require('../services/dispatch.service').retry(token,runId,'telegram:'+String(callback.from?.id || '')); }
+      catch(e) { await telegramService.sendToChat(chat,'Повтор рассылки: '+e.message); }
+      return res.sendStatus(200);
+    }
     if (callback.data.startsWith('cats_refresh:') || callback.data.startsWith('cats_page:')) {
       const callbackChat = String(callback.message?.chat?.id || '');
       const allowed = callbackChat === String(process.env.TELEGRAM_MODERATOR_CHAT_ID) || await managerService.isActiveModerator(callback.from?.id);
@@ -704,11 +735,13 @@ async function telegramWebhook(req, res) {
         return res.sendStatus(200);
       }
       await answer('Запускаем рассылку…');
-      const result = await dispatchService.dispatch(token, category, vehicleSize, { price: plan.price, count: plan.count, revision: Number(revisionRaw || 0) }, language);
+      const result = await dispatchService.dispatch(token, category, vehicleSize, { price: plan.price, count: plan.count, revision: Number(revisionRaw || 0) }, language, {actor:'telegram:'+String(callback.from?.id || '')});
       console.log('Dispatch completed:', token, result.count);
     } catch (err) {
       console.error('Dispatch rejected or incomplete:', err.message);
       if (!answered) await answer(err.message);
+      else await telegramService.sendToChat(callbackChat, 'Рассылка не завершена: ' + err.message + '. Проверьте результаты в карточке заявки.');
+      await telegramService.updateMessage(order).catch(()=>{});
       await restoreCategories();
     }
 
@@ -802,6 +835,7 @@ async function show(req, res) {
     isOwner,
     masterId,
     masterCategory,
+    noMatchingNeeds: !!m && !(await require('../services/serviceMatching.service').openMatches(m,order)).length,
     funnel,
     masterAccount,
     requestLang,

@@ -14,58 +14,16 @@
 </details>
 <% } %>
 
-<div class="card">
-  <h2>1. Категория</h2>
-  <p class="muted">Выберите, чем занимается специалист — заявка сразу закрепится за вами, а ниже появятся вопросы именно для этой категории.</p>
-  <div class="grid" id="categoryPicker">
-    <% categories.forEach(function (c) { %>
-      <button type="button" class="category-btn" data-pick="<%= c.type %>"><%= c.icon ? c.icon + ' ' : '' %><%= c.label %></button>
-    <% }); %>
-  </div>
-</div>
-
-<form method="post" action="/manager/review/<%= master.id %>/approve" id="approveForm" class="card" hidden>
+<form method="post" action="/manager/review/<%= master.id %>/approve" class="card">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
-  <input type="hidden" name="category" id="categoryInput">
-  <h2>2. <span id="approveStepLabel"></span></h2>
-  <% categories.forEach(function (c) { %>
-    <% var required = c.fields.filter(function (f) { return f.required; }); %>
-    <% var tailLift = c.type === 'van' ? c.fields.find(function (f) { return f.key === 'tail_lift'; }) : null; %>
-    <div data-fields-for="<%= c.type %>" hidden>
-      <% if (!required.length && c.type !== 'van') { %><p class="muted">Для этой категории дополнительных характеристик не требуется — можно сразу одобрять.</p><% } %>
-      <% if (c.type === 'van') { %>
-        <p class="muted" style="margin:4px 0 8px">Введите размеры кузова (см) — категория S/M/L/XL/XXL определится сама, как в тарифе «Грузовой» Яндекса.</p>
-        <label>Длина, см<input type="number" name="cargoLength" min="1" max="2000" required data-cargo-input></label>
-        <label>Ширина, см<input type="number" name="cargoWidth" min="1" max="2000" required data-cargo-input></label>
-        <label>Высота, см<input type="number" name="cargoHeight" min="1" max="2000" required data-cargo-input></label>
-        <p><small id="cargoSizePreview" class="muted">Заполните все три поля, чтобы увидеть категорию.</small></p>
-        <label><input type="checkbox" id="anySizeCheck"> Точные размеры неизвестны — не ограничивать рассылку по размеру</label>
-        <input type="hidden" name="vehicleSize" id="anySizeInput" value="any" disabled>
-      <% } %>
-      <% required.forEach(function (f) { %>
-        <label><%= f.label %>
-          <% if (f.input === 'enum') { %>
-            <select name="attr_<%= f.key %>" required>
-              <% f.options.forEach(function (o) { %><option value="<%= o.value %>"><%= o.label %></option><% }); %>
-            </select>
-          <% } else if (f.input === 'number') { %>
-            <input type="number" name="attr_<%= f.key %>" min="<%= f.min %>" max="<%= f.max %>" required>
-          <% } else if (f.input === 'bool') { %>
-            <input type="checkbox" name="attr_<%= f.key %>" value="true">
-          <% } else { %>
-            <input type="text" name="attr_<%= f.key %>" required>
-          <% } %>
-        </label>
-      <% }); %>
-      <% if (tailLift) { %>
-        <label><input type="checkbox" name="attr_<%= tailLift.key %>" value="true"> <%= tailLift.label %></label>
-      <% } %>
-    </div>
-  <% }); %>
-  <div style="display:flex;gap:8px">
-    <button type="submit" formaction="/manager/review/<%= master.id %>/assign" style="flex:1;background:white;color:#19232d;border:1px solid #bbc9c5">Только категория</button>
-    <button type="submit" formaction="/manager/review/<%= master.id %>/approve" style="flex:1">Категория и одобрить</button>
-  </div>
+  <input type="hidden" name="servicesForm" value="1">
+  <h2>Услуги исполнителя</h2><p>Можно выбрать несколько услуг. Укажите, принимает ли грузчик отдельные заявки или работает только со своим транспортом.</p>
+  <% categories.forEach(c=>{ %><label><input type="checkbox" name="services" value="<%= c.type %>" <%= (master.services || []).some(s=>s.service_type===c.type) ? 'checked' : '' %>> <%= c.label %></label><% }); %>
+  <div id="vehicleSizeField" hidden><label>Размер кузова<select name="vehicleSize"><option value="">Размер неизвестен</option><% vanSizes.forEach(s=>{ %><option value="<%= s.code %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — <%= s.spec %></option><% }); %></select></label>
+  <p>Или укажите все три размера в см — размер определится автоматически.</p>
+  <label>Длина<input type="number" name="cargoLength" min="1" max="2000"></label><label>Ширина<input type="number" name="cargoWidth" min="1" max="2000"></label><label>Высота<input type="number" name="cargoHeight" min="1" max="2000"></label></div>
+  <%- include('../admin/_master-service-fields', {master,serviceConfig:categories}) %>
+  <div style="display:flex;gap:8px"><button type="submit" formaction="/manager/review/<%= master.id %>/assign">Сохранить услуги</button><button type="submit">Сохранить и одобрить</button></div>
 </form>
 
 <% if (manager.is_head_moderator) { %>
@@ -81,68 +39,4 @@
 
 <p><small>Другой случай (необязательные характеристики) — <a href="/admin/masters/<%= master.id %>">полная карточка в админке</a>.</small></p>
 
-<style>.category-btn{background:white;color:#19232d;border:1px solid #bbc9c5}.category-btn.active{background:#08765f;color:white;border-color:#08765f}</style>
-<script>
-(function () {
-  var buttons = document.querySelectorAll('#categoryPicker [data-pick]');
-  var form = document.getElementById('approveForm');
-  var categoryInput = document.getElementById('categoryInput');
-  var stepLabel = document.getElementById('approveStepLabel');
-  var fieldBlocks = document.querySelectorAll('[data-fields-for]');
-
-  // Пороги S/M/L/XL/XXL — то же самое, что deriveVanSize на сервере (см.
-  // config/serviceTypes.js), только тут для превью до отправки формы: итоговую букву
-  // всё равно определяет сервер, клиенту доверять нельзя.
-  var VAN_SIZES = <%- JSON.stringify(vanSizes) %>;
-  function deriveSize(l, w, h) {
-    if (!l || !w || !h) return null;
-    for (var i = VAN_SIZES.length - 1; i >= 0; i--) {
-      var t = VAN_SIZES[i];
-      if (l >= t.length && w >= t.width && h >= t.height) return t.code;
-    }
-    return 'S';
-  }
-  var cargoInputs = document.querySelectorAll('[data-cargo-input]');
-  var cargoPreview = document.getElementById('cargoSizePreview');
-  var anyCheck = document.getElementById('anySizeCheck');
-  var anyInput = document.getElementById('anySizeInput');
-  function updateCargoPreview() {
-    if (!cargoPreview) return;
-    var l = Number(document.querySelector('[name="cargoLength"]').value);
-    var w = Number(document.querySelector('[name="cargoWidth"]').value);
-    var h = Number(document.querySelector('[name="cargoHeight"]').value);
-    var size = deriveSize(l, w, h);
-    if (!size) { cargoPreview.textContent = 'Заполните все три поля, чтобы увидеть категорию.'; return; }
-    var spec = VAN_SIZES.filter(function (s) { return s.code === size; })[0];
-    cargoPreview.textContent = 'Категория: ' + size + (spec ? ' (' + spec.spec + ')' : '');
-  }
-  function syncAnySize() {
-    if (!anyCheck) return;
-    var any = anyCheck.checked;
-    cargoInputs.forEach(function (el) { el.disabled = any; el.required = !any; });
-    anyInput.disabled = !any;
-    if (cargoPreview) cargoPreview.hidden = any;
-  }
-  cargoInputs.forEach(function (el) { el.addEventListener('input', updateCargoPreview); });
-  if (anyCheck) anyCheck.addEventListener('change', syncAnySize);
-
-  buttons.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      buttons.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var type = btn.dataset.pick;
-      categoryInput.value = type;
-      stepLabel.textContent = btn.textContent.trim();
-      fieldBlocks.forEach(function (block) {
-        var match = block.getAttribute('data-fields-for') === type;
-        block.hidden = !match;
-        block.querySelectorAll('input,select').forEach(function (el) { el.disabled = !match; });
-      });
-      if (type === 'van') syncAnySize(); // переоткрыли van — восстановить disabled/required по чекбоксу, а не по общему тумблеру выше
-      form.hidden = false;
-      form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-})();
-</script>
 </main></body></html>

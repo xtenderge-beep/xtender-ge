@@ -17,10 +17,11 @@ async function reveal(token, masterToken, channel, meta = {}) {
     const sold = charged ? (await client.query("SELECT metadata FROM sms_consent_logs WHERE order_id=$1 AND master_id=$2 AND event_type='LEAD_CHARGE_ACCEPTED' ORDER BY id DESC LIMIT 1", [order.id, master.id])).rows[0] : null;
     const targets = order.target_categories || [];
     const category = sold?.metadata?.category || (master.category === 'transport' && master.is_flatbed && !targets.includes('transport') && targets.includes('flatbed') ? 'flatbed' : master.category);
-    const closure = (await client.query('SELECT category FROM order_category_closures WHERE order_id=$1 AND category=$2', [order.id, category])).rows[0];
+    const matching = require('./serviceMatching.service');
+    const openMatches = await matching.openMatches(master,order,client);
     let code = null;
-    if (!charged || master.is_technical !== order.is_technical || !targets.includes(category)) code = 'forbidden';
-    else if (!['new', 'pending_review'].includes(order.status) || closure || !order.phone) code = 'unavailable';
+    if (!charged || master.is_technical !== order.is_technical) code = 'forbidden';
+    else if (!['new', 'pending_review'].includes(order.status) || !openMatches.length || !order.phone) code = 'unavailable';
     await consentLog.recordAction({
       eventType: code ? 'ORDER_CONTACT_DENIED' : 'ORDER_CONTACT_RELEASED',
       phone: order.phone, masterId: master.id, orderId: order.id, meta,

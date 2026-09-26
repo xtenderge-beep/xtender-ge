@@ -201,7 +201,7 @@ async function getMasterDetail(id) {
     [id]
   );
   const workCities = await pool.query('SELECT c.name_ru FROM cities c JOIN master_cities mc ON mc.city_id = c.id WHERE mc.master_id = $1 ORDER BY c.sort_order, c.id', [id]);
-  const services = await pool.query('SELECT service_type, attributes FROM master_services WHERE master_id = $1', [id]);
+  const services = await pool.query('SELECT service_type, attributes, requires_own_transport FROM master_services WHERE master_id = $1', [id]);
   const category = await require('./category.service').get(master.category);
   return { ...master, category_label: category?.name_ru || master.category || 'Категория не назначена', services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
 }

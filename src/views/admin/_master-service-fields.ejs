@@ -1,8 +1,16 @@
+<style>
+label.service-choice{display:flex;align-items:center;gap:8px;margin:8px 0}
+label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;flex:0 0 18px;margin:0;padding:0}
+</style>
 <% serviceConfig.forEach(svc => { const saved = (master.services || []).find(s => s.service_type === svc.type); const attrs = saved ? saved.attributes : {}; %>
 <fieldset data-service-panel="<%= svc.type %>" class="space-y-3 border border-stone-200 rounded-xl p-3">
   <legend class="text-sm font-bold"><%= svc.label %>: характеристики</legend>
+  <% if (svc.type === 'movers') { %>
+    <label class="service-choice text-sm"><input type="checkbox" name="moversOwnTransport" <%= saved?.requires_own_transport ? 'checked' : '' %>> Погрузка только вместе со своим транспортом</label>
+    <p class="text-xs">Без этой отметки принимает отдельные заявки на грузчиков. Для отметки нужно также выбрать перевозки.</p>
+  <% } %>
   <% svc.fields.filter(f => f.input !== 'size').forEach(f => { %>
-    <label class="block text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
+    <label class="<%= f.input === 'bool' ? 'service-choice' : 'block' %> text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
     <% if (f.input === 'enum') { %>
       <select name="<%= svc.type %>_<%= f.key %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
         <option value="">Выберите</option>
@@ -16,26 +24,27 @@
       <input type="number" name="<%= svc.type %>_<%= f.key %>" value="<%= attrs[f.key] == null ? '' : attrs[f.key] %>" min="<%= f.min %>" max="<%= f.max %>" step="any" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
     <% } %>
     </label>
+    <% if(svc.type === 'van' && f.key === 'with_helpers') { %><p class="text-xs">Это характеристика перевозки. Чтобы получать предложения по погрузке, выберите также услугу «Грузчики» и её условия.</p><% } %>
   <% }); %>
 </fieldset>
 <% }); %>
 <script>
 (() => {
- const select = document.getElementById('moderatorCategory');
+ const choices = [...document.querySelectorAll('input[name=services]')];
  const sizeField = document.getElementById('vehicleSizeField');
  function update() {
-  const type = select.value === 'transport' ? 'van' : select.value;
+  const types = choices.filter(input=>input.checked).map(input=>input.value);
   document.querySelectorAll('[data-service-panel]').forEach(panel => {
-   const active = panel.dataset.servicePanel === type;
+   const active = types.includes(panel.dataset.servicePanel);
    panel.hidden = !active;
    panel.querySelectorAll('input,select').forEach(input => input.disabled = !active);
   });
   if (sizeField) {
-   const showSize = select.value === 'transport';
+   const showSize = types.includes('van');
    sizeField.hidden = !showSize;
-   sizeField.querySelectorAll('select').forEach(input => input.disabled = !showSize);
+   sizeField.querySelectorAll('input,select').forEach(input => input.disabled = !showSize);
   }
  }
- select.addEventListener('change', update); update();
+ choices.forEach(input=>input.addEventListener('change', update)); update();
 })();
 </script>

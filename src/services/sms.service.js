@@ -96,6 +96,9 @@ async function send(phone, text, context = {}) {
       ok = true;
     }
   } catch (err) {
+    // Known gateway error codes are safe to retry; timeouts and unknown replies are not.
+    const raw=err.response?.data ?? providerResponse;
+    err.deliveryUnknown = !((typeof raw === 'string' && /^000[1-9]-/.test(raw)) || (raw && typeof raw === 'object' && (raw.ok === false || raw.success === false)));
     providerResponse = providerResponse ?? { error: err.message };
     console.error(`[SMS GATEWAY] to=${normalizePhone(phone)} failed: ${err.message}`);
     if (context.log !== false) {

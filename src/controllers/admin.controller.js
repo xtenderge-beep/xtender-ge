@@ -243,7 +243,8 @@ async function updateMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   const name = (req.body.name || '').trim();
   const phoneRaw = (req.body.phone || '').trim();
-  const category = req.body.category;
+  const selectedTypes = [].concat(req.body.services || []).filter(t=>typeof t === 'string');
+  const category = selectedTypes.length ? (selectedTypes[0] === 'van' ? 'transport' : selectedTypes[0]) : req.body.category;
   const vehicleType = (req.body.vehicleType || '').trim();
   const priceText = (req.body.priceText || '').trim();
   const description = (req.body.description || '').trim();
@@ -252,7 +253,7 @@ async function updateMaster(req, res) {
     return res.redirect(`/admin/masters/${id}?error=invalid_fields`);
   }
 
-  const vehicleSize = category === 'transport' && ALLOWED_SIZES.has(req.body.vehicleSize) ? req.body.vehicleSize : null;
+  const vehicleSize = (category === 'transport' || selectedTypes.includes('van')) && ALLOWED_SIZES.has(req.body.vehicleSize) ? req.body.vehicleSize : null;
   const isFlatbed = category === 'transport' && req.body.isFlatbed === 'on';
 
   try {
@@ -265,6 +266,9 @@ async function updateMaster(req, res) {
       isFlatbed,
       priceText,
       description,
+      services: req.body.servicesForm ? selectedTypes.map(type=>({ type,
+        requiresOwnTransport: type === 'movers' && req.body.moversOwnTransport === 'on',
+        attributes: Object.fromEntries(Object.entries(req.body).filter(([key])=>key.startsWith(type+'_')).map(([key,value])=>[key.slice(type.length+1),value])) })) : undefined,
       serviceAttributes: Object.fromEntries(Object.entries(req.body).filter(([key]) => key.startsWith((category === 'transport' ? 'van' : category) + '_')).map(([key, value]) => [key.slice((category === 'transport' ? 'van' : category).length + 1), value])),
     });
   } catch (err) {
@@ -362,6 +366,9 @@ async function orderDetail(req, res) {
   res.locals.revisionNotice = req.query.revisionNotice === 'failed' ? 'failed' : req.query.revisionNotice === 'sent' ? 'sent' : null;
   const order = await adminService.getOrderDetailAdmin(req.params.token);
   if (!order) return res.status(404).send('Заявка не найдена');
+  order.deliveryRuns = await orderService.getOrderDispatches(order.id);
+  order.funnel = await orderService.getOrderFunnelStats(order.id);
+  res.locals.dispatchError = req.query.dispatchError || null;
   res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups(), speakLabels: require('../config/spokenLanguages').speakLabels });
 }
 
@@ -703,6 +710,30 @@ async function cancelTopup(req, res) {
     res.status(400).render('admin/receipts', { receipts: await receiptsWithPurpose(), error: error.message });
   }
 }
+async function saveOrderNeeds(req,res) {
+  const token=req.params.token;
+  try {
+    const selected=[...new Set([].concat(req.body.needs || []))];
+    const groups=await require('../services/category.service').groups();
+    const size=req.body.transportSize || '';
+    if(!selected.length || selected.some(c=>typeof c !== 'string' || !Object.hasOwn(groups,c)) || (size && !ALLOWED_SIZES.has(size)) || (size && !selected.includes('transport'))) throw new Error('Выберите потребности и корректный размер транспорта');
+    await require('../config/db').withTransaction(async client=>{
+      const order=(await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
+      if(!order || order.first_dispatched_at || order.status !== 'pending_review') throw new Error('Потребности можно настроить до первой рассылки. После неё можно закрывать отдельные потребности.');
+      await client.query('UPDATE orders SET target_categories=$2,requirements=$3::jsonb,revision_version=revision_version+1 WHERE token=$1',[token,selected,JSON.stringify({configured:true,transport_size:size})]);
+    });
+    const order=await orderService.getOrderByToken(token);
+    await require('../services/telegram.service').updateMessage(order);
+    res.redirect('/admin/orders/'+encodeURIComponent(token));
+  } catch(e) {res.redirect('/admin/orders/'+encodeURIComponent(token)+'?dispatchError='+encodeURIComponent(e.message));}
+}
+async function retryDispatch(req,res) {
+  try {
+    await require('../services/dispatch.service').retry(req.params.token,req.body.runId,'admin');
+    res.redirect('/admin/orders/'+encodeURIComponent(req.params.token)+'#dispatch-results');
+  } catch(e) {res.redirect('/admin/orders/'+encodeURIComponent(req.params.token)+'?dispatchError='+encodeURIComponent(e.message)+'#dispatch-results');}
+}
+
 async function dispatchPreview(req,res) {
   let plan=null, error=null;
   try { plan=await dispatchService.preview(req.params.token, req.query.category, req.query.size || '', req.query.language || ''); } catch(err) { error=err.message; }
@@ -710,7 +741,7 @@ async function dispatchPreview(req,res) {
 }
 async function dispatchOrder(req,res) {
   let result=null,error=null;
-  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || ''); } catch(err) { error=err.message; }
+  try { result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || '',{actor:'admin'}); } catch(err) { error=err.message; }
   res.status(error ? 409 : 200).render('admin/dispatch',{token:req.params.token,plan:null,error,result,groups:await require('../services/category.service').groups(),speakLabels:require('../config/spokenLanguages').speakLabels,emptyReason:dispatchService.emptyReason});
 }
 async function updateWelcomeBonus(req, res) {
@@ -761,6 +792,8 @@ module.exports = {
   updateMasterDisplayName,
   updatePaymentDetails,
   updateWelcomeBonus,
+  saveOrderNeeds,
+  retryDispatch,
   dispatchPreview, dispatchOrder,
   receiptsList, receiptReview, confirmTopup, cancelTopup, importStatement, assignStatementCredit, dismissStatementCredit,
   showLogin,

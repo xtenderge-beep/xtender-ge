@@ -1,0 +1,87 @@
+const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
+const db=require('pg-mem').newDb();
+const schema=fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8');
+db.public.none(schema);
+const {Pool}=db.adapters.createPg(),pool=new Pool();
+pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}};
+const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
+stub('../src/config/db',pool);const redis=new(require('ioredis-mock'))();stub('../src/config/redis',redis);
+const sent=[];let failure=null;
+stub('../src/services/sms.service',{sendOrderNotification:async(phone,text,context)=>{
+  if(context?.kind === 'lead') {sent.push(phone);if(failure === phone)return {ok:false};if(failure === 'unknown')throw Error('timeout');}
+  return {ok:true,providerMessageId:'sms-test'};
+}});
+stub('../src/services/translation.service',{translateOrder:async()=>null});
+stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async()=>false});
+const masters=require('../src/services/master.service'),orders=require('../src/services/order.service'),dispatch=require('../src/services/dispatch.service');
+const matching=require('../src/services/serviceMatching.service'),contact=require('../src/services/orderContact.service');
+const van=size=>({type:'van',attributes:{body:'closed'},size});
+const mover=own=>({type:'movers',attributes:{crew_size:1},requiresOwnTransport:own});
+let seq=0;
+async function provider(services,size='L') {
+  const m=await masters.registerMaster({name:'Provider '+(++seq),phone:'+99550000800'+seq,serviceType:null});
+  await masters.updateMasterProfile(m.id,{name:m.name,phone:m.phone,services,vehicleSize:size});
+  await masters.approveMaster(m.id);
+  await pool.query('UPDATE masters SET balance_tetri=5000 WHERE id=$1',[m.id]);
+  await require('./billing-fixture')(pool,m.id);
+  return (await pool.query('SELECT * FROM masters WHERE id=$1',[m.id])).rows[0];
+}
+let orderSeq=0;
+async function order(needs=['transport','movers']) {
+  return (await pool.query("INSERT INTO orders(token,phone,description,status,target_categories,requirements) VALUES($1,'+995500008999','Move boxes','pending_review',$2,$3::jsonb) RETURNING *",['multi-'+(++orderSeq),needs,JSON.stringify({configured:true,transport_size:needs.includes('transport')?'L':''})])).rows[0];
+}
+const ids=plan=>plan.recipients.map(m=>m.id).sort((a,b)=>a-b);
+(async()=>{
+  const transport=await provider([van()]);
+  const independent=await provider([mover(false)]);
+  const combined=await provider([van(),mover(true)]);
+  const both=await provider([van(),mover(false)]);
+  const small=await provider([van(),mover(true)],'S');
+  await assert.rejects(provider([mover(true)]),{code:'INVALID_SERVICE'});
+  assert.deepEqual((await masters.listMasters({serviceType:'movers'})).map(m=>m.id),[independent.id,both.id]);
+  assert.equal((await masters.listMasters()).filter(m=>m.id === both.id).length,1);
+  const o=await order();
+  assert.deepEqual(ids(await dispatch.preview(o.token,'transport','L')),[transport.id,combined.id,both.id]);
+  assert.deepEqual(ids(await dispatch.preview(o.token,'movers','')),[independent.id,combined.id,both.id]);
+  const moversOnly=await order(['movers']);
+  assert.deepEqual(ids(await dispatch.preview(moversOnly.token,'movers','')),[independent.id,both.id]);
+  await assert.rejects(dispatch.preview(moversOnly.token,'transport',''),/не указана/);
+  const first=await dispatch.dispatch(o.token,'transport','L',null,'',{actor:'telegram:777'});
+  assert.equal(first.count,3);assert.equal(first.run.initiated_by,'telegram:777');
+  assert.deepEqual(ids(await dispatch.preview(o.token,'movers','')),[independent.id]);
+  assert.equal((await dispatch.dispatch(o.token,'movers','')).count,1);
+  const charges=(await pool.query("SELECT master_id FROM balance_transactions WHERE order_id=$1 AND reason='lead_charge'",[o.id])).rows;
+  assert.equal(charges.length,4);assert.equal(new Set(charges.map(r=>r.master_id)).size,4);
+  await orders.closeOrderCategory(o.token,'transport',{actor:'client'});
+  const remaining=await orders.getOrderByToken(o.token);
+  assert.deepEqual(await matching.openMatches(combined,remaining),[]);
+  assert.deepEqual(await matching.openMatches(both,remaining),['movers']);
+  assert.equal((await contact.reveal(o.token,combined.master_token,'call')).status,409);
+  assert.equal((await contact.reveal(o.token,both.master_token,'call')).status,200);
+  assert.equal((await contact.reveal(o.token,both.master_token,'whatsapp')).status,200);
+  assert.equal((await orders.getOrderFunnelStats(o.id)).contacted,1);
+  const leads=await masters.getMasterLeads(combined.id,combined.category);
+  assert.equal(leads.find(l=>l.id === o.id).is_closed_for_master,true);
+  const countBefore=(await orders.getOrderDispatches(o.id))[0].master_count;
+  await masters.updateMasterProfile(combined.id,{name:combined.name,phone:combined.phone,services:[{type:'junk',attributes:{volume_m3:'4'}}]});
+  assert.equal((await orders.getOrderDispatches(o.id))[0].master_count,countBefore);
+  const cohorts=await orders.getOrderFunnelByCategory(o.id);
+  assert.ok(!cohorts.some(r=>r.category === 'junk' && r.received));
+  const failures=await order(['movers']);failure=independent.phone;
+  const failed=await dispatch.dispatch(failures.token,'movers','');
+  assert.equal(failed.run.failed,1);assert.equal(failed.run.accepted,1);
+  failure=null;const retried=await dispatch.retry(failures.token,failed.run.id,'admin');
+  assert.equal(retried.count,1);assert.equal(retried.run.retry_of,failed.run.id);
+  await assert.rejects(dispatch.retry(failures.token,failed.run.id),/Нет подтверждённых/);
+  const uncertain=await order(['movers']);failure='unknown';
+  const pending=await dispatch.dispatch(uncertain.token,'movers','');
+  assert.equal(pending.run.pending,2);assert.equal(pending.run.accepted,0);
+  failure=null;const before=sent.length;
+  assert.equal(await orders.notifyMasters(await orders.getOrderByToken(uncertain.token),'movers','',50),0);
+  assert.equal(sent.length,before,'unknown attempts must not be sent again');
+  await assert.rejects(dispatch.retry(uncertain.token,pending.run.id),/Нет подтверждённых/);
+  await orders.closeOrderCategory(o.token,'movers',{actor:'client'});
+  assert.equal((await orders.getOrderByToken(o.token)).status,'closed');
+  assert.equal((await contact.reveal(o.token,both.master_token,'call')).status,409);
+  console.log('PASS: multi-service assignment, conditional loading, vehicle size, independent needs, unique charges, contacts, snapshots, retry and uncertain attempts');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

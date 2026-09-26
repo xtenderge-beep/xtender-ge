@@ -70,20 +70,24 @@ async function buildKeyboardWithCounts(token, page = 0) {
   const sizeSpec = (code) => vanSizeSpec(code, sizeThresholds);
 
   const groups = await require('./category.service').groups();
-  const entries = Object.entries(groups);
+  const closed = order ? await orderService.getClosedCategories(order.id) : [];
+  const entries = Object.entries(groups).filter(([key])=>!closed.includes(key) && (!order?.requirements?.configured || order.target_categories.includes(key)));
   const pages = Math.max(1, Math.ceil(entries.length / 20));
   page = Number.isSafeInteger(page) ? Math.max(0, Math.min(page, pages - 1)) : 0;
   const visible = entries.slice(page * 20, (page + 1) * 20);
-  const rows = visible.map(([key,label]) => [{text: label+' ('+total(key)+')', callback_data: 'pick:'+token+':'+key}]);
+  const rows = [];
+  for(const [key,label] of visible) { const plan=await require('./dispatch.service').preview(token,key,'').catch(()=>null); rows.push([{text:label+' · новых: '+(plan?.count || 0),callback_data:'pick:'+token+':'+key}]); }
   if (visible.some(([key])=>key==='transport') && transportSizes.length) {
-    transportSizes.forEach((row) => {
+    for (const row of transportSizes) {
+      const plan=await require('./dispatch.service').preview(token,'transport',row.vehicle_size).catch(()=>null);
+      if(!plan) continue;
       rows.push([
         {
-          text: `🚚 ${row.vehicle_size} ${sizeSpec(row.vehicle_size)} (${row.count})`,
+          text: `🚚 ${row.vehicle_size} ${sizeSpec(row.vehicle_size)} · новых: ${plan.count}`,
           callback_data: `pick:${token}:transport:${row.vehicle_size}`,
         },
       ]);
-    });
+    }
   }
 
   rows.forEach(row => row.forEach(button => {
@@ -99,7 +103,12 @@ async function buildKeyboardWithCounts(token, page = 0) {
     if (page < pages-1) navigation.push({text:'Далее →',callback_data:'cats_page:'+token+':'+(page+1)});
     rows.push(navigation);
   }
-  rows.push([{ text: '🔄 Обновить категории', callback_data: 'cats_refresh:'+token }]);
+  rows.push([{text:'📊 Получатели и результаты',callback_data:'report:'+token}]);
+  if (order) for (const run of await orderService.getOrderDispatches(order.id)) {
+    const retryable=run.deliveries.filter(d=>d.status === 'failed' && !d.retry_run_id).length;
+    if(!run.legacy && retryable && !closed.includes(run.category)) rows.push([{text:'Повторить ошибки #'+run.id+' ('+retryable+')',callback_data:'retry:'+token+':'+run.id}]);
+  }
+  rows.push([{ text: '🔄 Обновить статистику и категории', callback_data: 'cats_refresh:'+token }]);
   rows.push([{ text: '✏️ Проверить / вернуть на доработку', url: getBaseUrl() + '/admin/orders/' + encodeURIComponent(token) }]);
   return { inline_keyboard: rows };
 }
@@ -113,7 +122,7 @@ async function buildLanguageKeyboard(order, category, sizeCode = '') {
   const revision = order.revision_version || 0;
   const pick = (language) => ['cat', order.token, category, sizeCode || '', revision, language].join(':');
   const labels = await require('./category.service').groups(true);
-  const label = (language, text, count) => (plan.sentLanguages.includes(language) ? `✅ ${text} · отправлено` : `${text} (${count})`);
+  const label = (language, text, count) => (plan.sentLanguages.includes(language) ? `↩ ${text} · запускалась` : `${text} (${count})`);
   const rows = [
     [{ text: `${labels[category] || category}${sizeCode ? ' · ' + sizeCode : ''} — кому отправить?`, callback_data: 'pick_head:' + order.token }],
     [{ text: label('', '👥 Все', plan.count), callback_data: pick('all') }],
@@ -159,7 +168,7 @@ async function notifyModerator(order) {
     `📞 ${order.phone}`,
     `🔗 ${base}/order/${order.token}`,
     '',
-    'Нажмите категорию, затем выберите, кому отправить: всем или тем, кто говорит на нужном языке. Можно отправить несколько категорий.',
+    'Для заявки с несколькими услугами сначала укажите все потребности в карточке заявки. Затем выберите группу и язык рассылки. Уже уведомлённые повторно не платят.',
   ].join('\n');
   const keyboard = await buildKeyboardWithCounts(order.token);
 
@@ -427,10 +436,11 @@ async function forwardSupportMessage(master, body, replyToMessageId) {
 // Рамка сообщения — на языке кабинета исполнителя (masters.language), текст заявки — оригинал
 // заказчика, поэтому строка «Язык заявки» нужна: исполнитель сразу видит, на каком языке
 // писать заказчику. Без сохранённого языка исполнителя рамка остаётся русской, как раньше.
-function leadMessage(master, order) {
+function leadMessage(master, order, labels = {}) {
   const t = translate(master.language || 'ru');
   const requestLang = requestLanguage.ofOrder(order);
   const lines = [(order.is_technical ? '🧪 ТЕСТ · ' : '') + t('tg_lead_title').replace('{id}', order.id), '', order.description];
+  if (master.matched_categories?.length) lines.push('', master.matched_categories.map(c=>labels[c] || c).join(' + '));
   if (order.district_name) lines.push('', `📍 ${order.district_name}`);
   if (requestLang) lines.push('', `💬 ${t('order_lang_label')}: ${t('order_lang_' + requestLang)}`);
   lines.push('', t('tg_lead_hint'));
@@ -444,7 +454,7 @@ async function sendLeadToMaster(master, order, link) {
     return { ok: true, status: 'accepted', providerResponse: { dev: true }, messageBody: leadMessage(master, order).text };
   }
 
-  const { text, openLabel } = leadMessage(master, order);
+  const { text, openLabel } = leadMessage(master, order, await require('./category.service').labelMap(master.language || 'ru'));
 
   try {
     const response = await axios.post(apiUrl('sendMessage'), {
@@ -452,7 +462,7 @@ async function sendLeadToMaster(master, order, link) {
       text,
       reply_markup: { inline_keyboard: [[{ text: openLabel, url: link }]] },
     }, { timeout: 15000 });
-    if (response.data?.ok !== true || !response.data.result?.message_id) return false;
+    if (response.data?.ok !== true || !response.data.result?.message_id) return {ok:false,uncertain:response.data?.ok !== false};
     return { ok: true, status: 'accepted', providerMessageId: String(response.data.result.message_id),
       providerResponse: response.data, messageBody: text };
   } catch (err) {
@@ -460,7 +470,7 @@ async function sendLeadToMaster(master, order, link) {
       `Failed to send lead #${order.id} to master ${master.id} on Telegram:`,
       err.response ? JSON.stringify(err.response.data) : err.message
     );
-    return false;
+    return {ok:false,uncertain:!err.response?.data || err.response.data.ok !== false};
   }
 }
 
@@ -474,11 +484,11 @@ function formatDispatchLine(category, vehicleSize, masterCount, language = '') {
 // Одна строка воронки по группе исполнителей. «Отклик» = мастер позвонил или написал в
 // WhatsApp, доля — от тех, кто лид получил (см. order.service.getOrderFunnelByCategory).
 function formatFunnelRow(row, labels, closed) {
-  const label = labels[row.category] || row.category || '—';
+  const label = labels[row.category] || (row.category === 'legacy' ? 'Архив: услуга неизвестна' : row.category) || '—';
   const rate = row.received
-    ? ` · отклик ${row.contacted} из ${row.received} (${Math.min(100, Math.round((row.contacted / row.received) * 100))}%)`
+    ? ` · нажали контакт ${row.contacted} из ${row.received} (${Math.min(100, Math.round((row.contacted / row.received) * 100))}%)`
     : '';
-  return `${label}${closed ? ' 🔒 закрыта' : ''}: получили ${row.received} · 👀 ${row.view} · 📞 ${row.call} · 💬 ${row.whatsapp}${rate}`;
+  return `${label}${closed ? ' 🔒 закрыта' : ''}: уведомлены ${row.received} · 👀 ${row.view} · 📞 ${row.call} · 💬 ${row.whatsapp}${rate}`;
 }
 
 function buildMessageText(order, dispatchLines, funnel, { byCategory = [], labels = {}, closedCategories = [] } = {}) {
@@ -487,7 +497,7 @@ function buildMessageText(order, dispatchLines, funnel, { byCategory = [], label
       ? '🔒 Заявка закрыта'
       : order.status === 'needs_revision' ? '✏️ Ожидаем уточнения клиента: ' + order.revision_reason
       : dispatchLines.length
-      ? '✅ Разослано'
+      ? '📨 Результаты рассылки'
       : '🆕 Новая заявка на модерацию';
   const lines = [
     (order.is_technical ? '🧪 ТЕСТ · ' : '') + header,
@@ -503,11 +513,11 @@ function buildMessageText(order, dispatchLines, funnel, { byCategory = [], label
     if (byCategory.length) {
       lines.push(
         '',
-        '📊 Воронка по группам:',
+        '📊 Действия получателей по предложенным услугам:',
         ...byCategory.map((row) => formatFunnelRow(row, labels, closedCategories.includes(row.category))),
         '',
         `Всего: 👀 ${funnel.view} · 📞 ${funnel.call} · 💬 ${funnel.whatsapp}`,
-        '👀 перешли по ссылке · 📞 «Позвонить» · 💬 «WhatsApp» · отклик = звонок или WhatsApp'
+        'Один человек может быть в нескольких группах. Нажатие контакта не подтверждает разговор или сделку.'
       );
     } else {
       lines.push(
@@ -520,6 +530,8 @@ function buildMessageText(order, dispatchLines, funnel, { byCategory = [], label
     }
   }
 
+  if (funnel.contacted != null) lines.push('Нажали хотя бы один контакт: '+funnel.contacted+' уникальных исполнителей');
+  if ((order.target_categories || []).length) lines.push('', 'Потребности:', ...order.target_categories.map(c=>(labels[c] || c)+': '+(order.status === 'closed' || closedCategories.includes(c) ? 'поиск закрыт' : 'поиск открыт')));
   return lines.join('\n');
 }
 
@@ -537,13 +549,18 @@ async function refreshMessage(order, keyboard) {
 
   const dispatches = await orderService.getOrderDispatches(order.id).catch(() => []);
   const labels = await require('./category.service').groups(true);
-  const dispatchLines = dispatches.map(d => (labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+(d.language ? ' · говорят '+(speakLabels[d.language] || d.language) : '')+' — '+d.master_count);
+  const dispatchLines = dispatches.map(d =>
+    (d.legacy ? 'Архивная рассылка (группа не сохранена)' : labels[d.category] || d.category)+(d.vehicle_size ? ' '+d.vehicle_size : '')+(d.language ? ' · говорят '+(speakLabels[d.language] || d.language) : '')+
+    '\nВыбрано: '+d.selected+' · принято: '+d.accepted+' (Telegram '+d.telegram+', SMS '+d.sms+')'+
+    '\nОшибки: '+d.failed+' · пропущено: '+d.skipped+' · в обработке / результат неизвестен: '+d.pending);
+  if(dispatches.length) dispatchLines.push('Принято каналом не означает прочтение. Неопределённые отправки автоматически не повторяются.');
   const funnel = await orderService.getOrderFunnelStats(order.id);
   // Разбивка по группам — дополнение к общей воронке: если её запрос упал, сообщение всё
   // равно обновится прежней общей воронкой, а не останется устаревшим.
   const byCategory = await orderService.getOrderFunnelByCategory(order.id).catch(() => []);
   const closedCategories = await orderService.getClosedCategories(order.id).catch(() => []);
-  const text = buildMessageText(order, dispatchLines, funnel, { byCategory, labels, closedCategories });
+  let text = buildMessageText(order, dispatchLines, funnel, { byCategory, labels, closedCategories });
+  if(text.length>3900) text=text.slice(0,3750)+'\n…Полная история — в карточке заявки.';
 
   for (const m of msgs) {
     await axios
@@ -560,6 +577,7 @@ async function refreshMessage(order, keyboard) {
 async function refreshCategories(order, chatId, messageId, page = 0) {
   if (!isEnabled()) return;
   const keyboard = ['pending_review','new'].includes(order.status) ? await buildKeyboardWithCounts(order.token, page) : { inline_keyboard: [] };
+  await refreshMessage(order,keyboard);
   try {
     await axios.post(apiUrl('editMessageReplyMarkup'),{chat_id:chatId,message_id:messageId,reply_markup:keyboard});
   } catch(error) { if(!String(error.response?.data?.description || '').includes('not modified')) throw error; }

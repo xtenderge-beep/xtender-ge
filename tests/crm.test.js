@@ -6,7 +6,7 @@ const redis=new(require('ioredis-mock'))();
 const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
 stub('../src/config/db',pool);stub('../src/config/redis',redis);
 let failPhone=null;
-stub('../src/services/sms.service',{sendOtp:async()=>({providerMessageId:'test'}),sendOrderNotification:async(phone)=>{if(phone===failPhone)throw Error('channel unavailable');return {ok:true,providerMessageId:'test'};}});
+stub('../src/services/sms.service',{sendOtp:async()=>({providerMessageId:'test'}),sendOrderNotification:async(phone)=>{if(phone===failPhone)throw Object.assign(Error('channel rejected'),{deliveryUnknown:false});return {ok:true,providerMessageId:'test'};}});
 stub('../src/services/telegram.service',{notifyModerator:async()=>null,updateMessage:async()=>{},sendLeadToMaster:async()=>false});
 stub('../src/services/translation.service',{translateOrder:async()=>null});
 const crm=require('../src/services/crm.service'),metrics=require('../src/services/crmMetrics.service'),managers=require('../src/services/manager.service'),portal=require('../src/services/managerPortal.service'),orders=require('../src/services/order.service'),partners=require('../src/services/partner.service'),masters=require('../src/services/master.service'),consent=require('../src/services/consent.service');

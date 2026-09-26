@@ -80,7 +80,7 @@ async function insertMaster(name,phone,balance,technicalRole,telegramId=null) {
  assert.equal(await orders.activateOrder(testOrder.token,testOrder.phone,{orderId:testOrder.id}),null);
  assert.equal((await orders.getOrderByToken(testOrder.token)).is_technical,true);
  const keyboard=await telegram.buildKeyboardWithCounts(testOrder.token);
- assert.ok(keyboard.inline_keyboard.flat().find(b=>b.callback_data?.includes(':movers:')).text.includes('(1)'));
+ assert.ok(keyboard.inline_keyboard.flat().find(b=>b.callback_data?.includes(':movers:')).text.includes('новых: 1'));
  const testPlan=await dispatch.preview(testOrder.token,'movers','');
  assert.deepEqual(testPlan.recipients.map(m=>m.id),[tech.id]);
  assert.deepEqual((await dispatch.preview(realOrder.token,'movers','')).recipients.map(m=>m.id),[real.id]);

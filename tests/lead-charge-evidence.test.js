@@ -5,7 +5,7 @@ pool.withTransaction=async fn=>{const backup=db.backup();try{return await fn(poo
 const stub=(name,exports)=>require.cache[require.resolve(name)]={exports};
 stub('../src/config/db',pool);const redis=new(require('ioredis-mock'))();stub('../src/config/redis',redis);
 let sends=0,fail=false,tgWorks=false;
-stub('../src/services/sms.service',{sendOrderNotification:async(phone,text)=>{sends++;if(fail)throw Error('gateway rejected');return {ok:true,status:'accepted',providerMessageId:'sms-123',providerResponse:'OK: 123456',messageBody:text};}});
+stub('../src/services/sms.service',{sendOrderNotification:async(phone,text)=>{sends++;if(fail)throw Object.assign(Error('gateway rejected'),{deliveryUnknown:false});return {ok:true,status:'accepted',providerMessageId:'sms-123',providerResponse:'OK: 123456',messageBody:text};}});
 stub('../src/services/telegram.service',{sendLeadToMaster:async()=>tgWorks?{ok:true,providerMessageId:'tg-123',providerResponse:{ok:true},messageBody:'Telegram lead'}:false,sendToChat:async()=>{}});
 const orders=require('../src/services/order.service'),audit=require('../src/services/consentLog.service');
 (async()=>{
@@ -29,10 +29,11 @@ const orders=require('../src/services/order.service'),audit=require('../src/serv
  assert.equal((await pool.query('SELECT status FROM dispatch_deliveries WHERE order_id=$1',[rejected.id])).rows[0].status,'failed');
  fail=false;const original=audit.recordAction;
  audit.recordAction=async args=>{if(args.eventType==='LEAD_CHARGE_ACCEPTED')throw Error('audit unavailable');};
- await assert.rejects(orders.notifyMasters(rejected,'movers',null,50),/audit unavailable/);
+ assert.equal(await orders.notifyMasters(rejected,'movers',null,50),0);
+ assert.ok((await pool.query("SELECT * FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[rejected.id])).rows.length);
  assert.equal(await count(rejected),0);assert.equal(await balance(),4950,'charge rolls back with missing evidence');
  audit.recordAction=original;
- assert.equal(await orders.notifyMasters(rejected,'movers',null,50),1);assert.equal(await count(rejected),1);
+ assert.equal(await orders.notifyMasters(rejected,'movers',null,50),0);assert.equal(await count(rejected),0,'uncertain delivery is not retried automatically');
  const closed=await create('closed');await orders.closeOrder(closed.token);
  let sentBefore=sends;assert.equal(await orders.notifyMasters(closed,'movers',null,50),0);assert.equal(sends,sentBefore);
  const partial=await create('partial');await orders.closeOrderCategory(partial.token,'movers');

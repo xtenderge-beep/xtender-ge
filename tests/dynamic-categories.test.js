@@ -24,7 +24,7 @@ const definition={name_ru:'Сантехник',name_ka:'სანტექნი
  const order=(await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('catorder','+995500000908','Plumbing','pending_review') RETURNING *")).rows[0];
  const keyboard=await telegram.buildKeyboardWithCounts(order.token);
  const button=keyboard.inline_keyboard.flat().find(b=>b.text.includes('Сантехник'));
- assert.ok(button.callback_data.includes(key));assert.ok(button.text.includes('(1)'));
+ assert.ok(button.callback_data.includes(key));assert.ok(button.text.includes('новых: 1'));
  for(const b of keyboard.inline_keyboard.flat()) if(b.callback_data) assert.ok(Buffer.byteLength(b.callback_data)<=64);
  const plan=await dispatch.preview(order.token,key,'');assert.equal(plan.count,1);
  const result=await dispatch.dispatch(order.token,key,'',{price:plan.price,count:plan.count,revision:0});assert.equal(result.count,1);

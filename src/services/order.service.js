@@ -6,6 +6,7 @@ const masterService = require('./master.service');
 const settingsService = require('./settings.service');
 const technical = require('./technical.service');
 const billing = require('./providerBilling.service');
+const matching = require('./serviceMatching.service');
 const { getBaseUrl } = require('../config/url');
 const { generateShortId } = require('../config/shortId');
 const serviceMessage = require('../config/service-message-copy');
@@ -153,35 +154,16 @@ async function recordDispatch(orderId, category, vehicleSize, revision = null, l
 }
 
 async function getOrderDispatches(orderId) {
-  const { rows: dispatches } = await pool.query(
-    `SELECT category, vehicle_size, language FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at`,
-    [orderId]
-  );
-  if (!dispatches.length) return [];
-
-  const order = (await pool.query('SELECT is_technical FROM orders WHERE id=$1', [orderId])).rows[0];
-  const counts = await getMasterCountsByCategory(order?.is_technical === true);
-  const totalFor = (category) =>
-    counts.filter((row) => row.category === category).reduce((sum, row) => sum + row.count, 0);
-  const sizedFor = (category, size) => {
-    const row = counts.find((row) => row.category === category && row.vehicle_size === size);
-    return row ? row.count : 0;
-  };
-
-  // Для рассылки по языку считаем тех же исполнителей, что получили бы её сейчас (та же выборка,
-  // что у dispatchFilter), но только говорящих на этом языке.
-  const leadPrice = dispatches.some((d) => d.language) ? await settingsService.getLeadPriceTetri() : 0;
-  const speakersFor = async (d) => {
-    const { activeWhere, catParams, catClause } = dispatchFilter(d.category, d.vehicle_size || null, order?.is_technical === true);
-    const { rows } = await pool.query(`SELECT spoken_languages FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
-    return rows.filter((row) => speaks(row, d.language)).length;
-  };
-  return Promise.all(dispatches.map(async (d) => ({
-    category: d.category,
-    vehicle_size: d.vehicle_size,
-    language: d.language,
-    master_count: d.language ? await speakersFor(d) : d.vehicle_size ? sizedFor(d.category, d.vehicle_size) : totalFor(d.category),
-  })));
+  const runs = (await pool.query('SELECT * FROM dispatch_runs WHERE order_id=$1 ORDER BY created_at', [orderId])).rows;
+  const deliveries = (await pool.query('SELECT * FROM dispatch_deliveries WHERE order_id=$1', [orderId])).rows.map(d=>({...d,matched_categories:Array.isArray(d.matched_categories)?d.matched_categories:[],service_snapshot:Array.isArray(d.service_snapshot)?d.service_snapshot:[]}));
+  return runs.map(run=>{
+    const rows=deliveries.filter(d=>d.run_id === run.id);
+    const count=status=>rows.filter(d=>d.status === status).length;
+    return { ...run, category:run.category || 'legacy', legacy:!run.category, master_count:count('accepted'), selected:rows.length, accepted:count('accepted'),
+      failed:count('failed'), pending:count('pending'), skipped:count('skipped'),
+      telegram:rows.filter(d=>d.status === 'accepted' && d.channel === 'telegram').length,
+      sms:rows.filter(d=>d.status === 'accepted' && d.channel === 'sms').length, deliveries:rows };
+  });
 }
 
 // Кому по этой заявке уже ушёл платный лид (по списанию lead_charge) — им повторно не платят и не шлют.
@@ -191,17 +173,13 @@ async function getChargedMasterIds(orderId) {
 }
 
 async function addTargetCategories(token, categories) {
-  const existing = await getOrderByToken(token);
-  if (!existing || existing.status === 'closed') return null;
-
-  const merged = [...new Set([...(existing.target_categories || []), ...categories])];
-  const { rows } = await pool.query(
-    `UPDATE orders SET target_categories = $1,
-         status = CASE WHEN status = 'pending_review' THEN 'new' ELSE status END
-     WHERE token = $2 RETURNING *`,
-    [merged, token]
-  );
-  return rows[0] || null;
+  return pool.withTransaction(async client=>{
+    const existing=(await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
+    if(!existing || !['new','pending_review'].includes(existing.status)) return null;
+    const merged=[...new Set([...(Array.isArray(existing.target_categories) ? existing.target_categories : []),...categories])];
+    if(existing.requirements?.configured && categories.some(c=>!existing.target_categories.includes(c))) throw new Error('Услуга не входит в потребности заявки');
+    return (await client.query("UPDATE orders SET target_categories=$1,status='new' WHERE token=$2 RETURNING *",[merged,token])).rows[0];
+  });
 }
 
 async function markFirstDispatch(token) {
@@ -291,22 +269,17 @@ async function deleteOrder(token, { meta = {} } = {}) {
 }
 
 async function getMasterCountsByCategory(isTechnical = false) {
-  const leadPrice = await settingsService.getLeadPriceTetri();
-  const { rows } = await pool.query(
-    `SELECT category, vehicle_size, COUNT(*)::int AS count
-     FROM masters
-     WHERE is_technical = $2 AND is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
-       AND (subscription_until IS NULL OR subscription_until > NOW())
-     GROUP BY category, vehicle_size
-     UNION ALL
-     SELECT 'flatbed' AS category, NULL AS vehicle_size, COUNT(*)::int AS count
-     FROM masters
-     WHERE is_technical = $2 AND is_active = true AND is_subscribed = true AND is_banned = false AND balance_tetri >= $1
-       AND (subscription_until IS NULL OR subscription_until > NOW())
-       AND category = 'transport' AND is_flatbed = true`,
-    [leadPrice, isTechnical === true]
-  );
-  return rows;
+  const price=await settingsService.getLeadPriceTetri(), groups=await require('./category.service').groups();
+  const counts=[];
+  for(const category of Object.keys(groups)) {
+    const recipients=await getDispatchRecipients(category,'',price,isTechnical);
+    if(category === 'transport') {
+      const sizes=new Map();
+      recipients.forEach(m=>{const size=m.services.find(s=>s.service_type === 'van')?.attributes?.size || null; sizes.set(size,(sizes.get(size)||0)+1);});
+      for(const [vehicle_size,count] of sizes) counts.push({category,vehicle_size,count});
+    } else counts.push({category,vehicle_size:null,count:recipients.length});
+  }
+  return counts;
 }
 
 const EVENT_TYPES = ['view', 'call', 'whatsapp'];
@@ -321,24 +294,20 @@ async function getOrderFunnelStats(orderId) {
   rows.forEach((row) => {
     stats[row.event_type] = row.count;
   });
+  const contacts=(await pool.query('SELECT master_id,event_type FROM order_views WHERE order_id=$1',[orderId])).rows;
+  stats.contacted=new Set(contacts.filter(e=>['call','whatsapp'].includes(e.event_type)).map(e=>e.master_id)).size;
   return stats;
 }
 
-// Воронка заявки в разрезе групп исполнителей (masters.category) — чтобы видеть, какая
-// группа откликается (заявка на «грузчики + машина» уходит двум группам сразу).
-// received — мастера, которым лид реально ушёл: dispatch_deliveries.status='accepted', а для
-// заявок до 2026-09-13, когда доставки ещё не писались, — списание lead_charge.
-// contacted — «отклик»: мастер позвонил ИЛИ написал в WhatsApp (просмотр откликом не считаем,
-// как и в crmMetrics). order_views уникален по (заявка, мастер, тип), поэтому view/call/whatsapp
-// уже считают уникальных мастеров; contacted — уникальные мастера из call ∪ whatsapp.
-// Агрегируем в JS, а не в SQL: COUNT(DISTINCT)/FILTER на pg-mem (dev-server) ненадёжны.
-// Группа 'flatbed' — это не masters.category, а подвыборка transport (is_flatbed), поэтому
-// в разрезе она учитывается как transport.
+// Cohorts describe the services offered at delivery, not the purpose of a contact click.
+// A provider may belong to several cohorts; overall contacted remains a unique union.
+// Old records without a snapshot use charge evidence or the sole historical group.
+// Never infer historical service attribution from today's provider profile.
 async function getOrderFunnelByCategory(orderId) {
-  const [dispatched, delivered, charged, events] = await Promise.all([
+  const [dispatched, delivered, charged, events, evidence] = await Promise.all([
     pool.query('SELECT category FROM order_dispatches WHERE order_id = $1 ORDER BY dispatched_at', [orderId]),
     pool.query(
-      `SELECT m.id AS master_id, m.category FROM dispatch_deliveries dd
+      `SELECT m.id AS master_id, m.category, dd.matched_categories FROM dispatch_deliveries dd
        JOIN masters m ON m.id = dd.master_id WHERE dd.order_id = $1 AND dd.status = 'accepted'`,
       [orderId]
     ),
@@ -352,6 +321,7 @@ async function getOrderFunnelByCategory(orderId) {
        JOIN masters m ON m.id = ov.master_id WHERE ov.order_id = $1`,
       [orderId]
     ),
+    pool.query("SELECT master_id,metadata FROM sms_consent_logs WHERE order_id=$1 AND event_type='LEAD_CHARGE_ACCEPTED'",[orderId]),
   ]);
 
   const groups = new Map();
@@ -365,10 +335,25 @@ async function getOrderFunnelByCategory(orderId) {
 
   // Сначала группы, в которые заявку рассылали (в порядке рассылки) — чтобы группа, где ещё
   // никто не получил лид, тоже была видна нулями, а не пропадала из отчёта.
-  dispatched.rows.forEach((row) => groupFor(row.category === 'flatbed' ? 'transport' : row.category));
-  [...delivered.rows, ...charged.rows].forEach((row) => groupFor(row.category).received.add(row.master_id));
-  events.rows.forEach((row) => {
-    if (EVENT_TYPES.includes(row.event_type)) groupFor(row.category)[row.event_type].add(row.master_id);
+  dispatched.rows.forEach((row) => groupFor(row.category));
+  const historicalGroups=[...new Set(dispatched.rows.map(r=>r.category))];
+  const sold=new Map(evidence.rows.map(r=>[r.master_id,r.metadata]));
+  const historicalCategories=id=>{
+    const metadata=sold.get(id);
+    if(Array.isArray(metadata?.matched_categories) && metadata.matched_categories.length)return metadata.matched_categories;
+    if(metadata?.category)return [metadata.category];
+    return historicalGroups.length === 1 ? historicalGroups : ['legacy'];
+  };
+  const cohorts=new Map();
+  delivered.rows.forEach(row=>{
+    const cats=Array.isArray(row.matched_categories) && row.matched_categories.length ? row.matched_categories : historicalCategories(row.master_id);
+    const existing=cohorts.get(row.master_id) || new Set();
+    cats.forEach(c=>existing.add(c)); cohorts.set(row.master_id,existing);
+  });
+  charged.rows.forEach(row=>{if(!cohorts.has(row.master_id))cohorts.set(row.master_id,new Set(historicalCategories(row.master_id)));});
+  for(const [id,cats] of cohorts) for(const category of cats) groupFor(category).received.add(id);
+  events.rows.forEach(row=>{
+    if(EVENT_TYPES.includes(row.event_type)) for(const category of cohorts.get(row.master_id) || []) groupFor(category)[row.event_type].add(row.master_id);
   });
 
   return [...groups.values()].map((g) => ({
@@ -403,66 +388,95 @@ function dispatchFilter(category, vehicleSize, isTechnical = false) {
  return { activeWhere, catParams, catClause };
 }
 // language: '' — все исполнители группы, иначе только отметившие этот язык при регистрации.
-async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '') {
- const catalog = require('./category.service');
- const definition = await catalog.get(category);
- if (!definition?.is_active) return [];
- const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
- const rates = await billing.pricing();
- if (rates.leadPriceTetri !== leadPrice) return [];
- const allowed = await billing.eligibleIds(rates);
- const result = await pool.query(`SELECT id, phone, telegram_id, master_token, balance_tetri, manager_id, language, spoken_languages FROM masters WHERE ${activeWhere} AND balance_tetri >= $1${catClause}`, [leadPrice, ...catParams]);
- const rows = result.rows.filter(master => allowed.has(master.id) && (!language || speaks(master, language)));
- if (!definition.is_builtin && rows.length) {
-   const services = (await pool.query('SELECT master_id, attributes FROM master_services WHERE service_type=$1',[definition.slug])).rows;
-   return rows.filter(m=>services.some(s=>s.master_id===m.id && !catalog.validate(definition,s.attributes).errors.length));
- }
- return rows;
+async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '', order = null) {
+  const catalog = require('./category.service');
+  const definition = await catalog.get(category);
+  if (!definition?.is_active) return [];
+  const rates = await billing.pricing();
+  if (rates.leadPriceTetri !== leadPrice) return [];
+  const allowed = await billing.eligibleIds(rates);
+  const rows=(await pool.query('SELECT * FROM masters WHERE is_technical=$1 AND is_active=true AND is_subscribed=true AND is_banned=false AND balance_tetri >= $2', [isTechnical,leadPrice])).rows;
+  const closed=order ? await getClosedCategories(order.id) : [];
+  const open=[...new Set([...(Array.isArray(order?.target_categories) ? order.target_categories : []),category])].filter(c=>!closed.includes(c));
+  if(!open.includes(category)) return [];
+  const result=[];
+  const active=new Set((await catalog.list()).filter(d=>d.is_active).map(d=>d.slug));
+  const allServices=(await pool.query('SELECT * FROM master_services')).rows;
+  for(const master of rows) {
+    if(!allowed.has(master.id) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
+    const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
+    const size=vehicleSize || (category === 'transport' ? order?.requirements?.transport_size : '') || '';
+    if(!matching.matches(services,category,size,open,order?.requirements)) continue;
+    if(!definition.is_builtin && catalog.validate(definition,services.find(s=>s.service_type === definition.slug)?.attributes).errors.length) continue;
+    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? order?.requirements?.transport_size || '' : '',open,order?.requirements))});
+  }
+  return result;
 }
-async function notifyMasters(order, category, vehicleSize, confirmedPrice = null, language = '') {
+
+async function notifyMasters(order, category, vehicleSize, confirmedPrice = null, language = '', context = {}) {
   if (!order) return 0;
   // Always use persisted routing, never a flag supplied by a caller or old preview.
   order = await getOrderByToken(order.token);
   if (!order || !['pending_review', 'new'].includes(order.status)) return 0;
+  if(!order.requirements?.configured && !(Array.isArray(order.target_categories) && order.target_categories.includes(category))) order=await addTargetCategories(order.token,[category]);
+  if(!order) return 0;
   const isTechnical = order.is_technical === true;
   const telegramService = require('./telegram.service');
   const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
   const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
-  const masters = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical, language);
-  const run = (await pool.query('INSERT INTO dispatch_runs(order_id) VALUES($1) RETURNING id', [order.id])).rows[0];
-  for (const master of masters) await pool.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id) VALUES($1,$2,$3,$4)', [run.id,order.id,master.id,master.manager_id]);
+  const received = await getChargedMasterIds(order.id);
+  const unresolved=new Set((await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[order.id])).rows.map(d=>d.master_id));
+  const candidates = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical, language, order);
+  let masters = candidates.filter(m=>!received.has(m.id) && !unresolved.has(m.id) && (!context.recipientIds || context.recipientIds.includes(m.id)));
+  if(context.preparedRun) masters=(await pool.query('SELECT * FROM masters')).rows.filter(m=>context.recipientIds.includes(m.id));
+  const run = context.preparedRun || await pool.withTransaction(async client=>{
+    const created=(await client.query('INSERT INTO dispatch_runs(order_id,category,vehicle_size,language,initiated_by,revision) VALUES($1,$2,$3,$4,$5,$6) RETURNING id', [order.id,category,vehicleSize || '',language,context.actor || null,order.revision_version || 0])).rows[0];
+    for (const master of masters) await client.query('INSERT INTO dispatch_deliveries(run_id,order_id,master_id,manager_id,matched_categories,service_snapshot) VALUES($1,$2,$3,$4,$5::jsonb,$6::jsonb)', [created.id,order.id,master.id,master.manager_id,JSON.stringify(master.matched_categories),JSON.stringify(master.services)]);
+    return created;
+  });
+  context.runId=run.id;
   const notifiedIds = [];
   // A row lock serializes routing changes against delivery and charging. Limit
   // concurrency so background SMS auditing can still obtain a pool connection.
   for (let offset = 0; offset < masters.length; offset += 4) {
    await Promise.all(masters.slice(offset, offset + 4).map(async candidate => {
     let outcome = 'skipped';
-    await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
-      const live = (await client.query('SELECT status FROM orders WHERE id=$1 FOR UPDATE', [order.id])).rows[0];
+    let attempted = false;
+    let skipReason = 'eligibility_changed';
+    try { await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
+      const live = (await client.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE', [order.id])).rows[0];
       if (!live || !['pending_review','new'].includes(live.status) || !master.is_active || master.is_banned || !master.is_subscribed ||
           (master.subscription_until && new Date(master.subscription_until) <= new Date()) || master.balance_tetri < leadPrice) return;
       const closed = await client.query('SELECT category FROM order_category_closures WHERE order_id=$1 AND category=$2', [order.id, category]);
-      if (closed.rows.length) return;
+      if (closed.rows.length) { skipReason='need_closed'; return; }
+      const openMatches=await matching.openMatches(master,live,client);
+      const liveServices=await matching.servicesFor(master,client);
+      if (!openMatches.includes(category) || !matching.matches(liveServices,category,vehicleSize || (category === 'transport' ? live.requirements?.transport_size : '') || '',openMatches,live.requirements)) { skipReason='service_changed'; return; }
+      if (language && !speaks(master,language)) { skipReason='language_changed'; return; }
+      await client.query('UPDATE dispatch_deliveries SET matched_categories=$3::jsonb,service_snapshot=$4::jsonb WHERE run_id=$1 AND master_id=$2',[run.id,master.id,JSON.stringify(openMatches),JSON.stringify(liveServices)]);
       // The master lock serializes concurrent attempts, including direct retries
       // that bypass the dispatch UI. One order can charge this provider once.
       const charged = await client.query("SELECT id FROM balance_transactions WHERE master_id=$1 AND order_id=$2 AND reason='lead_charge' LIMIT 1", [master.id, order.id]);
-      if (charged.rows.length) return;
+      if (charged.rows.length) { skipReason='already_received'; return; }
+      const earlier=(await client.query("SELECT id FROM dispatch_deliveries WHERE order_id=$1 AND master_id=$2 AND status='pending' AND run_id < $3",[order.id,master.id,run.id])).rows;
+      if(earlier.length) { skipReason='prior_attempt_pending'; return; }
       const rates = await billing.pricing(client, true);
       const billingConsent = await billing.accepted(master.id, rates, client);
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
       const link = getBaseUrl() + '/order/' + order.token + '?master=' + master.id;
       let receipt = null;
+      attempted = true;
       let channel = 'telegram';
-      if (master.telegram_id) receipt = await telegramService.sendLeadToMaster(master, order, link).catch(() => null);
-      if (!receipt?.ok) {
+      if (master.telegram_id) receipt = await telegramService.sendLeadToMaster({...master,matched_categories:openMatches}, order, link).catch(() => ({ok:false,uncertain:true}));
+      if (!receipt?.ok && !receipt?.uncertain) {
         channel = 'sms';
         try {
           receipt = await smsService.sendOrderNotification(master.phone, serviceMessage.sms('lead', { test: isTechnical ? '[TEST] ' : '', id: order.id, link }),
             { kind: 'lead', masterId: master.id, orderId: order.id });
-        } catch (err) { receipt = null; console.error('Failed to notify master ' + master.id + ':', err.message); }
+        } catch (err) { receipt = {ok:false,uncertain:err.deliveryUnknown !== false}; console.error('Failed to notify master ' + master.id + ':', err.message); }
       }
       const delivered = receipt?.ok === true;
-      outcome = delivered ? 'accepted' : 'failed';
+      outcome = delivered ? 'accepted' : receipt?.uncertain ? 'pending' : 'failed';
       if (delivered) {
         // Evidence and debit commit together. A failed audit means no charge.
         const charges = await masterService.chargeMastersForLead([master.id], leadPrice, order.id, client);
@@ -470,29 +484,37 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
           masterId: master.id, orderId: order.id, metadata: {
             balance_transaction_id: charges[0].id,
             billing_consent_log_id: billingConsent.consent_log_id, pricing_key: rates.key,
-            run_id: run.id, category, amount_tetri: leadPrice, balance_before_tetri: master.balance_tetri,
+            run_id: run.id, category, matched_categories: openMatches, service_snapshot: liveServices, amount_tetri: leadPrice, balance_before_tetri: master.balance_tetri,
             balance_after_tetri: master.balance_tetri - leadPrice, channel,
             provider_message_id: receipt.providerMessageId || null,
             provider_response: receipt.providerResponse || null, message_body: receipt.messageBody || null,
             acceptance_status: 'accepted', delivery_status: 'unknown',
           } }, client);
       }
-      await client.query('UPDATE dispatch_deliveries SET status=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2', [run.id,master.id,outcome]);
-    });
+      await client.query('UPDATE dispatch_deliveries SET status=$3,channel=$4,reason=$5,finished_at=NOW() WHERE run_id=$1 AND master_id=$2', [run.id,master.id,outcome,channel,delivered ? null : receipt?.uncertain ? 'result_unknown' : 'channel_rejected']);
+    }); } catch(error) {
+      // A provider may already have accepted a message before a transaction failed.
+      // Leave uncertain attempts pending: they must never be blindly retried.
+      outcome = attempted ? 'pending' : 'failed';
+      await pool.query('UPDATE dispatch_deliveries SET status=$3,reason=$4 WHERE run_id=$1 AND master_id=$2',[run.id,candidate.id,outcome,attempted ? 'result_unknown' : 'before_send_error']);
+      console.error('Dispatch recipient failed:',candidate.id,error.message);
+    }
     if (outcome === 'accepted') {
       notifiedIds.push(candidate.id);
       if (candidate.balance_tetri >= lowBalanceNudgeTetri && candidate.balance_tetri - leadPrice < lowBalanceNudgeTetri)
         await nudgeLowBalance({ ...candidate, is_technical: isTechnical, balance_tetri: candidate.balance_tetri - leadPrice }, telegramService, 'low').catch(err => console.error('Low balance reminder failed:', err.message));
     }
-    if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id]);
+    if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',reason=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id,skipReason]);
    }));
   }
   const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
   // Прежние отправки этой же группы (другой язык): кого они уже учли, тому «упущенный лид» второй раз не засчитываем.
   const { rows: earlier } = await pool.query('SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3 AND language <> $4', [order.id, category, vehicleSize || '', language || '']);
-  const { rows: broke } = await pool.query('SELECT id, spoken_languages FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1' + catClause, [leadPrice, ...catParams]);
+  const { rows: broke } = await pool.query('SELECT * FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1', [leadPrice]);
   for (const candidate of broke) {
     if (notifiedIds.includes(candidate.id)) continue;
+    if (!(await matching.openMatches(candidate,await getOrderByToken(order.token))).includes(category)) continue;
+    if(!matching.matches(await matching.servicesFor(candidate),category,vehicleSize || '',order.target_categories,order.requirements)) continue;
     // Рассылка по языку не касается тех, кто на нём не говорит.
     if (language && !speaks(candidate, language)) continue;
     if (earlier.some((e) => !e.language || speaks(candidate, e.language))) continue;

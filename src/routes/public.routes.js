@@ -70,7 +70,7 @@ router.get('/', asyncHandler(async (req, res) => {
   const t = translate(locale);
   const categoryService = require('../services/category.service');
   const categories = await categoryService.list();
-  masters.forEach(m => { m.badges = categoryService.badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale); });
+  masters.forEach(m => { m.badges = [...(m.services || []).filter(s=>s.service_type !== m.service_type).map(s=>{const c=categories.find(c=>c.slug===s.service_type);return c?.['name_'+locale] || c?.name_ru || s.service_type;}), ...categoryService.badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale)]; });
 
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
