@@ -11,7 +11,7 @@ stub('../src/services/sms.service',{sendOrderNotification:async(phone,text,conte
   if(context?.kind === 'lead') {sent.push(phone);if(failure === phone)return {ok:false};if(failure === 'unknown')throw Error('timeout');}
   return {ok:true,providerMessageId:'sms-test'};
 }});
-stub('../src/services/translation.service',{translateOrder:async()=>null});
+stub('../src/services/translation.service',{translateOrder:async()=>null,detectLang:()=> 'ru'});
 stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async()=>false});
 const masters=require('../src/services/master.service'),orders=require('../src/services/order.service'),dispatch=require('../src/services/dispatch.service');
 const matching=require('../src/services/serviceMatching.service'),contact=require('../src/services/orderContact.service');
@@ -60,6 +60,20 @@ const ids=plan=>plan.recipients.map(m=>m.id).sort((a,b)=>a-b);
   assert.equal((await contact.reveal(o.token,both.master_token,'call')).status,200);
   assert.equal((await contact.reveal(o.token,both.master_token,'whatsapp')).status,200);
   assert.equal((await orders.getOrderFunnelStats(o.id)).contacted,1);
+  const controller=require('../src/controllers/order.controller');
+  const sessions=require('../src/services/masterSession.service');
+  const originalToken=sessions.token;
+  sessions.token=async()=>combined.master_token;
+  let locals;
+  await controller.show({params:{token:o.token},cookies:{},query:{},lang:'ru'}, {set(){},render(view,data){locals=data;}});
+  sessions.token=originalToken;
+  const i18n=require('../src/config/i18n');
+  const html=await require('ejs').renderFile(path.join(__dirname,'../src/views/order.ejs'),{
+    ...locals,lang:'ru',t:i18n.translate('ru'),clientStrings:i18n.clientStrings('ru'),currentPath:'/',isRememberedProvider:false,csrfToken:'test',
+  });
+  assert.match(html,/Поиск закрыт/);assert.match(html,/Поиск открыт/);
+  assert.match(html,/нет открытых потребностей, подходящих/);
+  assert.ok(!html.includes('id="callBtn"'),'conditional loader cannot contact client after transport closes');
   const leads=await masters.getMasterLeads(combined.id,combined.category);
   assert.equal(leads.find(l=>l.id === o.id).is_closed_for_master,true);
   const countBefore=(await orders.getOrderDispatches(o.id))[0].master_count;
@@ -83,5 +97,7 @@ const ids=plan=>plan.recipients.map(m=>m.id).sort((a,b)=>a-b);
   await orders.closeOrderCategory(o.token,'movers',{actor:'client'});
   assert.equal((await orders.getOrderByToken(o.token)).status,'closed');
   assert.equal((await contact.reveal(o.token,both.master_token,'call')).status,409);
+  db.public.none(schema.slice(schema.indexOf('-- Multiple provider services')));
+  assert.equal((await pool.query('SELECT service_type FROM master_services WHERE master_id=$1',[both.id])).rows.length,2,'reapplying additive migration preserves services');
   console.log('PASS: multi-service assignment, conditional loading, vehicle size, independent needs, unique charges, contacts, snapshots, retry and uncertain attempts');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

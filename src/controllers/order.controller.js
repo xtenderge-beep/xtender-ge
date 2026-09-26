@@ -800,7 +800,7 @@ async function show(req, res) {
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
   const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
-  const categoryLabels = (order.target_categories || []).length > 1 ? await categoryLabelMap(req.lang) : {};
+  const categoryLabels = (order.target_categories || []).length ? await categoryLabelMap(req.lang) : {};
 
   // Плашка «баланс · мой аккаунт» + предупреждение о низком балансе — только для мастера,
   // открывшего лид по своей ссылке (?master=<id>), не для владельца заявки. Категорию
@@ -889,7 +889,7 @@ async function showByOwnerToken(req, res) {
     : (['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang);
   res.locals.lang = ownerLang;
   res.locals.t = translate(ownerLang);
-  const categoryLabels = (order.target_categories || []).length > 1 ? await categoryLabelMap(ownerLang) : {};
+  const categoryLabels = (order.target_categories || []).length ? await categoryLabelMap(ownerLang) : {};
 
   return res.render('order', {
     ...revisionLocals(order, ownerLang),
