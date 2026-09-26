@@ -1,8 +1,8 @@
-<%- include('_header') %><a href="/manager">← Моя база</a><h1><%= master.name %></h1><p><%= master.phone %> · заявка от <%= date(master.created_at) %></p>
+<%- include('_header') %><a href="/manager/masters/<%= master.id %>">← Карточка специалиста</a><h1><%= master.name %></h1><p><%= master.phone %> · зарегистрирован <%= date(master.created_at) %></p>
 <% if (master.description) { %><div class="card"><h2>Описание услуг</h2><p class="pre"><%= master.description %></p></div><% } %>
 <% if (master.avatar_url) { %><div class="card"><h2>Фото</h2><img src="<%= master.avatar_url %>" alt="" style="max-width:280px;border-radius:12px;display:block"></div><% } %>
 
-<% if (manager.is_head_moderator) { %>
+<% if (manager.is_head_moderator && !master.is_active) { %>
 <details class="card">
   <summary>✏️ Поправить имя/телефон (опечатка при регистрации)</summary>
   <form method="post" action="/manager/review/<%= master.id %>/contact" style="margin-top:10px">
@@ -23,10 +23,10 @@
   <p>Или укажите все три размера в см — размер определится автоматически.</p>
   <label>Длина<input type="number" name="cargoLength" min="1" max="2000"></label><label>Ширина<input type="number" name="cargoWidth" min="1" max="2000"></label><label>Высота<input type="number" name="cargoHeight" min="1" max="2000"></label></div>
   <%- include('../admin/_master-service-fields', {master,serviceConfig:categories}) %>
-  <div style="display:flex;gap:8px"><button type="submit" formaction="/manager/review/<%= master.id %>/assign">Сохранить услуги</button><button type="submit">Сохранить и одобрить</button></div>
+  <div style="display:flex;gap:8px"><button type="submit" formaction="/manager/review/<%= master.id %>/assign">Сохранить услуги</button><% if (!master.is_active) { %><button type="submit">Сохранить и одобрить</button><% } %></div>
 </form>
 
-<% if (manager.is_head_moderator) { %>
+<% if (manager.is_head_moderator && !master.is_active) { %>
 <details class="card">
   <summary style="color:#a53030">🚫 Отклонить заявку (явный спам/дубль/фейк)</summary>
   <form method="post" action="/manager/review/<%= master.id %>/reject" style="margin-top:10px">

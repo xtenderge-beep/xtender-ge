@@ -79,6 +79,7 @@ async function reviewGet(managerId, masterId) {
   )).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
+  if (master.is_active && !master.manager_id) throw fail('Активный специалист не закреплён за вами.', 403);
   const categories = await require('./category.service').configForView('ru');
   const { vanSizeSpec } = require('../config/serviceTypes');
   const thresholds = await require('./settings.service').getVanSizeThresholds();
@@ -160,11 +161,12 @@ async function rejectPending(managerId, masterId, reason) {
 // Внутреннее ядро, без журналирования события — используется и «только категория»,
 // и первым шагом «категория и одобрить», а событие в manager_portal_events у них
 // разное (assign_category vs approve), поэтому пишет его каждый вызывающий сам.
-async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined) {
+async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, allowActive = false) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
-  if (master.is_active) throw fail('Заявка уже одобрена.', 409);
+  if (master.is_active && !allowActive) throw fail('Заявка уже одобрена.', 409);
+  if (master.is_active && !master.manager_id) throw fail('Активный специалист не закреплён за вами.', 403);
   if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
   if (!master.manager_id) {
     const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
@@ -196,8 +198,8 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
 // единственного пути, из-за которого приходилось уходить в общий список
 // /admin/masters, чтобы отдельно одобрить уже закреплённую заявку.
 async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined) {
-  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services);
-  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'assign_category',$3)", [managerId, masterId, 'Назначены услуги (без одобрения): ' + (services ? services.map(s=>s.type).join(', ') : category)]);
+  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, true);
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'assign_category',$3)", [managerId, masterId, 'Назначены услуги: ' + (services ? services.map(s=>s.type).join(', ') : category)]);
   return id;
 }
 async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined) {
@@ -259,6 +261,5 @@ async function finances(id, value) {
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
   issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,
   logout: sid => redis.del('manager_session:'+sid) };
-
 
 

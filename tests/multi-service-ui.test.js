@@ -48,6 +48,15 @@ let server;
  const portal=require('../src/services/managerPortal.service');
  await portal.assignCategory(manager.id,pending.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}},{type:'movers',attributes:{crew_size:2},requiresOwnTransport:true}]);
  const saved=await portal.reviewGet(manager.id,pending.id);assert.equal(saved.master.services.length,2);
+ await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1',[m.id,manager.id]);
+ await portal.assignCategory(manager.id,m.id,'van',{},'M',null,[{type:'van',attributes:{body:'closed'}}]);
+ const updated=await portal.reviewGet(manager.id,m.id);
+ assert.equal(updated.master.is_active,true);
+ assert.equal(updated.master.services.length,1);
+ assert.equal(updated.master.vehicle_size,'M');
+ const stranger=(await pool.query("INSERT INTO managers(name,phone) VALUES('Чужой менеджер','+995500009555') RETURNING id")).rows[0].id;
+ await assert.rejects(()=>portal.assignCategory(stranger,m.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}}]),{status:403});
+ assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');
  if(process.env.PREVIEW_MULTISERVICE){console.log('PREVIEW '+base+'/admin/masters/'+m.id);console.log('ORDER '+base+'/admin/orders/ui-multi');console.log('MANAGER '+base+'/preview-manager');}
  else {await new Promise(resolve=>server.close(resolve));redis.disconnect();}
