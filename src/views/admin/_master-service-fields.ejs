@@ -39,11 +39,15 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
    panel.hidden = !active;
    panel.querySelectorAll('input,select').forEach(input => input.disabled = !active);
   });
-  if (sizeField) {
+ if (sizeField) {
    const showSize = types.includes('van');
    sizeField.hidden = !showSize;
    sizeField.querySelectorAll('input,select').forEach(input => input.disabled = !showSize);
   }
+  const summary = document.getElementById('admin-service-summary');
+  if (summary) summary.textContent = types.length
+   ? 'Выбрано: ' + choices.filter(input=>input.checked).map(input=>input.closest('label').textContent.trim()).join(' · ')
+   : 'Услуги пока не выбраны.';
  }
  choices.forEach(input=>input.addEventListener('change', update)); update();
 })();
