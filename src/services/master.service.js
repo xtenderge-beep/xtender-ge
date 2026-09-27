@@ -413,7 +413,7 @@ async function topUpBalance(phone, amountTetri) {
 // category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
 // остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
 // мастера до одного тира).
-async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services }) {
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds }) {
   const config = require('../config/serviceTypes');
   const categories = require('./category.service');
   const selected = services || [{ type: category === 'transport' ? 'van' : category, attributes: serviceAttributes }];
@@ -431,6 +431,12 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   }
   const primary = normalized.find(s=>s.type === 'van') || normalized[0];
   const legacy = config.legacyColumnsFor(primary.type, primary.attributes);
+  if (cityIds !== undefined) {
+    const active = new Set((await getActiveCities()).map(city => city.id));
+    if (!Array.isArray(cityIds) || !cityIds.length || cityIds.some(cityId => !Number.isSafeInteger(cityId) || !active.has(cityId))) {
+      throw Object.assign(new Error('Выберите хотя бы один доступный город'), { code: 'INVALID_CITY' });
+    }
+  }
   return pool.withTransaction(async client => {
     await client.query('SELECT id FROM masters WHERE id=$1 FOR UPDATE', [id]);
     const { rows } = await client.query(
@@ -440,6 +446,12 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
     await client.query('DELETE FROM master_services WHERE master_id=$1', [id]);
     for (const service of normalized) await client.query('INSERT INTO master_services(master_id,service_type,attributes,is_primary,requires_own_transport) VALUES($1,$2,$3::jsonb,$4,$5)',
       [id,service.type,JSON.stringify(service.attributes),service === primary,service.requiresOwnTransport]);
+    if (cityIds !== undefined) {
+      await client.query('DELETE FROM master_cities WHERE master_id=$1', [id]);
+      for (const cityId of new Set(cityIds)) await client.query('INSERT INTO master_cities(master_id,city_id) VALUES($1,$2)', [id,cityId]);
+      await client.query('UPDATE masters SET city_id=$1 WHERE id=$2', [cityIds[0],id]);
+      rows[0].city_id = cityIds[0];
+    }
     return rows[0];
   });
 }
@@ -483,7 +495,7 @@ const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicl
 // Каталог группирует по service_type из master_services. Тип и attributes подтягиваем
 // вторым запросом и клеим в JS (а не join + GROUP BY по jsonb — pg-mem не тянет).
 // Один мастер = одна карточка: берём primary-услугу (все мигрированные/новые — primary).
-async function listMasters({ serviceType, language } = {}) {
+async function listMasters({ serviceType, language, cityId } = {}) {
   const { rows } = await pool.query(
     `SELECT ${LIST_FIELDS}, COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating, COUNT(r.id)::int AS review_count
      FROM masters m
@@ -513,6 +525,10 @@ async function listMasters({ serviceType, language } = {}) {
   const profiles = (await pool.query('SELECT id, spoken_languages, contact_channels FROM masters WHERE id IN (' + ph + ')', ids)).rows;
   const profileMap = new Map(profiles.map(m => [m.id, m]));
   const billingIds = await billing.eligibleIds(await billing.pricing());
+  const cityCoverage = cityId ? (await pool.query('SELECT master_id FROM master_cities WHERE city_id=$1', [cityId])).rows : [];
+  const covered = new Set(cityCoverage.map(row => row.master_id));
+  const explicitCoverage = cityId ? new Set((await pool.query('SELECT master_id FROM master_cities')).rows.map(row => row.master_id)) : null;
+  const tbilisi = cityId ? (await pool.query("SELECT id FROM cities WHERE slug='tbilisi'")).rows[0]?.id : null;
   const result = rows.map((m) => {
     const s = byMaster.get(m.id);
     return {
@@ -526,7 +542,7 @@ async function listMasters({ serviceType, language } = {}) {
       services: services.filter(s=>s.master_id === m.id && !s.requires_own_transport && active.has(s.service_type)),
     };
   });
-  return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType)).sort((a,b) => Number(b.spoken_languages.includes(language)) - Number(a.spoken_languages.includes(language)));
+  return result.filter(m => active.has(m.service_type) && (!serviceType || m.service_type === serviceType) && (!cityId || covered.has(m.id) || (!explicitCoverage.has(m.id) && (m.city_id === cityId || (!m.city_id && cityId === tbilisi))))).sort((a,b) => Number(b.spoken_languages.includes(language)) - Number(a.spoken_languages.includes(language)));
 }
 
 // Lock the provider before checking the durable access record. Access, debit and audit commit together.

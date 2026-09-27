@@ -52,8 +52,10 @@ function redirectToCookieLocale(req, res, path) {
 router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
   const locale = resolveLocale(req, res, '/');
+  const catalogCities = await masterService.getActiveCities();
+  const catalogCity = catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
   const [masters, catalogCallPriceTetri] = await Promise.all([
-    masterService.listMasters({ language: locale }),
+    masterService.listMasters({ language: locale, cityId: catalogCity?.id }),
     settingsService.getCatalogCallPriceTetri(),
   ]);
   res.set('Cache-Control', 'private, no-store');
@@ -83,6 +85,8 @@ router.get('/', asyncHandler(async (req, res) => {
   res.render('index', {
     consent: await consentService.bundle('client', locale),
     masters,
+    catalogCities,
+    catalogCity,
     catalogCallPriceTetri,
     prefillPhone,
     clientStrings: clientStrings(locale),
@@ -153,7 +157,7 @@ router.get('/join', asyncHandler(async (req, res) => {
 
   const t = translate(locale);
   const nameKey = { ka: 'name_ka', ru: 'name_ru', en: 'name_en' }[locale] || 'name_ru';
-  const cities = await masterService.getWorkCities();
+  const cities = await masterService.getActiveCities();
 
   const [leadPriceTetri, catalogCallPriceTetri] = await Promise.all([settingsService.getLeadPriceTetri(), settingsService.getCatalogCallPriceTetri()]);
   const welcomeBonusTetri = await settingsService.getWelcomeBonusTetri();

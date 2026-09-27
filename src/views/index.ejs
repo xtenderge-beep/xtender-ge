@@ -259,6 +259,8 @@
                         %>
 
                         <div class="catalog-language-filter">
+<label for="catalog-city"><%= lang === 'ka' ? 'ქალაქი' : lang === 'en' ? 'City' : 'Город' %></label>
+<select id="catalog-city" onchange="const url=new URL(location.href);url.searchParams.set('city',this.value);url.hash='masters-section';location.href=url.toString()"><% catalogCities.forEach(city=>{ %><option value="<%= city.slug %>" <%= city.id===catalogCity?.id?'selected':'' %>><%= city['name_'+lang] || city.name_ru %></option><% }); %></select>
 <label for="catalog-language"><%= t('catalog_languages') %></label>
 <select id="catalog-language"><% Object.entries({ka:'ქართული',ru:'Русский',en:'English',hy:'Հայերեն',az:'Azərbaycan dili',tr:'Türkçe',uk:'Українська'}).forEach(([code,label]) => { %><option value="<%= code %>" <%= lang === code ? 'selected' : '' %>><%= label %></option><% }); %></select>
 <label class="catalog-language-only"><input type="checkbox" id="catalog-only-language"> <%= t('catalog_only_language') %></label>

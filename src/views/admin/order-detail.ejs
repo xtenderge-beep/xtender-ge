@@ -6,6 +6,7 @@
 <% if(order.status === 'pending_review' && !order.first_dispatched_at) { %>
 <section class="admin-dispatch"><h2>Что нужно клиенту?</h2><p>Отметьте все потребности до рассылки. Клиент сможет закрыть каждую отдельно.</p>
 <form method="post" action="/admin/orders/<%= order.token %>/needs"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<label class="block my-3">Город заявки <select name="cityId" required><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id || (!order.city_id && city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
 <% Object.entries(groups).forEach(([key,label])=>{ const svc=serviceConfig.find(s=>s.type===(key==='transport'||key==='flatbed'?'van':key)); const fields=(svc?.fields || []).filter(f=>f.input!=='size' && f.input!=='text' && f.match && f.match!=='ignore' && !(key==='flatbed'&&f.key==='body')); const values=order.requirements?.services?.[key] || {}; %>
 <fieldset data-need-panel="<%= key %>" class="border rounded-xl p-3 my-2"><legend><label><input type="checkbox" name="needs" value="<%= key %>" <%= (order.target_categories || []).includes(key) ? 'checked' : '' %>> <%= label %></label></legend>
 <div data-need-fields class="space-y-2"><% fields.forEach(f=>{ %>
@@ -27,6 +28,7 @@
         </span>
     </div>
     <p class="text-sm text-stone-800 mt-3"><%= order.description %></p>
+    <p class="text-sm">Город заявки: <strong><%= allCities.find(city=>city.id===order.city_id)?.name_ru || 'Тбилиси (старая заявка)' %></strong></p>
     <p class="text-xs text-stone-500 mt-2">
         Создана: <%= new Date(order.created_at).toLocaleString('ru') %>
         <% if (order.closed_at) { %> · Закрыта: <%= new Date(order.closed_at).toLocaleString('ru') %><% } %>

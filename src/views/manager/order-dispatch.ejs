@@ -1,6 +1,7 @@
 <%- include('_header') %>
 <a href="/manager/orders">← Все заявки</a><h1>Заявка #<%= order.id %></h1>
 <p class="pre"><%= order.description %></p>
+<p>Город заявки: <strong><%= allCities.find(city=>city.id===order.city_id)?.name_ru || 'Тбилиси (старая заявка)' %></strong></p>
 <% if(order.is_technical){ %><p>🧪 Техническая заявка: рассылка только техническим исполнителям.</p><% } %>
 <% if((order.target_categories||[]).length>1){ %><details class="card"><summary>Отметить закрытую потребность</summary><p>Используйте после подтверждения, что по этой услуге новые предложения уже не нужны.</p><% order.target_categories.filter(key=>!(order.closedCategories||[]).includes(key)).forEach(key=>{ %><form method="post" action="/manager/orders/<%= order.token %>/close-category" class="form-actions"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= key %>"><button type="submit" class="secondary-action">Закрыть «<%= key==='flatbed'?'🚛 Перевозки — бортовая машина':groups[key]||key %>»</button></form><% }); %></details><% } %>
 <% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
@@ -8,6 +9,7 @@
 <% if(order.status==='pending_review' && !order.first_dispatched_at){ %>
 <section class="card"><h2>1. Что нужно клиенту?</h2><p>Отметьте услуги и уточните требования только для них. «Бортовая машина» — вариант перевозки с открытым кузовом.</p>
 <form method="post" action="/manager/orders/<%= order.token %>/needs"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label>Город заявки<select name="cityId" required><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id || (!order.city_id && city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
 <div class="need-grid">
 <% Object.entries(groups).forEach(([key,label])=>{const svc=serviceConfig.find(s=>s.type===(key==='transport'||key==='flatbed'?'van':key));const fields=(svc?.fields||[]).filter(f=>f.input!=='size'&&f.input!=='text'&&f.match&&f.match!=='ignore'&&!(key==='flatbed'&&f.key==='body'));const values=order.requirements?.services?.[key]||{}; %>
 <fieldset data-need-panel="<%= key %>" class="need-item"><legend><label><input type="checkbox" name="needs" value="<%= key %>" <%= (order.target_categories||[]).includes(key)?'checked':'' %>> <%= key==='flatbed'?'🚛 Перевозки — бортовая машина':label %></label></legend><div data-need-fields class="need-fields">

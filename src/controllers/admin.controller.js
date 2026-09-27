@@ -216,6 +216,7 @@ async function masterDetail(req, res) {
   const vanSizeThresholds = await settingsService.getVanSizeThresholds();
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
+    activeCities: await masterService.getActiveCities(),
     vanSizes: vanSizeThresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
     languageNames: require('../config/spokenLanguages').ruNames,
     autoDisplayName: require('../config/providerName').displayName(master.name),
@@ -266,6 +267,7 @@ async function updateMaster(req, res) {
       isFlatbed,
       priceText,
       description,
+      cityIds: [].concat(req.body.cityIds || []).map(Number),
       services: req.body.servicesForm ? selectedTypes.map(type=>({ type,
         requiresOwnTransport: type === 'movers' && req.body.moversOwnTransport === 'on',
         attributes: Object.fromEntries(Object.entries(req.body).filter(([key])=>key.startsWith(type+'_')).map(([key,value])=>[key.slice(type.length+1),value])) })) : undefined,
@@ -273,6 +275,7 @@ async function updateMaster(req, res) {
     });
   } catch (err) {
     if (err.code === 'INVALID_SERVICE') return res.redirect(`/admin/masters/${id}?error=service_required`);
+    if (err.code === 'INVALID_CITY') return res.redirect(`/admin/masters/${id}?error=invalid_city`);
     if (err.code === '23505') {
       return res.redirect(`/admin/masters/${id}?error=phone_taken`);
     }
@@ -369,7 +372,7 @@ async function orderDetail(req, res) {
   order.deliveryRuns = await orderService.getOrderDispatches(order.id);
   order.funnel = await orderService.getOrderFunnelStats(order.id);
   res.locals.dispatchError = req.query.dispatchError || null;
-  res.render('admin/order-detail', { order, groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
+  res.render('admin/order-detail', { order, activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(), groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -713,7 +716,7 @@ async function cancelTopup(req, res) {
 async function saveOrderNeeds(req,res) {
   const token=req.params.token;
   try {
-    await require('../services/orderNeeds.service').save(token,req.body.needs,req.body.transportSize,req.body.needAttributes);
+    await require('../services/orderNeeds.service').save(token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId);
     res.redirect('/admin/orders/'+encodeURIComponent(token));
   } catch(e) {res.redirect('/admin/orders/'+encodeURIComponent(token)+'?dispatchError='+encodeURIComponent(e.message));}
 }

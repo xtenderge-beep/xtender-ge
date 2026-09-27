@@ -128,6 +128,8 @@
             </div>
         </div>
         <section id="admin-services" class="admin-services" aria-labelledby="admin-services-title">
+            <h3>Города работы</h3><p>Отметьте все города, где специалист принимает заказы.</p>
+            <div class="admin-service-grid"><% activeCities.forEach(city=>{ %><label class="admin-service-tile"><input type="checkbox" name="cityIds" value="<%= city.id %>" <%= (master.work_cities||[]).some(row=>row.id===city.id) || (!(master.work_cities||[]).length && (master.city_id===city.id || (!master.city_id && city.slug==='tbilisi'))) ? 'checked' : '' %>> <span><%= city.name_ru %></span></label><% }); %></div>
             <h3 id="admin-services-title">1. Какие услуги выполняет специалист?</h3>
             <p>Выберите все подходящие услуги. У каждой появятся свои характеристики для каталога и точной рассылки.</p>
             <input type="hidden" name="servicesForm" value="1">

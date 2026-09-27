@@ -32,7 +32,7 @@ let server;
  const get=async url=>{const response=await fetch(base+url,{headers:{cookie}});assert.equal(response.status,200);const html=await response.text();for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);return html;};
  const post=async(url,pairs)=>fetch(base+url,{method:'POST',headers:{cookie,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams([['_csrf',session.csrfToken],...pairs]),redirect:'manual'});
  assert.match(await get('/admin/masters/'+m.id),/Какие услуги выполняет специалист/);
- assert.equal((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['servicesForm','1'],['services','van'],['services','movers'],['van_body','closed'],['vehicleSize','L'],['movers_crew_size','1'],['moversOwnTransport','on'],['thenApprove','1']])).status,302);
+ assert.equal((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['cityIds','1'],['servicesForm','1'],['services','van'],['services','movers'],['van_body','closed'],['vehicleSize','L'],['movers_crew_size','1'],['moversOwnTransport','on'],['thenApprove','1']])).status,302);
  assert.equal((await pool.query('SELECT * FROM master_services WHERE master_id=$1',[m.id])).rows.length,2);
  await pool.query('UPDATE masters SET balance_tetri=5000 WHERE id=$1',[m.id]);await require('./billing-fixture')(pool,m.id);
  await post('/admin/orders/ui-multi/needs',[['needs','transport'],['needs','movers'],['transportSize','L']]);
@@ -61,7 +61,7 @@ let server;
  await portal.requireHeadModerator(manager.id);
  const managerHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/order-dispatch.ejs'),{
   manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
-  groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
+  activeCities:await masters.getActiveCities(),allCities:await masters.getWorkCities(),groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
   speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
  });
  assert.match(managerHtml,/Что нужно клиенту/);

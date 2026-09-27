@@ -177,7 +177,7 @@ async function render(file, locals) {
   for(const lang of ['ru','en','ka']) {
     const t=translate(lang);
     const common={lang,t,clientStrings:clientStrings(lang),currentPath:'/',isRememberedProvider:false,csrfToken:'test',seo:buildSeo(lang,'/')};
-    const html=await render('index.ejs',{...common,masters:[],catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:await consent.bundle('client',lang)});
+    const html=await render('index.ejs',{...common,masters:[],catalogCities:[{id:1,slug:'tbilisi',name_ka:'თბილისი',name_ru:'Тбилиси',name_en:'Tbilisi'}],catalogCity:{id:1},catalogCallPriceTetri:50,prefillPhone:'',catalogGroups:serviceTypes.catalogGroupsForView(t),consent:await consent.bundle('client',lang)});
     assert.ok(html.includes('id="clientSharing"'));assert.ok(!/id="clientSharing"[^>]*checked/.test(html));
     await render('join.ejs',{...common,consent:await consent.bundle('provider',lang),legalDoc:legalContent.terms,reqLabels:legalContent.REQUISITE_LABELS,reqPending:legalContent.REQUISITE_PENDING,requisites:SERVICE_REQUISITES,welcomeBonusTetri:0,leadPriceTetri:50,catalogCallPriceTetri:50,promo:null,serviceConfig:serviceTypes.configForView(t),cities:[{id:1,name:'Tbilisi'}],districtsByCity:{1:[]}});
     await render('order.ejs',{...common,order:published,files:[],isOwner:true,masterId:null,masterCategory:null,funnel:null,masterAccount:null,targetCategories:[],closedCategories:[],categoryLabels:{},whatsappText:''});

@@ -28,6 +28,7 @@ async function preview(token, category, size, languageRaw = '') {
   if(order.requirements?.configured && !order.target_categories.includes(category)) throw new Error('Эта услуга не указана в потребностях заявки');
   if(category === 'transport' && order.requirements?.transport_size && size && size !== order.requirements.transport_size) throw new Error('Размер не соответствует потребности заявки');
   const price = await settingsService.getLeadPriceTetri();
+  const city = (await pool.query('SELECT name_ru FROM cities WHERE id=$1', [order.city_id || (await pool.query("SELECT id FROM cities WHERE slug='tbilisi'")).rows[0]?.id])).rows[0];
   const eligible = await orderService.getDispatchRecipients(category, size, price, order.is_technical === true, '', order);
   const definition = await require('./category.service').get(category);
   const fields = definition ? require('./category.service').view(definition, 'ru').fields : [];
@@ -37,6 +38,7 @@ async function preview(token, category, size, languageRaw = '') {
     return {label:field?.label || key,value:shown + (field?.unit && typeof value === 'number' ? ' '+field.unit : '')};
   });
   if (size) criteria.unshift({label:'Размер транспорта',value:size});
+  if (city) criteria.unshift({label:'Город заявки',value:city.name_ru});
   let attributeExcluded = 0;
   if (Object.keys(order.requirements?.services?.[category] || {}).length) {
     const broadOrder = {...order,requirements:{...order.requirements,services:{},rules:{}}};

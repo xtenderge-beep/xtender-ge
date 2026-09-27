@@ -21,6 +21,10 @@ router.post('/verify-2fa', asyncHandler(adminController.verify2fa));
 router.post('/verify-2fa/resend', asyncHandler(adminController.resend2fa));
 
 router.use(requireAdmin);
+const cityController = require('../controllers/city.controller');
+router.get('/cities', asyncHandler(cityController.index));
+router.post('/cities', verifyCsrf, asyncHandler(cityController.create));
+router.post('/cities/:id/status', verifyCsrf, asyncHandler(cityController.setStatus));
 const categories = require('../controllers/category.controller');
 router.get('/categories', asyncHandler(categories.index));
 router.get('/categories/new', asyncHandler(categories.form));

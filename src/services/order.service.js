@@ -404,6 +404,7 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
   const allServices=(await pool.query('SELECT * FROM master_services')).rows;
   for(const master of rows) {
     if(!allowed.has(master.id) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
+    if(order && !(await matching.coversCity(master,order))) continue;
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
     const size=vehicleSize || (category === 'transport' ? order?.requirements?.transport_size : '') || '';
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;

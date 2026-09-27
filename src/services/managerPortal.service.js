@@ -88,7 +88,8 @@ async function reviewGet(managerId, masterId) {
   // сервер в approvePending, клиентский расчёт — только превью.
   const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   master.services=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[masterId])).rows;
-  return { master, categories, vanSizes };
+  master.work_cities=(await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1',[masterId])).rows;
+  return { master, categories, vanSizes, activeCities: await require('./master.service').getActiveCities() };
 }
 
 // Свежая проверка из БД (не из закешированной сессии) — на неё завязаны действия с
@@ -161,7 +162,7 @@ async function rejectPending(managerId, masterId, reason) {
 // Внутреннее ядро, без журналирования события — используется и «только категория»,
 // и первым шагом «категория и одобрить», а событие в manager_portal_events у них
 // разное (assign_category vs approve), поэтому пишет его каждый вызывающий сам.
-async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, allowActive = false) {
+async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, allowActive = false, cityIds = undefined) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
@@ -184,10 +185,11 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
     await require('./master.service').updateMasterProfile(masterId, {
       name: master.name, phone: master.phone, category,
       vehicleType: master.vehicle_type, vehicleSize: effectiveSize || master.vehicle_size, isFlatbed: master.is_flatbed,
-      priceText: master.price_text, description: master.description, serviceAttributes: attributes, services,
+      priceText: master.price_text, description: master.description, serviceAttributes: attributes, services, cityIds,
     });
   } catch (e) {
     if (e.code === 'INVALID_SERVICE') throw fail('Эта категория требует дополнительных характеристик — заполните их в полной карточке в админке.', 422);
+    if (e.code === 'INVALID_CITY') throw fail(e.message, 422);
     throw e;
   }
   return master.id;
@@ -197,13 +199,13 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
 // не одобряя) и «Категория и одобрить» (то же самое + сразу approveMaster) — вместо
 // единственного пути, из-за которого приходилось уходить в общий список
 // /admin/masters, чтобы отдельно одобрить уже закреплённую заявку.
-async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined) {
-  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, true);
+async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, cityIds = undefined) {
+  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, true, cityIds);
   await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'assign_category',$3)", [managerId, masterId, 'Назначены услуги: ' + (services ? services.map(s=>s.type).join(', ') : category)]);
   return id;
 }
-async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined) {
-  await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services);
+async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, cityIds = undefined) {
+  await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, false, cityIds);
   const approved = await require('./master.service').approveMaster(masterId);
   if (!approved) throw fail('Не удалось одобрить — проверьте данные в полной карточке в админке.', 422);
   await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'approve',$3)", [managerId, masterId, 'Одобрены услуги: ' + (services ? services.map(s=>s.type).join(', ') : category)]);

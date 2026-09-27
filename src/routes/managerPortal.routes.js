@@ -47,7 +47,7 @@ const dispatchPage=async(req,res,result=null)=>{
   order.closedCategories=await orderService.getClosedCategories(order.id);
   let plan=null,error=req.query.error || null;
   if(req.query.category)try {plan=await dispatchService.preview(order.token,req.query.category,req.query.size || '',req.query.language || '');}catch(e){error=e.message;}
-  res.render('manager/order-dispatch',{order,plan,result,error,groups:await categoryService.groups(),serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
+  res.render('manager/order-dispatch',{order,plan,result,error,activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups:await categoryService.groups(),serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
 };
 router.get('/orders',wrap(async(req,res)=>{
   await service.requireHeadModerator(req.managerSession.id);
@@ -57,7 +57,7 @@ router.get('/orders',wrap(async(req,res)=>{
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
   await service.requireHeadModerator(req.managerSession.id);
-  try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'#dispatch-selection');}
+  try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'#dispatch-selection');}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/dispatch',wrap(async(req,res)=>{
@@ -83,7 +83,7 @@ function reviewFormInput(req) {
   const services=req.body.servicesForm ? [].concat(req.body.services || []).filter(t=>typeof t === 'string').map(type=>({type,
     attributes:Object.fromEntries(Object.entries(req.body).filter(([k])=>k.startsWith(type+'_')).map(([k,v])=>[k.slice(type.length+1),v])),
     requiresOwnTransport:type === 'movers' && req.body.moversOwnTransport === 'on'})) : undefined;
-  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, cargoDimensions, services];
+  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, cargoDimensions, services, [].concat(req.body.cityIds || []).map(Number)];
 }
 // Два действия одной формы (review.ejs, кнопки с разным formaction): «Только
 // категория» закрепляет заявку и сохраняет характеристики, не одобряя — модератор

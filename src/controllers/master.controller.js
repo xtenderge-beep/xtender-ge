@@ -196,7 +196,7 @@ async function register(req, res) {
 
   const attributes = {};
 
-  const cities = await masterService.getWorkCities();
+  const cities = await masterService.getActiveCities();
   let rawCityIds = req.body.cityIds || [];
   if (!Array.isArray(rawCityIds)) rawCityIds = [rawCityIds];
   const cityIds = [...new Set(rawCityIds.map(id => typeof id === 'string' && /^\d+$/.test(id) ? Number(id) : NaN))];
