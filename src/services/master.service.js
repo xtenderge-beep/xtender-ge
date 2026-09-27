@@ -422,7 +422,18 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   const normalized = [];
   for (const item of selected) {
     const definition = await categories.get(item.type);
-    const checked = categories.validate(definition, item.attributes);
+    const raw = { ...(item.attributes || {}) };
+    if (item.type === 'junk') {
+      const keys = ['body_length_cm', 'body_width_cm', 'side_height_cm'];
+      const entered = keys.filter(key => raw[key] !== undefined && raw[key] !== '').length;
+      if (entered && entered !== keys.length) throw invalid();
+      if (entered) {
+        const dimensions = require('../config/junkBody').derive(...keys.map(key => raw[key]));
+        if (!dimensions) throw invalid();
+        raw.volume_m3 = dimensions.tier;
+      }
+    }
+    const checked = categories.validate(definition, raw);
     if (definition?.slug !== item.type || checked.errors.length) throw invalid();
     if (item.type === 'van' && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
     const requiresOwnTransport = item.requiresOwnTransport === true;

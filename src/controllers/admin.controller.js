@@ -217,7 +217,7 @@ async function masterDetail(req, res) {
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
     workCities: await masterService.getWorkCities(),
-    vanSizes: vanSizeThresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
+    vanSizes: vanSizeThresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
     languageNames: require('../config/spokenLanguages').ruNames,
     autoDisplayName: require('../config/providerName').displayName(master.name),
     publicName: require('../config/providerName').resolve(master),

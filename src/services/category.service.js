@@ -5,8 +5,8 @@ const { randomBytes } = require('crypto');
 const toType = key => key === 'transport' || key === 'flatbed' ? 'van' : key;
 const toCategory = key => key === 'van' ? 'transport' : key;
 function fail(message, status = 400) { return Object.assign(new Error(message), { status }); }
-async function list(client = pool) { return (await client.query('SELECT * FROM service_categories ORDER BY sort_order, name_ru, slug')).rows; }
-async function get(key, client = pool) { return (await client.query('SELECT * FROM service_categories WHERE slug=$1', [toType(key)])).rows[0] || null; }
+async function list(client = pool) { return (await client.query('SELECT * FROM service_categories ORDER BY sort_order, name_ru, slug')).rows.map(require('../config/junkBody').withBuiltInFields); }
+async function get(key, client = pool) { return require('../config/junkBody').withBuiltInFields((await client.query('SELECT * FROM service_categories WHERE slug=$1', [toType(key)])).rows[0] || null); }
 function validate(row, raw) {
   if (!row || !row.is_active) return { attributes: {}, errors: ['category'] };
   return base.validateAttributes(row.slug, raw || {}, row.fields);
@@ -51,6 +51,13 @@ async function catalogGroups(lang) {
 function badges(row, attributes, lang) {
   if (!row) return [];
   const a=attributes || {};
+  if (row.slug === 'junk') {
+    const volume = a.volume_m3 ? `${lang==='ka'?'მოცულობა':lang==='en'?'Volume':'Объём'}: ${a.volume_m3}+ м³` : null;
+    const dimensions = ['body_length_cm','body_width_cm','side_height_cm'].every(key=>a[key])
+      ? `${lang==='ka'?'ძარა':lang==='en'?'Body':'Кузов'}: ${a.body_length_cm}×${a.body_width_cm}×${a.side_height_cm} см` : null;
+    const payload = a.payload_t ? `${lang==='ka'?'ტვირთამწეობა':lang==='en'?'Payload':'Грузоподъёмность'}: ${a.payload_t} т` : null;
+    return [volume,dimensions,payload].filter(Boolean);
+  }
   return view(row,lang).fields.flatMap(f=> {
     const v=a[f.key];if(v === undefined || v === null || v === '' || v === false) return [];
     if(f.input==='bool') return [f.label];
@@ -151,6 +158,9 @@ async function save(slug, input) {
     const lockedFields=(previous?.fields || []).filter(f=>f.input==='size');
     const editableExisting=(previous?.fields || []).filter(f=>f.input!=='size');
     const fields=[...lockedFields, ...parseFields(input.fields || [],editableExisting)];
+    if (previous?.slug === 'junk' && ['volume_m3','body_length_cm','body_width_cm','side_height_cm','payload_t'].some(key => !fields.some(field => field.key === key))) {
+      throw fail('Поля объёма, габаритов и грузоподъёмности самосвала используются системой; измените их подписи или параметры, не удаляя поля.',409);
+    }
     if (previous) {
       const assignments=(await client.query('SELECT attributes FROM master_services WHERE service_type=$1',[previous.slug])).rows;
       for (const oldField of editableExisting) {

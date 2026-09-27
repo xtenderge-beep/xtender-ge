@@ -9,7 +9,19 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
     <label class="service-choice text-sm"><input type="checkbox" name="moversOwnTransport" <%= saved?.requires_own_transport ? 'checked' : '' %>> Погрузка только вместе со своим транспортом</label>
     <p class="text-xs">Без этой отметки принимает отдельные заявки на грузчиков. Для отметки нужно также выбрать перевозки.</p>
   <% } %>
-  <% svc.fields.filter(f => f.input !== 'size').forEach(f => { %>
+  <% if (svc.type === 'junk') { %>
+    <p class="text-sm">Укажите внутренние размеры кузова. Объём рассчитается автоматически; грузоподъёмность укажите отдельно.</p>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" data-junk-dimensions>
+      <% [['body_length_cm','Длина кузова'],['body_width_cm','Ширина кузова'],['side_height_cm','Высота борта']].forEach(([key,label])=>{ %>
+      <label class="text-sm"><%= label %>, см<input type="number" name="junk_<%= key %>" min="1" max="2000" step="1" value="<%= attrs[key] ?? '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+      <% }); %>
+    </div>
+    <p class="text-sm" data-junk-volume aria-live="polite">Расчётный объём: <%= attrs.body_length_cm && attrs.body_width_cm && attrs.side_height_cm ? (Number(attrs.body_length_cm)*Number(attrs.body_width_cm)*Number(attrs.side_height_cm)/1000000).toFixed(2)+' м³' : 'укажите три размера' %></p>
+    <details><summary class="text-sm">Габариты неизвестны — выбрать примерный класс объёма</summary>
+      <label class="text-sm">Класс объёма<select name="junk_volume_m3" class="block w-full border rounded-xl px-3 py-2"><option value="">Не выбран</option><% (svc.fields.find(f=>f.key==='volume_m3')?.options || []).forEach(o=>{ %><option value="<%= o.value %>" <%= attrs.volume_m3===o.value?'selected':'' %>><%= o.label %></option><% }); %></select></label>
+    </details>
+  <% } %>
+  <% svc.fields.filter(f => f.input !== 'size' && !(svc.type === 'junk' && ['volume_m3','body_length_cm','body_width_cm','side_height_cm'].includes(f.key))).forEach(f => { %>
     <label class="<%= f.input === 'bool' ? 'service-choice' : 'block' %> text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
     <% if (f.input === 'enum') { %>
       <select name="<%= svc.type %>_<%= f.key %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">
@@ -50,5 +62,14 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
    : 'Услуги пока не выбраны.';
  }
  choices.forEach(input=>input.addEventListener('change', update)); update();
+ if(sizeField){const select=sizeField.querySelector('select[name=vehicleSize]'), preset=sizeField.querySelector('[data-van-preset]');
+  const refresh=()=>{const data=select.selectedOptions[0]?.dataset || {};const spec=data.spec;preset.textContent=spec?'Минимум для класса: '+spec+'. Точные размеры машины не подтверждены.':'Выберите класс, чтобы увидеть минимальные габариты.';
+   sizeField.querySelectorAll('[data-dimension]').forEach(output=>{output.textContent=data[output.dataset.dimension] || '—';});};
+  select.addEventListener('change',refresh);refresh();}
+ document.querySelectorAll('[data-junk-dimensions]').forEach(block=>{
+  const inputs=[...block.querySelectorAll('input')], output=block.parentElement.querySelector('[data-junk-volume]');
+  const refresh=()=>{const nums=inputs.map(input=>Number(input.value));output.textContent=nums.every(n=>n>0)?'Расчётный объём: '+(nums.reduce((a,b)=>a*b,1)/1e6).toFixed(2)+' м³ · класс подбора определится при сохранении':'Расчётный объём: укажите три размера';};
+  inputs.forEach(input=>input.addEventListener('input',refresh));refresh();
+ });
 })();
 </script>

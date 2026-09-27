@@ -150,9 +150,11 @@
                 <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
                     <option value="" <%= !master.vehicle_size ? 'selected' : '' %>>Размер неизвестен</option>
                     <% vanSizes.forEach(s => { %>
-                    <option value="<%= s.code %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option>
+                    <option value="<%= s.code %>" data-spec="<%= s.spec %>" data-length="<%= s.length %>" data-width="<%= s.width %>" data-height="<%= s.height %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option>
                     <% }); %>
                 </select>
+                <div class="grid grid-cols-3 gap-2 text-xs mt-2" data-van-dimensions><span>Длина: <output data-dimension="length">—</output> см</span><span>Ширина: <output data-dimension="width">—</output> см</span><span>Высота: <output data-dimension="height">—</output> см</span></div>
+                <p data-van-preset class="text-xs text-stone-600" aria-live="polite">Это минимальные габариты класса, не точные размеры машины.</p>
             </div>
         <%- include('./_master-service-fields', { master, serviceConfig }) %>
         </section>
