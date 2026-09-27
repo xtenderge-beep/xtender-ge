@@ -635,6 +635,11 @@ async function telegramWebhook(req, res) {
         if(run.deliveries.length>25) lines.push('…остальные получатели — в карточке заявки');
       }
       if(!runs.length)lines.push('Рассылок ещё нет.');
+      const funnel = await orderService.getOrderFunnelStats(order.id);
+      lines.push('', 'Действия получателей: просмотров '+funnel.view+' · позвонить '+funnel.call+' · WhatsApp '+funnel.whatsapp+' · нажали хотя бы один контакт '+(funnel.contacted||0));
+      const byCategory = await orderService.getOrderFunnelByCategory(order.id);
+      for (const row of byCategory) lines.push((labels[row.category] || row.category)+': уведомлены '+row.received+' · просмотров '+row.view+' · звонок '+row.call+' · WhatsApp '+row.whatsapp);
+      lines.push('Принято каналом не означает прочтение; нажатие контакта не подтверждает договорённость.');
       await telegramService.sendToChat(chat,lines.join('\n').slice(0,3800));
       return res.sendStatus(200);
     }

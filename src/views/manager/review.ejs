@@ -17,11 +17,13 @@
 <form method="post" action="/manager/review/<%= master.id %>/approve" class="card">
   <input type="hidden" name="_csrf" value="<%= csrf %>">
   <input type="hidden" name="servicesForm" value="1">
-  <h2>Города работы</h2><p>Отметьте города, в которых специалист принимает заказы. Можно выбрать несколько.</p>
-  <div class="service-grid"><% activeCities.forEach(city=>{ %><label class="service-tile"><input type="checkbox" name="cityIds" value="<%= city.id %>" <%= (master.work_cities||[]).some(row=>row.city_id===city.id) || (!(master.work_cities||[]).length && (master.city_id===city.id || (!master.city_id && city.slug==='tbilisi'))) ? 'checked' : '' %>> <%= city.name_ru %></label><% }); %></div>
-  <h2>1. Выберите услуги</h2><p>Отметьте всё, что исполнитель реально выполняет. Характеристики выбранных услуг появятся ниже.</p>
+  <h2>1. Города работы</h2><p>Отметьте все города, где специалист готов получать заявки. Выключенный город может включить администратор.</p>
+  <div class="service-grid"><% workCities.forEach(city=>{ %><label class="service-tile"><input type="checkbox" name="cityIds" value="<%= city.id %>" <%= city.is_active?'':'disabled' %> <%= (master.work_cities||[]).some(row=>row.city_id===city.id) || (!(master.work_cities||[]).length && (master.city_id===city.id || (!master.city_id && city.slug==='tbilisi'))) ? 'checked' : '' %>> <%= city.name_ru %><%= city.is_active?'':' · выключен' %></label><% }); %></div>
+  <h2>2. Языки общения</h2><p>Выберите языки, на которых исполнитель сможет ответить клиенту. Они используются при подборе.</p>
+  <div class="service-grid"><% Object.entries(languageNames).forEach(([code,label])=>{ %><label class="service-tile"><input type="checkbox" name="spokenLanguages" value="<%= code %>" <%= (master.spoken_languages||[]).includes(code)?'checked':'' %>> <%= label %></label><% }); %></div>
+  <h2>3. Выберите услуги</h2><p>Отметьте всё, что исполнитель реально выполняет. Характеристики выбранных услуг появятся ниже.</p>
   <div class="service-grid"><% categories.forEach(c=>{ %><label class="service-tile"><input type="checkbox" name="services" value="<%= c.type %>" <%= (master.services || []).some(s=>s.service_type===c.type) ? 'checked' : '' %>> <%= c.label %></label><% }); %></div>
-  <h2>2. Уточните возможности</h2><p>Для грузчиков отдельно укажите, берут ли они заявки без своей машины.</p>
+  <h2>4. Уточните возможности</h2><p>Для грузчиков отдельно укажите, берут ли они заявки без своей машины.</p>
   <div id="vehicleSizeField" hidden><label>Размер кузова<select name="vehicleSize"><option value="">Размер неизвестен</option><% vanSizes.forEach(s=>{ %><option value="<%= s.code %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — <%= s.spec %></option><% }); %></select></label>
   <p>Или укажите все три размера в см — размер определится автоматически.</p>
   <label>Длина<input type="number" name="cargoLength" min="1" max="2000"></label><label>Ширина<input type="number" name="cargoWidth" min="1" max="2000"></label><label>Высота<input type="number" name="cargoHeight" min="1" max="2000"></label></div>

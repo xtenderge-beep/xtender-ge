@@ -83,7 +83,7 @@ function reviewFormInput(req) {
   const services=req.body.servicesForm ? [].concat(req.body.services || []).filter(t=>typeof t === 'string').map(type=>({type,
     attributes:Object.fromEntries(Object.entries(req.body).filter(([k])=>k.startsWith(type+'_')).map(([k,v])=>[k.slice(type.length+1),v])),
     requiresOwnTransport:type === 'movers' && req.body.moversOwnTransport === 'on'})) : undefined;
-  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, cargoDimensions, services, [].concat(req.body.cityIds || []).map(Number)];
+  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, cargoDimensions, services, [].concat(req.body.cityIds || []).map(Number), [].concat(req.body.spokenLanguages || [])];
 }
 // Два действия одной формы (review.ejs, кнопки с разным formaction): «Только
 // категория» закрепляет заявку и сохраняет характеристики, не одобряя — модератор

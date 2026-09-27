@@ -216,7 +216,7 @@ async function masterDetail(req, res) {
   const vanSizeThresholds = await settingsService.getVanSizeThresholds();
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
-    activeCities: await masterService.getActiveCities(),
+    workCities: await masterService.getWorkCities(),
     vanSizes: vanSizeThresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
     languageNames: require('../config/spokenLanguages').ruNames,
     autoDisplayName: require('../config/providerName').displayName(master.name),
@@ -268,6 +268,7 @@ async function updateMaster(req, res) {
       priceText,
       description,
       cityIds: [].concat(req.body.cityIds || []).map(Number),
+      spokenLanguages: [].concat(req.body.spokenLanguages || []),
       services: req.body.servicesForm ? selectedTypes.map(type=>({ type,
         requiresOwnTransport: type === 'movers' && req.body.moversOwnTransport === 'on',
         attributes: Object.fromEntries(Object.entries(req.body).filter(([key])=>key.startsWith(type+'_')).map(([key,value])=>[key.slice(type.length+1),value])) })) : undefined,
@@ -276,6 +277,7 @@ async function updateMaster(req, res) {
   } catch (err) {
     if (err.code === 'INVALID_SERVICE') return res.redirect(`/admin/masters/${id}?error=service_required`);
     if (err.code === 'INVALID_CITY') return res.redirect(`/admin/masters/${id}?error=invalid_city`);
+    if (err.code === 'INVALID_LANGUAGE') return res.redirect(`/admin/masters/${id}?error=invalid_language`);
     if (err.code === '23505') {
       return res.redirect(`/admin/masters/${id}?error=phone_taken`);
     }

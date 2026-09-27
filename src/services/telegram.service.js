@@ -160,12 +160,14 @@ async function notifyModerator(order) {
   }
 
   const base = getBaseUrl();
+  const cityName = await getOrderCityName(order);
   const text = [
     order.is_technical ? '🧪 ТЕСТ — только техническим исполнителям' : '🆕 Новая заявка на модерацию',
     '',
     moderatorDescription(order),
     '',
-    `📍 ${order.district_name || '—'}`,
+    `📍 Город: ${cityName}`,
+    `Место: ${order.district_name || 'не уточнено'}`,
     `📞 ${order.phone}`,
     `🔗 ${base}/order/${order.token}`,
     '',
@@ -219,18 +221,22 @@ async function notifyModeratorNewMaster(master) {
     return null;
   }
 
+  const workCities = (await require('../config/db').query('SELECT c.name_ru FROM cities c JOIN master_cities mc ON mc.city_id=c.id WHERE mc.master_id=$1 ORDER BY c.sort_order,c.id', [master.id]).catch(() => ({ rows: [] }))).rows;
+  const { ruNames } = require('../config/spokenLanguages');
   const lines = [
     '🆕 Новая регистрация исполнителя',
     '',
     `👤 ${master.name}`,
     `📞 ${master.phone}`,
+    `📍 Города: ${workCities.map(city=>city.name_ru).join(', ') || 'Тбилиси (старый профиль)'}`,
+    `🗣 Языки: ${(master.spoken_languages || []).map(code=>ruNames[code] || code).join(', ') || 'не указаны'}`,
     `${MASTER_CATEGORY_LABELS[master.category] || master.category || 'Категорию назначит модератор'}`,
   ];
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
   lines.push(master.referral_manager_name ? `🔗 По ссылке: ${master.referral_manager_name}` : '🔗 Без реферальной ссылки (органика)');
   const text = lines.join('\n');
-  const btnText = '📝 Проверить анкету и назначить категорию';
+  const btnText = '📝 Проверить города, языки и услуги';
   const adminMarkup = { inline_keyboard: [[{ text: btnText, url: getBaseUrl() + '/admin/masters/' + master.id }]] };
 
   // Маршрутизация: реферальная регистрация (referral_manager_id уже проставлен при
@@ -492,7 +498,12 @@ function formatFunnelRow(row, labels, closed) {
   return `${label}${closed ? ' 🔒 закрыта' : ''}: уведомлены ${row.received} · 👀 ${row.view} · 📞 ${row.call} · 💬 ${row.whatsapp}${rate}`;
 }
 
-function buildMessageText(order, dispatchLines, funnel, { byCategory = [], labels = {}, closedCategories = [] } = {}) {
+async function getOrderCityName(order) {
+  const city = order.city_id && (await require('../config/db').query('SELECT name_ru FROM cities WHERE id=$1', [order.city_id])).rows[0];
+  return city?.name_ru || 'Тбилиси (старая заявка)';
+}
+
+function buildMessageText(order, dispatchLines, funnel, { byCategory = [], labels = {}, closedCategories = [], cityName = null } = {}) {
   const header =
     order.status === 'closed'
       ? '🔒 Заявка закрыта'
@@ -505,7 +516,8 @@ function buildMessageText(order, dispatchLines, funnel, { byCategory = [], label
     '',
     moderatorDescription(order),
     '',
-    `📍 ${order.district_name || '—'}`,
+    cityName ? `📍 Город: ${cityName}` : `📍 ${order.district_name || '—'}`,
+    ...(cityName ? [`Место: ${order.district_name || 'не уточнено'}`] : []),
     `📞 ${order.phone}`,
   ];
 
@@ -560,7 +572,7 @@ async function refreshMessage(order, keyboard) {
   // равно обновится прежней общей воронкой, а не останется устаревшим.
   const byCategory = await orderService.getOrderFunnelByCategory(order.id).catch(() => []);
   const closedCategories = await orderService.getClosedCategories(order.id).catch(() => []);
-  let text = buildMessageText(order, dispatchLines, funnel, { byCategory, labels, closedCategories });
+  let text = buildMessageText(order, dispatchLines, funnel, { byCategory, labels, closedCategories, cityName: await getOrderCityName(order) });
   if(text.length>3900) text=text.slice(0,3750)+'\n…Полная история — в карточке заявки.';
 
   for (const m of msgs) {

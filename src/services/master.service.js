@@ -127,7 +127,7 @@ async function registerMaster({
 }
 
 async function getWorkCities() {
-  const { rows } = await pool.query('SELECT id, slug, name_ka, name_ru, name_en FROM cities ORDER BY sort_order, id');
+  const { rows } = await pool.query('SELECT id, slug, name_ka, name_ru, name_en, is_active FROM cities ORDER BY sort_order, id');
   return rows;
 }
 
@@ -413,7 +413,7 @@ async function topUpBalance(phone, amountTetri) {
 // category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
 // остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
 // мастера до одного тира).
-async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds }) {
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds, spokenLanguages }) {
   const config = require('../config/serviceTypes');
   const categories = require('./category.service');
   const selected = services || [{ type: category === 'transport' ? 'van' : category, attributes: serviceAttributes }];
@@ -437,6 +437,10 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
       throw Object.assign(new Error('Выберите хотя бы один доступный город'), { code: 'INVALID_CITY' });
     }
   }
+  const languages = spokenLanguages === undefined ? undefined : require('../config/spokenLanguages').parse(spokenLanguages);
+  if (spokenLanguages !== undefined && !languages) {
+    throw Object.assign(new Error('Выберите хотя бы один язык общения'), { code: 'INVALID_LANGUAGE' });
+  }
   return pool.withTransaction(async client => {
     await client.query('SELECT id FROM masters WHERE id=$1 FOR UPDATE', [id]);
     const { rows } = await client.query(
@@ -451,6 +455,10 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
       for (const cityId of new Set(cityIds)) await client.query('INSERT INTO master_cities(master_id,city_id) VALUES($1,$2)', [id,cityId]);
       await client.query('UPDATE masters SET city_id=$1 WHERE id=$2', [cityIds[0],id]);
       rows[0].city_id = cityIds[0];
+    }
+    if (languages !== undefined) {
+      await client.query('UPDATE masters SET spoken_languages=$1::jsonb WHERE id=$2', [JSON.stringify(languages),id]);
+      rows[0].spoken_languages = languages;
     }
     return rows[0];
   });

@@ -1,13 +1,14 @@
 const categories=require('../services/category.service');
 const settingsService=require('../services/settings.service');
 const { vanSizeSpec }=require('../config/serviceTypes');
+const masterReturn = value => typeof value === 'string' && /^\/admin\/masters\/[1-9]\d*#admin-services$/.test(value) ? value : null;
 async function index(req,res) { res.render('admin/categories',{categories:await categories.list()}); }
 async function form(req,res) {
  const category=req.params.slug ? await categories.get(req.params.slug) : null;
  if(req.params.slug && !category) return res.status(404).send('Категория не найдена');
  const fieldsLocked=categories.hasLockedField(category?.fields);
  const vanSizeThresholds=fieldsLocked ? await settingsService.getVanSizeThresholds() : null;
- res.render('admin/category-edit',{category,error:req.query.error || null,submitted:null,fieldsLocked,
+ res.render('admin/category-edit',{category,error:req.query.error || null,submitted:null,fieldsLocked,returnTo:masterReturn(req.query.returnTo),
    vanSizeThresholds,vanSizeSpec,sizeError:req.query.sizeError || null});
 }
 async function save(req,res) {
@@ -16,11 +17,11 @@ async function save(req,res) {
  let fields=req.body.fields || [];
  if(!Array.isArray(fields)) fields=[];
  const input={...req.body,is_active:req.body.is_active==='on',fields:fields.map(f=>({...f,required:f.required==='on',filter:f.filter==='on'}))};
- try { const saved=await categories.save(slug,input);res.redirect('/admin/categories/'+saved.slug); }
+ try { const saved=await categories.save(slug,input);res.redirect(masterReturn(req.body.returnTo) || '/admin/categories/'+saved.slug); }
  catch(error) {
    if(!error.status)throw error;
    const fieldsLocked=categories.hasLockedField(category?.fields);
-   res.status(error.status).render('admin/category-edit',{category,error:error.message,submitted:input,fieldsLocked,
+   res.status(error.status).render('admin/category-edit',{category,error:error.message,submitted:input,fieldsLocked,returnTo:masterReturn(req.body.returnTo),
      vanSizeThresholds:fieldsLocked ? await settingsService.getVanSizeThresholds() : null,vanSizeSpec,sizeError:null});
  }
 }

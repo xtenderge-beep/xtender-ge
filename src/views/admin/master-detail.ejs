@@ -6,6 +6,7 @@
 .admin-services>p{font-size:13px;color:#52645d;margin-top:5px}
 .admin-service-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px}
 .admin-service-tile{display:flex;gap:10px;align-items:center;min-height:54px;padding:11px 13px;border:1px solid #cddbd3;border-radius:12px;background:white;cursor:pointer;font-size:14px;font-weight:650}
+.admin-service-tile label{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer}
 .admin-service-tile:has(input:checked){background:#e9f7f0;border-color:#059669;color:#065f46}
 .admin-service-tile input{width:20px;height:20px;flex:none;accent-color:#059669}
 .admin-service-summary{font-weight:650;color:#047857;min-height:20px}
@@ -21,11 +22,9 @@
 @media(max-width:600px){.admin-services,.admin-service-details{padding:14px}.admin-service-grid{grid-template-columns:1fr}.admin-service-actions button{width:100%}}
 </style>
 
-<section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Языки общения</h2><p class="text-sm mt-2"><%= (master.spoken_languages || []).map(code => languageNames[code] || code).join(', ') || 'Не указаны' %></p><p class="text-xs text-stone-500 mt-1">Интерфейс сайта при регистрации: <%= master.registration_language ? (languageNames[master.registration_language] || master.registration_language) : 'не записан' %><% if (master.registration_language && master.language && master.language !== master.registration_language) { %> · сейчас в кабинете: <%= languageNames[master.language] || master.language %><% } %></p></section>
-
-<section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Города работы</h2><p class="text-sm mt-2"><%= (master.work_cities || []).map(c => c.name_ru).join(', ') || 'Не указаны' %></p></section>
-
 <% if (error === 'service_required') { %><p role="alert" class="mt-3 text-red-600">Назначьте категорию, заполните обязательные характеристики и сохраните профиль перед одобрением.</p><% } %>
+<% if (error === 'invalid_city') { %><p role="alert" class="mt-3 text-red-600">Выберите хотя бы один активный город работы.</p><% } %>
+<% if (error === 'invalid_language') { %><p role="alert" class="mt-3 text-red-600">Выберите хотя бы один язык общения.</p><% } %>
 <a href="/admin/masters" class="text-xs font-bold text-stone-500 hover:text-stone-800">&larr; Все специалисты</a>
 
 <section class="mt-3 p-4 bg-white border border-stone-200 rounded-xl"><h2 class="font-bold">Источник привлечения и комиссия</h2><% if(partnerReferrer) { %><p class="text-sm mt-2">Привёл: <a href="/admin/managers/<%= partnerReferrer.id %>" class="text-emerald-700 underline"><%= partnerReferrer.name %></a> · ставка на будущие пополнения: <%= partnerReferrer.commission_bps/100 %>%.</p><a href="/admin/partner-payouts?manager=<%= partnerReferrer.id %>" class="text-sm text-emerald-700 underline">Начисления и выплаты →</a><p class="text-xs text-stone-500 mt-2">Смена ответственного менеджера не меняет этот источник привлечения.</p><% } else { %><p class="text-sm mt-2">Источник для комиссии не закреплён. Для ранее привлечённого специалиста укажите его ID <%= master.id %> и основание в карточке менеджера. Прошлые пополнения автоматически не пересчитываются.</p><% } %></section>
@@ -128,20 +127,24 @@
             </div>
         </div>
         <section id="admin-services" class="admin-services" aria-labelledby="admin-services-title">
-            <h3>Города работы</h3><p>Отметьте все города, где специалист принимает заказы.</p>
-            <div class="admin-service-grid"><% activeCities.forEach(city=>{ %><label class="admin-service-tile"><input type="checkbox" name="cityIds" value="<%= city.id %>" <%= (master.work_cities||[]).some(row=>row.id===city.id) || (!(master.work_cities||[]).length && (master.city_id===city.id || (!master.city_id && city.slug==='tbilisi'))) ? 'checked' : '' %>> <span><%= city.name_ru %></span></label><% }); %></div>
-            <h3 id="admin-services-title">1. Какие услуги выполняет специалист?</h3>
+            <h3>1. Города работы</h3><p>Можно выбрать несколько. Выключенный город сначала включите в <a href="/admin/cities">справочнике городов</a>.</p>
+            <div class="admin-service-grid"><% workCities.forEach(city=>{ %><label class="admin-service-tile"><input type="checkbox" name="cityIds" value="<%= city.id %>" <%= city.is_active?'':'disabled' %> <%= (master.work_cities||[]).some(row=>row.id===city.id) || (!(master.work_cities||[]).length && (master.city_id===city.id || (!master.city_id && city.slug==='tbilisi'))) ? 'checked' : '' %>> <span><%= city.name_ru %><%= city.is_active?'':' · выключен' %></span></label><% }); %></div>
+            <h3>2. Языки общения</h3><p>Отметьте все языки, на которых исполнитель готов общаться с заказчиком. Это фильтр рассылки; язык интерфейса кабинета не меняется.</p>
+            <div class="admin-service-grid"><% Object.entries(languageNames).forEach(([code,label])=>{ %><label class="admin-service-tile"><input type="checkbox" name="spokenLanguages" value="<%= code %>" <%= (master.spoken_languages||[]).includes(code)?'checked':'' %>> <span><%= label %></span></label><% }); %></div>
+            <p>Язык при регистрации: <%= languageNames[master.registration_language] || 'не записан' %>. Язык кабинета: <%= languageNames[master.language] || 'не записан' %>.</p>
+            <h3 id="admin-services-title">3. Какие услуги выполняет специалист?</h3>
             <p>Выберите все подходящие услуги. У каждой появятся свои характеристики для каталога и точной рассылки.</p>
+            <p><a href="/admin/categories/new?returnTo=<%= encodeURIComponent('/admin/masters/'+master.id+'#admin-services') %>" target="_blank" rel="noopener">+ Добавить новую услугу и её характеристики</a> · <a href="/admin/categories" target="_blank" rel="noopener">Открыть справочник услуг</a>. После добавления обновите карточку, чтобы новая услуга появилась здесь.</p>
             <input type="hidden" name="servicesForm" value="1">
             <div class="admin-service-grid">
             <% serviceConfig.forEach(svc => { const selected = (master.services || []).some(s=>s.service_type === svc.type); %>
-              <label class="admin-service-tile"><input type="checkbox" name="services" value="<%= svc.type %>" <%= selected ? 'checked' : '' %>> <span><%= svc.label %></span></label>
+              <div class="admin-service-tile"><label><input type="checkbox" name="services" value="<%= svc.type %>" <%= selected ? 'checked' : '' %>> <span><%= svc.label %></span></label><a href="/admin/categories/<%= encodeURIComponent(svc.type) %>?returnTo=<%= encodeURIComponent('/admin/masters/'+master.id+'#admin-services') %>" target="_blank" rel="noopener" aria-label="Настроить характеристики: <%= svc.label %>">⚙</a></div>
             <% }); %>
             </div>
             <p id="admin-service-summary" class="admin-service-summary" aria-live="polite"></p>
         </section>
         <section class="admin-service-details" aria-labelledby="admin-service-details-title">
-            <h3 id="admin-service-details-title">2. Уточните возможности по выбранным услугам</h3>
+            <h3 id="admin-service-details-title">4. Уточните возможности по выбранным услугам</h3>
             <div id="vehicleSizeField" hidden>
                 <label class="text-sm font-bold text-stone-700">Размер кузова — S / M / L / XL / XXL</label>
                 <select name="vehicleSize" class="mt-1 w-full border border-stone-300 rounded-xl px-3 py-2 text-sm">
