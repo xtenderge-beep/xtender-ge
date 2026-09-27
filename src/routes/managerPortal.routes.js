@@ -87,7 +87,16 @@ router.post('/orders/:token/close-category',wrap(async(req,res)=>{
   try {await orderService.closeOrderCategory(req.params.token,req.body.category,{actor:'manager:'+req.managerSession.id});await require('../services/telegram.service').updateMessage(await orderService.getOrderByToken(req.params.token));res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
-router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',await service.reviewGet(req.managerSession.id,req.params.id))));
+router.get('/review/:id',wrap(async(req,res) => res.render('manager/review',{...await service.reviewGet(req.managerSession.id,req.params.id),descriptionSaved:req.query.descriptionSaved==='1',descriptionError:null,draftDescription:null})));
+router.post('/review/:id/description',wrap(async(req,res) => {
+  try {
+    await service.updateDescription(req.managerSession.id,req.params.id,req.body.description,req.body.sourceLang);
+    res.redirect('/manager/review/'+encodeURIComponent(req.params.id)+'?descriptionSaved=1');
+  } catch(e) {
+    if (![400,503].includes(e.status)) throw e;
+    res.status(e.status).render('manager/review',{...await service.reviewGet(req.managerSession.id,req.params.id),descriptionSaved:false,descriptionError:e.message,draftDescription:req.body.description,descriptionSourceLang:req.body.sourceLang});
+  }
+}));
 function reviewFormInput(req) {
   const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));
   const cargoDimensions = req.body.cargoLength || req.body.cargoWidth || req.body.cargoHeight

@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS master_districts (
 
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS spoken_languages JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+-- Исходный язык и переводы описания услуг. Старые профили остаются с оригиналом,
+-- пока менеджер не сохранит описание через кабинет.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS description_source_lang VARCHAR(2);
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS description_translations JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 -- Язык сайта, на котором мастер регистрировался (ka/ru/en) — используется для его
 -- личного кабинета (/master/:token) вместо ненадёжной куки `lang`: ссылка на кабинет
 -- приходит по SMS и часто открывается в другом браузере/устройстве без этой куки.

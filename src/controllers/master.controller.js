@@ -304,6 +304,7 @@ async function statusPage(req, res) {
 
   const category = await require('../services/category.service').get(master.category);
   master.category_label = category?.['name_'+req.lang] || category?.name_ru || '';
+  master.description = masterService.descriptionFor(master, req.lang);
   res.render('master-status', {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
     publicName: require('../config/providerName').resolve(master),

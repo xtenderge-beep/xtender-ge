@@ -4,7 +4,14 @@ const pool = require('../config/db');
 const { generateShortId } = require('../config/shortId');
 const { legacyColumnsFor } = require('../config/serviceTypes');
 
-const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, avatar_url, rating, language, spoken_languages, contact_channels, display_name_override';
+const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, description_source_lang, description_translations, avatar_url, rating, language, spoken_languages, contact_channels, display_name_override';
+
+function descriptionFor(master, lang) {
+  if (!master?.description) return null;
+  const translations = typeof master.description_translations === 'string'
+    ? JSON.parse(master.description_translations) : master.description_translations || {};
+  return translations[lang] || master.description;
+}
 
 // Регистрация с /join (Фаза 2 конфиг-движка). Пишет:
 //   masters              — профиль + city_id + avatar_url + старые колонки в синхроне
@@ -46,6 +53,8 @@ async function registerMaster({
        ON CONFLICT (phone) DO UPDATE SET
          name = EXCLUDED.name,
          description = EXCLUDED.description,
+         description_source_lang = NULL,
+         description_translations = '{}'::jsonb,
          category = EXCLUDED.category,
          vehicle_type = EXCLUDED.vehicle_type,
          vehicle_size = EXCLUDED.vehicle_size,
@@ -453,11 +462,12 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
     throw Object.assign(new Error('Выберите хотя бы один язык общения'), { code: 'INVALID_LANGUAGE' });
   }
   return pool.withTransaction(async client => {
-    await client.query('SELECT id FROM masters WHERE id=$1 FOR UPDATE', [id]);
+    const previous=(await client.query('SELECT description FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
     const { rows } = await client.query(
       'UPDATE masters SET name=$1, phone=$2, category=$3, vehicle_type=$4, vehicle_size=$5, is_flatbed=$6, price_text=$7, description=$8 WHERE id=$9 RETURNING *',
       [name, phone, legacy.category, vehicleType || null, legacy.vehicle_size, legacy.is_flatbed, priceText || null, description || null, id]);
     if (!rows[0]) return null;
+    if (previous.description !== (description || null)) await client.query("UPDATE masters SET description_source_lang=NULL,description_translations='{}'::jsonb WHERE id=$1", [id]);
     await client.query('DELETE FROM master_services WHERE master_id=$1', [id]);
     for (const service of normalized) await client.query('INSERT INTO master_services(master_id,service_type,attributes,is_primary,requires_own_transport) VALUES($1,$2,$3::jsonb,$4,$5)',
       [id,service.type,JSON.stringify(service.attributes),service === primary,service.requiresOwnTransport]);
@@ -541,7 +551,7 @@ async function listMasters({ serviceType, language, cityId } = {}) {
   }
 
   const billing = require('./providerBilling.service');
-  const profiles = (await pool.query('SELECT id, spoken_languages, contact_channels FROM masters WHERE id IN (' + ph + ')', ids)).rows;
+  const profiles = (await pool.query('SELECT id, spoken_languages, contact_channels, description_source_lang, description_translations FROM masters WHERE id IN (' + ph + ')', ids)).rows;
   const profileMap = new Map(profiles.map(m => [m.id, m]));
   const billingIds = await billing.eligibleIds(await billing.pricing());
   const cityCoverage = cityId ? (await pool.query('SELECT master_id FROM master_cities WHERE city_id=$1', [cityId])).rows : [];
@@ -552,6 +562,7 @@ async function listMasters({ serviceType, language, cityId } = {}) {
     const s = byMaster.get(m.id);
     return {
       ...m,
+      description: descriptionFor({ ...m, ...profileMap.get(m.id) }, language),
       display_name: require('../config/providerName').resolve(m),
       spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
       available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),
@@ -625,6 +636,7 @@ async function updateMasterDisplayNameOverride(id, value) {
   return (await pool.query('UPDATE masters SET display_name_override=$1 WHERE id=$2 RETURNING id', [trimmed || null, id])).rows[0];
 }
 module.exports = {
+  descriptionFor,
   updateMasterWhatsapp,
   updateMasterDisplayNameOverride,
   contactHistory, saveContacts,

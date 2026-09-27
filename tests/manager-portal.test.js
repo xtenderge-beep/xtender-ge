@@ -5,6 +5,11 @@ const {Pool}=db.adapters.createPg(),pool=new Pool();
 pool.withTransaction=async fn=>{const b=db.backup();try{return await fn(pool);}catch(e){b.restore();throw e;}};
 require.cache[require.resolve('../src/config/db')]={exports:pool};
 require.cache[require.resolve('../src/config/redis')]={exports:new(require('ioredis-mock'))()};
+let translationAvailable=true;
+require.cache[require.resolve('../src/services/translation.service')]={exports:{
+ detectLang:()=> 'ru',
+ translateProviderDescription:async(text,sourceLang)=>translationAvailable ? {sourceLang,translations:{ka:'ქართული: '+text,en:'English: '+text}} : null,
+}};
 const portal=require('../src/services/managerPortal.service');
 (async()=>{
  const a=(await pool.query("INSERT INTO managers(name,phone) VALUES('Alice','111') RETURNING id")).rows[0].id;
@@ -27,6 +32,18 @@ const portal=require('../src/services/managerPortal.service');
  await require('../src/services/admin.service').setMasterBanned(own,false,null);
  await portal.action(a,own,'ban','Manager ban');await portal.action(a,own,'unban','Resolved');
  const details=await portal.detail(a,own);assert.equal(details.master.is_banned,false);assert.equal(details.events.length,4);
+ await portal.updateDescription(a,own,'Грузовые работы','ru');
+ let profile=(await pool.query('SELECT description,description_source_lang,description_translations FROM masters WHERE id=$1',[own])).rows[0];
+ assert.equal(profile.description,'Грузовые работы');assert.equal(profile.description_source_lang,'ru');assert.equal(profile.description_translations.ka,'ქართული: Грузовые работы');
+ await assert.rejects(()=>portal.updateDescription(a,other,'Чужое','ru'),{status:403});
+ await assert.rejects(()=>portal.updateDescription(a,own,'x'.repeat(2001),'ru'),{status:400});
+ translationAvailable=false;
+ await assert.rejects(()=>portal.updateDescription(a,own,'Новый текст','ru'),{status:503});
+ assert.equal((await pool.query('SELECT description FROM masters WHERE id=$1',[own])).rows[0].description,'Грузовые работы');
+ translationAvailable=true;
+ const unassigned=(await pool.query("INSERT INTO masters(name,phone,is_active) VALUES('Unassigned','555000',false) RETURNING id")).rows[0].id;
+ await portal.updateDescription(a,unassigned,'Услуги','ru');
+ assert.equal((await pool.query('SELECT manager_id FROM masters WHERE id=$1',[unassigned])).rows[0].manager_id,a);
  await portal.provision(a,'alice','a-new-password-123',true);assert.equal(await portal.session(sid),null);
  const sid2=await portal.login('alice','a-new-password-123','test');
  await pool.query('UPDATE managers SET is_active=false WHERE id=$1',[a]);assert.equal(await portal.session(sid2),null);
@@ -42,7 +59,7 @@ const portal=require('../src/services/managerPortal.service');
   await pool.query('INSERT INTO manager_commissions(manager_id,master_id,transaction_id,base_tetri,rate_bps,amount_tetri) VALUES($1,$2,$3,$4,2500,$5)',[mgr,master,tx,amount,amount/4]);
  }
  assert.equal(Number((await portal.finances(a)).earned),2500);assert.equal(Number((await portal.finances(b)).earned),22500);
- const summary=await portal.dashboard(a);assert.equal(Number(summary.stats.total),1);assert.equal(Number(summary.stats.active),1);assert.equal(Number(summary.stats.banned),0);
+ const summary=await portal.dashboard(a);assert.equal(Number(summary.stats.total),2);assert.equal(Number(summary.stats.active),1);assert.equal(Number(summary.stats.banned),0);
  const express=require('express'),app=express();app.set('view engine','ejs');app.set('views',path.join(__dirname,'../src/views'));
  app.use(express.urlencoded({extended:false}));app.use(require('cookie-parser')());app.use('/manager',require('../src/routes/managerPortal.routes'));
  app.use((e,req,res,next)=>{console.error(e);res.status(500).send('failure');});
@@ -55,6 +72,9 @@ const portal=require('../src/services/managerPortal.service');
   const success=await fetch(base+'/manager/login',{method:'POST',headers:{cookie},body:new URLSearchParams({_csrf:csrf,login:'alice',password:'a-new-password-123'}),redirect:'manual'});
   assert.equal(success.status,302);const auth=success.headers.get('set-cookie').split(';')[0];
   const detail=await fetch(base+'/manager/masters/'+own,{headers:{cookie:auth}}),body=await detail.text();assert.equal(detail.status,200);assert.ok(body.includes('&lt;script&gt;unsafe&lt;/script&gt;'));assert.ok(!body.includes('<script>unsafe'));
+  const review=await fetch(base+'/manager/review/'+own,{headers:{cookie:auth}});assert.equal(review.status,200);assert.match(await review.text(),/Перевести и сохранить/);
+  const descriptionSave=await fetch(base+'/manager/review/'+own+'/description',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({_csrf:(await portal.session(auth.split('=')[1])).csrf,description:'Новые услуги',sourceLang:'ru'}),redirect:'manual'});
+  assert.equal(descriptionSave.status,302);assert.equal((await pool.query('SELECT description FROM masters WHERE id=$1',[own])).rows[0].description,'Новые услуги');
   assert.equal((await fetch(base+'/manager/masters/'+other,{headers:{cookie:auth}})).status,404);
   assert.equal((await fetch(base+'/manager/masters/'+own+'/ban',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({body:'No csrf'})})).status,403);
   const dashboard=await fetch(base+'/manager',{headers:{cookie:auth}});assert.equal(dashboard.status,200);const dash=await dashboard.text();assert.ok(!dash.includes('Secret'));assert.ok(dash.includes('Own'));

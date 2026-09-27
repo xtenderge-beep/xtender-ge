@@ -105,7 +105,32 @@ async function reviewGet(managerId, masterId) {
   const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   master.services=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[masterId])).rows;
   master.work_cities=(await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1',[masterId])).rows;
-  return { master, categories, vanSizes, workCities: await require('./master.service').getWorkCities(), languageNames: require('../config/spokenLanguages').ruNames };
+  return { master, categories, vanSizes, descriptionSourceLang:master.description_source_lang || require('./translation.service').detectLang(master.description), descriptionTranslations:typeof master.description_translations==='string' ? JSON.parse(master.description_translations) : master.description_translations || {}, workCities: await require('./master.service').getWorkCities(), languageNames: require('../config/spokenLanguages').ruNames };
+}
+
+async function updateDescription(managerId, masterId, description, sourceLang) {
+  if (typeof description !== 'string' || description.trim().length > 2000) throw fail('Описание должно быть не длиннее 2000 символов.', 400);
+  const value = description.trim();
+  if(value && !['ru','ka','en'].includes(sourceLang)) throw fail('Выберите язык исходного описания.', 400);
+  const owner = (await pool.query('SELECT id,manager_id,is_active,is_banned FROM masters WHERE id=$1', [masterId])).rows[0];
+  if (!owner) throw fail('Специалист не найден.', 404);
+  if (owner.is_banned) throw fail('Профиль заблокирован.', 409);
+  if (owner.manager_id && owner.manager_id !== Number(managerId)) throw fail('Специалист закреплён за другим менеджером.', 403);
+  if (owner.is_active && !owner.manager_id) throw fail('Активный специалист не закреплён за вами.', 403);
+  const translation = value ? await require('./translation.service').translateProviderDescription(value,sourceLang) : null;
+  if (value && (!translation || !['ru','ka','en'].filter(lang=>lang!==sourceLang).every(lang=>translation.translations[lang]))) {
+    throw fail('Перевод сейчас недоступен. Описание не изменено — повторите сохранение позже.', 503);
+  }
+  return pool.withTransaction(async tx => {
+    const master = (await tx.query('SELECT id,manager_id,is_active,is_banned FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
+    if (!master) throw fail('Специалист не найден.', 404);
+    if (master.is_banned) throw fail('Профиль заблокирован.', 409);
+    if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Специалист закреплён за другим менеджером.', 403);
+    if (master.is_active && !master.manager_id) throw fail('Активный специалист не закреплён за вами.', 403);
+    await tx.query('UPDATE masters SET description=$1,description_source_lang=$2,description_translations=$3::jsonb,manager_id=COALESCE(manager_id,$4) WHERE id=$5', [value || null, value ? sourceLang : null, JSON.stringify(translation?.translations || {}), managerId, masterId]);
+    await tx.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'edit_description',$3)", [managerId, masterId, value ? 'Описание услуг обновлено.' : 'Описание услуг удалено.']);
+    return value;
+  });
 }
 
 // Свежая проверка из БД (не из закешированной сессии) — на неё завязаны действия с
@@ -278,7 +303,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,issueOrderLink,consumeOrderLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
+  issueMagicLink,consumeMagicLink,issueOrderLink,consumeOrderLink,reviewGet,updateDescription,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

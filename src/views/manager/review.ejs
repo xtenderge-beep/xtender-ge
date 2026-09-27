@@ -1,5 +1,11 @@
 <%- include('_header') %><a href="/manager/masters/<%= master.id %>">← Карточка специалиста</a><h1><%= master.name %></h1><p><%= master.phone %> · зарегистрирован <%= date(master.created_at) %></p>
-<% if (master.description) { %><div class="card"><h2>Описание услуг</h2><p class="pre"><%= master.description %></p></div><% } %>
+<div class="card"><h2>Описание услуг</h2><p>Напишите текст на одном языке. После сохранения система переведёт его на остальные два языка; на сайте заказчик увидит описание на языке интерфейса.</p>
+<% if(typeof descriptionSaved!=='undefined' && descriptionSaved){ %><p role="status">Описание и переводы сохранены.</p><% } %>
+<% if(typeof descriptionError!=='undefined' && descriptionError){ %><p role="alert"><%= descriptionError %></p><% } %>
+<form method="post" action="/manager/review/<%= master.id %>/description" onsubmit="this.querySelector('button').disabled=true"><input type="hidden" name="_csrf" value="<%= csrf %>">
+<label for="description-source-lang">Язык исходного текста<select id="description-source-lang" name="sourceLang"><% [['ru','Русский'],['ka','ქართული'],['en','English']].forEach(([code,label])=>{ %><option value="<%= code %>" <%= descriptionSourceLang===code?'selected':'' %>><%= label %></option><% }) %></select></label>
+<label for="service-description">Описание<textarea id="service-description" name="description" rows="5" maxlength="2000" class="pre"><%= typeof draftDescription==='undefined'||draftDescription===null ? master.description || '' : draftDescription %></textarea></label><button type="submit">Перевести и сохранить</button></form>
+<% if(master.description && Object.keys(descriptionTranslations).length){ %><details><summary>Посмотреть сохранённые переводы</summary><% [['ru','Русский'],['ka','ქართული'],['en','English']].forEach(([code,label])=>{ %><p><b><%= label %></b></p><p class="pre"><%= code===master.description_source_lang ? master.description : descriptionTranslations[code] || master.description %></p><% }) %></details><% } %></div>
 <% if (master.avatar_url) { %><div class="card"><h2>Фото</h2><img src="<%= master.avatar_url %>" alt="" style="max-width:280px;border-radius:12px;display:block"></div><% } %>
 
 <% if (manager.is_head_moderator && !master.is_active) { %>

@@ -6,7 +6,7 @@ const stub=(p,exports)=>require.cache[require.resolve(p)]={exports};
 stub('../src/config/db',pool);const redis=new(require('ioredis-mock'))();stub('../src/config/redis',redis);
 stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async()=>false});
 stub('../src/services/sms.service',{sendOrderNotification:async()=>({ok:true,providerMessageId:'test'})});
-stub('../src/services/translation.service',{translateOrder:async()=>null});
+stub('../src/services/translation.service',{translateOrder:async()=>null,detectLang:()=> 'ru'});
 process.env.ADMIN_PASSWORD='test-only';process.env.ADMIN_SESSION_SECRET='multi-service-ui-only';
 const auth=require('../src/config/adminAuth'),session=auth.createSessionValue();
 const masters=require('../src/services/master.service'),orders=require('../src/services/order.service');

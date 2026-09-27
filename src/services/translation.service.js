@@ -29,8 +29,8 @@ function detectLang(text) {
   return 'en';
 }
 
-function buildPrompt(text, target) {
-  return `You translate short service requests for a Tbilisi marketplace (moving, loaders, junk removal, tow trucks, aerial lifts). Translate the text into ${LANG_NAME[target]}.
+function buildPrompt(text, target, kind = 'request') {
+  return `You translate a ${kind === 'provider' ? 'provider service description' : 'short service request'} for a Tbilisi marketplace (moving, loaders, junk removal, tow trucks, aerial lifts). Translate the text into ${LANG_NAME[target]}.
 
 HARD RULES:
 - Street names, place names, district names, metro stations, personal names, company names, phone numbers and every number/quantity/date/time: reproduce EXACTLY. Never replace a place with a different place. Never drop or change a digit.
@@ -53,12 +53,12 @@ Text:
 ${text}`;
 }
 
-async function callModel(text, target) {
+async function callModel(text, target, kind = 'request') {
   const res = await axios.post(
     'https://openrouter.ai/api/v1/chat/completions',
     {
       model: MODEL,
-      messages: [{ role: 'user', content: buildPrompt(text, target) }],
+      messages: [{ role: 'user', content: buildPrompt(text, target, kind) }],
       temperature: 0.2,
       max_tokens: 1200,
     },
@@ -104,4 +104,25 @@ async function translateOrder(text) {
   return { sourceLang, translations };
 }
 
-module.exports = { translateOrder, detectLang };
+// Описание услуг публикуется сразу на трёх языках. Частичный результат не
+// возвращаем: менеджер может повторить сохранение, а сайт не покажет устаревший
+// перевод одного из языков после правки оригинала.
+async function translateProviderDescription(text, sourceLangRaw) {
+  const clean = String(text || '').trim();
+  if (!clean || !KEY) return null;
+  const sourceLang = LANGS.includes(sourceLangRaw) ? sourceLangRaw : detectLang(clean);
+  const targets = LANGS.filter(l => l !== sourceLang);
+  try {
+    const translated = await Promise.all(targets.map(async target => {
+      const output = await callModel(clean, target, 'provider');
+      if (!output) throw new Error(`Empty ${target} translation`);
+      return [target, output];
+    }));
+    return { sourceLang, translations: Object.fromEntries(translated) };
+  } catch (err) {
+    console.error('[translation] provider description failed:', err.response?.status || '', err.message);
+    return null;
+  }
+}
+
+module.exports = { translateOrder, translateProviderDescription, detectLang };
