@@ -171,9 +171,8 @@ async function notifyModerator(order) {
     `📞 ${order.phone}`,
     `🔗 ${base}/order/${order.token}`,
     '',
-    'Для заявки с несколькими услугами сначала укажите все потребности в карточке заявки. Затем выберите группу и язык рассылки. Уже уведомлённые повторно не платят.',
+    'Откройте карточку кнопкой ниже, отметьте потребности и выберите получателей. Уже уведомлённые повторно не платят.',
   ].join('\n');
-  const keyboard = await buildKeyboardWithCounts(order.token);
 
   // Фото к заявке — публичные URL, Telegram сам их подтянет (как чеки на пополнение).
   const files = await orderService.getOrderFiles(order.id).catch(() => []);
@@ -184,6 +183,7 @@ async function notifyModerator(order) {
   const sent = [];
   for (const chatId of chatIds) {
     try {
+      const keyboard = await orderManagerKeyboard(order.token, chatId);
       const { data } = await axios.post(apiUrl('sendMessage'), { chat_id: chatId, text, reply_markup: keyboard });
       sent.push({ chatId, messageId: data.result.message_id });
     } catch (err) {
@@ -207,6 +207,13 @@ async function notifyModerator(order) {
   }
   if (sent.length) await orderService.recordModerationMessages(order.id, sent);
   return sent.length ? sent[0].messageId : null; // legacy orders.moderation_message_id
+}
+async function orderManagerKeyboard(orderToken, chatId) {
+  const manager = await managerService.getByTelegramId(chatId);
+  const url = manager?.is_active
+    ? getBaseUrl() + '/manager/order-auth/' + await require('./managerPortal.service').issueOrderLink(manager.id, orderToken)
+    : getBaseUrl() + '/admin/orders/' + encodeURIComponent(orderToken);
+  return { inline_keyboard: [[{ text: 'Открыть заявку и настроить рассылку', url }]] };
 }
 
 const MASTER_CATEGORY_LABELS = {
@@ -548,7 +555,7 @@ function buildMessageText(order, dispatchLines, funnel, { byCategory = [], label
   return lines.join('\n');
 }
 
-async function refreshMessage(order, keyboard) {
+async function refreshMessage(order) {
   if (!isEnabled()) return;
 
   let msgs = await orderService.getModerationMessages(order.id).catch(() => []);
@@ -577,7 +584,7 @@ async function refreshMessage(order, keyboard) {
 
   for (const m of msgs) {
     await axios
-      .post(apiUrl('editMessageText'), { chat_id: m.chat_id, message_id: m.message_id, text, reply_markup: keyboard })
+      .post(apiUrl('editMessageText'), { chat_id: m.chat_id, message_id: m.message_id, text, reply_markup: await orderManagerKeyboard(order.token, m.chat_id) })
       .catch((err) => {
         const data = err.response ? JSON.stringify(err.response.data) : err.message;
         if (!data.includes('not modified')) {
@@ -589,17 +596,12 @@ async function refreshMessage(order, keyboard) {
 
 async function refreshCategories(order, chatId, messageId, page = 0) {
   if (!isEnabled()) return;
-  const keyboard = ['pending_review','new'].includes(order.status) ? await buildKeyboardWithCounts(order.token, page) : { inline_keyboard: [] };
-  await refreshMessage(order,keyboard);
-  try {
-    await axios.post(apiUrl('editMessageReplyMarkup'),{chat_id:chatId,message_id:messageId,reply_markup:keyboard});
-  } catch(error) { if(!String(error.response?.data?.description || '').includes('not modified')) throw error; }
+  await refreshMessage(order);
 }
 
 async function updateMessage(order) {
   if (!isEnabled()) return;
-  const keyboard = ['closed','needs_revision','unverified'].includes(order.status) ? { inline_keyboard: [] } : await buildKeyboardWithCounts(order.token);
-  await refreshMessage(order, keyboard);
+  await refreshMessage(order);
 }
 
 async function setWebhook() {

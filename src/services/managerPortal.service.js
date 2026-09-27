@@ -42,7 +42,7 @@ async function session(sid) {
   if (!/^[a-f0-9]{64}$/.test(sid || '')) return null;
   const raw = await redis.get('manager_session:' + sid); if (!raw) return null;
   const s = JSON.parse(raw);
-  const m = (await pool.query('SELECT id,name,commission_bps,referral_token,is_head_moderator FROM managers WHERE id=$1 AND web_auth_version=$2 AND web_enabled=true AND is_active=true', [s.id, s.version])).rows[0];
+  const m = (await pool.query(`SELECT id,name,commission_bps,referral_token,is_head_moderator FROM managers WHERE id=$1 AND web_auth_version=$2 AND is_active=true ${s.telegram ? '' : 'AND web_enabled=true'}`, [s.id, s.version])).rows[0];
   return m ? { ...s, manager: m } : null;
 }
 // Персональная одноразовая ссылка из Telegram-уведомления модератору: открывает его
@@ -68,6 +68,22 @@ async function consumeMagicLink(t) {
   const sid = token(), session = { id: m.id, version: m.web_auth_version, csrf: token() };
   await redis.set('manager_session:' + sid, JSON.stringify(session), 'EX', TTL);
   return { sid, masterId };
+}
+async function issueOrderLink(managerId, orderToken) {
+  const t = token();
+  await redis.set('manager_order_magic:' + t, JSON.stringify({ managerId, orderToken }), 'EX', MAGIC_TTL);
+  return t;
+}
+async function consumeOrderLink(t) {
+  if (!/^[a-f0-9]{64}$/.test(t || '')) return null;
+  const raw = await redis.get('manager_order_magic:' + t);
+  if (!raw) return null;
+  const { managerId, orderToken } = JSON.parse(raw);
+  const m = (await pool.query('SELECT id,web_auth_version FROM managers WHERE id=$1 AND is_active=true AND telegram_id IS NOT NULL', [managerId])).rows[0];
+  if (!m || !/^[a-zA-Z0-9_-]+$/.test(orderToken)) return null;
+  const sid = token();
+  await redis.set('manager_session:' + sid, JSON.stringify({ id:m.id, version:m.web_auth_version, csrf:token(), telegram:true }), 'EX', TTL);
+  return { sid, orderToken };
 }
 
 // Карточка для быстрого одобрения новой заявки: либо ещё ничья (manager_id IS NULL —
@@ -262,7 +278,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
+  issueMagicLink,consumeMagicLink,issueOrderLink,consumeOrderLink,reviewGet,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

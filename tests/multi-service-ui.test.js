@@ -79,11 +79,12 @@ let server;
  await pool.query('UPDATE managers SET is_head_moderator=true WHERE id=$1',[manager.id]);
  await portal.requireHeadModerator(manager.id);
  const managerHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/order-dispatch.ejs'),{
-  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
+  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,serviceRows:[{key:'movers',label:'Грузчики',count:2}],runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
   activeCities:await masters.getActiveCities(),allCities:await masters.getWorkCities(),groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
   speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
  });
  assert.match(managerHtml,/Что нужно клиенту/);
+ assert.match(managerHtml,/Новых получателей: 2/);
  for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');

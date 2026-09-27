@@ -178,12 +178,12 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
   assert.equal(await charges(order3, A), 0);
   out = await press('cat:langord3:movers::0:ka');
   assert.deepEqual(out.toasts, ['Рассылка этой группе уже запускалась']);
-  assert.ok(out.edits[0].reply_markup.inline_keyboard.flat().some(b => b.callback_data && b.callback_data.startsWith('pick:')), 'после отказа возвращаются категории');
+  assert.equal(out.edits.length, 0, 'старые кнопки не возвращаются в уведомление');
   out = await press('cat:langord3:movers::0:ru');
   assert.deepEqual(await dispatchRows(order3), ['ka', 'ru']);
   out = await press('cat:langord3:movers::0:en');
   assert.deepEqual(out.toasts, ['Все подходящие исполнители уже получили эту заявку']);
-  assert.equal(out.edits.length, 1);
+  assert.equal(out.edits.length, 0);
   // Кнопка из старого сообщения (без языка) работает как раньше: всем.
   out = await press('cat:langord3:movers::0');
   assert.deepEqual(out.toasts, ['Запускаем рассылку…']);

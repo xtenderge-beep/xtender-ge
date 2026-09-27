@@ -26,6 +26,12 @@ router.get('/auth/:token',wrap(async(req,res) => {
   res.cookie(service.COOKIE,result.sid,{...service.cookieOptions,maxAge:service.TTL*1000});
   res.redirect('/manager/review/'+encodeURIComponent(result.masterId));
 }));
+router.get('/order-auth/:token',wrap(async(req,res) => {
+  const result = await service.consumeOrderLink(req.params.token);
+  if (!result) return res.status(410).send('Ссылка устарела. Откройте новое уведомление в Telegram.');
+  res.cookie(service.COOKIE,result.sid,{...service.cookieOptions,maxAge:service.TTL*1000});
+  res.redirect('/manager/orders/'+encodeURIComponent(result.orderToken));
+}));
 router.use(wrap(async(req,res,next) => {
   req.managerSession = await service.session(req.cookies[service.COOKIE]);
   if (!req.managerSession) return res.redirect('/manager/login'+(req.method==='GET' && /^\/manager\/orders\/[a-zA-Z0-9_-]+$/.test(req.path) ? '?next='+encodeURIComponent(req.path) : ''));
@@ -41,32 +47,38 @@ const dispatchService=require('../services/dispatch.service');
 const orderService=require('../services/order.service');
 const categoryService=require('../services/category.service');
 const dispatchPage=async(req,res,result=null)=>{
-  await service.requireHeadModerator(req.managerSession.id);
   const order=await orderService.getOrderByToken(req.params.token);
   if(!order)return res.status(404).send('Заявка не найдена');
+  if(typeof order.target_categories==='string') {
+    try {order.target_categories=JSON.parse(order.target_categories);} catch {order.target_categories=[];}
+  }
+  if(!Array.isArray(order.target_categories)) order.target_categories=[];
+  if(typeof order.requirements==='string') order.requirements=JSON.parse(order.requirements);
   order.closedCategories=await orderService.getClosedCategories(order.id);
   let plan=null,error=req.query.error || null;
   if(req.query.category)try {plan=await dispatchService.preview(order.token,req.query.category,req.query.size || '',req.query.language || '');}catch(e){error=e.message;}
-  res.render('manager/order-dispatch',{order,plan,result,error,activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups:await categoryService.groups(),serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
+  const groups=await categoryService.groups();
+  const serviceRows=await Promise.all(Object.entries(groups).filter(([key])=>(order.target_categories||[]).includes(key)&&!order.closedCategories.includes(key)).map(async ([key,label])=>{
+    if(!order.requirements?.configured || !['pending_review','new'].includes(order.status)) return {key,label,count:null};
+    try {const preview=await dispatchService.preview(order.token,key,'');return {key,label,count:preview.count,alreadySent:preview.alreadySent};}
+    catch(e){return {key,label,count:null,error:e.message};}
+  }));
+  res.render('manager/order-dispatch',{order,plan,result,error,serviceRows,activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups,serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
 };
 router.get('/orders',wrap(async(req,res)=>{
-  await service.requireHeadModerator(req.managerSession.id);
   const rows=(await require('../config/db').query("SELECT id,token,description,status,created_at FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT 100")).rows;
   res.render('manager/orders',{orders:rows});
 }));
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
-  await service.requireHeadModerator(req.managerSession.id);
   try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'#dispatch-selection');}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/dispatch',wrap(async(req,res)=>{
-  await service.requireHeadModerator(req.managerSession.id);
   try {const result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || '',{actor:'manager:'+req.managerSession.id});return dispatchPage(req,res,result);}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/retry',wrap(async(req,res)=>{
-  await service.requireHeadModerator(req.managerSession.id);
   try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));

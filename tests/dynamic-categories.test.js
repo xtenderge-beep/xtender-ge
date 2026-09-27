@@ -41,9 +41,11 @@ const definition={name_ru:'Сантехник',name_ka:'სანტექნი
  await assert.rejects(categories.save(key,{...definition,version:1,fields:definition.fields.map(f=>({...f,key:field}))}),{status:409});
  const on=await categories.save(key,{...definition,version:off.version,fields:definition.fields.map(f=>({...f,key:field}))});assert.ok(on.is_active);
  process.env.TELEGRAM_BOT_TOKEN='test-only';process.env.NODE_ENV='test';
- await telegram.refreshCategories(order,'100',200);
- assert.ok(calls.at(-1).body.reply_markup.inline_keyboard.flat().some(b=>b.callback_data?.includes(key)));
- await telegram.refreshCategories({...order,status:'closed'},'100',200);assert.deepEqual(calls.at(-1).body.reply_markup.inline_keyboard,[]);
+ await pool.query("INSERT INTO order_moderation_messages(order_id,chat_id,message_id) VALUES($1,'100',200)",[order.id]);
+ await telegram.refreshCategories(await orders.getOrderByToken(order.token),'100',200);
+ assert.equal(calls.at(-1).body.reply_markup.inline_keyboard.length,1);
+ assert.match(calls.at(-1).body.reply_markup.inline_keyboard[0][0].url,/\/admin\/orders\/catorder$/);
+ await telegram.refreshCategories({...await orders.getOrderByToken(order.token),status:'closed'},'100',200);assert.equal(calls.at(-1).body.reply_markup.inline_keyboard.length,1);
  const ejs=require('ejs'),views=path.join(__dirname,'../src/views/admin');
  for(const file of ['categories.ejs','category-edit.ejs']) {
   const html=ejs.render(fs.readFileSync(path.join(views,file),'utf8'),{categories:await categories.list(),category:on,submitted:null,error:null,csrfToken:'csrf',fieldsLocked:categories.hasLockedField(on.fields)},{filename:path.join(views,file),includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});

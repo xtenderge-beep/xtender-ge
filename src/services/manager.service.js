@@ -65,7 +65,7 @@ async function update(id, { isModerator, isActive, isHeadModerator }) {
 // Активные модераторы с привязанным Telegram — кому рассылать заявки на модерацию.
 async function listActiveModeratorChatIds() {
   const { rows } = await pool.query(
-    `SELECT telegram_id FROM managers WHERE is_moderator = true AND is_active = true AND telegram_id IS NOT NULL`
+    `SELECT telegram_id FROM managers WHERE is_active = true AND telegram_id IS NOT NULL`
   );
   return rows.map((r) => r.telegram_id);
 }
