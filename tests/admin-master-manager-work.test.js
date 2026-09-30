@@ -47,7 +47,7 @@ const adminService=require('../src/services/admin.service');
 
  const ejs=require('ejs'),views_=path.join(__dirname,'../src/views'),file=path.join(views_,'admin/masters.ejs');
  const html=ejs.render(fs.readFileSync(file,'utf8'),
-  {masters:list.map(m=>({...m,category_label:'Грузчики'})),languageSummary:adminService.languageSummary(list),languageNames:require('../src/config/spokenLanguages').ruNames,filter:{status:'',lang:'',site:''},csrfToken:'csrf'},
+  {masters:list.map(m=>({...m,category_label:'Грузчики'})),languageSummary:adminService.languageSummary(list),managerSummary:adminService.managerSummary(list),languageNames:require('../src/config/spokenLanguages').ruNames,filter:{status:'',lang:'',site:'',manager:''},csrfToken:'csrf'},
   {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
  assert.match(html,/href="\/admin\/managers\/\d+" [^>]*>Alice<\/a>/);
  assert.match(html,/открывал карточку: <b[^>]*>[^<]+<\/b> \(2 раз\)/);
@@ -58,6 +58,17 @@ const adminService=require('../src/services/admin.service');
  assert.match(html,/Грузчики, 5 лет опыта/);
  assert.match(html,/менеджеры ничего не меняли/);
  assert.match(html,/не назначен/);
+
+ // Фильтр по менеджеру: плашки с числами и выборка по id / без менеджера.
+ const summary=adminService.managerSummary(list);
+ assert.deepEqual(summary.managers.map(m=>[m.name,m.count]),[['Alice',1]]);
+ assert.equal(summary.none,2);
+ assert.deepEqual(adminService.filterByManager(list,String(a)).map(m=>m.id),[own]);
+ assert.deepEqual(adminService.filterByManager(list,'none').map(m=>m.id).sort(),[pending,alone].sort());
+ assert.equal(adminService.filterByManager(list,'').length,list.length);
+ assert.ok(html.includes('href="/admin/masters?manager='+a+'" '),'manager chip link');
+ assert.match(html,/>Alice <b>1<\/b><\/a>/);
+ assert.match(html,/href="\/admin\/masters\?manager=none"[^>]*>Без менеджера <b>2<\/b>/);
 
  // Удаление исполнителя убирает и его просмотры.
  await require('../src/services/master.service').deleteMaster(own);

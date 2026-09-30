@@ -222,6 +222,26 @@ function filterByLanguage(masters, { lang = '', site = '' } = {}) {
   });
 }
 
+// Плашки фильтра по менеджеру: кто ведёт сколько исполнителей в текущем списке.
+function managerSummary(masters) {
+  const byId = new Map();
+  let none = 0;
+  for (const m of masters) {
+    if (!m.manager_id) { none++; continue; }
+    const row = byId.get(m.manager_id) || { id: m.manager_id, name: m.manager_name, count: 0 };
+    row.count++;
+    byId.set(m.manager_id, row);
+  }
+  return { managers: [...byId.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru')), none };
+}
+
+// manager: '' — все, 'none' — без менеджера, иначе id менеджера строкой.
+function filterByManager(masters, manager = '') {
+  if (!manager) return masters;
+  if (manager === 'none') return masters.filter(m => !m.manager_id);
+  return masters.filter(m => String(m.manager_id) === manager);
+}
+
 async function getMasterDetail(id) {
   const { rows } = await pool.query('SELECT * FROM masters WHERE id = $1', [id]);
   const master = rows[0];
@@ -319,6 +339,8 @@ module.exports = {
   listMastersAdmin,
   languageSummary,
   filterByLanguage,
+  managerSummary,
+  filterByManager,
   getMasterDetail,
   getMasterBalanceHistory,
   setMasterBanned,

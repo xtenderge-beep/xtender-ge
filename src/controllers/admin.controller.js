@@ -199,7 +199,10 @@ async function mastersList(req, res) {
   const known = (value, codes) => (typeof value === 'string' && (value === 'none' || codes.includes(value)) ? value : '');
   const filter = { status: req.query.status === 'pending' ? 'pending' : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
   const scoped = filter.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters;
-  res.render('admin/masters', { masters: adminService.filterByLanguage(scoped, filter), languageSummary: adminService.languageSummary(masters), languageNames: ruNames, filter });
+  const managerSummary = adminService.managerSummary(scoped);
+  filter.manager = known(req.query.manager, managerSummary.managers.map(m => String(m.id)));
+  const shown = adminService.filterByManager(adminService.filterByLanguage(scoped, filter), filter.manager);
+  res.render('admin/masters', { masters: shown, languageSummary: adminService.languageSummary(masters), managerSummary, languageNames: ruNames, filter });
 }
 
 async function masterDetail(req, res) {

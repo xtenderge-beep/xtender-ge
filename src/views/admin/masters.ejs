@@ -10,6 +10,18 @@
 <% const clip = function (s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n).trimEnd() + '…' : s; }; %>
 <% const actionLabels = { ban: 'заблокировал', unban: 'разблокировал', approve: 'одобрил', assign_category: 'назначил услуги', edit_contact: 'изменил контакты', edit_description: 'изменил описание',reject: 'отклонил заявку' }; %>
 <% const spokenCodes = main.concat(Object.keys(languageNames).filter(function (c) { return main.indexOf(c) === -1 && languageSummary.spoken[c]; })); %>
+<%# Фильтр по менеджеру: число — исполнители в текущем списке (с учётом «На модерации»), без учёта фильтра языка. %>
+<section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4" aria-label="Менеджеры исполнителей">
+    <p class="text-xs text-stone-500 mb-2">Менеджер</p>
+    <div class="flex flex-wrap gap-2">
+        <a href="<%= href({ manager: '' }) %>" class="<%= chip(!filter.manager) %>">Все</a>
+        <% managerSummary.managers.forEach(function (mg) { %>
+            <a href="<%= href({ manager: filter.manager === String(mg.id) ? '' : String(mg.id) }) %>" class="<%= chip(filter.manager === String(mg.id)) %>"><%= mg.name %> <b><%= mg.count %></b></a>
+        <% }); %>
+        <a href="<%= href({ manager: filter.manager === 'none' ? '' : 'none' }) %>" class="<%= chip(filter.manager === 'none') %>">Без менеджера <b><%= managerSummary.none %></b></a>
+    </div>
+</section>
+
 <section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4 space-y-3" aria-label="Языки исполнителей">
     <div>
         <p class="text-xs text-stone-500 mb-2">Говорят на языке (отмечено при регистрации)</p>
