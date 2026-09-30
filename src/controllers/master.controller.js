@@ -234,6 +234,7 @@ async function register(req, res) {
     throw err;
   }
   await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
+  require('../services/descriptionTranslation.service').queue(master.id);
 
   // Промокод: welcome-бонус на баланс. Ошибка/невалидный код не ломает регистрацию.
   let promoBonusGel = 0;

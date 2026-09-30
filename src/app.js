@@ -133,6 +133,8 @@ runMigrations()
     telegramService.setWebhook().catch((err) => {
       console.error('Failed to (re)register Telegram webhook on startup:', err.message);
     });
+    // Описания исполнителей без перевода (старые профили, сбои) — через минуту и раз в час.
+    require('./services/descriptionTranslation.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

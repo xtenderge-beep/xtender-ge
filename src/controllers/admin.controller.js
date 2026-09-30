@@ -286,6 +286,8 @@ async function updateMaster(req, res) {
     }
     throw err;
   }
+  // Правка описания обнуляет переводы — переводим новый текст в фоне.
+  require('../services/descriptionTranslation.service').queue(id);
 
   // "Сохранить и одобрить" — второй submit-button той же формы (name=thenApprove).
   // Раньше приходилось отдельно ходить в общий список /admin/masters, чтобы одобрить
