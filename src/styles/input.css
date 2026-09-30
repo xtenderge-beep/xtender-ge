@@ -203,6 +203,7 @@ details > summary::-webkit-details-marker { display: none; }
 .home-hero-title { margin:0; font-size:clamp(30px,3.3vw,42px); font-weight:780; letter-spacing:-.035em; line-height:1.12; color:var(--home-ink); }
 .home-hero-title span { display:block; color:var(--home-green); }
 .home-hero-lead { margin:18px 0 0; max-width:480px; font-size:17px; line-height:1.6; color:#33463f; }
+.home-hero-lead--short { display:none; }
 .home-points { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
 .home-points li { display:flex; align-items:flex-start; gap:12px; font-size:15px; line-height:1.5; font-weight:550; color:var(--home-ink); }
 .home-points i { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-top:1px; border-radius:50%; background:#e3f1e7; color:var(--home-green); font-size:11px; flex-shrink:0; }
@@ -402,6 +403,8 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
   .home-hero-title { font-size:25px; line-height:1.18; }
   html[lang="ka"] .home-hero-title { font-size:22px; }
   .home-hero-lead { font-size:14px; line-height:1.55; }
+  .home-hero-lead--full { display:none; }
+  .home-hero-lead--short { display:block; }
   /* The placeholder already shows what to write; the hint stays linked for screen readers. */
   .home-page #home-description-hint { display:none; }
   .home-points li { font-size:14px; }

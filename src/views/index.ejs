@@ -76,7 +76,9 @@
         <div class="home-hero-layout">
           <div class="home-hero-head">
             <h1 class="home-hero-title"><%= t('home_hero_title') %> <span><%= t('home_hero_title_accent') %></span></h1>
-            <p class="home-hero-lead"><%= t('home_hero_lead') %></p>
+            <p class="home-hero-lead home-hero-lead--full"><%= t('home_hero_lead') %></p>
+            <%# Phones get the same idea in one line so the request field stays on the first screen. %>
+            <p class="home-hero-lead home-hero-lead--short"><%= t('home_hero_lead_short') %></p>
           </div>
                     <section id="post-section" class="home-request scroll-mt-20" aria-labelledby="home-form-title">
                         <div class="composer-card">
@@ -175,7 +177,7 @@
                     </section>
           <div id="seo-hero" class="home-intro">
             <ul class="home-points">
-              <% ['home_point_free', 'home_point_review', 'home_point_choice'].forEach(function (key) { %>
+              <% ['home_point_terms', 'home_point_visible', 'home_point_free'].forEach(function (key) { %>
               <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><%= t(key) %></span></li>
               <% }); %>
             </ul>
