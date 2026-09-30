@@ -953,15 +953,27 @@
 
         let modalReturnFocus = null;
         let activeModal = null;
+        // On touch screens focusing the field opens the keyboard over the dialog's explanation, so
+        // the dialog itself takes focus and the keyboard appears only when the field is tapped.
+        const touchScreen = window.matchMedia('(pointer: coarse)').matches;
         function openModal(id) {
             modalReturnFocus = document.activeElement;
             activeModal = document.getElementById(id);
             activeModal.classList.remove('hidden');
             activeModal.classList.add('flex');
             document.body.classList.add('home-modal-open');
-            const input = Array.from(activeModal.querySelectorAll('input')).find((el) => el.getClientRects().length);
+            const input = touchScreen ? null : Array.from(activeModal.querySelectorAll('input')).find((el) => el.getClientRects().length);
             (input || activeModal).focus();
         }
+        // With the keyboard open the dialog gets short and stays scrolled to the top, hiding the
+        // field. Bring the focused field together with its button (same step block) into view.
+        function keepModalFieldVisible() {
+            const field = document.activeElement;
+            if (!activeModal || !field || field.tagName !== 'INPUT' || !activeModal.contains(field)) return;
+            field.parentElement.scrollIntoView({ block: 'end' });
+        }
+        document.addEventListener('focusin', () => { if (touchScreen) setTimeout(keepModalFieldVisible, 300); });
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', () => { if (touchScreen) keepModalFieldVisible(); });
         function closeModal(id) {
             const modal = document.getElementById(id);
             modal.classList.add('hidden');
