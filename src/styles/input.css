@@ -47,6 +47,7 @@ details > summary::-webkit-details-marker { display: none; }
   body.compose-active header,
   body.compose-active #mobileNav,
   body.compose-active #seo-hero,
+  body.compose-active .home-hero-head,
   body.compose-active .composer-toprow,
   body.compose-active .composer-chips,
   body.compose-active .composer-trust-line,
@@ -156,18 +157,14 @@ details > summary::-webkit-details-marker { display: none; }
 }
 
 /* Desktop presentation only; mobile keeps its existing layout and animations. */
-.home-desktop-lead, .home-example-outcome, .provider-demo-lead, .provider-demo-next { display:none; }
+.home-example-outcome, .provider-demo-lead, .provider-demo-next { display:none; }
 @media (min-width:761px) {
-  .home-page .home-hero-layout { align-items:start; padding-top:56px; gap:40px; }
-  .home-page .home-intro-title { position:static; width:auto; height:auto; padding:0; margin:0 0 14px; overflow:visible; clip:auto; white-space:normal; font-size:clamp(28px,2.8vw,36px); font-weight:750; letter-spacing:-.035em; line-height:1.18; }
-  .home-intro-title span { display:block; color:var(--home-green); }
-  .home-page .home-desktop-lead { display:block; max-width:490px; margin:0 0 24px; font-size:14px; line-height:1.7; color:var(--home-muted); }
+  .home-page .home-hero-layout { align-items:start; padding-top:56px; column-gap:64px; row-gap:32px; }
+  /* The reassurance list beside the form already says the request is free. */
+  .home-page .home-free-note { display:none; }
   .home-page .home-examples--hero { padding:22px 24px; border-radius:22px; }
   .home-examples--hero .home-examples-track { min-height:230px; }
-  .home-page .home-examples--hero .home-example-response { display:grid; grid-template-columns:14px minmax(0,1fr); column-gap:8px; row-gap:2px; font-size:14px; padding:11px 14px; }
-  .home-examples--hero .home-example-response i { grid-column:1; grid-row:1; }
-  .home-examples--hero .home-example-response b { grid-column:2; grid-row:1; font-size:12px; }
-  .home-examples--hero .home-example-response > span { grid-column:2; grid-row:2; }
+  .home-page .home-examples--hero .home-example-response { font-size:14px; padding:11px 14px; }
   .home-page .home-example-outcome { display:flex; align-items:flex-start; gap:8px; padding-top:14px; margin-top:14px; border-top:1px solid var(--home-line); color:var(--home-green); font-size:12px; font-weight:650; line-height:1.5; }
   .home-example-outcome i { margin-top:3px; }
   .provider-join .provider-demo-lead { display:block; font-size:16px; line-height:1.65; color:#193d31; }
@@ -198,7 +195,32 @@ details > summary::-webkit-details-marker { display: none; }
 .home-provider-link:hover { background:#eff5f1; }
 .home-provider-link i { color:var(--home-green); }
 .home-shell { max-width:1240px; padding:0 40px 88px; margin:auto; }
-.home-hero-layout { display:grid; grid-template-columns:minmax(0,.93fr) minmax(0,1.07fr); align-items:center; gap:64px; padding:72px 0 64px; }
+.home-hero-layout { display:grid; grid-template-columns:minmax(0,.93fr) minmax(0,1.07fr); grid-template-areas:"head form" "intro form"; grid-template-rows:auto 1fr; align-items:center; gap:64px; padding:72px 0 64px; }
+/* Hero: what and where (head), the request form, then reassurance and the real catalog (intro). */
+.home-hero-head { grid-area:head; }
+.home-page #post-section { grid-area:form; }
+.home-page #seo-hero { grid-area:intro; }
+.home-hero-title { margin:0; font-size:clamp(30px,3.3vw,42px); font-weight:780; letter-spacing:-.035em; line-height:1.12; color:var(--home-ink); }
+.home-hero-title span { display:block; color:var(--home-green); }
+.home-hero-lead { margin:18px 0 0; max-width:480px; font-size:17px; line-height:1.6; color:#33463f; }
+.home-points { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.home-points li { display:flex; align-items:flex-start; gap:12px; font-size:15px; line-height:1.5; font-weight:550; color:var(--home-ink); }
+.home-points i { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-top:1px; border-radius:50%; background:#e3f1e7; color:var(--home-green); font-size:11px; flex-shrink:0; }
+.home-catalog-strip { display:flex; align-items:center; gap:14px; max-width:480px; margin-top:30px; padding:14px 16px; background:#fff; border:1px solid var(--home-line); border-radius:14px; transition:border-color .2s; }
+.home-catalog-strip:hover { border-color:#a5c0af; }
+.home-strip-avatars { display:flex; flex-shrink:0; }
+.home-strip-avatars span { display:flex; align-items:center; justify-content:center; width:34px; height:34px; margin-left:-9px; border:2px solid #fff; border-radius:50%; background:#e6efe8; color:#2a624b; font-size:13px; font-weight:700; }
+.home-strip-avatars span:first-child { margin-left:0; }
+.home-strip-avatars span:nth-child(2) { background:#efe8da; color:#6b5424; }
+.home-strip-avatars span:nth-child(3) { background:#e3ebf1; color:#2f526b; }
+.home-strip-avatars span:nth-child(4) { background:#f1e4e1; color:#6e3b31; }
+.home-strip-text { flex:1; min-width:0; font-size:13px; line-height:1.45; color:var(--home-muted); }
+.home-strip-text b { display:block; font-size:14px; font-weight:700; color:var(--home-ink); }
+.home-strip-cta { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:650; color:var(--home-green); white-space:nowrap; }
+.home-strip-cta i { font-size:11px; }
+.home-how-body { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:56px; align-items:start; }
+.home-how-body .home-steps { grid-template-columns:1fr; gap:28px; }
+.home-how-body .home-examples--hero { max-width:none; margin:0; }
 .home-eyebrow { display:flex; align-items:center; gap:10px; color:var(--home-green); font-size:12px; font-weight:700; letter-spacing:.045em; line-height:1.6; }
 .home-examples { margin:4px 0 26px; max-width:460px; }
 .home-examples-label { font-size:11px; font-weight:700; letter-spacing:.045em; text-transform:uppercase; color:var(--home-green); margin-bottom:10px; }
@@ -216,6 +238,11 @@ details > summary::-webkit-details-marker { display: none; }
 .home-examples--hero .home-examples-label { font-size:12px; margin-bottom:16px; }
 .home-examples--hero .home-example-request, .home-examples--hero .home-example-response { font-size:15px; padding:12px 16px; }
 .home-examples--hero .home-examples-note { margin-top:14px; }
+/* "Звонит Дато:" sits above the reply so the label never squeezes into a narrow column. */
+.home-page .home-examples--hero .home-example-response { display:grid; grid-template-columns:14px minmax(0,1fr); column-gap:8px; row-gap:2px; }
+.home-examples--hero .home-example-response i { grid-column:1; grid-row:1; }
+.home-examples--hero .home-example-response b { grid-column:2; grid-row:1; font-size:12px; }
+.home-examples--hero .home-example-response > span { grid-column:2; grid-row:2; }
 @keyframes home-example-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 .home-text-link { display:inline-flex; align-items:center; gap:12px; color:var(--home-ink); font-size:14px; font-weight:650; padding-bottom:4px; border-bottom:1px solid #bdcfc4; }
 .home-text-link i { font-size:11px; }
@@ -314,6 +341,7 @@ details > summary::-webkit-details-marker { display: none; }
 .home-page [role="dialog"] > div { max-height:calc(100dvh - 40px); overflow-y:auto; border-radius:20px; padding:30px; }
 .home-page [role="dialog"] :is(input,textarea) { font-size:16px; }
 html[lang="ka"] .home-provider-link { font-size:12px; }
+html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height:1.2; }
 @media (max-width:1100px) {
   .home-header-inner { gap:28px; padding:18px 28px; }
   .home-shell { padding-left:28px; padding-right:28px; }
@@ -344,11 +372,12 @@ html[lang="ka"] .home-provider-link { font-size:12px; }
 @media (max-width:760px) {
   .home-header-inner { min-height:72px; padding:14px 22px; }
   .home-brand { font-size:27px; }
-  .home-hero-layout { grid-template-columns:1fr; gap:30px; padding:38px 0; }
-  /* Mobile: the request form comes first so visitors can start typing right away;
-     the animated examples move below it instead of pushing the form off-screen. */
-  #post-section { order:1; }
-  #seo-hero { order:2; }
+  /* Mobile: a short what-and-where headline, then the form right away;
+     the reassurance list and catalog strip move below the form. */
+  .home-hero-layout { grid-template-columns:1fr; grid-template-areas:"head" "form" "intro"; grid-template-rows:auto; gap:30px; padding:38px 0; }
+  .home-hero-title { font-size:28px; }
+  .home-hero-lead { margin-top:10px; font-size:15px; }
+  .home-how-body { grid-template-columns:1fr; gap:32px; }
   .home-text-link { font-size:13px; }
   .home-page #detailsStep { padding:28px; }
   .home-page .composer-chip { font-size:13px; padding:9px 12px; }
@@ -371,7 +400,15 @@ html[lang="ka"] .home-provider-link { font-size:12px; }
   .home-header-actions .lang-btn { min-width:30px; min-height:30px; font-size:11px; }
   .home-shell { padding:0 18px 40px; }
   .home-eyebrow { font-size:11px; letter-spacing:.015em; }
-  .home-hero-layout { padding:30px 0 34px; gap:25px; }
+  .home-hero-layout { padding:24px 0 34px; gap:20px; }
+  .home-hero-title { font-size:25px; line-height:1.18; }
+  html[lang="ka"] .home-hero-title { font-size:22px; }
+  .home-hero-lead { font-size:14px; line-height:1.55; }
+  /* The placeholder already shows what to write; the hint stays linked for screen readers. */
+  .home-page #home-description-hint { display:none; }
+  .home-points li { font-size:14px; }
+  .home-catalog-strip { margin-top:22px; }
+  .home-strip-avatars span:nth-child(n+4), .home-strip-cta > span { display:none; }
   .home-examples--hero { padding:22px 20px; }
   .home-page #detailsStep { padding:22px 18px 18px; }
   .home-page .composer-card { border-radius:18px; }
@@ -379,7 +416,7 @@ html[lang="ka"] .home-provider-link { font-size:12px; }
   .home-page .composer-toprow p { font-size:13px; line-height:1.6; }
   .home-page .composer-chips { margin:17px 0 15px; gap:7px; }
   .home-page .composer-chip { font-size:11px; padding:8px 10px; gap:6px; min-height:36px; }
-  .home-page .composer-textarea { padding:14px; min-height:135px; font-size:16px; line-height:1.6; }
+  .home-page .composer-textarea { padding:14px; height:112px; min-height:0; font-size:16px; line-height:1.6; }
   .home-page .composer-actionbar { padding:10px; gap:8px; }
   .home-page .composer-actionbar label { font-size:12px; padding:10px 0; }
   .home-page .composer-inline-publish { padding:12px; gap:9px; font-size:12px; }

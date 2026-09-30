@@ -62,38 +62,22 @@
       <div class="home-header-inner">
         <a href="<%= homePrefix || '/' %>" class="home-brand" aria-label="Xtender"><%- include('partials/brand') %></a>
         <nav class="home-desktop-nav" aria-label="<%= t('how_it_works_title') %>">
-          <a href="#how-it-works"><%= t('how_it_works_title') %></a>
-          <a href="#masters-section"><%= t('catalog_title') %></a>
+          <a href="#how-it-works"><%= t('home_nav_how') %></a>
+          <a href="#masters-section"><%= t('home_nav_catalog') %></a>
         </nav>
         <div class="home-header-actions">
           <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
-          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('master_login_nav') %></span></a>
+          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_label') %></span></a>
         </div>
       </div>
     </header>
     <main class="flex-grow">
       <div class="home-shell">
         <div class="home-hero-layout">
-          <section id="seo-hero" class="home-intro">
-            <h1 class="sr-only home-intro-title"><%= t('home_title') %> <span><%= t('home_title_accent') %></span></h1>
-            <p class="home-desktop-lead"><%= t('home_lead') %></p>
-            <% const homeExamplesFirst = t('home_examples_data')[0]; %>
-            <div class="home-examples home-examples--hero" id="homeExamples">
-              <p class="home-examples-label"><%= t('home_examples_label') %></p>
-              <div class="home-examples-track" id="homeExamplesTrack" aria-live="polite">
-                <div class="home-example is-active">
-                  <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= homeExamplesFirst.emoji %></span><%= homeExamplesFirst.request %></p>
-                  <% homeExamplesFirst.responses.forEach(function (resp) { %>
-                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><b><%= resp.name %>:</b> <span><%= resp.text %></span></p>
-                  <% }); %>
-                </div>
-              </div>
-              <p class="home-example-outcome"><i class="fa-solid fa-check" aria-hidden="true"></i><%= t('home_choice') %></p>
-              <p class="home-examples-note"><%= t('home_examples_note') %></p>
-              <button type="button" id="homeExampleNext" class="example-next"><%= t('example_next') %></button>
-            </div>
-            <a href="#masters-section" class="home-text-link"><%= t('home_catalog_link') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
-          </section>
+          <div class="home-hero-head">
+            <h1 class="home-hero-title"><%= t('home_hero_title') %> <span><%= t('home_hero_title_accent') %></span></h1>
+            <p class="home-hero-lead"><%= t('home_hero_lead') %></p>
+          </div>
                     <section id="post-section" class="home-request scroll-mt-20" aria-labelledby="home-form-title">
                         <div class="composer-card">
 
@@ -189,6 +173,27 @@
                         </div>
 
                     </section>
+          <div id="seo-hero" class="home-intro">
+            <ul class="home-points">
+              <% ['home_point_free', 'home_point_review', 'home_point_choice'].forEach(function (key) { %>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><%= t(key) %></span></li>
+              <% }); %>
+            </ul>
+            <% if (masters.length) {
+              const stripCount = masters.length, m10 = stripCount % 10, m100 = stripCount % 100;
+              const stripForm = lang === 'ru'
+                ? (m10 === 1 && m100 !== 11 ? 'one' : (m10 >= 2 && m10 <= 4 && !(m100 >= 12 && m100 <= 14) ? 'few' : 'many'))
+                : (stripCount === 1 ? 'one' : 'many');
+            %>
+            <a href="#masters-section" class="home-catalog-strip">
+              <span class="home-strip-avatars" aria-hidden="true"><% masters.slice(0, 4).forEach(function (m) { %><span><%= String(m.display_name || m.name || '?').trim().charAt(0).toUpperCase() %></span><% }); %></span>
+              <span class="home-strip-text"><b><%= stripCount %> <%= t('home_strip_word_' + stripForm) %></b><%= t('home_strip_label') %><% if (catalogCity) { %> · <%= catalogCity['name_' + lang] || catalogCity.name_ru %><% } %></span>
+              <span class="home-strip-cta"><span><%= t('home_strip_cta') %></span><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></span>
+            </a>
+            <% } else { %>
+            <a href="#masters-section" class="home-text-link"><%= t('home_catalog_link') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+            <% } %>
+          </div>
         </div>
 
                     <section id="tender-live-section" class="hidden mt-6">
@@ -229,10 +234,27 @@
 
         <section id="how-it-works" class="home-how" aria-labelledby="home-how-title">
           <div class="home-section-heading"><p class="home-eyebrow"><%= t('how_it_works_title') %></p><h2 id="home-how-title"><%= t('home_how_title') %></h2></div>
+          <div class="home-how-body">
           <div class="home-steps">
             <% [1, 2, 3].forEach(function (n) { %>
             <article class="home-step"><span class="home-step-number" aria-hidden="true">0<%= n %></span><div><h3><%= t('home_step' + n + '_title') %></h3><p><%= t('home_step' + n + '_body') %></p></div></article>
             <% }); %>
+          </div>
+            <% const homeExamplesFirst = t('home_examples_data')[0]; %>
+            <div class="home-examples home-examples--hero" id="homeExamples">
+              <p class="home-examples-label"><%= t('home_examples_label') %></p>
+              <div class="home-examples-track" id="homeExamplesTrack" data-call-from="<%= t('home_example_call_from') %>" aria-live="polite">
+                <div class="home-example is-active">
+                  <p class="home-example-request"><span class="home-example-emoji" aria-hidden="true"><%= homeExamplesFirst.emoji %></span><%= homeExamplesFirst.request %></p>
+                  <% homeExamplesFirst.responses.forEach(function (resp) { %>
+                  <p class="home-example-response"><i class="fa-solid fa-phone" aria-hidden="true"></i><b><%= t('home_example_call_from').replace('{name}', resp.name) %></b> <span><%= resp.text %></span></p>
+                  <% }); %>
+                </div>
+              </div>
+              <p class="home-example-outcome"><i class="fa-solid fa-check" aria-hidden="true"></i><%= t('home_choice') %></p>
+              <p class="home-examples-note"><%= t('home_examples_note') %></p>
+              <button type="button" id="homeExampleNext" class="example-next"><%= t('example_next') %></button>
+            </div>
           </div>
         </section>
 
@@ -1277,7 +1299,7 @@
                     icon.className = 'fa-solid fa-phone';
                     icon.setAttribute('aria-hidden', 'true');
                     const name = document.createElement('b');
-                    name.textContent = response.name + ': ';
+                    name.textContent = (track.dataset.callFrom || '{name}:').replace('{name}', response.name) + ' ';
                     const body = document.createElement('span');
                     body.textContent = response.text;
                     line.append(icon, name, body);
