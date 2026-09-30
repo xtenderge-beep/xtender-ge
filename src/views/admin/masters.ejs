@@ -6,6 +6,9 @@
 <% const href = function (over) { const q = Object.assign({}, filter, over); const p = new URLSearchParams(); Object.keys(q).forEach(function (k) { if (q[k]) p.set(k, q[k]); }); const s = p.toString(); return '/admin/masters' + (s ? '?' + s : ''); }; %>
 <% const chip = function (on) { return 'px-3 py-2 text-xs font-bold rounded-xl transition ' + (on ? 'bg-emerald-600 text-white' : 'bg-stone-100 hover:bg-stone-200 text-stone-700'); }; %>
 <% const main = ['ru', 'ka', 'en']; %>
+<% const when = function (v) { return new Date(v).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }; %>
+<% const clip = function (s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n).trimEnd() + '…' : s; }; %>
+<% const actionLabels = { ban: 'заблокировал', unban: 'разблокировал', approve: 'одобрил', assign_category: 'назначил услуги', edit_contact: 'изменил контакты', edit_description: 'изменил описание',reject: 'отклонил заявку' }; %>
 <% const spokenCodes = main.concat(Object.keys(languageNames).filter(function (c) { return main.indexOf(c) === -1 && languageSummary.spoken[c]; })); %>
 <section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4 space-y-3" aria-label="Языки исполнителей">
     <div>
@@ -54,6 +57,42 @@
                   Говорит: <% if (m.spoken_languages.length) { %><b class="text-stone-800"><%= m.spoken_languages.map(function (c) { return languageNames[c] || c; }).join(', ') %></b><% } else { %>не указано<% } %>
                   · интерфейс при регистрации: <% if (m.registration_language) { %><b class="text-stone-800"><%= languageNames[m.registration_language] || m.registration_language %></b><% } else { %>не записан<% } %>
               </p>
+              <%# Работа менеджера с исполнителем — видно без захода в карточку. %>
+              <div class="text-xs text-stone-500 mt-3 pt-3 border-t border-stone-100 space-y-1">
+                  <p>
+                      Менеджер: <% if (m.manager_name) { %><a href="/admin/managers/<%= m.manager_id %>" class="font-bold text-stone-800 hover:text-emerald-700"><%= m.manager_name %></a><% } else { %><b class="text-amber-700">не назначен</b><% } %>
+                      <% if (m.manager_name) { %>
+                        · открывал карточку: <% if (m.manager_view) { %><b class="text-stone-800"><%= when(m.manager_view.last_viewed_at) %></b> (<%= m.manager_view.view_count %> раз)<% } else { %>не открывал<% } %>
+                      <% } %>
+                      <% if (m.last_view && (!m.manager_view || m.last_view.manager_id !== m.manager_id)) { %>
+                        · последним смотрел <%= m.last_view.manager_name %>, <%= when(m.last_view.last_viewed_at) %>
+                      <% } %>
+                  </p>
+                  <p>
+                      Последнее изменение: <% if (m.last_change) { %><b class="text-stone-800"><%= when(m.last_change.created_at) %></b> · <%= m.last_change.manager_name %> · <%= actionLabels[m.last_change.action] || m.last_change.action %>: <span class="text-stone-700 break-words"><%= clip(m.last_change.body, 160) %></span><% } else { %>менеджеры ничего не меняли<% } %>
+                  </p>
+                  <% if (m.description) { %>
+                    <% if (m.description.length > 220) { %>
+                      <details class="text-stone-700"><summary class="cursor-pointer"><span class="text-stone-500">Описание:</span> <%= clip(m.description, 220) %> <b class="text-emerald-700">полностью</b></summary><p class="whitespace-pre-wrap break-words mt-1"><%= m.description %></p></details>
+                    <% } else { %>
+                      <p class="text-stone-700 whitespace-pre-wrap break-words"><span class="text-stone-500">Описание:</span> <%= m.description %></p>
+                    <% } %>
+                  <% } else { %>
+                    <p>Описание: не заполнено</p>
+                  <% } %>
+                  <% if (m.notes.length) { %>
+                    <div class="bg-stone-50 rounded-xl p-2 space-y-1">
+                        <p class="font-bold text-stone-700">Заметки (<%= m.notes.length %>)</p>
+                        <% const noteLine = function (n) { %><p class="text-stone-700 whitespace-pre-wrap break-words"><span class="text-stone-500"><%= when(n.created_at) %> · <%= n.manager_name %>:</span> <%= n.body %></p><% }; %>
+                        <% m.notes.slice(0, 3).forEach(noteLine); %>
+                        <% if (m.notes.length > 3) { %>
+                          <details><summary class="cursor-pointer font-bold text-emerald-700">Ещё <%= m.notes.length - 3 %></summary><div class="space-y-1 mt-1"><% m.notes.slice(3).forEach(noteLine); %></div></details>
+                        <% } %>
+                    </div>
+                  <% } else { %>
+                    <p>Заметок нет</p>
+                  <% } %>
+              </div>
           </div>
           <% if (!m.is_active && !m.is_banned) { %>
             <form method="POST" action="/admin/masters/<%= m.id %>/approve">

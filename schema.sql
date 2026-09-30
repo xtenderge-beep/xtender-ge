@@ -799,6 +799,17 @@ CREATE TABLE IF NOT EXISTS catalog_contact_access (
   PRIMARY KEY (master_id, caller_phone)
 );
 
+-- Когда менеджер последний раз открывал карточку исполнителя в своём кабинете
+-- (/manager/masters/:id и /manager/review/:id). Одна строка на пару менеджер+исполнитель,
+-- показывается админу в списке /admin/masters. Пишется с 2026-09-30, раньше данных нет.
+CREATE TABLE IF NOT EXISTS manager_master_views (
+  manager_id INTEGER NOT NULL REFERENCES managers(id),
+  master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  last_viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  view_count INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (manager_id, master_id)
+);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

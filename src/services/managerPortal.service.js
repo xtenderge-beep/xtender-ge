@@ -105,6 +105,7 @@ async function reviewGet(managerId, masterId) {
   const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   master.services=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[masterId])).rows;
   master.work_cities=(await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1',[masterId])).rows;
+  await recordView(managerId, master.id);
   return { master, categories, vanSizes, descriptionSourceLang:master.description_source_lang || require('./translation.service').detectLang(master.description), descriptionTranslations:typeof master.description_translations==='string' ? JSON.parse(master.description_translations) : master.description_translations || {}, workCities: await require('./master.service').getWorkCities(), languageNames: require('../config/spokenLanguages').ruNames };
 }
 
@@ -254,9 +255,18 @@ async function approvePending(managerId, masterId, category, attributes = {}, ve
   return approved;
 }
 
+// Отметка «менеджер открывал карточку» для списка в админке. Сбой записи не должен
+// ломать саму карточку — это вспомогательная статистика.
+async function recordView(managerId, masterId) {
+  try {
+    await pool.query('INSERT INTO manager_master_views(manager_id,master_id) VALUES($1,$2) ON CONFLICT(manager_id,master_id) DO UPDATE SET last_viewed_at=NOW(),view_count=manager_master_views.view_count+1', [managerId, masterId]);
+  } catch (e) { console.error('manager_master_views:', e.message); }
+}
+
 async function detail(managerId, masterId) {
   const master = (await pool.query('SELECT id,name,phone,category,balance_tetri,is_active,is_banned,banned_reason,banned_by_manager_id,is_subscribed,subscription_until,created_at FROM masters WHERE id=$1 AND manager_id=$2', [masterId, managerId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
+  await recordView(managerId, master.id);
   const ledger = (await pool.query('SELECT b.id,b.amount_tetri,b.reason,b.created_at FROM balance_transactions b JOIN masters m ON m.id=b.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY b.created_at DESC,b.id DESC LIMIT 100', [masterId, managerId])).rows;
   const events = (await pool.query('SELECT e.action,e.body,e.created_at FROM manager_portal_events e JOIN masters m ON m.id=e.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY e.created_at DESC,e.id DESC LIMIT 100', [masterId, managerId])).rows;
   const activity = (await pool.query('SELECT v.order_id,v.event_type,v.viewed_at FROM order_views v JOIN masters m ON m.id=v.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY v.viewed_at DESC LIMIT 100', [masterId, managerId])).rows;

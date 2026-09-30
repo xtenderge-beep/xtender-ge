@@ -69,7 +69,7 @@ const {registerMaster} = require('../src/services/master.service');
   const {ruNames}=require('../src/config/spokenLanguages');
   const views=require('path').join(__dirname,'../src/views');
   const render=filter=>ejs.render(fs.readFileSync(require('path').join(views,'admin/masters.ejs'),'utf8'),
-    {masters:adminService.filterByLanguage(rows,filter).map(r=>({is_active:true,is_banned:false,balance_tetri:0,rating:0,review_count:0,last_topup_at:null,category:'movers',phone:'+995500000000',...r})),
+    {masters:adminService.filterByLanguage(rows,filter).map(r=>({is_active:true,is_banned:false,balance_tetri:0,rating:0,review_count:0,last_topup_at:null,category:'movers',phone:'+995500000000',description:'',manager_id:null,manager_name:null,manager_view:null,last_view:null,last_change:null,notes:[],...r})),
       languageSummary:summary,languageNames:ruNames,filter:{status:'',lang:'',site:'',...filter},csrfToken:'csrf'},
     {filename:require('path').join(views,'admin/masters.ejs'),includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
   const all=render({});

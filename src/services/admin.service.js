@@ -151,11 +151,43 @@ async function listMastersAdmin() {
      ORDER BY m.id`
   );
   // Языки — отдельным запросом и склейкой в JS, как master_services в каталоге: jsonb в GROUP BY pg-mem не тянет.
-  const langRows = await pool.query('SELECT id, registration_language, spoken_languages FROM masters');
+  const langRows = await pool.query('SELECT id, registration_language, spoken_languages, description, manager_id FROM masters');
   const langs = new Map(langRows.rows.map(r => [r.id, r]));
+  const work = await managerWorkByMaster();
   return rows.map(m => {
     const l = langs.get(m.id) || {};
-    return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null };
+    const w = work(m.id, l.manager_id);
+    return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null,
+      description: l.description || '', manager_id: l.manager_id || null, ...w };
+  });
+}
+
+// Работа менеджеров с исполнителем для списка /admin/masters: кто ведёт, когда менеджер
+// последний раз открывал карточку, последнее действие (кроме заметок) и свежие заметки.
+// Тремя плоскими запросами со склейкой в JS — без оконных функций и подзапросов (pg-mem).
+async function managerWorkByMaster() {
+  const managers = new Map((await pool.query('SELECT id, name FROM managers')).rows.map(r => [r.id, r.name]));
+  const views = (await pool.query('SELECT manager_id, master_id, last_viewed_at, view_count FROM manager_master_views ORDER BY last_viewed_at DESC')).rows;
+  const events = (await pool.query('SELECT manager_id, master_id, action, body, created_at FROM manager_portal_events WHERE master_id IS NOT NULL ORDER BY created_at DESC, id DESC')).rows;
+  const named = r => ({ ...r, manager_name: managers.get(r.manager_id) || ('#' + r.manager_id) });
+  const lastView = new Map(), ownView = new Map(), lastChange = new Map(), notes = new Map();
+  for (const v of views) {
+    if (!lastView.has(v.master_id)) lastView.set(v.master_id, named(v));
+    ownView.set(v.master_id + ':' + v.manager_id, named(v));
+  }
+  for (const e of events) {
+    if (e.action === 'note') {
+      const list = notes.get(e.master_id) || [];
+      list.push(named(e));
+      notes.set(e.master_id, list);
+    } else if (!lastChange.has(e.master_id)) lastChange.set(e.master_id, named(e));
+  }
+  return (masterId, managerId) => ({
+    manager_name: managerId ? (managers.get(managerId) || ('#' + managerId)) : null,
+    manager_view: managerId ? (ownView.get(masterId + ':' + managerId) || null) : null,
+    last_view: lastView.get(masterId) || null,
+    last_change: lastChange.get(masterId) || null,
+    notes: notes.get(masterId) || [],
   });
 }
 
