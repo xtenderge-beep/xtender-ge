@@ -283,6 +283,7 @@ async function updateMaster(req, res) {
     if (err.code === 'INVALID_SERVICE') return res.redirect(`/admin/masters/${id}?error=service_required`);
     if (err.code === 'INVALID_CITY') return res.redirect(`/admin/masters/${id}?error=invalid_city`);
     if (err.code === 'INVALID_LANGUAGE') return res.redirect(`/admin/masters/${id}?error=invalid_language`);
+    if (err.code === 'DESCRIPTION_HAS_PHONE') return res.redirect(`/admin/masters/${id}?error=description_phone`);
     if (err.code === '23505') {
       return res.redirect(`/admin/masters/${id}?error=phone_taken`);
     }

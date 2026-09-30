@@ -6,6 +6,13 @@ const { legacyColumnsFor } = require('../config/serviceTypes');
 
 const FIELDS = 'is_technical, id, name, phone, category, vehicle_type, vehicle_size, price_text, description, description_source_lang, description_translations, avatar_url, rating, language, spoken_languages, contact_channels, display_name_override';
 
+// Номер в описании или цене обходит платный показ номера в каталоге.
+function rejectPhoneInText(...texts) {
+  if (texts.some(text => require('../config/phoneInText').hasPhone(text))) {
+    throw Object.assign(new Error('Description contains a phone number'), { code: 'DESCRIPTION_HAS_PHONE' });
+  }
+}
+
 function descriptionFor(master, lang) {
   if (!master?.description) return null;
   const translations = typeof master.description_translations === 'string'
@@ -26,6 +33,7 @@ async function registerMaster({
   vehicleTypeText = null, cityId = null, districtIds = [], cityIds = null, photoUrl = null,
   createOnly = false, consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null, language = null,
 }) {
+  rejectPhoneInText(description);
   const masterToken = generateShortId();
   const legacy = legacyColumnsFor(serviceType, attributes);
   const vehicleType = serviceType === 'van' ? (vehicleTypeText || null) : null;
@@ -423,6 +431,7 @@ async function topUpBalance(phone, amountTetri) {
 // остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
 // мастера до одного тира).
 async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds, spokenLanguages }) {
+  rejectPhoneInText(description, priceText);
   const config = require('../config/serviceTypes');
   const categories = require('./category.service');
   const selected = services || [{ type: category === 'transport' ? 'van' : category, attributes: serviceAttributes }];
@@ -560,11 +569,14 @@ async function listMasters({ serviceType, language, cityId } = {}) {
   const covered = new Set(cityCoverage.map(row => row.master_id));
   const explicitCoverage = cityId ? new Set((await pool.query('SELECT master_id FROM master_cities')).rows.map(row => row.master_id)) : null;
   const tbilisi = cityId ? (await pool.query("SELECT id FROM cities WHERE slug='tbilisi'")).rows[0]?.id : null;
+  const phoneInText = require('../config/phoneInText');
   const result = rows.map((m) => {
     const s = byMaster.get(m.id);
     return {
       ...m,
-      description: descriptionFor({ ...m, ...profileMap.get(m.id) }, language),
+      description: phoneInText.maskPhones(descriptionFor({ ...m, ...profileMap.get(m.id) }, language)),
+      price_text: phoneInText.maskPhones(m.price_text),
+      phone_masked: require('../config/catalogContacts').maskedPhone(m.phone),
       display_name: require('../config/providerName').resolve(m),
       spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
       available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),

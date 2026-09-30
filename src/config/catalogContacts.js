@@ -21,4 +21,19 @@ function links(master) {
   if (/^[A-Za-z][A-Za-z0-9_]{4,31}$/.test(c.telegram || '')) result.telegram = 'https://t.me/' + c.telegram;
   return result;
 }
-module.exports = { parse, links };
+// Start of the number shown on a catalog card before the paid reveal: country code, operator
+// code and two digits, the last four hidden. The full number never reaches the page for a
+// caller who has not opened this provider yet.
+function maskedPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  if (digits.length === 12 && digits.startsWith('995')) return `+995 ${digits.slice(3, 6)} ${digits.slice(6, 8)} •• ••`;
+  return `+${digits.slice(0, -4)} •• ••`;
+}
+// Full number for a caller who already opened this provider's contacts.
+function formattedPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 12 && digits.startsWith('995')) return `+995 ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8, 10)} ${digits.slice(10)}`;
+  return phone || null;
+}
+module.exports = { parse, links, maskedPhone, formattedPhone };

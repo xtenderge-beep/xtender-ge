@@ -296,8 +296,6 @@ details > summary::-webkit-details-marker { display: none; }
 .home-page .master-card { border:1px solid var(--home-line); border-radius:16px; box-shadow:none; padding:22px; gap:15px; transition:border-color .2s,box-shadow .2s; }
 .home-page .master-card:hover { border-color:#a5c0af; box-shadow:0 8px 24px -16px #1e604d40; }
 .home-avatar { display:flex; justify-content:center; align-items:center; width:40px; height:40px; background:#ecf2eb; color:#2a624b; border-radius:12px; font-size:18px; font-weight:650; flex-shrink:0; }
-.home-master-heading { gap:12px; flex-wrap:wrap; }
-.home-master-heading > .shrink-0 { display:none; }
 .home-page .master-card h3 { font-size:16px; }
 .home-page .master-card .text-xs { font-size:14px; line-height:1.6; }
 .home-page .master-card [class*="text-[10px]"], .home-page .master-card [class*="text-[11px]"] { font-size:12px; line-height:1.5; }
@@ -512,11 +510,28 @@ body.signup-compose-active .provider-focus-promo{display:none}
 /* Directory: consistent language and contact rows, no profile photography. */
 .catalog-language-filter{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px;background:#f4f7f2;border:1px solid #dce5d7;border-radius:14px;font-size:13px}
 .catalog-language-filter>label:first-child{font-weight:750}.catalog-language-filter select{padding:9px 12px;border:1px solid #ccd8c7;border-radius:8px;background:white;min-height:44px}.catalog-language-filter p{width:100%;color:#647269;font-size:12px}.catalog-language-only{display:flex;gap:8px;align-items:center;min-height:44px}
-.catalog-card-languages{min-height:70px;padding-top:10px;border-top:1px solid #edf0ea;font-size:11px;color:#667264}.catalog-card-languages>div{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}.catalog-language-badge{padding:4px 7px;background:#f3f5f1;border-radius:6px;color:#52604e}.catalog-language-badge.is-preferred{background:#e5f2e5;color:#225d35;font-weight:750}
+.catalog-card-languages{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font-size:11px;color:#667264}.catalog-card-languages>div{display:flex;flex-wrap:wrap;gap:5px}.catalog-language-badge{padding:4px 7px;background:#f3f5f1;border-radius:6px;color:#52604e}.catalog-language-badge.is-preferred{background:#e5f2e5;color:#225d35;font-weight:750}
 .catalog-contact-state{font-size:11px;color:#397046;min-height:30px;line-height:1.4;margin-bottom:6px}.catalog-contact-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.catalog-contact-button{min-height:44px;display:flex;justify-content:center;align-items:center;text-align:center;padding:10px 6px;border:1px solid #cbdcc7;border-radius:9px;font-size:12px;font-weight:700;color:#285e37;background:#f3f8ef;overflow-wrap:anywhere}.catalog-contact-button.is-call{background:#28693e;color:white;border-color:#28693e}.catalog-contact-button:focus-visible{outline:3px solid #85b48a;outline-offset:2px}.catalog-contact-button:disabled{opacity:.5}
 .catalog-form-benefit{padding:18px 20px;border:1px solid #dce5d7;border-radius:14px;background:#fff}.catalog-form-benefit h3{font-weight:750;font-size:16px}.catalog-form-benefit p{font-size:13px;line-height:1.65;color:#647269;margin:7px 0}.catalog-form-benefit a{font-size:13px;font-weight:750;color:#28693e}
-.home-page .master-card .catalog-card-languages{margin-top:auto;min-height:60px}.home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-actions{min-height:96px;align-content:start}.catalog-contact-button:only-child{grid-column:1/-1}.catalog-contact-state{min-height:24px}.catalog-contact-state:empty{visibility:hidden}
-@media(max-width:639px){.catalog-contact-actions{min-height:0}.catalog-contact-state:empty{display:none}}
+.home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-button:only-child{grid-column:1/-1}.catalog-contact-state{min-height:0}.catalog-contact-state:empty{display:none}
+
+/* Catalog card: initials and category beside the name; contacts pinned to the bottom so cards in
+   one row line up without reserving empty space; the number shows its start until it is opened. */
+.catalog-card-head{display:flex;align-items:flex-start;gap:12px}
+.catalog-card-avatar{display:flex;align-items:center;justify-content:center;width:42px;height:42px;flex-shrink:0;border-radius:50%;background:#e6efe8;color:#2a624b;font-size:15px;font-weight:700;letter-spacing:.02em}
+.catalog-card-category{margin-top:2px;font-size:13px;line-height:1.4;color:#647269}
+.catalog-card-bottom{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid #edf0ea}
+.catalog-card-phone{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:15px;font-weight:650;color:#152e29;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.catalog-card-phone i{font-size:12px;color:#087e61}
+.catalog-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#647269}
+/* Fewer than 10 providers: all cards share one grid; category headings are hidden. */
+.catalog-groups{display:flex;flex-direction:column;gap:32px}
+.catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.catalog-groups.is-flat>[data-group],.catalog-groups.is-flat .home-master-grid{display:contents}
+.catalog-groups.is-flat>[data-group]>h3{display:none}
+.catalog-groups.is-flat>[data-group].hidden{display:none}
+@media(max-width:1100px){.catalog-groups.is-flat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:639px){.catalog-groups.is-flat{grid-template-columns:1fr}}
 
 .signup-login { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:16px 0 24px; padding:16px; border:1px solid #a7d4bf; border-radius:14px; background:#ecfdf5; color:#064e3b; font-size:14px; font-weight:600; }
 .signup-login a,.signup-existing-login { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:12px 20px; border-radius:10px; background:#065f46; color:white; font-weight:700; }

@@ -6,6 +6,7 @@ const redis = require('../config/redis');
 const COOKIE = 'manager_session';
 const TTL = 8 * 60 * 60;
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
+const PHONE_IN_DESCRIPTION = 'Уберите номер телефона из описания и цены: заказчики получают номер специалиста через кнопки в каталоге.';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/manager' };
 const token = () => crypto.randomBytes(32).toString('hex');
 async function hash(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -112,6 +113,7 @@ async function reviewGet(managerId, masterId) {
 async function updateDescription(managerId, masterId, description, sourceLang) {
   if (typeof description !== 'string' || description.trim().length > 2000) throw fail('Описание должно быть не длиннее 2000 символов.', 400);
   const value = description.trim();
+  if (require('../config/phoneInText').hasPhone(value)) throw fail(PHONE_IN_DESCRIPTION, 400);
   if(value && !['ru','ka','en'].includes(sourceLang)) throw fail('Выберите язык исходного описания.', 400);
   const owner = (await pool.query('SELECT id,manager_id,is_active,is_banned FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!owner) throw fail('Специалист не найден.', 404);
@@ -233,6 +235,7 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
     if (e.code === 'INVALID_SERVICE') throw fail('Эта категория требует дополнительных характеристик — заполните их в полной карточке в админке.', 422);
     if (e.code === 'INVALID_CITY') throw fail(e.message, 422);
     if (e.code === 'INVALID_LANGUAGE') throw fail(e.message, 422);
+    if (e.code === 'DESCRIPTION_HAS_PHONE') throw fail(PHONE_IN_DESCRIPTION, 422);
     throw e;
   }
   return master.id;

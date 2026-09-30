@@ -326,6 +326,10 @@
             if (step === 0 && (!payload.description || payload.description.length > 2000)) {
                 return signupError(0, T.join_services_required, '#descriptionInput');
             }
+            // Same rule as src/config/phoneInText.js: the number is shown through the paid catalog reveal.
+            if (step === 0 && /\+?\d(?:[\s\-.()]{0,2}\d){8,}/.test(payload.description)) {
+                return signupError(0, T.join_description_phone, '#descriptionInput');
+            }
             if (step === 1) {
                 if (!payload.cityIds.length) return signupError(1, T.join_work_cities_required, 'input[name="cityIds"]');
                 if (!payload.spokenLanguages.length) return signupError(1, T.join_languages_required, 'input[name="spokenLanguages"]');

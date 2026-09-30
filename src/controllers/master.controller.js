@@ -181,6 +181,7 @@ async function register(req, res) {
   if (!spokenLanguages) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_languages_required });
   const serviceType = null;
   if (!description || description.length > 2000) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_services_required });
+  if (require('../config/phoneInText').hasPhone(description)) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_description_phone });
   const termsAccepted = isChecked(req.body.termsAccepted);
   const privacyAccepted = isChecked(req.body.privacyAccepted);
 

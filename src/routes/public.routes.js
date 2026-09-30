@@ -61,7 +61,12 @@ router.get('/', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   const callerPhone = await require('../services/catalogSession.service').getPhone(req);
   const history = new Map((await masterService.contactHistory(callerPhone)).map(h => [h.master_id, h.opened_at]));
-  masters.forEach(m => { m.contact_opened = history.has(m.id); });
+  const { formattedPhone } = require('../config/catalogContacts');
+  masters.forEach(m => {
+    m.contact_opened = history.has(m.id);
+    // Full number only for a caller who already opened this provider; everyone else sees the masked start.
+    m.phone_display = m.contact_opened ? formattedPhone(m.phone) : m.phone_masked;
+  });
   const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
   const reviewsByMaster = new Map();
   reviews.forEach((rv) => {
