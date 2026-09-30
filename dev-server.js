@@ -90,6 +90,7 @@ async function seedMasters() {
              END)::jsonb
      FROM masters
      WHERE category IS NOT NULL
+       AND id NOT IN (SELECT master_id FROM master_services)
      ON CONFLICT (master_id, service_type) DO NOTHING`
   );
   await fakePool.query(

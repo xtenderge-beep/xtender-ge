@@ -478,6 +478,17 @@ ALTER TABLE orders  ADD COLUMN IF NOT EXISTS city_id INTEGER;
 -- vehicle_size / is_flatbed переезжают в attributes. junk принудительно flatbed (это и была
 -- «вывоз мусора» = борт). JSON собирается конкатенацией строк — jsonb_build_object на pg-mem
 -- нет. Идемпотентно через ON CONFLICT (master_id, service_type).
+-- Этот файл выполняется при каждом старте. Без условия «ни одной строки услуг» каждая выкладка
+-- заново добавляла «Перевозки» (основной услугой, is_primary по умолчанию TRUE) исполнителям
+-- вывоза мусора, эвакуатора и автовышки: у них category = junk/tow/bucket_lift → ELSE 'van'.
+-- Так было и после того, как админ снимал эту услугу (найдено 2026-09-30). Сначала убираем такие
+-- строки: настоящая строка van бывает только при category = 'transport' (legacyColumnsFor делает
+-- van основной, если она выбрана), значит van у мастера с другой category и другой услугой — след
+-- этой миграции. Подзапросы без корреляции — их понимает pg-mem.
+DELETE FROM master_services
+WHERE service_type = 'van'
+  AND master_id IN (SELECT id FROM masters WHERE category IS NOT NULL AND category <> 'transport')
+  AND master_id IN (SELECT master_id FROM master_services WHERE service_type <> 'van');
 INSERT INTO master_services (master_id, service_type, attributes)
 SELECT id,
        CASE WHEN category = 'movers' THEN 'movers' ELSE 'van' END,
@@ -488,6 +499,7 @@ SELECT id,
         END)::jsonb
 FROM masters
 WHERE category IS NOT NULL
+  AND id NOT IN (SELECT master_id FROM master_services)
 ON CONFLICT (master_id, service_type) DO NOTHING;
 UPDATE masters SET city_id = (SELECT id FROM cities WHERE slug = 'tbilisi') WHERE city_id IS NULL;
 
