@@ -151,15 +151,25 @@ async function listMastersAdmin() {
      ORDER BY m.id`
   );
   // Языки — отдельным запросом и склейкой в JS, как master_services в каталоге: jsonb в GROUP BY pg-mem не тянет.
-  const langRows = await pool.query('SELECT id, registration_language, spoken_languages, description, manager_id FROM masters');
+  const langRows = await pool.query('SELECT id, registration_language, spoken_languages, description, manager_id, contact_channels FROM masters');
   const langs = new Map(langRows.rows.map(r => [r.id, r]));
   const work = await managerWorkByMaster();
   return rows.map(m => {
     const l = langs.get(m.id) || {};
     const w = work(m.id, l.manager_id);
     return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null,
-      description: l.description || '', manager_id: l.manager_id || null, ...w };
+      description: l.description || '', manager_id: l.manager_id || null, ...adminWhatsapp(m.phone, l.contact_channels), ...w };
   });
+}
+
+// Кнопка «WhatsApp» в списке админки: номер WhatsApp из карточки (его подтверждает
+// исполнитель или правит админ), иначе основной телефон. Ссылку строим сами — только цифры.
+function adminWhatsapp(phone, channels) {
+  const saved = (channels || {}).whatsapp;
+  const number = /^\+[1-9]\d{7,14}$/.test(saved || '') ? saved : String(phone || '').replace(/[^\d+]/g, '');
+  const digits = number.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15) return { whatsapp_url: null, whatsapp_number: null, whatsapp_is_primary: false };
+  return { whatsapp_url: 'https://wa.me/' + digits, whatsapp_number: number, whatsapp_is_primary: number !== saved };
 }
 
 // Работа менеджеров с исполнителем для списка /admin/masters: кто ведёт, когда менеджер

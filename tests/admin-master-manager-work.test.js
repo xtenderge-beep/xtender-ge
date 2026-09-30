@@ -59,6 +59,20 @@ const adminService=require('../src/services/admin.service');
  assert.match(html,/менеджеры ничего не меняли/);
  assert.match(html,/не назначен/);
 
+ // Кнопка WhatsApp: сохранённый номер WhatsApp важнее основного телефона; без годного номера кнопки нет.
+ await pool.query("UPDATE masters SET phone='+995555000111' WHERE id=$1",[pending]);
+ await pool.query(`UPDATE masters SET phone='+995555000222',contact_channels='{"whatsapp":"+995599000333"}' WHERE id=$1`,[alone]);
+ const wa=await adminService.listMastersAdmin();
+ assert.deepEqual([wa.find(m=>m.id===pending).whatsapp_url,wa.find(m=>m.id===pending).whatsapp_is_primary],['https://wa.me/995555000111',true]);
+ assert.deepEqual([wa.find(m=>m.id===alone).whatsapp_url,wa.find(m=>m.id===alone).whatsapp_is_primary],['https://wa.me/995599000333',false]);
+ assert.equal(wa.find(m=>m.id===own).whatsapp_url,null);
+ const waHtml=ejs.render(fs.readFileSync(file,'utf8'),
+  {masters:wa,languageSummary:adminService.languageSummary(wa),managerSummary:adminService.managerSummary(wa),languageNames:require('../src/config/spokenLanguages').ruNames,filter:{status:'',lang:'',site:'',manager:''},csrfToken:'csrf'},
+  {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+ assert.match(waHtml,/href="https:\/\/wa\.me\/995599000333" target="_blank" rel="noopener noreferrer"/);
+ assert.match(waHtml,/основной телефон — отдельный номер WhatsApp не указан/);
+ assert.equal((waHtml.match(/>WhatsApp<\/a>/g)||[]).length,2);
+
  // Фильтр по менеджеру: плашки с числами и выборка по id / без менеджера.
  const summary=adminService.managerSummary(list);
  assert.deepEqual(summary.managers.map(m=>[m.name,m.count]),[['Alice',1]]);
