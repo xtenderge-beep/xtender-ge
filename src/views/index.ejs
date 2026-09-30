@@ -561,10 +561,15 @@
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
             <button type="button" aria-label="<%= t('otp_back') %>" onclick="closeModal('reveal-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
 
-            <div class="space-y-1">
-                <h3 id="reveal-modal-title" class="text-base font-bold text-stone-900"><%= t('reveal_modal_title') %></h3>
-                <p class="text-xs text-stone-500"><%= t('reveal_modal_hint') %></p>
+            <div class="space-y-2 pr-8">
+                <h3 id="reveal-modal-title" class="text-lg font-bold leading-snug text-stone-900"><%= t('reveal_modal_title') %></h3>
+                <p class="text-sm leading-relaxed text-stone-600"><%= t('reveal_modal_hint') %></p>
             </div>
+            <ul class="reveal-points">
+                <% ['reveal_point_sms', 'reveal_point_day', 'reveal_point_private'].forEach(function (key) { %>
+                <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><%= t(key) %></span></li>
+                <% }); %>
+            </ul>
 
             <p id="reveal-modal-msg" class="hidden text-xs font-bold p-3 rounded-xl"></p>
 
@@ -572,14 +577,14 @@
                 <input id="reveal-phone" aria-label="<%= t('form_phone_label') %>" autocomplete="tel" type="tel" data-georgian-phone value="+995" pattern="\+995(?:\s*[0-9]){9}\s*" inputmode="tel" placeholder="+995 5XX XX XX XX"
                        class="w-full text-sm border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="revealRequestCode()" id="reveal-phone-btn"
-                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
+                        class="reveal-primary w-full py-3 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_get_code') %></button>
             </div>
 
             <div id="reveal-step-code" class="hidden space-y-3">
                 <input id="reveal-code" aria-label="<%= t('otp_label') %>" autocomplete="one-time-code" type="text" inputmode="numeric" maxlength="4" placeholder="1234"
                        class="w-full text-center tracking-[0.4em] font-mono text-lg border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500">
                 <button type="button" onclick="revealVerifyCode()" id="reveal-code-btn"
-                        class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
+                        class="reveal-primary w-full py-3 text-white text-sm font-bold rounded-xl transition"><%= t('reviews_confirm_code') %></button>
             </div>
         </div>
     </div>

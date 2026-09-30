@@ -531,6 +531,11 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .home-page .catalog-card-foot .review-leave-btn{color:#647269;font-weight:500}
 .home-page .catalog-card-foot .review-leave-btn:hover{color:#087e61}
 .home-master-grid{align-items:start}
+/* Number reveal dialog: why we ask for the phone, then the site's green primary button. */
+.reveal-points{display:flex;flex-direction:column;gap:8px;margin:0;padding:12px 14px;list-style:none;background:#f3f8f4;border-radius:12px;font-size:13px;line-height:1.5;color:#2f4a3d}
+.reveal-points li{display:flex;align-items:flex-start;gap:9px}
+.reveal-points i{margin-top:4px;font-size:11px;color:#087e61}
+.reveal-primary{background:#087e61}.reveal-primary:hover{background:#06664d}
 /* Fewer than 10 providers: all cards share one grid; category headings are hidden. */
 .catalog-groups{display:flex;flex-direction:column;gap:32px}
 .catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
