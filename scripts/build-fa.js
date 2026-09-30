@@ -28,7 +28,7 @@ const ICONS = {
     'truck', 'truck-pickup', 'xmark',
   ],
   regular: ['copy', 'image'],
-  brands: ['telegram', 'whatsapp'],
+  brands: ['telegram', 'viber', 'whatsapp'],
 };
 
 const FONT_FILE = {

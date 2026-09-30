@@ -411,19 +411,19 @@
                                       <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
                                           <% if (master.contact_opened || (master.billing_accepted === true && master.balance_tetri >= catalogCallPriceTetri)) { %>
 <p class="catalog-contact-state"><%= master.contact_opened ? t('catalog_opened') : '' %></p>
-<% if (master.phone_display) { %><p class="catalog-card-phone"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= master.phone_display %></span></p><% } %>
+<% if (master.phone_display) { %><p class="catalog-card-phone"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= master.phone_display %></span><% if (!master.contact_opened) { %><button type="button" class="reveal-contact-btn catalog-phone-reveal" data-master-id="<%= master.id %>" data-action="show"><%= t('catalog_show_number') %></button><% } %></p><% } %>
 <div class="catalog-contact-actions"><% (master.available_channels || ['call']).forEach(channel => { %>
-<button type="button" class="reveal-contact-btn catalog-contact-button <%= channel==='call'?'is-call':'' %>" data-master-id="<%= master.id %>" data-action="<%= channel %>"><%= ({call:t('btn_call'),whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel] %></button>
+<button type="button" class="reveal-contact-btn catalog-contact-button is-<%= channel %>" data-master-id="<%= master.id %>" data-action="<%= channel %>"><i class="<%= ({call:'fa-solid fa-phone',whatsapp:'fa-brands fa-whatsapp',viber:'fa-brands fa-viber',telegram:'fa-brands fa-telegram'})[channel] %>" aria-hidden="true"></i><span><%= ({call:t('btn_call'),whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel] %></span></button>
 <% }); %></div>
                                           <% } else { %><p class="text-xs text-stone-500"><%= t('catalog_master_unavailable') %></p><% } %>
                                       </div>
 
+                                      <%# Eligibility (the provider called this customer about their request) is checked after SMS, so the link stays for everyone but quiet. %>
                                       <div class="catalog-card-foot">
-                                          <button type="button" class="review-leave-btn text-xs font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5"
+                                          <button type="button" class="review-leave-btn flex items-center gap-1.5"
                                                   data-master-id="<%= master.id %>" data-master-name="<%= cardName %>">
-                                              <i class="fa-solid fa-pen text-[10px]"></i><%= t('reviews_leave_btn') %>
+                                              <i class="fa-solid fa-pen text-[10px]" aria-hidden="true"></i><%= t('reviews_leave_btn') %>
                                           </button>
-                                          <% if (!master.reviews.length) { %><span><%= t('reviews_none') %></span><% } %>
                                       </div>
                                       </div>
                                   </div>
@@ -1150,10 +1150,14 @@
             slot.replaceChildren();
             const status = document.createElement('p'); status.className = 'catalog-contact-state'; status.textContent = T.catalog_opened; slot.append(status);
             const actions = document.createElement('div'); actions.className = 'catalog-contact-actions'; slot.append(actions);
+            const icons = {call:'fa-solid fa-phone',whatsapp:'fa-brands fa-whatsapp',viber:'fa-brands fa-viber',telegram:'fa-brands fa-telegram'};
             Object.entries(data.contacts).forEach(([channel, href]) => {
                 const link = document.createElement('a'); link.href = href;
-                link.className = 'catalog-contact-button' + (channel === 'call' ? ' is-call' : '');
-                link.textContent = channel === 'call' ? data.phone : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
+                link.className = 'catalog-contact-button is-' + channel;
+                const icon = document.createElement('i'); icon.className = icons[channel] || ''; icon.setAttribute('aria-hidden', 'true');
+                const label = document.createElement('span');
+                label.textContent = channel === 'call' ? data.phone : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
+                link.append(icon, label);
                 actions.append(link);
             });
         }

@@ -510,23 +510,30 @@ body.signup-compose-active .provider-focus-promo{display:none}
 /* Directory: consistent language and contact rows, no profile photography. */
 .catalog-language-filter{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px;background:#f4f7f2;border:1px solid #dce5d7;border-radius:14px;font-size:13px}
 .catalog-language-filter>label:first-child{font-weight:750}.catalog-language-filter select{padding:9px 12px;border:1px solid #ccd8c7;border-radius:8px;background:white;min-height:44px}.catalog-language-filter p{width:100%;color:#647269;font-size:12px}.catalog-language-only{display:flex;gap:8px;align-items:center;min-height:44px}
-.catalog-card-languages{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font-size:11px;color:#667264}.catalog-card-languages>div{display:flex;flex-wrap:wrap;gap:5px}.catalog-language-badge{padding:4px 7px;background:#f3f5f1;border-radius:6px;color:#52604e}.catalog-language-badge.is-preferred{background:#e5f2e5;color:#225d35;font-weight:750}
-.catalog-contact-state{font-size:11px;color:#397046;min-height:30px;line-height:1.4;margin-bottom:6px}.catalog-contact-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.catalog-contact-button{min-height:44px;display:flex;justify-content:center;align-items:center;text-align:center;padding:10px 6px;border:1px solid #cbdcc7;border-radius:9px;font-size:12px;font-weight:700;color:#285e37;background:#f3f8ef;overflow-wrap:anywhere}.catalog-contact-button.is-call{background:#28693e;color:white;border-color:#28693e}.catalog-contact-button:focus-visible{outline:3px solid #85b48a;outline-offset:2px}.catalog-contact-button:disabled{opacity:.5}
+/* Languages as plain text: the preferred one is bold, not a pill that looks pressed. */
+.catalog-card-languages{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px;font-size:12px;color:#52604e}.catalog-card-languages>div{display:flex;flex-wrap:wrap}.catalog-language-badge{font-size:13px;color:#2f4a3d}.catalog-language-badge+.catalog-language-badge::before{content:"·";margin:0 7px;color:#9aa89f;font-weight:400}.catalog-language-badge.is-preferred{font-weight:700;color:#1d4a33}
+/* Call always takes its own full-width row; messengers share the next row equally. */
+.catalog-contact-state{font-size:12px;color:#397046;line-height:1.4;margin-bottom:6px}.catalog-contact-actions{display:flex;flex-wrap:wrap;gap:8px}.catalog-contact-button{flex:1 1 0;min-width:fit-content;min-height:44px;display:flex;justify-content:center;align-items:center;gap:7px;text-align:center;padding:10px 8px;border:1px solid #cbdcc7;border-radius:9px;font-size:13px;font-weight:700;color:#285e37;background:#f3f8ef;white-space:nowrap}.catalog-contact-button.is-call{flex-basis:100%;background:#28693e;color:white;border-color:#28693e}.catalog-contact-button.is-whatsapp i{color:#1faa53}.catalog-contact-button.is-viber i{color:#7360f2}.catalog-contact-button.is-telegram i{color:#229ed9}.catalog-contact-button i{font-size:15px}.catalog-contact-button.is-call i{font-size:13px}.catalog-contact-button:focus-visible{outline:3px solid #85b48a;outline-offset:2px}.catalog-contact-button:disabled{opacity:.5}
 .catalog-form-benefit{padding:18px 20px;border:1px solid #dce5d7;border-radius:14px;background:#fff}.catalog-form-benefit h3{font-weight:750;font-size:16px}.catalog-form-benefit p{font-size:13px;line-height:1.65;color:#647269;margin:7px 0}.catalog-form-benefit a{font-size:13px;font-weight:750;color:#28693e}
-.home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-button:only-child{grid-column:1/-1}.catalog-contact-state{min-height:0}.catalog-contact-state:empty{display:none}
+.home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-state:empty{display:none}
 
-/* Catalog card: initials and category beside the name; contacts pinned to the bottom so cards in
-   one row line up without reserving empty space; the number shows its start until it is opened. */
+/* Catalog card: initials and category beside the name; contacts follow the content (cards keep
+   their own height, tops aligned); the number shows its start until it is opened. */
 .catalog-card-head{display:flex;align-items:flex-start;gap:12px}
 .catalog-card-avatar{display:flex;align-items:center;justify-content:center;width:42px;height:42px;flex-shrink:0;border-radius:50%;background:#e6efe8;color:#2a624b;font-size:15px;font-weight:700;letter-spacing:.02em}
 .catalog-card-category{margin-top:2px;font-size:13px;line-height:1.4;color:#647269}
-.catalog-card-bottom{margin-top:auto;display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid #edf0ea}
-.catalog-card-phone{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:15px;font-weight:650;color:#152e29;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.catalog-card-bottom{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid #edf0ea}
+.catalog-card-phone{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;font-size:15px;font-weight:650;color:#152e29;font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .catalog-card-phone i{font-size:12px;color:#087e61}
-.catalog-card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;color:#647269}
+.home-page .reveal-contact-slot .catalog-phone-reveal{margin-left:auto;padding:4px 0;border-radius:4px;font-size:13px;font-weight:650;color:#087e61;text-decoration:underline;text-underline-offset:3px;letter-spacing:0}
+.home-page .reveal-contact-slot .catalog-phone-reveal:hover{color:#06664d}
+.catalog-card-foot{display:flex;align-items:center;gap:12px}
+.home-page .catalog-card-foot .review-leave-btn{color:#647269;font-weight:500}
+.home-page .catalog-card-foot .review-leave-btn:hover{color:#087e61}
+.home-master-grid{align-items:start}
 /* Fewer than 10 providers: all cards share one grid; category headings are hidden. */
 .catalog-groups{display:flex;flex-direction:column;gap:32px}
-.catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
 .catalog-groups.is-flat>[data-group],.catalog-groups.is-flat .home-master-grid{display:contents}
 .catalog-groups.is-flat>[data-group]>h3{display:none}
 .catalog-groups.is-flat>[data-group].hidden{display:none}

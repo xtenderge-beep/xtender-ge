@@ -11,10 +11,13 @@ function validate(row, raw) {
   if (!row || !row.is_active) return { attributes: {}, errors: ['category'] };
   return base.validateAttributes(row.slug, raw || {}, row.fields);
 }
+// Единицы в конфиге услуг записаны по-русски; известные переводим, остальные показываем как есть.
+const UNITS = { 'м³': { ka: 'მ³', en: 'm³' }, 'см': { ka: 'სმ', en: 'cm' }, 'м': { ka: 'მ', en: 'm' }, 'т': { ka: 'ტ', en: 't' }, 'кг': { ka: 'კგ', en: 'kg' } };
+function unitFor(unit, lang) { return (unit && UNITS[unit]?.[lang]) || unit; }
 function view(row, lang = 'ru') {
   const t = translate(lang);
   return { type: row.slug, label: row['name_'+lang] || row.name_ru, icon: row.icon, active: row.is_active,
-    fields: row.fields.map(f => ({ ...f, min: f.min ?? null, max: f.max ?? null,
+    fields: row.fields.map(f => ({ ...f, unit: unitFor(f.unit, lang), min: f.min ?? null, max: f.max ?? null,
       label: f.labels?.[lang] || f.labels?.ru || t('svc_'+row.slug+'_'+f.key),
       options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || f.optionLabels?.[value]?.ru || value})) })) };
 }
@@ -52,10 +55,10 @@ function badges(row, attributes, lang) {
   if (!row) return [];
   const a=attributes || {};
   if (row.slug === 'junk') {
-    const volume = a.volume_m3 ? `${lang==='ka'?'მოცულობა':lang==='en'?'Volume':'Объём'}: ${a.volume_m3}+ м³` : null;
+    const volume = a.volume_m3 ? `${lang==='ka'?'მოცულობა':lang==='en'?'Volume':'Объём'}: ${a.volume_m3}+ ${unitFor('м³', lang)}` : null;
     const dimensions = ['body_length_cm','body_width_cm','side_height_cm'].every(key=>a[key])
-      ? `${lang==='ka'?'ძარა':lang==='en'?'Body':'Кузов'}: ${a.body_length_cm}×${a.body_width_cm}×${a.side_height_cm} см` : null;
-    const payload = a.payload_t ? `${lang==='ka'?'ტვირთამწეობა':lang==='en'?'Payload':'Грузоподъёмность'}: ${a.payload_t} т` : null;
+      ? `${lang==='ka'?'ძარა':lang==='en'?'Body':'Кузов'}: ${a.body_length_cm}×${a.body_width_cm}×${a.side_height_cm} ${unitFor('см', lang)}` : null;
+    const payload = a.payload_t ? `${lang==='ka'?'ტვირთამწეობა':lang==='en'?'Payload':'Грузоподъёмность'}: ${a.payload_t} ${unitFor('т', lang)}` : null;
     return [volume,dimensions,payload].filter(Boolean);
   }
   return view(row,lang).fields.flatMap(f=> {
