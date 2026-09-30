@@ -9,6 +9,7 @@ const { requestMeta } = require('../config/requestMeta');
 const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
+const audit = require('../services/masterAudit.service');
 const reviewService = require('../services/review.service');
 const orderService = require('../services/order.service');
 const telegramService = require('../services/telegram.service');
@@ -234,12 +235,13 @@ async function approveMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   const approved = await masterService.approveMaster(id);
   if (!approved) return res.redirect('/admin/masters/' + id + '?error=service_required');
+  await audit.record(id, { action: 'approve', body: 'Профиль одобрен' });
   res.redirect('/admin/masters');
 }
 
 async function unapproveMaster(req, res) {
   const id = parseInt(req.params.id, 10);
-  await masterService.unapproveMaster(id);
+  if (await masterService.unapproveMaster(id)) await audit.record(id, { action: 'unapprove', body: 'Возвращён на модерацию' });
   res.redirect(`/admin/masters/${id}`);
 }
 
@@ -288,6 +290,7 @@ async function updateMaster(req, res) {
   }
   // Правка описания обнуляет переводы — переводим новый текст в фоне.
   require('../services/descriptionTranslation.service').queue(id);
+  await audit.record(id, { action: 'edit', body: 'Профиль изменён' });
 
   // "Сохранить и одобрить" — второй submit-button той же формы (name=thenApprove).
   // Раньше приходилось отдельно ходить в общий список /admin/masters, чтобы одобрить
@@ -295,6 +298,7 @@ async function updateMaster(req, res) {
   if (req.body.thenApprove === '1') {
     const approved = await masterService.approveMaster(id);
     if (!approved) return res.redirect(`/admin/masters/${id}?error=service_required`);
+    await audit.record(id, { action: 'approve', body: 'Профиль одобрен' });
   }
 
   res.redirect(`/admin/masters/${id}`);
@@ -330,12 +334,14 @@ async function banMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   const reason = (req.body.reason || '').trim() || null;
   await adminService.setMasterBanned(id, true, reason);
+  await audit.record(id, { action: 'ban', body: reason || 'Без причины' });
   res.redirect(`/admin/masters/${id}`);
 }
 
 async function unbanMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   await adminService.setMasterBanned(id, false, null);
+  await audit.record(id, { action: 'unban', body: 'Блокировка снята' });
   res.redirect(`/admin/masters/${id}`);
 }
 

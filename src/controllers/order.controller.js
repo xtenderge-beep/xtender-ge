@@ -388,6 +388,8 @@ async function handleMasterApproval(callback) {
     return;
   }
 
+  const audit = require('../services/masterAudit.service');
+  await audit.record(masterId, { ...(await audit.telegramActor(callback.from)), action: 'approve', body: 'Одобрен кнопкой в Telegram' });
   await telegramService.answerCallback(callback.id, 'Одобрено');
   await telegramService.confirmMasterApproved(callback.message.chat.id, callback.message.message_id, master);
 }

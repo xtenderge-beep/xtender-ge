@@ -810,6 +810,22 @@ CREATE TABLE IF NOT EXISTS manager_master_views (
   PRIMARY KEY (manager_id, master_id)
 );
 
+-- Журнал действий с профилем исполнителя вне кабинета менеджера: админка (одобрение,
+-- возврат на модерацию, бан, правка) и одобрение кнопкой в Telegram. Действия менеджера
+-- из его кабинета — в manager_portal_events. actor — подпись для людей («Администратор»,
+-- имя менеджера, имя в Telegram); вход в админку общий, конкретного человека не знаем.
+-- Пишется с 2026-09-30.
+CREATE TABLE IF NOT EXISTS master_admin_events (
+  id SERIAL PRIMARY KEY,
+  master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  actor VARCHAR(120) NOT NULL,
+  manager_id INTEGER REFERENCES managers(id),
+  action VARCHAR(40) NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_master_admin_events_master ON master_admin_events(master_id, created_at);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

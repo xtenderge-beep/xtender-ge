@@ -56,7 +56,7 @@ const adminService=require('../src/services/admin.service');
  assert.match(html,/Заметки \(5\)/);
  assert.match(html,/<summary[^>]*>Ещё 2<\/summary>/);
  assert.match(html,/Грузчики, 5 лет опыта/);
- assert.match(html,/менеджеры ничего не меняли/);
+ assert.match(html,/изменений не было/);
  assert.match(html,/не назначен/);
 
  // Кнопка WhatsApp: сохранённый номер WhatsApp важнее основного телефона; без годного номера кнопки нет.
@@ -83,6 +83,34 @@ const adminService=require('../src/services/admin.service');
  assert.ok(html.includes('href="/admin/masters?manager='+a+'" '),'manager chip link');
  assert.match(html,/>Alice <b>1<\/b><\/a>/);
  assert.match(html,/href="\/admin\/masters\?manager=none"[^>]*>Без менеджера <b>2<\/b>/);
+
+ // Кто одобрил и что сделал админ: записи через настоящие обработчики админки.
+ const audit=require('../src/services/masterAudit.service');
+ const adminController=require('../src/controllers/admin.controller');
+ const res={redirect(){}};
+ await audit.record(pending,{action:'approve',body:'Профиль одобрен'});
+ await pool.query('UPDATE masters SET is_active=true WHERE id=$1',[pending]);
+ await adminController.unapproveMaster({params:{id:String(pending)}},res);
+ await adminController.banMaster({params:{id:String(alone)},body:{reason:'Спам в описании'}},res);
+ let listed=await adminService.listMastersAdmin();
+ const p=listed.find(m=>m.id===pending),al=listed.find(m=>m.id===alone);
+ assert.deepEqual([p.last_approval.manager_name,p.last_approval.action],['Администратор','approve']);
+ assert.deepEqual([p.last_change.manager_name,p.last_change.action],['Администратор','unapprove']);
+ assert.deepEqual([al.last_change.action,al.last_change.body],['ban','Спам в описании']);
+ assert.equal(al.last_approval,null);
+ // Одобрение менеджером позже админского — в «Одобрил» побеждает самое свежее.
+ await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body,created_at) VALUES($1,$2,'approve','Одобрены услуги: movers',NOW()+interval '1 hour')",[a,pending]);
+ listed=await adminService.listMastersAdmin();
+ assert.equal(listed.find(m=>m.id===pending).last_approval.manager_name,'Alice');
+ const approvalHtml=ejs.render(fs.readFileSync(file,'utf8'),
+  {masters:listed,languageSummary:adminService.languageSummary(listed),managerSummary:adminService.managerSummary(listed),languageNames:require('../src/config/spokenLanguages').ruNames,filter:{status:'',lang:'',site:'',manager:''},csrfToken:'csrf'},
+  {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+ assert.match(approvalHtml,/Одобрил: <b[^>]*>Alice<\/b>, [^<]+ <span[^>]*>\(сейчас снова на модерации\)<\/span>/);
+ assert.match(approvalHtml,/Одобрил: нет записи/);
+ // Кнопка «Одобрить» в Telegram: привязанный менеджер — по имени, иначе имя из Telegram.
+ await pool.query('UPDATE managers SET telegram_id=777 WHERE id=$1',[b]);
+ assert.deepEqual(await audit.telegramActor({id:777,first_name:'X'}),{actor:'Bob',managerId:b});
+ assert.deepEqual(await audit.telegramActor({id:888,first_name:'Ivan',username:'ivan'}),{actor:'Telegram: Ivan (@ivan)',managerId:null});
 
  // Удаление исполнителя убирает и его просмотры.
  await require('../src/services/master.service').deleteMaster(own);

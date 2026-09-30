@@ -510,6 +510,7 @@ async function deleteMaster(id, { meta = {} } = {}) {
     await client.query('UPDATE crm_invites SET master_id = NULL WHERE master_id = $1', [id]);
     await client.query('UPDATE manager_portal_events SET master_id = NULL WHERE master_id = $1', [id]);
     await client.query('DELETE FROM manager_master_views WHERE master_id = $1', [id]);
+    await client.query('DELETE FROM master_admin_events WHERE master_id = $1', [id]);
     await client.query('DELETE FROM dispatch_deliveries WHERE master_id = $1', [id]);
     await client.query('DELETE FROM masters WHERE id = $1', [id]);
     return master;
