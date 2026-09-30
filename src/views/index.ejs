@@ -561,15 +561,27 @@
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 relative shadow-2xl">
             <button type="button" aria-label="<%= t('otp_back') %>" onclick="closeModal('reveal-modal')" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center text-xs font-bold hover:bg-stone-200 transition">✕</button>
 
-            <div class="space-y-2 pr-8">
-                <h3 id="reveal-modal-title" class="text-lg font-bold leading-snug text-stone-900"><%= t('reveal_modal_title') %></h3>
-                <p class="text-sm leading-relaxed text-stone-600"><%= t('reveal_modal_hint') %></p>
+            <div id="reveal-intro" class="space-y-4">
+                <div class="space-y-2 pr-8">
+                    <h3 id="reveal-modal-title" class="text-lg font-bold leading-snug text-stone-900"><%= t('reveal_modal_title') %></h3>
+                    <p class="text-sm leading-relaxed text-stone-600"><%= t('reveal_modal_hint') %></p>
+                </div>
+                <ul class="reveal-points">
+                    <% ['reveal_point_sms', 'reveal_point_day', 'reveal_point_private'].forEach(function (key) { %>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><%= t(key) %></span></li>
+                    <% }); %>
+                </ul>
             </div>
-            <ul class="reveal-points">
-                <% ['reveal_point_sms', 'reveal_point_day', 'reveal_point_private'].forEach(function (key) { %>
-                <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><%= t(key) %></span></li>
-                <% }); %>
-            </ul>
+
+            <%# After the SMS code the same dialog shows this provider's contacts, so people don't have to find the card again. %>
+            <div id="reveal-step-contacts" class="hidden space-y-4">
+                <div class="space-y-1 pr-8">
+                    <h3 id="reveal-contacts-title" class="text-lg font-bold leading-snug text-stone-900"></h3>
+                    <p class="text-sm leading-relaxed text-stone-600"><%= t('reveal_contacts_hint') %></p>
+                </div>
+                <p class="catalog-card-phone reveal-contacts-phone"><i class="fa-solid fa-phone" aria-hidden="true"></i><span id="reveal-contacts-number"></span></p>
+                <div id="reveal-contacts-actions" class="catalog-contact-actions"></div>
+            </div>
 
             <p id="reveal-modal-msg" class="hidden text-xs font-bold p-3 rounded-xl"></p>
 
@@ -1157,26 +1169,49 @@
         }
 
         function revealShowStep(name) {
+            document.getElementById('reveal-intro').classList.toggle('hidden', name === 'contacts');
             document.getElementById('reveal-step-phone').classList.toggle('hidden', name !== 'phone');
             document.getElementById('reveal-step-code').classList.toggle('hidden', name !== 'code');
+            document.getElementById('reveal-step-contacts').classList.toggle('hidden', name !== 'contacts');
+            document.getElementById('reveal-modal').setAttribute('aria-labelledby', name === 'contacts' ? 'reveal-contacts-title' : 'reveal-modal-title');
+            if (name === 'contacts') revealMsg('');
+        }
+
+        // Call, WhatsApp, Viber and Telegram links, the same in the card and in the dialog.
+        function renderContactLinks(actions, contacts) {
+            const icons = {call:'fa-solid fa-phone',whatsapp:'fa-brands fa-whatsapp',viber:'fa-brands fa-viber',telegram:'fa-brands fa-telegram'};
+            actions.replaceChildren();
+            Object.entries(contacts).forEach(([channel, href]) => {
+                const link = document.createElement('a'); link.href = href;
+                link.className = 'catalog-contact-button is-' + channel;
+                const icon = document.createElement('i'); icon.className = icons[channel] || ''; icon.setAttribute('aria-hidden', 'true');
+                const label = document.createElement('span');
+                label.textContent = channel === 'call' ? T.btn_call : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
+                link.append(icon, label);
+                actions.append(link);
+            });
         }
 
         function showRevealedContact(masterId, data) {
             const slot = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]');
             if (!slot) return;
             slot.replaceChildren();
-            const status = document.createElement('p'); status.className = 'catalog-contact-state'; status.textContent = T.catalog_opened; slot.append(status);
+            const status = document.createElement('p'); status.className = 'catalog-contact-state'; status.textContent = data.alreadyOpened ? T.catalog_opened : ''; slot.append(status);
+            const phone = document.createElement('p'); phone.className = 'catalog-card-phone';
+            const phoneIcon = document.createElement('i'); phoneIcon.className = 'fa-solid fa-phone'; phoneIcon.setAttribute('aria-hidden', 'true');
+            const phoneText = document.createElement('span'); phoneText.textContent = data.phoneDisplay || data.phone;
+            phone.append(phoneIcon, phoneText); slot.append(phone);
             const actions = document.createElement('div'); actions.className = 'catalog-contact-actions'; slot.append(actions);
-            const icons = {call:'fa-solid fa-phone',whatsapp:'fa-brands fa-whatsapp',viber:'fa-brands fa-viber',telegram:'fa-brands fa-telegram'};
-            Object.entries(data.contacts).forEach(([channel, href]) => {
-                const link = document.createElement('a'); link.href = href;
-                link.className = 'catalog-contact-button is-' + channel;
-                const icon = document.createElement('i'); icon.className = icons[channel] || ''; icon.setAttribute('aria-hidden', 'true');
-                const label = document.createElement('span');
-                label.textContent = channel === 'call' ? data.phone : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
-                link.append(icon, label);
-                actions.append(link);
-            });
+            renderContactLinks(actions, data.contacts);
+        }
+
+        function showRevealContactsStep(masterId, data) {
+            const card = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]')?.closest('.master-card');
+            document.getElementById('reveal-contacts-title').textContent = card?.querySelector('h3')?.textContent.trim() || '';
+            document.getElementById('reveal-contacts-number').textContent = data.phoneDisplay || data.phone;
+            renderContactLinks(document.getElementById('reveal-contacts-actions'), data.contacts);
+            revealShowStep('contacts');
+            document.getElementById('reveal-modal').focus();
         }
 
         function showRevealUnavailable(masterId) {
@@ -1197,7 +1232,7 @@
             const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST' });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || T.contacts_error);
-            if (data.success) { showRevealedContact(masterId, data); return { handled: true, contacts: data.contacts }; }
+            if (data.success) { showRevealedContact(masterId, data); return { handled: true, contacts: data.contacts, data }; }
             if (data.needsVerification) return { handled: false, phone: null };
             showRevealUnavailable(masterId);
             return { handled: true, phone: null };
@@ -1285,9 +1320,12 @@
                 const data = await res.json();
                 if (!data.success) return revealMsg(data.message || T.js_err_wrong_code, true);
                 const rev = await attemptReveal(revealMasterId);
-                if (rev.handled) {
+                if (rev.handled && rev.data) {
+                    // Whatever they tapped (show, call, WhatsApp), let them pick the channel here.
+                    showRevealContactsStep(revealMasterId, rev.data);
+                    revealPendingAction = null;
+                } else if (rev.handled) {
                     closeModal('reveal-modal');
-                    performContactAction(revealPendingAction, rev.contacts);
                     revealPendingAction = null;
                 } else {
                     revealMsg(T.js_err_send_code, true);

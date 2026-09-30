@@ -228,6 +228,7 @@ const dictionaries = {
     reveal_point_sms: 'კოდს SMS-ით მიიღებთ, ამას დაახლოებით ნახევარი წუთი სჭირდება',
     reveal_point_day: 'დადასტურება ამ მოწყობილობაზე 24 საათი მოქმედებს: სხვა ნომრები მაშინვე გაიხსნება',
     reveal_point_private: 'თქვენს ნომერს შემსრულებელს არ გადავცემთ: ის მას მხოლოდ მაშინ გაიგებს, თუ თავად დაურეკავთ',
+    reveal_contacts_hint: 'ნომერი გაიხსნა. აირჩიეთ, როგორ დაუკავშირდეთ:',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'შეკვეთების ავტომატური განაწილების სერვისი თბილისში: გადაზიდვები, მუშები, სამშენებლო ნარჩენების გატანა.',
@@ -778,6 +779,7 @@ const dictionaries = {
     reveal_point_sms: 'Код придёт по SMS, это займёт полминуты',
     reveal_point_day: 'Подтверждение действует сутки на этом устройстве: другие номера откроются сразу',
     reveal_point_private: 'Мы не передаём ваш номер исполнителю: он узнает его, только если вы позвоните сами',
+    reveal_contacts_hint: 'Номер открыт. Выберите, как связаться:',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'Информационный сервис рассылки заказов по Тбилиси: Перевозки, Грузчики, Вывоз строймусора.',
@@ -1328,6 +1330,7 @@ const dictionaries = {
     reveal_point_sms: 'The code arrives by SMS; it takes about half a minute',
     reveal_point_day: 'Verification lasts 24 hours on this device: other numbers open right away',
     reveal_point_private: 'We don’t share your number with the provider: they only get it if you call them',
+    reveal_contacts_hint: 'Number unlocked. Choose how to get in touch:',
     btn_whatsapp: 'WhatsApp',
 
     footer_desc: 'Automatic order dispatch service in Tbilisi: Moving, Movers, Construction waste removal.',

@@ -111,7 +111,8 @@ async function revealPhone(req, res) {
     return res.json({ success: false, reason: 'unavailable' });
   }
   res.set('Cache-Control', 'no-store');
-  return res.json({ success: true, phone: master.phone, contacts: require('../config/catalogContacts').links(master), alreadyOpened: master.alreadyOpened });
+  const catalogContacts = require('../config/catalogContacts');
+  return res.json({ success: true, phone: master.phone, phoneDisplay: catalogContacts.formattedPhone(master.phone), contacts: catalogContacts.links(master), alreadyOpened: master.alreadyOpened });
 }
 
 function existingProfileResponse(req, res) {

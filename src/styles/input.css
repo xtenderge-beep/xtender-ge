@@ -536,6 +536,7 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .reveal-points li{display:flex;align-items:flex-start;gap:9px}
 .reveal-points i{margin-top:4px;font-size:11px;color:#087e61}
 .reveal-primary{background:#087e61}.reveal-primary:hover{background:#06664d}
+.catalog-card-phone.reveal-contacts-phone{margin:0;font-size:20px}
 /* A field block scrolled into view above the phone keyboard keeps a little space under its button. */
 .home-page [role="dialog"] :has(> input){scroll-margin-bottom:24px}
 /* Fewer than 10 providers: all cards share one grid; category headings are hidden. */
