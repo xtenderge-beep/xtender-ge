@@ -265,9 +265,11 @@ async function getMasterActivity(masterId) {
   };
 }
 
+// История баланса для кабинета исполнителя. В примечании к показу номера из каталога записан
+// телефон заказчика — это учёт для админки, исполнителю его не показываем.
 async function getMasterBalanceHistory(masterId, limit = 40) {
   const { rows } = await pool.query(
-    `SELECT amount_tetri, reason, note, created_at
+    `SELECT amount_tetri, reason, CASE WHEN reason = 'catalog_call' THEN NULL ELSE note END AS note, created_at
      FROM balance_transactions
      WHERE master_id = $1
      ORDER BY created_at DESC
@@ -590,16 +592,23 @@ async function listMasters({ serviceType, language, cityId } = {}) {
 }
 
 // Lock the provider before checking the durable access record. Access, debit and audit commit together.
-async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
+// free — тестовый телефон из /admin/technical: номер открывается при тех же условиях, что и у
+// настоящего заказчика (тариф подтверждён, баланса хватает), но без списания.
+async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = false } = {}) {
   return pool.withTransaction(async (client) => {
     const found = (await client.query('SELECT * FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
     if (!found || !callerPhone || !found.is_active || found.is_banned || found.is_technical) return null;
     const prior = (await client.query('SELECT opened_at FROM catalog_contact_access WHERE master_id=$1 AND caller_phone=$2', [masterId, callerPhone])).rows[0];
-    if (prior) return { ...found, alreadyOpened: true, openedAt: prior.opened_at };
+    if (prior) return { ...found, alreadyOpened: true, charged: false, openedAt: prior.opened_at };
     const billing = require('./providerBilling.service');
     const rates = await billing.pricing(client, true);
     const acceptance = await billing.accepted(masterId, rates, client);
     if (!acceptance || rates.catalogCallPriceTetri !== priceTetri) return null;
+    if (free) {
+      if (Number(found.balance_tetri) < priceTetri) return null;
+      await client.query('INSERT INTO catalog_contact_access (master_id, caller_phone) VALUES ($1,$2)', [masterId, callerPhone]);
+      return { ...found, alreadyOpened: false, charged: false };
+    }
     const { rows } = await client.query(
       `UPDATE masters SET balance_tetri = balance_tetri + $1
        WHERE id = $2 AND is_technical = false AND is_active = true AND is_banned = false AND balance_tetri >= $3
@@ -616,7 +625,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone) {
     await consentLog.recordAction({ eventType: 'CATALOG_CHARGE_ACCEPTED', phone: master.phone, masterId: master.id,
       metadata: { amount_tetri: priceTetri, balance_transaction_id: charge.rows[0].id,
         billing_consent_log_id: acceptance.consent_log_id, pricing_key: rates.key } }, client);
-    return { ...found, ...master, alreadyOpened: false };
+    return { ...found, ...master, alreadyOpened: false, charged: true };
   });
 }
 

@@ -33,6 +33,7 @@ let server;
  const post=async(url,pairs)=>fetch(base+url,{method:'POST',headers:{cookie,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams([['_csrf',session.csrfToken],...pairs]),redirect:'manual'});
  const profilePage=await get('/admin/masters/'+m.id);
  assert.match(profilePage,/Какие услуги выполняет специалист/);
+ assert.match(profilePage,/Каталог: действия заказчиков/);
  assert.match(profilePage,/Батуми · выключен/);
  assert.match(profilePage,/name="spokenLanguages"/);
  assert.match(profilePage,/Добавить новую услугу и её характеристики/);

@@ -185,6 +185,23 @@
     <% } %>
 </div>
 
+<% const channelNames = { show: 'Показать номер', call: 'Позвонить', whatsapp: 'WhatsApp', viber: 'Viber', telegram: 'Telegram' };
+   const channelLine = (counts) => Object.keys(channelNames).filter(key => counts[key]).map(key => channelNames[key] + ': ' + counts[key]).join(' · ') || 'нет'; %>
+<section class="mt-4 bg-white rounded-2xl border border-stone-200 p-5" aria-labelledby="catalog-stats-title">
+    <h2 id="catalog-stats-title" class="text-sm font-extrabold text-stone-900 uppercase mb-1">Каталог: действия заказчиков</h2>
+    <p class="text-xs text-stone-500 mb-3">Считается с 30.09.2026. Тестовые телефоны из «Технических» не списывают деньги и в остальные цифры не входят.</p>
+    <dl class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+        <div><dt class="text-stone-500">Платные открытия номера</dt><dd class="font-bold text-stone-900"><%= catalogStats.paid %></dd></div>
+        <div><dt class="text-stone-500">Повторные, без списания</dt><dd class="font-bold text-stone-900"><%= catalogStats.repeat %></dd></div>
+        <div><dt class="text-stone-500">Просили SMS, не подтвердив телефон</dt><dd class="font-bold text-stone-900"><%= catalogStats.smsGate %></dd></div>
+        <div><dt class="text-stone-500">Недоступен при нажатии</dt><dd class="font-bold text-stone-900"><%= catalogStats.unavailable %></dd></div>
+        <div><dt class="text-stone-500">Упёрлись в лимит 20 в час</dt><dd class="font-bold text-stone-900"><%= catalogStats.rateLimited %></dd></div>
+        <div><dt class="text-stone-500">Открытия с тестовых телефонов</dt><dd class="font-bold text-stone-900"><%= catalogStats.technical %></dd></div>
+    </dl>
+    <p class="mt-3 text-sm text-stone-700"><span class="text-stone-500">Открывали с кнопки:</span> <%= channelLine(catalogStats.openedFrom) %></p>
+    <p class="mt-1 text-sm text-stone-700"><span class="text-stone-500">После открытия нажали:</span> <%= channelLine(catalogStats.contacts) %></p>
+</section>
+
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">История баланса</h2>
     <% if (!history.length) { %>

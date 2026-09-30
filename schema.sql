@@ -811,6 +811,26 @@ CREATE TABLE IF NOT EXISTS catalog_contact_access (
   PRIMARY KEY (master_id, caller_phone)
 );
 
+-- Каждое действие заказчика с контактами исполнителя в каталоге — только для статистики (деньги и
+-- доступ — balance_transactions и catalog_contact_access). event_type: sms_gate (нажал, но телефон ещё
+-- не подтверждён — показали окно SMS), reveal (номер открыт; charged — было ли списание, повтор без
+-- списания = false), unavailable, rate_limited, contact (после открытия нажал канал). channel — кнопка:
+-- show/call/whatsapp/viber/telegram; place — card/dialog; technical — тестовый телефон из
+-- /admin/technical. caller_phone — подтверждённый телефон из сессии каталога (у sms_gate его нет).
+-- Значения проверяет src/services/catalogStats.service.js. Ведётся с 2026-09-30.
+CREATE TABLE IF NOT EXISTS catalog_contact_events (
+  id SERIAL PRIMARY KEY,
+  master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+  caller_phone TEXT,
+  event_type VARCHAR(20) NOT NULL,
+  channel VARCHAR(20),
+  place VARCHAR(10),
+  charged BOOLEAN NOT NULL DEFAULT FALSE,
+  technical BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_catalog_contact_events_master ON catalog_contact_events(master_id, created_at);
+
 -- Когда менеджер последний раз открывал карточку исполнителя в своём кабинете
 -- (/manager/masters/:id и /manager/review/:id). Одна строка на пару менеджер+исполнитель,
 -- показывается админу в списке /admin/masters. Пишется с 2026-09-30, раньше данных нет.

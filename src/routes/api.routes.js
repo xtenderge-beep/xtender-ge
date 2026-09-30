@@ -23,6 +23,7 @@ router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));
 router.post('/masters/otp/verify', asyncHandler(masterController.verifyOtp));
 router.post('/masters/register', upload.single('photo'), asyncHandler(masterController.register));
 router.post('/masters/:id/reveal-phone', asyncHandler(masterController.revealPhone));
+router.post('/masters/:id/contact-click', asyncHandler(masterController.contactClick));
 
 // Раскрытие номера мастера в публичном каталоге — своя OTP-«авторизация» звонящего,
 // отдельная от регистрации исполнителя (purpose 'catalog', не 'master').

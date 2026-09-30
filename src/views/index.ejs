@@ -1177,8 +1177,17 @@
             if (name === 'contacts') revealMsg('');
         }
 
+        // Statistics: which channel the customer chose after the number was opened (keepalive survives
+        // the jump to tel:/wa.me). Never blocks the link.
+        function trackContact(masterId, channel, place) {
+            if (!masterId || !channel || channel === 'show') return;
+            try {
+                fetch('/api/masters/' + masterId + '/contact-click', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel, place }) }).catch(() => {});
+            } catch (e) { /* statistics only */ }
+        }
+
         // Call, WhatsApp, Viber and Telegram links, the same in the card and in the dialog.
-        function renderContactLinks(actions, contacts) {
+        function renderContactLinks(actions, contacts, masterId, place) {
             const icons = {call:'fa-solid fa-phone',whatsapp:'fa-brands fa-whatsapp',viber:'fa-brands fa-viber',telegram:'fa-brands fa-telegram'};
             actions.replaceChildren();
             Object.entries(contacts).forEach(([channel, href]) => {
@@ -1188,6 +1197,7 @@
                 const label = document.createElement('span');
                 label.textContent = channel === 'call' ? T.btn_call : ({whatsapp:'WhatsApp',viber:'Viber',telegram:'Telegram'})[channel];
                 link.append(icon, label);
+                link.addEventListener('click', () => trackContact(masterId, channel, place));
                 actions.append(link);
             });
         }
@@ -1202,14 +1212,14 @@
             const phoneText = document.createElement('span'); phoneText.textContent = data.phoneDisplay || data.phone;
             phone.append(phoneIcon, phoneText); slot.append(phone);
             const actions = document.createElement('div'); actions.className = 'catalog-contact-actions'; slot.append(actions);
-            renderContactLinks(actions, data.contacts);
+            renderContactLinks(actions, data.contacts, masterId, 'card');
         }
 
         function showRevealContactsStep(masterId, data) {
             const card = document.querySelector('.reveal-contact-slot[data-master-id="' + masterId + '"]')?.closest('.master-card');
             document.getElementById('reveal-contacts-title').textContent = card?.querySelector('h3')?.textContent.trim() || '';
             document.getElementById('reveal-contacts-number').textContent = data.phoneDisplay || data.phone;
-            renderContactLinks(document.getElementById('reveal-contacts-actions'), data.contacts);
+            renderContactLinks(document.getElementById('reveal-contacts-actions'), data.contacts, masterId, 'dialog');
             revealShowStep('contacts');
             document.getElementById('reveal-modal').focus();
         }
@@ -1221,15 +1231,16 @@
 
         // Открываем через клик по <a> (а не location.href) — так браузер отдаёт
         // tel:/wa.me системному обработчику и не «роняет» текущую страницу.
-        function performContactAction(action, contacts) {
+        function performContactAction(action, contacts, masterId) {
             if (!contacts || !contacts[action]) return;
+            trackContact(masterId, action, 'card');
             // Same-tab navigation preserves the native app handoff after async OTP.
             window.location.href = contacts[action];
         }
 
         // { handled, phone } — handled:false = нужна верификация телефона (открыть модалку)
-        async function attemptReveal(masterId) {
-            const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST' });
+        async function attemptReveal(masterId, action) {
+            const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || T.contacts_error);
             if (data.success) { showRevealedContact(masterId, data); return { handled: true, contacts: data.contacts, data }; }
@@ -1258,7 +1269,7 @@
                 slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = true; });
                 let res;
                 try {
-                    res = await attemptReveal(masterId);
+                    res = await attemptReveal(masterId, action);
                 } catch (e) {
                     slot.querySelectorAll('.reveal-contact-btn').forEach(b => { b.disabled = false; });
                     const status = slot.querySelector('.catalog-contact-state');
@@ -1266,7 +1277,7 @@
                     return;
                 }
                 if (res.handled) {
-                    performContactAction(action, res.contacts);
+                    performContactAction(action, res.contacts, masterId);
                 } else {
                     slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = false; });
                     revealMasterId = masterId;
@@ -1319,7 +1330,7 @@
                 });
                 const data = await res.json();
                 if (!data.success) return revealMsg(data.message || T.js_err_wrong_code, true);
-                const rev = await attemptReveal(revealMasterId);
+                const rev = await attemptReveal(revealMasterId, revealPendingAction);
                 if (rev.handled && rev.data) {
                     // Whatever they tapped (show, call, WhatsApp), let them pick the channel here.
                     showRevealContactsStep(revealMasterId, rev.data);

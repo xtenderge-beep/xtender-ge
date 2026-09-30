@@ -13,6 +13,8 @@ const promoService = require('../services/promo.service');
 const supportService = require('../services/support.service');
 const settingsService = require('../services/settings.service');
 const catalogSession = require('../services/catalogSession.service');
+const catalogStats = require('../services/catalogStats.service');
+const technicalService = require('../services/technical.service');
 const redis = require('../config/redis');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
@@ -90,10 +92,14 @@ async function revealPhone(req, res) {
     return res.status(400).json({ success: false, message: 'Invalid master id' });
   }
 
+  // Which button started it (show/call/whatsapp/…) — only for statistics.
+  const action = catalogStats.channel(req.body && req.body.action);
   const callerPhone = await catalogSession.getPhone(req);
   if (!callerPhone) {
+    await catalogStats.record({ masterId, type: 'sms_gate', channel: action });
     return res.json({ success: false, needsVerification: true });
   }
+  const technical = await technicalService.isClientPhone(callerPhone).catch(() => false);
 
   const opened = (await masterService.contactHistory(callerPhone)).some(row => row.master_id === masterId);
   if (!opened) {
@@ -101,18 +107,36 @@ async function revealPhone(req, res) {
     const count = await redis.incr(key);
     if (count === 1) await redis.expire(key, CATALOG_REVEAL_RATE_WINDOW_SECONDS);
     if (count > CATALOG_REVEAL_RATE_MAX) {
+      await catalogStats.record({ masterId, callerPhone, type: 'rate_limited', channel: action, technical });
       return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
     }
   }
 
   const price = await settingsService.getCatalogCallPriceTetri();
-  const master = await masterService.revealPhoneForCall(masterId, price, callerPhone);
+  // Test phones from /admin/technical open numbers like customers do, without charging the provider.
+  const master = await masterService.revealPhoneForCall(masterId, price, callerPhone, { free: technical });
   if (!master) {
+    await catalogStats.record({ masterId, callerPhone, type: 'unavailable', channel: action, technical });
     return res.json({ success: false, reason: 'unavailable' });
   }
+  await catalogStats.record({ masterId, callerPhone, type: 'reveal', channel: action, charged: master.charged, technical });
   res.set('Cache-Control', 'no-store');
   const catalogContacts = require('../config/catalogContacts');
   return res.json({ success: true, phone: master.phone, phoneDisplay: catalogContacts.formattedPhone(master.phone), contacts: catalogContacts.links(master), alreadyOpened: master.alreadyOpened });
+}
+
+// The customer tapped Call/WhatsApp/Viber/Telegram after the number was opened. Statistics only:
+// counted for a verified caller who has actually opened this provider, anything else is ignored.
+async function contactClick(req, res) {
+  const masterId = parseInt(req.params.id, 10);
+  const channel = catalogStats.channel(req.body && req.body.channel);
+  const callerPhone = await catalogSession.getPhone(req);
+  if (Number.isInteger(masterId) && channel && channel !== 'show' && callerPhone
+    && (await masterService.contactHistory(callerPhone)).some(row => row.master_id === masterId)) {
+    const technical = await technicalService.isClientPhone(callerPhone).catch(() => false);
+    await catalogStats.record({ masterId, callerPhone, type: 'contact', channel, place: req.body.place, technical });
+  }
+  return res.status(204).end();
 }
 
 function existingProfileResponse(req, res) {
@@ -500,4 +524,5 @@ module.exports = {
   catalogOtpSend,
   catalogOtpVerify,
   revealPhone,
+  contactClick,
 };

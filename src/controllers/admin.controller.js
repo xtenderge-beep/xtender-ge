@@ -212,6 +212,7 @@ async function masterDetail(req, res) {
   if (!master) return res.status(404).send('Мастер не найден');
   const history = await adminService.getMasterBalanceHistory(id);
   const responseStats = await adminService.getResponseStats(id);
+  const catalogStats = await require('../services/catalogStats.service').summary(id);
   const promoOrigin = master.promo_code_used ? await promoService.getCode(master.promo_code_used) : null;
   const managers = await managerService.list();
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
@@ -227,7 +228,7 @@ async function masterDetail(req, res) {
     publicName: require('../config/providerName').resolve(master),
     whatsappSaved: req.query.saved === 'whatsapp',
     displayNameSaved: req.query.saved === 'displayname',
-    master, history, responseStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
+    master, history, responseStats, catalogStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
 
