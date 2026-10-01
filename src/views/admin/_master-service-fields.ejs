@@ -9,10 +9,19 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
     <label class="service-choice text-sm"><input type="checkbox" name="moversOwnTransport" <%= saved?.requires_own_transport ? 'checked' : '' %>> Погрузка только вместе со своим транспортом</label>
     <p class="text-xs">Без этой отметки принимает отдельные заявки на грузчиков. Для отметки нужно также выбрать перевозки.</p>
   <% } %>
-  <% if (svc.type === 'junk') { %>
+  <% if (svc.type === 'junk') { const kind = svc.fields.find(f => f.key === 'vehicle_kind'); %>
+    <% if (kind) { %>
+    <label class="block text-sm"><%= kind.label %> *
+      <select name="junk_vehicle_kind" required class="block w-full border rounded-xl px-3 py-2">
+        <option value="">Выберите</option>
+        <% kind.options.forEach(o => { %><option value="<%= o.value %>" <%= attrs.vehicle_kind === o.value ? 'selected' : '' %>><%= o.label %></option><% }); %>
+      </select>
+    </label>
+    <p class="text-xs">Самосвал берёт мусор навалом и сам его сваливает. Фургон и бортовая — мешки, мебель, техника. От типа зависит, какие заявки получит исполнитель.</p>
+    <% } %>
     <p class="text-sm">Укажите внутренние размеры кузова. Объём рассчитается автоматически; грузоподъёмность укажите отдельно.</p>
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" data-junk-dimensions>
-      <% [['body_length_cm','Длина кузова'],['body_width_cm','Ширина кузова'],['side_height_cm','Высота борта']].forEach(([key,label])=>{ %>
+      <% [['body_length_cm','Длина кузова'],['body_width_cm','Ширина кузова'],['side_height_cm','Высота борта (у фургона — высота кузова)']].forEach(([key,label])=>{ %>
       <label class="text-sm"><%= label %>, см<input type="number" name="junk_<%= key %>" min="1" max="2000" step="1" value="<%= attrs[key] ?? '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
       <% }); %>
     </div>
@@ -21,7 +30,7 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
       <label class="text-sm">Класс объёма<select name="junk_volume_m3" class="block w-full border rounded-xl px-3 py-2"><option value="">Не выбран</option><% (svc.fields.find(f=>f.key==='volume_m3')?.options || []).forEach(o=>{ %><option value="<%= o.value %>" <%= attrs.volume_m3===o.value?'selected':'' %>><%= o.label %></option><% }); %></select></label>
     </details>
   <% } %>
-  <% svc.fields.filter(f => f.input !== 'size' && !(svc.type === 'junk' && ['volume_m3','body_length_cm','body_width_cm','side_height_cm'].includes(f.key))).forEach(f => { %>
+  <% svc.fields.filter(f => f.input !== 'size' && !(svc.type === 'junk' && ['vehicle_kind','volume_m3','body_length_cm','body_width_cm','side_height_cm'].includes(f.key))).forEach(f => { %>
     <label class="<%= f.input === 'bool' ? 'service-choice' : 'block' %> text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
     <% if (f.input === 'enum') { %>
       <select name="<%= svc.type %>_<%= f.key %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">

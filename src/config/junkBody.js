@@ -1,6 +1,24 @@
 // Exact body dimensions are optional for old profiles. New profiles derive the
 // existing volume tier so catalog and dispatch keep using one matching key.
 const TIERS = [2, 4, 8, 15];
+// Waste removal is done by more than dump trucks: a van or a flatbed takes bags and
+// furniture, only a dump truck takes loose debris. The kind is what a moderator
+// decides first when routing a request, so the wording for that step lives here.
+const KIND_FIELD = {
+  key: 'vehicle_kind', input: 'enum', options: ['dump', 'van', 'flatbed'], match: 'exact', filter: true, required: true,
+  labels: { ru: 'Тип машины', ka: 'მანქანის ტიპი', en: 'Vehicle type' },
+  optionLabels: {
+    dump: { ru: 'Самосвал', ka: 'თვითმცლელი', en: 'Dump truck' },
+    van: { ru: 'Фургон', ka: 'ფურგონი', en: 'Van' },
+    flatbed: { ru: 'Бортовая', ka: 'ბორტიანი', en: 'Flatbed' },
+  },
+};
+// Shown on the moderator's "what does the client need" step (Russian-only screens).
+// Kept out of the stored field: the category editor rewrites fields on save.
+const KIND_NEED = {
+  anyLabel: 'Любая машина',
+  hint: 'Мешки, мебель, техника — оставьте «Любая машина»: заявку получат все. Мусор навалом, грунт, погрузка экскаватором — выберите «Самосвал».',
+};
 const VOLUME_FIELD = {
   key: 'volume_m3', input: 'enum', options: TIERS.map(String), unit: 'м³', match: 'gte', filter: true, required: true,
   labels: { ru: 'Объём кузова', ka: 'ძარის მოცულობა', en: 'Cargo volume' },
@@ -12,6 +30,7 @@ const EXTRA_FIELDS = [
   { key: 'side_height_cm', input: 'number', unit: 'см', min: 1, max: 2000, match: 'ignore', labels: { ru: 'Высота борта', ka: 'ბორტის სიმაღლე', en: 'Side height' } },
   { key: 'payload_t', input: 'number', unit: 'т', min: 0.1, max: 100, match: 'gte', filter: true, labels: { ru: 'Грузоподъёмность', ka: 'ტვირთამწეობა', en: 'Payload capacity' } },
 ];
+const BUILT_IN_KEYS = [KIND_FIELD.key, VOLUME_FIELD.key, ...EXTRA_FIELDS.map(field => field.key)];
 function withBuiltInFields(row) {
   if (!row || row.slug !== 'junk') return row;
   const fields = [...(row.fields || [])];
@@ -25,8 +44,9 @@ function withBuiltInFields(row) {
       '8': { ...volume.optionLabels?.['8'], ru: 'от 8 м³', en: 'from 8 m³', ka: '8 მ³-დან' },
     } };
   }
+  if (!fields.some(field => field.key === KIND_FIELD.key)) fields.unshift(KIND_FIELD);
   for (const field of EXTRA_FIELDS) if (!fields.some(current => current.key === field.key)) fields.push(field);
-  return { ...row, fields };
+  return { ...row, fields: fields.map(field => field.key === KIND_FIELD.key ? { ...field, need: KIND_NEED } : field) };
 }
 function derive(lengthCm, widthCm, sideHeightCm) {
   const dimensions = [lengthCm, widthCm, sideHeightCm].map(Number);
@@ -38,4 +58,4 @@ function derive(lengthCm, widthCm, sideHeightCm) {
   if (!tier) return null;
   return { cubicMetres, tier: String(tier), lengthCm: dimensions[0], widthCm: dimensions[1], sideHeightCm: dimensions[2] };
 }
-module.exports = { derive, withBuiltInFields };
+module.exports = { derive, withBuiltInFields, BUILT_IN_KEYS };

@@ -55,11 +55,13 @@ function badges(row, attributes, lang) {
   if (!row) return [];
   const a=attributes || {};
   if (row.slug === 'junk') {
+    const kindLabels = require('../config/junkBody').withBuiltInFields(row).fields.find(f => f.key === 'vehicle_kind')?.optionLabels?.[a.vehicle_kind];
+    const kind = kindLabels ? kindLabels[lang] || kindLabels.ru : null;
     const volume = a.volume_m3 ? `${lang==='ka'?'მოცულობა':lang==='en'?'Volume':'Объём'}: ${a.volume_m3}+ ${unitFor('м³', lang)}` : null;
     const dimensions = ['body_length_cm','body_width_cm','side_height_cm'].every(key=>a[key])
       ? `${lang==='ka'?'ძარა':lang==='en'?'Body':'Кузов'}: ${a.body_length_cm}×${a.body_width_cm}×${a.side_height_cm} ${unitFor('см', lang)}` : null;
     const payload = a.payload_t ? `${lang==='ka'?'ტვირთამწეობა':lang==='en'?'Payload':'Грузоподъёмность'}: ${a.payload_t} ${unitFor('т', lang)}` : null;
-    return [volume,dimensions,payload].filter(Boolean);
+    return [kind,volume,dimensions,payload].filter(Boolean);
   }
   return view(row,lang).fields.flatMap(f=> {
     const v=a[f.key];if(v === undefined || v === null || v === '' || v === false) return [];
@@ -161,8 +163,8 @@ async function save(slug, input) {
     const lockedFields=(previous?.fields || []).filter(f=>f.input==='size');
     const editableExisting=(previous?.fields || []).filter(f=>f.input!=='size');
     const fields=[...lockedFields, ...parseFields(input.fields || [],editableExisting)];
-    if (previous?.slug === 'junk' && ['volume_m3','body_length_cm','body_width_cm','side_height_cm','payload_t'].some(key => !fields.some(field => field.key === key))) {
-      throw fail('Поля объёма, габаритов и грузоподъёмности самосвала используются системой; измените их подписи или параметры, не удаляя поля.',409);
+    if (previous?.slug === 'junk' && require('../config/junkBody').BUILT_IN_KEYS.some(key => !fields.some(field => field.key === key))) {
+      throw fail('Поля типа машины, объёма, габаритов и грузоподъёмности используются системой; измените их подписи или параметры, не удаляя поля.',409);
     }
     if (previous) {
       const assignments=(await client.query('SELECT attributes FROM master_services WHERE service_type=$1',[previous.slug])).rows;
