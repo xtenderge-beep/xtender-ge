@@ -865,6 +865,14 @@ CREATE TABLE IF NOT EXISTS master_admin_events (
 );
 CREATE INDEX IF NOT EXISTS idx_master_admin_events_master ON master_admin_events(master_id, created_at);
 
+-- Специалисты, которых администратор отложил «на уточнение»: в /admin/masters они уходят из
+-- рабочего списка на отдельную вкладку, пока по ним что-то выясняют. Только порядок в списке
+-- админки — на заявки, каталог и баланс исполнителя отметка не влияет.
+CREATE TABLE IF NOT EXISTS admin_master_followups (
+  master_id INTEGER PRIMARY KEY REFERENCES masters(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Посещаемость сайта (вкладка «Посещаемость» в /admin) вместо Google Analytics. Без куки и
 -- без IP: visitor — обрезанный sha256(соль дня + IP + браузер), соль меняется каждые сутки
 -- и живёт только в Redis, поэтому человека нельзя ни узнать, ни связать между днями.

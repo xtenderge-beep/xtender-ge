@@ -154,12 +154,25 @@ async function listMastersAdmin() {
   const langRows = await pool.query('SELECT id, registration_language, spoken_languages, description, manager_id, contact_channels FROM masters');
   const langs = new Map(langRows.rows.map(r => [r.id, r]));
   const work = await managerWorkByMaster();
+  const followups = new Map((await pool.query('SELECT master_id, created_at FROM admin_master_followups')).rows.map(r => [r.master_id, r.created_at]));
   return rows.map(m => {
     const l = langs.get(m.id) || {};
     const w = work(m.id, l.manager_id);
     return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null,
-      description: l.description || '', manager_id: l.manager_id || null, ...adminWhatsapp(m.phone, l.contact_channels), ...w };
+      description: l.description || '', manager_id: l.manager_id || null, followup_at: followups.get(m.id) || null, ...adminWhatsapp(m.phone, l.contact_channels), ...w };
   });
+}
+
+// «На уточнении»: администратор убирает специалиста из рабочего списка /admin/masters на отдельную
+// вкладку и возвращает обратно. На заявки и каталог не влияет. false — специалиста нет.
+async function setMasterFollowup(masterId, on) {
+  if (!Number.isSafeInteger(masterId) || !(await pool.query('SELECT id FROM masters WHERE id=$1', [masterId])).rows[0]) return false;
+  if (on) await pool.query('INSERT INTO admin_master_followups(master_id) VALUES($1) ON CONFLICT (master_id) DO NOTHING', [masterId]);
+  else await pool.query('DELETE FROM admin_master_followups WHERE master_id=$1', [masterId]);
+  return true;
+}
+async function isMasterFollowup(masterId) {
+  return Boolean((await pool.query('SELECT master_id FROM admin_master_followups WHERE master_id=$1', [masterId])).rows[0]);
 }
 
 // Кнопка «WhatsApp» в списке админки: номер WhatsApp из карточки (его подтверждает
@@ -377,6 +390,8 @@ module.exports = {
   managerSummary,
   filterByManager,
   masterNotes,
+  setMasterFollowup,
+  isMasterFollowup,
   getMasterDetail,
   getMasterBalanceHistory,
   setMasterBanned,

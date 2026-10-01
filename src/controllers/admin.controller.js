@@ -202,11 +202,14 @@ async function mastersList(req, res) {
   const { options, ruNames } = require('../config/spokenLanguages');
   // Фильтры приходят из адресной строки — принимаем только известные коды.
   const known = (value, codes) => (typeof value === 'string' && (value === 'none' || codes.includes(value)) ? value : '');
-  const filter = { status: ['pending', 'active', 'banned'].includes(req.query.status) ? req.query.status : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
+  const filter = { status: ['pending', 'active', 'banned', 'followup'].includes(req.query.status) ? req.query.status : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
   const statusOf = m => m.is_banned ? 'banned' : m.is_active ? 'active' : 'pending';
-  const statusSummary = { all: masters.length, pending: 0, active: 0, banned: 0 };
-  masters.forEach(m => statusSummary[statusOf(m)]++);
-  const scoped = filter.status ? masters.filter(m => statusOf(m) === filter.status) : masters;
+  // Отложенные «на уточнение» живут на своей вкладке и в остальные вкладки и их числа не входят.
+  const working = masters.filter(m => !m.followup_at);
+  const parked = masters.filter(m => m.followup_at);
+  const statusSummary = { all: working.length, pending: 0, active: 0, banned: 0, followup: parked.length };
+  working.forEach(m => statusSummary[statusOf(m)]++);
+  const scoped = filter.status === 'followup' ? parked : filter.status ? working.filter(m => statusOf(m) === filter.status) : working;
   const managerSummary = adminService.managerSummary(scoped);
   filter.manager = known(req.query.manager, managerSummary.managers.map(m => String(m.id)));
   const shown = adminService.filterByManager(adminService.filterByLanguage(scoped, filter), filter.manager);
@@ -236,6 +239,7 @@ async function masterDetail(req, res) {
     whatsappSaved: req.query.saved === 'whatsapp',
     displayNameSaved: req.query.saved === 'displayname',
     notes: await adminService.masterNotes(id),
+    followup: await adminService.isMasterFollowup(id),
     master, history, responseStats, catalogStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
@@ -350,6 +354,13 @@ async function banMaster(req, res) {
 
 // Заметка администратора: форма есть в списке специалистов и в карточке. Возвращаем туда, откуда
 // её отправили (с теми же фильтрами списка), адрес возврата — только страницы специалистов.
+function mastersReturn(value) {
+  return typeof value === 'string' && /^\/admin\/masters(\/\d+)?(\?[\w=&%.~-]*)?$/.test(value) ? value : '/admin/masters';
+}
+const isMasterCard = (back) => /^\/admin\/masters\/\d+/.test(back);
+
+// Кнопка «Сохранить и отложить» (park=1) заодно уводит специалиста на вкладку «На уточнении»:
+// тогда в списке его уже нет, возвращаем в список без якоря.
 async function addMasterNote(req, res) {
   const id = parseInt(req.params.id, 10);
   try {
@@ -358,8 +369,19 @@ async function addMasterNote(req, res) {
     if (err.status === 400 || err.status === 404) return res.status(err.status).send(err.message);
     throw err;
   }
-  const back = typeof req.body.returnTo === 'string' && /^\/admin\/masters(\/\d+)?(\?[\w=&%.~-]*)?$/.test(req.body.returnTo) ? req.body.returnTo : '/admin/masters';
-  res.redirect(back + (/^\/admin\/masters\/\d+/.test(back) ? '#master-notes' : '#master-' + id));
+  const park = req.body.park === '1';
+  if (park) await adminService.setMasterFollowup(id, true);
+  const back = mastersReturn(req.body.returnTo);
+  res.redirect(back + (isMasterCard(back) ? '#master-notes' : park ? '' : '#master-' + id));
+}
+
+// «На уточнение» / «Вернуть в список»: специалист переходит между рабочим списком и вкладкой
+// «На уточнении». Только порядок в админке — заявки и каталог исполнителя не меняются.
+async function setMasterFollowup(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (!(await adminService.setMasterFollowup(id, req.body.on === '1'))) return res.status(404).send('Специалист не найден.');
+  const back = mastersReturn(req.body.returnTo);
+  res.redirect(back + (isMasterCard(back) ? '#master-notes' : ''));
 }
 
 async function unbanMaster(req, res) {
@@ -839,6 +861,7 @@ module.exports = {
   unapproveMaster,
   banMaster,
   addMasterNote,
+  setMasterFollowup,
   unbanMaster,
   deleteMaster,
   correctBalance,

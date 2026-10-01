@@ -146,7 +146,7 @@ const adminService=require('../src/services/admin.service');
  // Фильтр по статусу: «На модерации», «Активные», «Заблокированные» с числами.
  const listFor=async status=>{let out;await adminController.mastersList({query:{status}},{render:(view,locals)=>{out=locals;}});return out;};
  const allStatuses=await listFor(undefined);
- assert.deepEqual(allStatuses.statusSummary,{all:3,pending:1,active:1,banned:1});
+ assert.deepEqual(allStatuses.statusSummary,{all:3,pending:1,active:1,banned:1,followup:0});
  assert.deepEqual((await listFor('pending')).masters.map(m=>m.id),[pending]);
  assert.deepEqual((await listFor('active')).masters.map(m=>m.id),[own]);
  assert.deepEqual((await listFor('banned')).masters.map(m=>m.id),[alone]);
@@ -156,8 +156,46 @@ const adminService=require('../src/services/admin.service');
  assert.match(statusHtml,/href="\/admin\/masters\?status=pending"[^>]*>На модерации <b>1<\/b>/);
  assert.match(statusHtml,/class="[^"]*bg-emerald-600[^"]*">Активные <b>1<\/b>/);
 
- // Удаление исполнителя убирает и его просмотры.
+ // Заметки выделены: жёлтая полоса у карточки с заметками, рамка и фон у самих заметок.
+ assert.match(statusHtml,/id="master-\d+" class="[^"]*border-amber-300 border-l-4 border-l-amber-400/);
+ assert.match(statusHtml,/class="bg-amber-50 border border-amber-300 rounded-xl[^"]*">\s*<p class="[^"]*">Заметки \(\d+\)/);
+ assert.match(statusHtml,/name="park" value="1"[^>]*>Сохранить и отложить<\/button>/);
+ assert.match(statusHtml,/>На уточнение<\/button>/);
+
+ // «На уточнении»: «Сохранить и отложить» и кнопка в списке уводят специалиста на отдельную вкладку,
+ // в остальных вкладках и их числах его нет; «Вернуть в список» возвращает. Заявки не затрагиваются.
+ const renderList=locals=>ejs.render(fs.readFileSync(file,'utf8'),{...locals,csrfToken:'csrf'},
+  {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+ reply=sent();await adminController.addMasterNote({params:{id:String(pending)},body:{body:'Выяснить, какая машина',park:'1',returnTo:'/admin/masters?status=pending'}},reply);
+ assert.equal(reply.to,'/admin/masters?status=pending','the card left this list, so no anchor');
+ const parkedView=await listFor('followup');
+ assert.deepEqual(parkedView.masters.map(m=>m.id),[pending]);
+ assert.deepEqual(parkedView.statusSummary,{all:2,pending:0,active:1,banned:1,followup:1});
+ assert.deepEqual((await listFor('pending')).masters,[]);
+ assert.ok(!(await listFor(undefined)).masters.some(m=>m.id===pending));
+ reply=sent();await adminController.setMasterFollowup({params:{id:String(pending)},body:{on:'1',returnTo:'/admin/masters'}},reply);
+ assert.equal(reply.to,'/admin/masters');
+ assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM admin_master_followups')).rows[0].n,1,'parking twice keeps one row');
+ const parkedHtml=renderList(parkedView);
+ assert.match(parkedHtml,/href="\/admin\/masters\?status=followup" class="[^"]*bg-amber-500[^"]*">На уточнении <b>1<\/b>/);
+ assert.match(parkedHtml,/На уточнении с \d\d\.\d\d\.\d{4}/);
+ assert.match(parkedHtml,/name="on" value="0">\s*<button[^>]*>Вернуть в список<\/button>/);
+ assert.match(parkedHtml,/Выяснить, какая машина/);
+ assert.ok(!parkedHtml.includes('Сохранить и отложить'));
+ const before=(await pool.query('SELECT is_active,is_banned,is_subscribed,balance_tetri FROM masters WHERE id=$1',[pending])).rows[0];
+ reply=sent();await adminController.setMasterFollowup({params:{id:String(pending)},body:{on:'0',returnTo:'/admin/masters?status=followup'}},reply);
+ assert.equal(reply.to,'/admin/masters?status=followup');
+ assert.deepEqual((await listFor('pending')).masters.map(m=>m.id),[pending]);
+ assert.deepEqual((await pool.query('SELECT is_active,is_banned,is_subscribed,balance_tetri FROM masters WHERE id=$1',[pending])).rows[0],before);
+ reply=sent();await adminController.setMasterFollowup({params:{id:'999999'},body:{on:'1'}},reply);
+ assert.equal(reply.code,404);
+ reply=sent();await adminController.setMasterFollowup({params:{id:String(own)},body:{on:'1',returnTo:'/admin/masters/'+own}},reply);
+ assert.equal(reply.to,'/admin/masters/'+own+'#master-notes');
+ assert.equal(await adminService.isMasterFollowup(own),true);
+
+ // Удаление исполнителя убирает и его просмотры, и отметку «на уточнении».
  await require('../src/services/master.service').deleteMaster(own);
  assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM manager_master_views WHERE master_id=$1',[own])).rows[0].n,0);
+ assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM admin_master_followups WHERE master_id=$1',[own])).rows[0].n,0);
  console.log('PASS: admin masters list shows manager, card views, last change, notes and description');
 })().catch(e=>{console.error(e);process.exit(1);});

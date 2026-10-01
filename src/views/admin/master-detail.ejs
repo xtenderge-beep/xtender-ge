@@ -111,11 +111,24 @@
 </div>
 
 <% const masterNotes = typeof notes === 'undefined' ? [] : notes; %>
-<section id="master-notes" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5" style="scroll-margin-top:110px" aria-labelledby="master-notes-title">
-    <h2 id="master-notes-title" class="text-sm font-extrabold text-stone-900 uppercase mb-1">Заметки (<%= masterNotes.length %>)</h2>
-    <p class="text-xs text-stone-500 mb-3">Заметки менеджеров и администратора. Заметку администратора видно только в админке.</p>
+<% const onFollowup = typeof followup !== 'undefined' && followup; %>
+<section id="master-notes" class="mt-4 bg-white rounded-2xl border <%= masterNotes.length ? 'border-amber-300 border-l-4 border-l-amber-400' : 'border-stone-200' %> p-5" style="scroll-margin-top:110px" aria-labelledby="master-notes-title">
+    <div class="flex items-center justify-between gap-3 flex-wrap mb-1">
+        <h2 id="master-notes-title" class="text-sm font-extrabold text-stone-900 uppercase">Заметки (<%= masterNotes.length %>)<% if (onFollowup) { %> <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900 align-middle">На уточнении</span><% } %></h2>
+        <form method="POST" action="/admin/masters/<%= master.id %>/followup">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <input type="hidden" name="returnTo" value="/admin/masters/<%= master.id %>">
+            <input type="hidden" name="on" value="<%= onFollowup ? '0' : '1' %>">
+            <% if (onFollowup) { %>
+              <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition">Вернуть в список</button>
+            <% } else { %>
+              <button type="submit" class="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold rounded-xl transition">На уточнение</button>
+            <% } %>
+        </form>
+    </div>
+    <p class="text-xs text-stone-500 mb-3">Заметки менеджеров и администратора. Заметку администратора видно только в админке. «На уточнение» убирает специалиста из рабочего списка на отдельную вкладку; заявки и каталог не меняются.</p>
     <% if (masterNotes.length) { %>
-      <div class="space-y-1 mb-3">
+      <div class="bg-amber-50 border border-amber-300 rounded-xl p-3 space-y-1.5 mb-3">
           <% masterNotes.forEach(function (n) { %>
             <p class="text-sm text-stone-700 whitespace-pre-wrap break-words"><span class="text-xs text-stone-500"><%= new Date(n.created_at).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %> · <%= n.manager_name %>:</span> <%= n.body %></p>
           <% }); %>
