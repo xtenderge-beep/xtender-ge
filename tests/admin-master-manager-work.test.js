@@ -112,6 +112,37 @@ const adminService=require('../src/services/admin.service');
  assert.deepEqual(await audit.telegramActor({id:777,first_name:'X'}),{actor:'Bob',managerId:b});
  assert.deepEqual(await audit.telegramActor({id:888,first_name:'Ivan',username:'ivan'}),{actor:'Telegram: Ivan (@ivan)',managerId:null});
 
+ // Заметка администратора из списка: попадает в общую ленту заметок свежей сверху, не считается
+ // «последним изменением», возвращает в список с теми же фильтрами; менеджер её не видит.
+ const noteReq=(id,body,returnTo)=>({params:{id:String(id)},body:{body,returnTo}});
+ const sent=()=>{const r={code:200,to:null,text:null,redirect(to){r.to=to;},status(code){r.code=code;return r;},send(text){r.text=text;}};return r;};
+ const changeBefore=(await adminService.listMastersAdmin()).find(m=>m.id===own).last_change;
+ let reply=sent();await adminController.addMasterNote(noteReq(own,'  Перезвонить после 18:00  ','/admin/masters?status=active&manager='+a),reply);
+ assert.equal(reply.to,'/admin/masters?status=active&manager='+a+'#master-'+own);
+ const noted=(await adminService.listMastersAdmin()).find(m=>m.id===own);
+ assert.deepEqual([noted.notes.length,noted.notes[0].body,noted.notes[0].manager_name],[6,'Перезвонить после 18:00','Администратор']);
+ assert.deepEqual(noted.last_change,changeBefore);
+ assert.deepEqual((await adminService.masterNotes(own)).map(n=>n.body),noted.notes.map(n=>n.body));
+ assert.ok(!(await portal.detail(a,own)).events.some(e=>e.body==='Перезвонить после 18:00'),'admin notes stay in the admin panel');
+ reply=sent();await adminController.addMasterNote(noteReq(own,'Из карточки','/admin/masters/'+own),reply);
+ assert.equal(reply.to,'/admin/masters/'+own+'#master-notes');
+ reply=sent();await adminController.addMasterNote(noteReq(alone,'Чужой адрес возврата','https://evil.example/'),reply);
+ assert.equal(reply.to,'/admin/masters#master-'+alone);
+ reply=sent();await adminController.addMasterNote(noteReq(own,'   ','/admin/masters'),reply);
+ assert.deepEqual([reply.code,reply.to],[400,null]);
+ reply=sent();await adminController.addMasterNote(noteReq(own,'x'.repeat(2001),'/admin/masters'),reply);
+ assert.equal(reply.code,400);
+ reply=sent();await adminController.addMasterNote(noteReq(999999,'Нет такого','/admin/masters'),reply);
+ assert.equal(reply.code,404);
+ assert.equal((await adminService.masterNotes(own)).length,7);
+ const noteHtml=ejs.render(fs.readFileSync(file,'utf8'),{...(await (async()=>{let out;await adminController.mastersList({query:{status:'active'}},{render:(view,locals)=>{out=locals;}});return out;})()),csrfToken:'csrf'},
+  {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+ assert.ok(noteHtml.includes('id="master-'+own+'"'));
+ assert.ok(noteHtml.includes('<form method="POST" action="/admin/masters/'+own+'/note"'));
+ assert.ok(noteHtml.includes('name="returnTo" value="/admin/masters?status=active"'));
+ assert.match(noteHtml,/Заметки \(7\)/);
+ assert.match(noteHtml,/Администратор:<\/span> Из карточки/);
+
  // Фильтр по статусу: «На модерации», «Активные», «Заблокированные» с числами.
  const listFor=async status=>{let out;await adminController.mastersList({query:{status}},{render:(view,locals)=>{out=locals;}});return out;};
  const allStatuses=await listFor(undefined);

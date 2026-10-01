@@ -77,7 +77,7 @@ const ids=plan=>plan.recipients.map(m=>m.id).sort((a,b)=>a-b);
   const leads=await masters.getMasterLeads(combined.id,combined.category);
   assert.equal(leads.find(l=>l.id === o.id).is_closed_for_master,true);
   const countBefore=(await orders.getOrderDispatches(o.id))[0].master_count;
-  await masters.updateMasterProfile(combined.id,{name:combined.name,phone:combined.phone,services:[{type:'junk',attributes:{vehicle_kind:'dump',volume_m3:'4'}}]});
+  await masters.updateMasterProfile(combined.id,{name:combined.name,phone:combined.phone,services:[{type:'junk',attributes:{volume_m3:'4'}}]});
   assert.equal((await orders.getOrderDispatches(o.id))[0].master_count,countBefore);
   const cohorts=await orders.getOrderFunnelByCategory(o.id);
   assert.ok(!cohorts.some(r=>r.category === 'junk' && r.received));

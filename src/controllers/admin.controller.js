@@ -235,6 +235,7 @@ async function masterDetail(req, res) {
     publicName: require('../config/providerName').resolve(master),
     whatsappSaved: req.query.saved === 'whatsapp',
     displayNameSaved: req.query.saved === 'displayname',
+    notes: await adminService.masterNotes(id),
     master, history, responseStats, catalogStats, promoOrigin, managers, currentManager, partnerReferrer, error: req.query.error || null,
   });
 }
@@ -345,6 +346,20 @@ async function banMaster(req, res) {
   await adminService.setMasterBanned(id, true, reason);
   await audit.record(id, { action: 'ban', body: reason || 'Без причины' });
   res.redirect(`/admin/masters/${id}`);
+}
+
+// Заметка администратора: форма есть в списке специалистов и в карточке. Возвращаем туда, откуда
+// её отправили (с теми же фильтрами списка), адрес возврата — только страницы специалистов.
+async function addMasterNote(req, res) {
+  const id = parseInt(req.params.id, 10);
+  try {
+    await audit.addNote(id, req.body.body);
+  } catch (err) {
+    if (err.status === 400 || err.status === 404) return res.status(err.status).send(err.message);
+    throw err;
+  }
+  const back = typeof req.body.returnTo === 'string' && /^\/admin\/masters(\/\d+)?(\?[\w=&%.~-]*)?$/.test(req.body.returnTo) ? req.body.returnTo : '/admin/masters';
+  res.redirect(back + (/^\/admin\/masters\/\d+/.test(back) ? '#master-notes' : '#master-' + id));
 }
 
 async function unbanMaster(req, res) {
@@ -823,6 +838,7 @@ module.exports = {
   approveMaster,
   unapproveMaster,
   banMaster,
+  addMasterNote,
   unbanMaster,
   deleteMaster,
   correctBalance,

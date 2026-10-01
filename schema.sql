@@ -726,8 +726,8 @@ INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_built
 UPDATE service_categories SET fields='[{"key":"volume_m3","input":"enum","options":["2","4","8","15"],"unit":"м³","match":"gte","filter":true,"required":true,"labels":{"ka":"ძარის მოცულობა","ru":"Объём кузова","en":"Cargo volume"},"optionLabels":{"2":{"ka":"2 მ³-მდე","ru":"до 2 м³","en":"up to 2 m³"},"4":{"ka":"4 მ³-მდე","ru":"до 4 м³","en":"up to 4 m³"},"8":{"ka":"8 მ³-მდე","ru":"до 8 м³","en":"up to 8 m³"},"15":{"ka":"15+ მ³","ru":"15+ м³","en":"15+ m³"}}}]'::jsonb,
   name_ka='ნარჩენების გატანა', name_ru='Вывоз мусора', name_en='Waste removal'
   WHERE slug='junk' AND fields='[]'::jsonb;
--- С 2026-10-01 категория — любой вывоз мусора машиной: самосвал, фургон или бортовая. Тип машины
--- стал характеристикой vehicle_kind (src/config/junkBody.js), слово «самосвал» из названия убрано.
+-- С 2026-10-01 категория — любой вывоз мусора машиной: самосвал, фургон или бортовая. Самосвальный
+-- кузов — необязательная отметка dump_body (src/config/junkBody.js), слово «самосвал» из названия убрано.
 -- Файл выполняется при каждом старте, поэтому меняем только прежние названия по умолчанию, каждое
 -- отдельно: название, которое админ задал сам в /admin/categories/junk, не трогаем.
 UPDATE service_categories SET name_ru='Вывоз мусора' WHERE slug='junk' AND name_ru='Вывоз мусора (самосвал)';

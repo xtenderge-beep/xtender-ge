@@ -200,9 +200,17 @@ async function managerWorkByMaster() {
     if (e.action === 'approve') newest(lastApproval, e.master_id, named(e));
   }
   for (const e of adminEvents) {
+    if (e.action === 'note') {
+      const list = notes.get(e.master_id) || [];
+      list.push(e);
+      notes.set(e.master_id, list);
+      continue;
+    }
     newest(lastChange, e.master_id, e);
     if (e.action === 'approve') newest(lastApproval, e.master_id, e);
   }
+  // Заметки менеджеров и администратора — одной лентой, свежие сверху.
+  for (const list of notes.values()) list.sort((x, y) => new Date(y.created_at) - new Date(x.created_at));
   return (masterId, managerId) => ({
     manager_name: managerId ? (managers.get(managerId) || ('#' + managerId)) : null,
     manager_view: managerId ? (ownView.get(masterId + ':' + managerId) || null) : null,
@@ -211,6 +219,11 @@ async function managerWorkByMaster() {
     last_approval: lastApproval.get(masterId) || null,
     notes: notes.get(masterId) || [],
   });
+}
+
+// Заметки менеджеров и администратора об одном исполнителе — для его карточки в админке.
+async function masterNotes(masterId) {
+  return (await managerWorkByMaster())(masterId, null).notes;
 }
 
 // Сколько исполнителей говорит на каждом языке и с какого языка сайта они регистрировались.
@@ -363,6 +376,7 @@ module.exports = {
   filterByLanguage,
   managerSummary,
   filterByManager,
+  masterNotes,
   getMasterDetail,
   getMasterBalanceHistory,
   setMasterBanned,

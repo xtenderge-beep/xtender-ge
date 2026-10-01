@@ -65,6 +65,15 @@ BEGIN
     END LOOP;
 END $$;
 
+-- «Вывоз мусора»: обязательный список «Тип машины» (vehicle_kind) прожил несколько часов 2026-10-01
+-- и заменён необязательной отметкой «Самосвал» (dump_body, src/config/junkBody.js). Выбранный
+-- «самосвал» переносим в отметку, сам ключ убираем — после этого строк с ним нет, и повторный
+-- старт ничего не меняет. Здесь, а не в schema.sql: pg-mem не знает операторов jsonb.
+UPDATE master_services
+SET attributes = (attributes - 'vehicle_kind') || jsonb_build_object('dump_body',
+      COALESCE((attributes->>'dump_body')::boolean, false) OR attributes->>'vehicle_kind' = 'dump')
+WHERE service_type = 'junk' AND attributes ? 'vehicle_kind';
+
 -- Preserve paid unlocks from before this migration.
 INSERT INTO catalog_contact_access (master_id, caller_phone, opened_at)
 SELECT master_id, replace(note, 'Звонок из каталога: ', ''), MIN(created_at)

@@ -55,6 +55,7 @@ router.post('/masters/:id/approve', verifyCsrf, asyncHandler(adminController.app
 router.post('/masters/:id/unapprove', verifyCsrf, asyncHandler(adminController.unapproveMaster));
 router.post('/masters/:id/ban', verifyCsrf, asyncHandler(adminController.banMaster));
 router.post('/masters/:id/unban', verifyCsrf, asyncHandler(adminController.unbanMaster));
+router.post('/masters/:id/note', verifyCsrf, asyncHandler(adminController.addMasterNote));
 router.post('/masters/:id/delete', verifyCsrf, asyncHandler(adminController.deleteMaster));
 router.post('/masters/:id/balance-correction', verifyCsrf, asyncHandler(adminController.correctBalance));
 

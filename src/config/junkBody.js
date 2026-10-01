@@ -1,39 +1,35 @@
 // Exact body dimensions are optional for old profiles. New profiles derive the
 // existing volume tier so catalog and dispatch keep using one matching key.
 const TIERS = [2, 4, 8, 15];
-// Waste removal is done by more than dump trucks: a van or a flatbed takes bags and
-// furniture, only a dump truck takes loose debris. The kind is what a moderator
-// decides first when routing a request, so the wording for that step lives here.
-const KIND_FIELD = {
-  key: 'vehicle_kind', input: 'enum', options: ['dump', 'van', 'flatbed'], match: 'exact', filter: true, required: true,
-  labels: { ru: 'Тип машины', ka: 'მანქანის ტიპი', en: 'Vehicle type' },
-  optionLabels: {
-    dump: { ru: 'Самосвал', ka: 'თვითმცლელი', en: 'Dump truck' },
-    van: { ru: 'Фургон', ka: 'ფურგონი', en: 'Van' },
-    flatbed: { ru: 'Бортовая', ka: 'ბორტიანი', en: 'Flatbed' },
-  },
-};
-// Shown on the moderator's "what does the client need" step (Russian-only screens).
-// Kept out of the stored field: the category editor rewrites fields on save.
-const KIND_NEED = {
-  anyLabel: 'Любая машина',
-  hint: 'Мешки, мебель, техника — оставьте «Любая машина»: заявку получат все. Мусор навалом, грунт, погрузка экскаватором — выберите «Самосвал».',
-};
 const VOLUME_FIELD = {
   key: 'volume_m3', input: 'enum', options: TIERS.map(String), unit: 'м³', match: 'gte', filter: true, required: true,
   labels: { ru: 'Объём кузова', ka: 'ძარის მოცულობა', en: 'Cargo volume' },
   optionLabels: Object.fromEntries(TIERS.map(n => [String(n), { ru: `от ${n} м³`, ka: `${n} მ³-დან`, en: `from ${n} m³` }])),
+};
+// Any vehicle may haul waste: the provider decides how to load and unload it. A tipping body
+// matters only when the load has to be poured out (sand, gravel, soil) or the client asks for
+// a dump truck by name, so it is an optional mark, not a required vehicle kind.
+const DUMP_FIELD = { key: 'dump_body', input: 'bool', match: 'flag', filter: true, labels: { ru: 'Самосвал', ka: 'თვითმცლელი', en: 'Dump truck' } };
+// Wording for the moderator's "what does the client need" step (Russian-only screens).
+// Kept out of the stored field: the category editor rewrites fields on save.
+const DUMP_NEED = {
+  label: 'Нужен самосвал',
+  hint: 'Ставьте, только если в заявке прямо просят самосвал или груз надо высыпать (песок, щебень, грунт). Без отметки заявку получат все, кто вывозит мусор.',
 };
 const EXTRA_FIELDS = [
   { key: 'body_length_cm', input: 'number', unit: 'см', min: 1, max: 2000, match: 'ignore', labels: { ru: 'Длина кузова', ka: 'ძარის სიგრძე', en: 'Body length' } },
   { key: 'body_width_cm', input: 'number', unit: 'см', min: 1, max: 2000, match: 'ignore', labels: { ru: 'Ширина кузова', ka: 'ძარის სიგანე', en: 'Body width' } },
   { key: 'side_height_cm', input: 'number', unit: 'см', min: 1, max: 2000, match: 'ignore', labels: { ru: 'Высота борта', ka: 'ბორტის სიმაღლე', en: 'Side height' } },
   { key: 'payload_t', input: 'number', unit: 'т', min: 0.1, max: 100, match: 'gte', filter: true, labels: { ru: 'Грузоподъёмность', ka: 'ტვირთამწეობა', en: 'Payload capacity' } },
+  DUMP_FIELD,
 ];
-const BUILT_IN_KEYS = [KIND_FIELD.key, VOLUME_FIELD.key, ...EXTRA_FIELDS.map(field => field.key)];
+const BUILT_IN_KEYS = [VOLUME_FIELD.key, ...EXTRA_FIELDS.map(field => field.key)];
+// The required three-way "vehicle kind" list lived for a few hours on 2026-10-01 and was replaced
+// by the dump mark. A category saved in the editor meanwhile may still carry it.
+const RETIRED_KEYS = ['vehicle_kind'];
 function withBuiltInFields(row) {
   if (!row || row.slug !== 'junk') return row;
-  const fields = [...(row.fields || [])];
+  const fields = (row.fields || []).filter(field => !RETIRED_KEYS.includes(field.key));
   if (!fields.some(field => field.key === 'volume_m3')) fields.unshift(VOLUME_FIELD);
   if (fields.some(field => field.key === 'volume_m3' && field.optionLabels?.['2']?.ru === 'до 2 м³')) {
     const index = fields.findIndex(field => field.key === 'volume_m3');
@@ -44,9 +40,8 @@ function withBuiltInFields(row) {
       '8': { ...volume.optionLabels?.['8'], ru: 'от 8 м³', en: 'from 8 m³', ka: '8 მ³-დან' },
     } };
   }
-  if (!fields.some(field => field.key === KIND_FIELD.key)) fields.unshift(KIND_FIELD);
   for (const field of EXTRA_FIELDS) if (!fields.some(current => current.key === field.key)) fields.push(field);
-  return { ...row, fields: fields.map(field => field.key === KIND_FIELD.key ? { ...field, need: KIND_NEED } : field) };
+  return { ...row, fields: fields.map(field => field.key === DUMP_FIELD.key ? { ...field, need: DUMP_NEED } : field) };
 }
 function derive(lengthCm, widthCm, sideHeightCm) {
   const dimensions = [lengthCm, widthCm, sideHeightCm].map(Number);

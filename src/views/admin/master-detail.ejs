@@ -110,6 +110,25 @@
     </form>
 </div>
 
+<% const masterNotes = typeof notes === 'undefined' ? [] : notes; %>
+<section id="master-notes" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5" style="scroll-margin-top:110px" aria-labelledby="master-notes-title">
+    <h2 id="master-notes-title" class="text-sm font-extrabold text-stone-900 uppercase mb-1">Заметки (<%= masterNotes.length %>)</h2>
+    <p class="text-xs text-stone-500 mb-3">Заметки менеджеров и администратора. Заметку администратора видно только в админке.</p>
+    <% if (masterNotes.length) { %>
+      <div class="space-y-1 mb-3">
+          <% masterNotes.forEach(function (n) { %>
+            <p class="text-sm text-stone-700 whitespace-pre-wrap break-words"><span class="text-xs text-stone-500"><%= new Date(n.created_at).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %> · <%= n.manager_name %>:</span> <%= n.body %></p>
+          <% }); %>
+      </div>
+    <% } %>
+    <form method="POST" action="/admin/masters/<%= master.id %>/note" class="flex flex-col sm:flex-row gap-2 sm:items-start">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="returnTo" value="/admin/masters/<%= master.id %>">
+        <textarea name="body" rows="2" required maxlength="2000" placeholder="Заметка администратора: договорённости, что уточнить" aria-label="Заметка администратора" class="flex-1 border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500"></textarea>
+        <button type="submit" class="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить заметку</button>
+    </form>
+</section>
+
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Редактировать данные</h2>
     <%- include('./_master-whatsapp') %>
