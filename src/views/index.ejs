@@ -439,10 +439,12 @@
 
                     <section id="service-categories" class="home-services"><h2><%= t('home_services_title') %></h2>
                         <div class="home-services-grid">
+                            <%# Описание есть только у встроенных услуг. У услуги, созданной в админке, перевода нет, и t() вернул бы сам ключ. %>
                             <% groups.forEach(function (group) { %>
+                              <% const serviceDescKey = 'service_desc_' + group.key + '_body'; const serviceDesc = t(serviceDescKey); %>
                               <div class="bg-white rounded-xl border border-stone-200/90 p-3.5">
                                   <span class="inline-block text-[10px] font-extrabold uppercase px-2 py-0.5 rounded border <%= group.color %>"><%= group.icon %> <%= group.label %></span>
-                                  <p class="mt-1.5 text-xs text-stone-500 leading-snug"><%= t('service_desc_' + group.key + '_body') %></p>
+                                  <% if (serviceDesc !== serviceDescKey) { %><p class="mt-1.5 text-xs text-stone-500 leading-snug"><%= serviceDesc %></p><% } %>
                               </div>
                             <% }); %>
                         </div>
