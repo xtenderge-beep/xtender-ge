@@ -9,13 +9,15 @@ stub('../src/services/telegram.service',{sendLeadToMaster:async()=>false,notifyM
 const billing=require('../src/services/providerBilling.service'),settings=require('../src/services/settings.service');
 const orders=require('../src/services/order.service'),masters=require('../src/services/master.service'),audit=require('../src/services/consentLog.service');
 const session=require('../src/services/masterSession.service'),controller=require('../src/controllers/master.controller');
-const {translate}=require('../src/config/i18n');
+const {translate}=require('../src/config/i18n'),copy=require('../src/config/provider-consent-copy'),topupController=require('../src/controllers/topup.controller');
 (async()=>{
  const master=(await pool.query("INSERT INTO masters(name,phone,master_token,category,is_active,is_subscribed,balance_tetri) VALUES('Billing','+995500000881','billing-master','movers',true,true,5000) RETURNING *")).rows[0];
  await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[master.id]);
+ // The balance holds the provider's own money: paid features wait for confirmed rates.
+ await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason) VALUES($1,5000,'topup')",[master.id]);
  const order=(await pool.query("INSERT INTO orders(token,phone,description,status,target_categories) VALUES('billing-order','+995500000882','Move a piano','new',ARRAY['movers']) RETURNING *")).rows[0];
  const balance=async()=>Number((await pool.query('SELECT balance_tetri FROM masters WHERE id=$1',[master.id])).rows[0].balance_tetri);
- let state=await billing.state(master.id,'ru');assert.equal(state.accepted,false);
+ let state=await billing.state(master.id,'ru');assert.equal(state.accepted,false);assert.equal(state.required,true);assert.equal(state.intro,copy.ru.billing_intro);
  assert.equal(await orders.notifyMasters(order,'movers',null,50),0);assert.equal(sent,0);
  assert.equal(await masters.revealPhoneForCall(master.id,50,'+995500000882'),null);assert.equal(await balance(),5000);
  let body={accepted:true,digest:state.digest,language:'ru'};
@@ -30,7 +32,7 @@ const {translate}=require('../src/config/i18n');
  assert.equal(await orders.notifyMasters(order,'movers',null,50),1);assert.equal(sent,1);
  assert.ok(await masters.revealPhoneForCall(master.id,50,'+995500000882'));assert.equal(await balance(),4900);
  const charge=(await pool.query("SELECT metadata FROM sms_consent_logs WHERE event_type='LEAD_CHARGE_ACCEPTED'")).rows[0].metadata;
- assert.equal(charge.billing_consent_log_id,accepted.consentLogId);
+ assert.equal(charge.billing_consent_log_id,accepted.consentLogId);assert.equal(charge.billing_basis,'accepted_rates');
  await settings.setLeadPriceTetri(75);
  assert.equal((await billing.state(master.id,'ru')).accepted,false);assert.equal((await billing.accept(master.master_token,body)).status,409);
  assert.ok((await masters.revealPhoneForCall(master.id,50,'+995500000882')).alreadyOpened,'previously paid contact remains free after rate changes');
@@ -54,5 +56,42 @@ const {translate}=require('../src/config/i18n');
    assert.ok(!/<input[^>]*\schecked(?:\s|>)/.test(html));
    for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new vm.Script(match[1]);
  }
- console.log('PASS: billing opt-in, both charge gates, exact pricing snapshot, idempotency, stale/reverted rates, audit rollback and session isolation');
+ // Gift balance only (welcome bonus, promo code): paid features work without confirmed rates.
+ await pool.query('UPDATE masters SET is_active=false WHERE id=$1',[master.id]);sent=0;
+ const gift=(await pool.query("INSERT INTO masters(name,phone,master_token,category,is_active,is_subscribed,balance_tetri) VALUES('Gift','+995500000884','gift-master','movers',true,true,500) RETURNING *")).rows[0];
+ await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[gift.id]);
+ await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason,note) VALUES($1,500,'promo','WELCOME_AUTO')",[gift.id]);
+ const giftBalance=async()=>Number((await pool.query('SELECT balance_tetri FROM masters WHERE id=$1',[gift.id])).rows[0].balance_tetri);
+ const giftCharges=async type=>(await pool.query('SELECT metadata FROM sms_consent_logs WHERE event_type=$1 AND master_id=$2 ORDER BY id',[type,gift.id])).rows.map(row=>row.metadata);
+ const newOrder=async token=>(await pool.query("INSERT INTO orders(token,phone,description,status,target_categories) VALUES($1,'+995500000882','Move a sofa','new',ARRAY['movers']) RETURNING *",[token])).rows[0];
+ state=await billing.state(gift.id,'ru');assert.equal(state.accepted,false);assert.equal(state.required,false,'gift balance does not wait for confirmation');
+ assert.equal(state.intro,copy.ru.rates_gift_intro,'the confirmation text says the rates already apply to the bonus balance');
+ assert.ok((await masters.listMasters()).find(m=>m.id===gift.id).billing_accepted,'catalog card offers contacts');
+ assert.equal(await orders.notifyMasters(await newOrder('gift-order-1'),'movers',null,50),1);assert.equal(sent,1);assert.equal(await giftBalance(),450);
+ let basis=(await giftCharges('LEAD_CHARGE_ACCEPTED'))[0];assert.equal(basis.billing_basis,'gift_balance');assert.equal(basis.billing_consent_log_id,null);
+ assert.ok((await masters.revealPhoneForCall(gift.id,50,'+995500000885')).charged);assert.equal(await giftBalance(),400);
+ basis=(await giftCharges('CATALOG_CHARGE_ACCEPTED'))[0];assert.equal(basis.billing_basis,'gift_balance');assert.equal(basis.billing_consent_log_id,null);
+ // Own money is accepted only after the rates are confirmed.
+ const topupRequest=()=>{const out={code:200,locals:{t:translate('ru')},status(n){this.code=n;return this;},json(data){this.data=data;return this;}};
+   return topupController.create({params:{token:gift.master_token},body:{amount:'10',requestKey:require('node:crypto').randomUUID()}},out).then(()=>out);};
+ res=await topupRequest();assert.equal(res.code,409);assert.equal(res.data.message,copy.ru.rates_before_topup);
+ assert.equal((await pool.query('SELECT id FROM topup_requests WHERE master_id=$1',[gift.id])).rows.length,0);
+ // A negative correction is not the provider's money; any credit other than a gift is.
+ await masters.adjustBalance({masterId:gift.id,amountTetri:-100,reason:'admin_correction'});assert.equal(await billing.ownFunds(gift.id),false);
+ await masters.adjustBalance({masterId:gift.id,amountTetri:100,reason:'promo',note:'CODE'});assert.equal(await billing.ownFunds(gift.id),false);
+ await masters.topUpBalance(gift.phone,1000);assert.equal(await billing.ownFunds(gift.id),true);
+ state=await billing.state(gift.id,'ru');assert.equal(state.required,true);assert.equal(state.intro,copy.ru.billing_intro);
+ assert.ok(!(await masters.listMasters()).find(m=>m.id===gift.id).billing_accepted);
+ assert.equal(await orders.notifyMasters(await newOrder('gift-order-2'),'movers',null,50),0,'own money on the balance: no charge before confirmation');
+ assert.equal(await masters.revealPhoneForCall(gift.id,50,'+995500000886'),null);
+ assert.ok((await masters.revealPhoneForCall(gift.id,50,'+995500000885')).alreadyOpened);assert.equal(await giftBalance(),1400);
+ const correction=(await pool.query("INSERT INTO masters(name,phone,master_token,category,is_active,is_subscribed) VALUES('Corrected','+995500000887','corrected-master','movers',false,true) RETURNING *")).rows[0];
+ await masters.adjustBalance({masterId:correction.id,amountTetri:500,reason:'admin_correction'});assert.equal(await billing.ownFunds(correction.id),true,'a manual credit counts as own money');
+ const giftAccepted=await billing.accept(gift.master_token,{accepted:true,digest:state.digest,language:'ru'});assert.equal(giftAccepted.status,200);
+ res=await topupRequest();assert.equal(res.code,200);assert.ok(res.data.url.includes('/topups/'));
+ assert.equal(await orders.notifyMasters(await newOrder('gift-order-3'),'movers',null,50),1);assert.equal(await giftBalance(),1350);
+ assert.equal((await giftCharges('LEAD_CHARGE_ACCEPTED'))[1].billing_consent_log_id,giftAccepted.consentLogId);
+ for(const lang of ['ka','ru','en']) assert.ok(copy[lang].rates_gift_intro&&copy[lang].rates_before_topup);
+ assert.deepEqual(Object.keys(copy.ru).filter(key=>key.startsWith('billing_')).sort(),['billing_accepted','billing_button','billing_catalog','billing_check','billing_error','billing_intro','billing_lead','billing_note','billing_required','billing_stale','billing_title'],'a new billing_* key would void every confirmation already given');
+ console.log('PASS: billing opt-in, both charge gates, exact pricing snapshot, idempotency, stale/reverted rates, audit rollback, session isolation, gift balance without confirmation and confirmation before a top-up');
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>redis.disconnect());

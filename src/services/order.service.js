@@ -462,7 +462,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const earlier=(await client.query("SELECT id FROM dispatch_deliveries WHERE order_id=$1 AND master_id=$2 AND status='pending' AND run_id < $3",[order.id,master.id,run.id])).rows;
       if(earlier.length) { skipReason='prior_attempt_pending'; return; }
       const rates = await billing.pricing(client, true);
-      const billingConsent = await billing.accepted(master.id, rates, client);
+      const billingConsent = await billing.permission(master.id, rates, client);
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
       const link = getBaseUrl() + '/order/' + order.token + '?master=' + master.id;
       let receipt = null;
@@ -484,7 +484,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
         await consentLog.recordAction({ eventType: 'LEAD_CHARGE_ACCEPTED', phone: master.phone,
           masterId: master.id, orderId: order.id, metadata: {
             balance_transaction_id: charges[0].id,
-            billing_consent_log_id: billingConsent.consent_log_id, pricing_key: rates.key,
+            billing_consent_log_id: billingConsent.consent_log_id, billing_basis: billingConsent.basis, pricing_key: rates.key,
             run_id: run.id, category, matched_categories: openMatches, service_snapshot: liveServices, amount_tetri: leadPrice, balance_before_tetri: master.balance_tetri,
             balance_after_tetri: master.balance_tetri - leadPrice, channel,
             provider_message_id: receipt.providerMessageId || null,
@@ -521,7 +521,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     if (earlier.some((e) => !e.language || speaks(candidate, e.language))) continue;
     await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
       if (!master.is_active || master.is_banned || !master.is_subscribed || master.balance_tetri >= leadPrice) return;
-      if (!await billing.accepted(master.id, await billing.pricing(client), client)) return;
+      if (!await billing.permission(master.id, await billing.pricing(client), client)) return;
       await client.query('UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1 WHERE id=$1', [master.id]);
       await nudgeLowBalance(master, telegramService, 'missed');
     });

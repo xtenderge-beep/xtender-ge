@@ -1,6 +1,8 @@
+// Ключи billing_* входят в хеш тарифа (providerBilling.service): правка любого из них и любой новый ключ
+// с этим префиксом обнуляют уже данные подтверждения. Тексты про подарочный баланс поэтому названы rates_*.
 module.exports = {
   ru: {
-    signup_summary: ['Xtender связывает заказчиков и независимых исполнителей.', 'Одну заявку могут получить несколько исполнителей. Заказ и заработок не гарантируются.', 'Цену и объём работ вы согласовываете с заказчиком самостоятельно.', 'Платные функции включаются после отдельного подтверждения тарифов в кабинете.'],
+    signup_summary: ['Xtender связывает заказчиков и независимых исполнителей.', 'Одну заявку могут получить несколько исполнителей. Заказ и заработок не гарантируются.', 'Цену и объём работ вы согласовываете с заказчиком самостоятельно.', 'Бонусный баланс тратится на уведомления о заявках и показ вашего номера по тарифам из кабинета. Перед пополнением вы подтверждаете тарифы.'],
     signup_terms: 'Мне есть 18 лет. Принимаю оферту.',
     signup_terms_link: 'Полный текст оферты',
     signup_privacy: 'Ознакомлен с политикой конфиденциальности. Согласен на публичное размещение моего имени и номера телефона в каталоге.',
@@ -21,11 +23,13 @@ module.exports = {
     billing_stale: 'Тарифы изменились. Обновите страницу и проверьте новые суммы.',
     billing_error: 'Не удалось сохранить согласие. Повторите попытку.',
     billing_accepted: 'Тарифы подтверждены',
+    rates_gift_intro: 'Сейчас уведомления о заявках и показ номера оплачиваются с бонусного баланса по этим тарифам. Чтобы пополнить баланс, подтвердите их.',
+    rates_before_topup: 'Чтобы пополнить баланс, сначала подтвердите тарифы.',
     provider_billing_pending: 'Нужно подтвердить тарифы',
     provider_billing_pending_hint: "Подтвердите тарифы ниже, чтобы начать получать заявки.",
   },
   en: {
-    signup_summary: ['Xtender connects customers with independent providers.', 'Several providers may receive the same request. Jobs and earnings are not guaranteed.', 'You agree on the price and scope of work directly with the customer.', 'Paid features start only after you separately confirm the rates in your account.'],
+    signup_summary: ['Xtender connects customers with independent providers.', 'Several providers may receive the same request. Jobs and earnings are not guaranteed.', 'You agree on the price and scope of work directly with the customer.', 'Bonus credit pays for request notifications and for showing your number, at the rates listed in your account. You confirm the rates before topping up.'],
     signup_terms: 'I am 18 or older. I accept the Terms of Service.',
     signup_terms_link: 'Full Terms of Service',
     signup_privacy: 'I have read the Privacy Policy. I consent to my name and phone number being displayed publicly in the directory.',
@@ -46,11 +50,13 @@ module.exports = {
     billing_stale: 'The rates have changed. Refresh the page and review the new amounts.',
     billing_error: 'Unable to save your acceptance. Please try again.',
     billing_accepted: 'Rates confirmed',
+    rates_gift_intro: 'Request notifications and showing your number are currently paid from your bonus balance at these rates. Confirm them to top up your balance.',
+    rates_before_topup: 'Confirm the rates before topping up your balance.',
     provider_billing_pending: 'Confirm rates',
     provider_billing_pending_hint: "Confirm the rates below to start receiving requests.",
   },
   ka: {
-    signup_summary: ['Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან.', 'ერთი განაცხადი შეიძლება რამდენიმე შემსრულებელმა მიიღოს. შეკვეთა და შემოსავალი გარანტირებული არ არის.', 'სამუშაოს ფასსა და მოცულობას უშუალოდ დამკვეთთან ათანხმებთ.', 'ფასიანი ფუნქციები ჩაირთვება მხოლოდ პირად კაბინეტში ტარიფების ცალკე დადასტურების შემდეგ.'],
+    signup_summary: ['Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან.', 'ერთი განაცხადი შეიძლება რამდენიმე შემსრულებელმა მიიღოს. შეკვეთა და შემოსავალი გარანტირებული არ არის.', 'სამუშაოს ფასსა და მოცულობას უშუალოდ დამკვეთთან ათანხმებთ.', 'ბონუსის თანხა იხარჯება განაცხადის შეტყობინებებსა და თქვენი ნომრის ჩვენებაზე, კაბინეტში მითითებული ტარიფებით. ბალანსის შევსებამდე ტარიფებს დაადასტურებთ.'],
     signup_terms: 'ვარ 18 წლის ან მეტის. ვეთანხმები ოფერტას.',
     signup_terms_link: 'ოფერტის სრული ტექსტი',
     signup_privacy: 'გავეცანი კონფიდენციალურობის პოლიტიკას. ვეთანხმები ჩემი სახელისა და ტელეფონის ნომრის კატალოგში საჯაროდ განთავსებას.',
@@ -71,6 +77,8 @@ module.exports = {
     billing_stale: 'ტარიფები შეიცვალა. განაახლეთ გვერდი და შეამოწმეთ ახალი თანხები.',
     billing_error: 'თანხმობის შენახვა ვერ მოხერხდა. სცადეთ ხელახლა.',
     billing_accepted: 'ტარიფები დადასტურებულია',
+    rates_gift_intro: 'ამჟამად განაცხადის შეტყობინებებისა და ნომრის ჩვენების საფასური ბონუსის თანხიდან იჭრება ამ ტარიფებით. ბალანსის შესავსებად დაადასტურეთ ისინი.',
+    rates_before_topup: 'ბალანსის შესავსებად ჯერ დაადასტურეთ ტარიფები.',
     provider_billing_pending: 'დაადასტურეთ ტარიფები',
     provider_billing_pending_hint: "დაადასტურეთ ტარიფები ქვემოთ, რომ განაცხადების მიღება დაიწყოთ.",
   },

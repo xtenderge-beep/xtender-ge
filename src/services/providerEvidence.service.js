@@ -32,6 +32,7 @@ async function collect(profiles, phoneEvents) {
       'Contact release does not prove a call, a reply or a completed job.',
       'current_orders and current_acceptances describe export-time state; historical snapshots are in audit events.',
       'Missing historical evidence is not reconstructed or inferred. Deleted rows may remain available only through audit events.',
+      'A charge event with billing_basis "gift_balance" was taken while the balance held promotional credit only; it has no billing_consent_log_id. Charges against a balance with the provider\'s own money reference the accepted rates.',
     ],
     current_acceptances: acceptances.rows,
     billing_acceptance_events: events.rows.filter(e => e.event_type === 'PROVIDER_BILLING_ACCEPTED'),

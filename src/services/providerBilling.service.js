@@ -17,12 +17,14 @@ async function pricing(client = pool, lock = false) {
   return { ...rates, key: hash({ rates, content }) };
 }
 
-function bundle(rates, language) {
+// gift — у исполнителя на балансе только подарок: вступление говорит правду о том, что тарифы уже
+// действуют для бонусного баланса. Показанный текст попадает в снимок и в digest.
+function bundle(rates, language, { gift = false } = {}) {
   const lang = Object.hasOwn(copy, language) ? language : 'ka';
   const text = copy[lang];
   const snapshot = { version: 'billing-v1', language: lang, pricing_key: rates.key,
     lead_price_tetri: rates.leadPriceTetri, catalog_call_price_tetri: rates.catalogCallPriceTetri,
-    title: text.billing_title, intro: text.billing_intro,
+    title: text.billing_title, intro: gift ? text.rates_gift_intro : text.billing_intro,
     lead: text.billing_lead.replace('{price}', (rates.leadPriceTetri / 100).toFixed(2)),
     catalog: text.billing_catalog.replace('{price}', (rates.catalogCallPriceTetri / 100).toFixed(2)),
     note: text.billing_note, checkbox: text.billing_check, button: text.billing_button };
@@ -33,9 +35,26 @@ async function accepted(masterId, rates, client = pool) {
   return (await client.query('SELECT consent_log_id FROM master_billing_acceptances WHERE master_id=$1 AND pricing_key=$2', [masterId, rates.key])).rows[0] || null;
 }
 
+// Подарочный баланс (приветственный бонус и промокод, reason 'promo') расходуется без подтверждения
+// тарифов: своих денег исполнитель не теряет. Любое другое зачисление (перевод, ручная коррекция
+// вверх) считается его деньгами, и с этого момента списания требуют подтверждённых тарифов.
+async function ownFunds(masterId, client = pool) {
+  return (await client.query("SELECT id FROM balance_transactions WHERE master_id=$1 AND amount_tetri > 0 AND reason <> 'promo' LIMIT 1", [masterId])).rows.length > 0;
+}
+
+// Основание для списания: подтверждённые тарифы либо баланс без денег исполнителя. null — списывать нельзя.
+async function permission(masterId, rates, client = pool) {
+  const acceptance = await accepted(masterId, rates, client);
+  if (acceptance) return { basis: 'accepted_rates', consent_log_id: acceptance.consent_log_id };
+  return await ownFunds(masterId, client) ? null : { basis: 'gift_balance', consent_log_id: null };
+}
+
+// required — на балансе есть свои деньги, а действующие тарифы не подтверждены: платные функции на паузе.
 async function state(masterId, language) {
   const rates = await pricing();
-  return { ...bundle(rates, language), accepted: Boolean(await accepted(masterId, rates)) };
+  const isAccepted = Boolean(await accepted(masterId, rates));
+  const funded = await ownFunds(masterId);
+  return { ...bundle(rates, language, { gift: !funded }), accepted: isAccepted, required: funded && !isAccepted };
 }
 
 async function accept(masterToken, body, meta = {}) {
@@ -44,7 +63,7 @@ async function accept(masterToken, body, meta = {}) {
     const master = (await client.query('SELECT * FROM masters WHERE master_token=$1 FOR UPDATE', [masterToken])).rows[0];
     if (!master || master.is_banned) return { status: 403, code: 'billing_error' };
     const rates = await pricing(client, true);
-    const snapshot = bundle(rates, body.language);
+    const snapshot = bundle(rates, body.language, { gift: !await ownFunds(master.id, client) });
     if (snapshot.digest !== body.digest) return { status: 409, code: 'billing_stale' };
     const existing = await accepted(master.id, rates, client);
     if (existing) return { status: 200, consentLogId: existing.consent_log_id };
@@ -58,8 +77,12 @@ async function accept(masterToken, body, meta = {}) {
   });
 }
 
+// Кому платные функции разрешены: подтвердившие действующие тарифы и те, у кого на балансе только подарок.
 async function eligibleIds(rates, client = pool) {
-  return new Set((await client.query('SELECT master_id FROM master_billing_acceptances WHERE pricing_key=$1', [rates.key])).rows.map(row => row.master_id));
+  const ids = new Set((await client.query('SELECT master_id FROM master_billing_acceptances WHERE pricing_key=$1', [rates.key])).rows.map(row => row.master_id));
+  const funded = new Set((await client.query("SELECT DISTINCT master_id FROM balance_transactions WHERE amount_tetri > 0 AND reason <> 'promo'")).rows.map(row => row.master_id));
+  for (const row of (await client.query('SELECT id FROM masters')).rows) if (!funded.has(row.id)) ids.add(row.id);
+  return ids;
 }
 
-module.exports = { pricing, bundle, state, accept, accepted, eligibleIds };
+module.exports = { pricing, bundle, state, accept, accepted, permission, ownFunds, eligibleIds };

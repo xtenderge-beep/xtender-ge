@@ -1,5 +1,6 @@
 const masters = require('../services/master.service');
 const topups = require('../services/topup.service');
+const billing = require('../services/providerBilling.service');
 const redis = require('../config/redis');
 
 async function create(req, res) {
@@ -11,6 +12,8 @@ async function create(req, res) {
   const count = await redis.incr(rateKey);
   if (count === 1) await redis.expire(rateKey, 3600);
   if (count > 20) return res.status(429).json({ message: res.locals.t('pay_rate') });
+  // Свои деньги вносятся только после подтверждения действующих тарифов (см. providerBilling.service).
+  if (!await billing.accepted(master.id, await billing.pricing())) return res.status(409).json({ message: res.locals.t('rates_before_topup') });
   const topup = await topups.create(master.id, amount, req.body.requestKey);
   res.json({ url: `/master/${master.master_token}/topups/${topup.id}` });
 }

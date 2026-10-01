@@ -35,11 +35,44 @@ alone cannot accept a rate.
 is idempotent. The audit and permission commit atomically. Later charges reference
 the exact billing acceptance audit ID and balance transaction ID.
 
-No acceptance means no new notification dispatch/charge and no paid directory
-disclosure. Directory cards remain visible but their contact controls are not
-offered until rates are accepted. Moderation and balance requirements still apply.
+For a provider whose balance holds their own money, no acceptance means no new
+notification dispatch/charge and no paid directory disclosure. Directory cards remain
+visible but their contact controls are not offered until rates are accepted. Moderation
+and balance requirements still apply.
 Already purchased order contacts do not require acceptance of a newly changed rate.
 Top-ups and promotional credits never imply billing acceptance.
+
+### Gift balance (owner's decision, 2026-10-02)
+
+Before this change every provider had to confirm the rates first. Providers who never
+opened the cabinet block kept their welcome bonus unused: no request notifications and
+«Temporarily unavailable» in the directory. The owner's reasoning: while only the
+platform's gift is spent the provider loses no money of their own, and consent to service
+notifications and to publishing contacts is already given at signup.
+
+- **Gift** is a balance credit with reason `promo`: the automatic welcome bonus and promo
+  codes. **Own money** is any other positive credit: `topup` (bank transfer, Telegram
+  `/topup`) and a positive `admin_correction`. `providerBilling.ownFunds` checks the ledger.
+- While the ledger has no own-money credit, notifications and directory disclosure are
+  charged without acceptance. `providerBilling.permission` returns the basis; the charge
+  audit stores `billing_basis: 'gift_balance'` and `billing_consent_log_id: null`. With an
+  acceptance the basis is `accepted_rates` and the ID is stored as before.
+- Own money is accepted only after the current rates are confirmed: the balance tab shows
+  the confirmation in place of the amount form, and `POST /api/master/:token/topups`
+  answers 409 without it. The intro of that confirmation is `rates_gift_intro` («the rates
+  already apply to your bonus balance»), and that text is what the snapshot archives.
+- A provider with own money and no current acceptance is paused exactly as before
+  (`state.required`): after a rate change, or when money was credited past the cabinet
+  (Telegram `/topup`, a manual correction). The cabinet shows the confirmation at the top.
+- The balance is a single number. Once own money is credited, the remaining gift is
+  spent under the same rule as the money: only with confirmed rates.
+- New keys are named `rates_*` on purpose: any key starting with `billing_` is part of the
+  pricing hash and would void every acceptance already given.
+- Signup fact four now says that the bonus is spent on notifications and number views at
+  the cabinet rates and that rates are confirmed before a top-up. The signup digest changed.
+
+Not a legal conclusion. The Offer still describes the earlier order; the note for the
+lawyer is in `tasks.md`.
 
 Editing either rate through settings creates a fresh revision and invalidates
 current permissions. Restoring an old numeric price does not revive an old consent.
@@ -56,7 +89,8 @@ permissions through a hash of the three-language billing text.
 setting through the normal migration-on-start flow. There is deliberately no
 automatic migration from top-ups or general terms acceptance to billing consent.
 **All existing providers must confirm rates in their cabinet before any new paid
-events.** Profiles, balances, historical charges and accepted documents are preserved.
+events** (since 2026-10-02 only those whose balance holds their own money, see «Gift
+balance»). Profiles, balances, historical charges and accepted documents are preserved.
 Staff should know this before deployment to explain why a funded account may not
 receive new leads. No notifications to staff or users are sent by this change.
 

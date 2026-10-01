@@ -583,6 +583,7 @@ async function listMasters({ serviceType, language, cityId } = {}) {
       display_name: require('../config/providerName').resolve(m),
       spoken_languages: profileMap.get(m.id)?.spoken_languages || [],
       available_channels: Object.keys(require('../config/catalogContacts').links({...m, contact_channels: profileMap.get(m.id)?.contact_channels})),
+      // Платные функции разрешены: тарифы подтверждены либо на балансе только подарок (см. providerBilling).
       billing_accepted: billingIds.has(m.id),
       service_type: s ? s.service_type : (services.some(row=>row.master_id === m.id) ? null : (m.category === 'transport' ? 'van' : m.category)),
       attributes: s ? s.attributes || {} : {},
@@ -594,7 +595,7 @@ async function listMasters({ serviceType, language, cityId } = {}) {
 
 // Lock the provider before checking the durable access record. Access, debit and audit commit together.
 // free — тестовый телефон из /admin/technical: номер открывается при тех же условиях, что и у
-// настоящего заказчика (тариф подтверждён, баланса хватает), но без списания.
+// настоящего заказчика (тариф подтверждён или на балансе только подарок, баланса хватает), но без списания.
 async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = false } = {}) {
   return pool.withTransaction(async (client) => {
     const found = (await client.query('SELECT * FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
@@ -603,7 +604,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = fa
     if (prior) return { ...found, alreadyOpened: true, charged: false, openedAt: prior.opened_at };
     const billing = require('./providerBilling.service');
     const rates = await billing.pricing(client, true);
-    const acceptance = await billing.accepted(masterId, rates, client);
+    const acceptance = await billing.permission(masterId, rates, client);
     if (!acceptance || rates.catalogCallPriceTetri !== priceTetri) return null;
     if (free) {
       if (Number(found.balance_tetri) < priceTetri) return null;
@@ -625,7 +626,7 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = fa
     );
     await consentLog.recordAction({ eventType: 'CATALOG_CHARGE_ACCEPTED', phone: master.phone, masterId: master.id,
       metadata: { amount_tetri: priceTetri, balance_transaction_id: charge.rows[0].id,
-        billing_consent_log_id: acceptance.consent_log_id, pricing_key: rates.key } }, client);
+        billing_consent_log_id: acceptance.consent_log_id, billing_basis: acceptance.basis, pricing_key: rates.key } }, client);
     return { ...found, ...master, alreadyOpened: false, charged: true };
   });
 }
