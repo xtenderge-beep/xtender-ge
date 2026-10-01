@@ -858,6 +858,28 @@ CREATE TABLE IF NOT EXISTS master_admin_events (
 );
 CREATE INDEX IF NOT EXISTS idx_master_admin_events_master ON master_admin_events(master_id, created_at);
 
+-- Посещаемость сайта (вкладка «Посещаемость» в /admin) вместо Google Analytics. Без куки и
+-- без IP: visitor — обрезанный sha256(соль дня + IP + браузер), соль меняется каждые сутки
+-- и живёт только в Redis, поэтому человека нельзя ни узнать, ни связать между днями.
+-- page — тип страницы, а не адрес: в адресах бывают секретные токены (/o/…, /master/…).
+-- source — внешний источник только у входа на сайт (utm_source или домен реферера).
+-- Строки старше 400 дней удаляются (siteAnalytics.service.start). Пишется с 2026-10-01.
+CREATE TABLE IF NOT EXISTS site_visits (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  visitor CHAR(16) NOT NULL,
+  page VARCHAR(40) NOT NULL,
+  source VARCHAR(80),
+  utm_medium VARCHAR(80),
+  utm_campaign VARCHAR(120),
+  device VARCHAR(10) NOT NULL,
+  browser VARCHAR(20) NOT NULL,
+  country CHAR(2),
+  lang VARCHAR(5),
+  is_staff BOOLEAN NOT NULL DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_site_visits_created ON site_visits(created_at);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

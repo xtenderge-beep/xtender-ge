@@ -135,6 +135,8 @@ runMigrations()
     });
     // Описания исполнителей без перевода (старые профили, сбои) — через минуту и раз в час.
     require('./services/descriptionTranslation.service').start();
+    // Посещаемость: удаление записей старше 400 дней раз в сутки.
+    require('./services/siteAnalytics.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

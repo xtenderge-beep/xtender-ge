@@ -179,7 +179,11 @@ async function overview(req, res) {
   let dashboard;
   try { dashboard = await require('../services/dashboard.service').getDashboard(req.query); }
   catch (error) { if (error.code === 'INVALID_RANGE') return res.status(400).send(error.message); throw error; }
-  dashboard.tab = ['providers', 'managers', 'finance'].includes(req.query.tab) ? req.query.tab : 'overview';
+  dashboard.tab = ['providers', 'managers', 'finance', 'traffic'].includes(req.query.tab) ? req.query.tab : 'overview';
+  if (dashboard.tab === 'traffic') {
+    const dashboardService = require('../services/dashboard.service');
+    dashboard.traffic = await require('../services/siteAnalytics.service').report(dashboardService.windowFor(req.query));
+  }
   dashboard.managerFilter = /^\d+$/.test(req.query.manager || '') ? String(req.query.manager) : '';
   res.set('Cache-Control', 'no-store');
   if (req.query.format === 'json') {

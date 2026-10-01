@@ -7,7 +7,9 @@ const count = reason => dashboard.money.current[reason]?.count || 0;
 const change = (current, previous) => previous ? ((current - previous) / previous * 100 >= 0 ? '+' : '') + Math.round((current - previous) / previous * 100) + '% к прошлому периоду' : 'Прошлый период: ' + num(previous);
 %>
 <div data-dashboard-time="<%= dashboard.generatedAt %>">
-  <% if (['providers', 'managers'].includes(dashboard.tab)) { %>
+  <% if (dashboard.tab === 'traffic') { %>
+    <%- include('./_traffic', { dashboard }) %>
+  <% } else if (['providers', 'managers'].includes(dashboard.tab)) { %>
     <%- include('./_people-analytics', { dashboard }) %>
   <% } else { %>
   <% if (dashboard.tab !== 'finance') { %>

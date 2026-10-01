@@ -8,6 +8,18 @@ const asyncHandler = require('../middleware/asyncHandler');
 
 const router = express.Router();
 
+// Просмотр страницы для вкладки «Посещаемость» (public/js/visit.js). Всегда 204: сбор
+// аналитики не должен ни ломать страницу, ни подсказывать, записали просмотр или нет.
+router.post('/v', (req, res) => {
+  res.status(204).end();
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  require('../services/siteAnalytics.service').record({
+    path: b.p, referrer: b.r, utmSource: b.us, utmMedium: b.um, utmCampaign: b.uc, lang: b.l, width: b.w, staff: b.s === 1,
+    ip: req.headers['cf-connecting-ip'] || req.ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 400),
+    host: req.hostname, country: req.headers['cf-ipcountry'],
+  }).catch(err => console.error('[site-analytics]', err.message));
+});
+
 router.post('/otp/send', asyncHandler(otpController.send));
 router.post('/otp/verify', asyncHandler(otpController.verify));
 

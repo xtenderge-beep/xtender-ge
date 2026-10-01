@@ -1,0 +1,63 @@
+<% const tr = dashboard.traffic;
+const num = n => Number(n || 0).toLocaleString('ru-RU');
+const pct = (n, d) => d ? (Math.round(n * 1000 / d) / 10) + '%' : '—';
+const change = (current, previous) => previous ? ((current - previous) / previous * 100 >= 0 ? '+' : '') + Math.round((current - previous) / previous * 100) + '% к прошлому периоду' : 'Прошлый период: ' + num(previous);
+const DEVICES = { mobile: 'Телефон', desktop: 'Компьютер', tablet: 'Планшет' };
+const LANGS = { ru: 'Русский', ka: 'Грузинский', en: 'Английский' };
+const bars = (title, items, total, label) => { %>
+  <section class="dash-panel" aria-label="<%= title %>">
+    <div class="dash-section-heading"><h2><%= title %></h2></div>
+    <% if (!items.length) { %><p class="dash-note">Нет данных за период.</p><% } %>
+    <% items.forEach(item => { %>
+      <div class="dash-funnel-row"><span><%= label ? label(item) : item.name %></span><div class="dash-track"><div style="width:<%= total ? Math.max(2, Math.round(item.count * 100 / total)) : 0 %>%"></div></div><b><%= num(item.count) %></b><small><%= pct(item.count, total) %></small></div>
+    <% }); %>
+  </section>
+<% }; %>
+<div class="dash-section-heading"><h2>Посещаемость сайта</h2><span>Сейчас на сайте: <b><%= num(tr.online) %></b> · за последние 5 минут</span></div>
+<% if (!tr.since) { %>
+  <p class="dash-note">Данных пока нет: счётчик собирает посещения с момента выкладки. Откройте сайт в обычном окне (не из админки) — через минуту здесь появятся цифры.</p>
+<% } %>
+<div class="dash-cards">
+  <article class="dash-card"><span>Посетители</span><strong><%= num(tr.current.visitors) %></strong><small><%= change(tr.current.visitors, tr.previous.visitors) %></small></article>
+  <article class="dash-card"><span>Визиты</span><strong><%= num(tr.current.visits) %></strong><small><%= change(tr.current.visits, tr.previous.visits) %></small></article>
+  <article class="dash-card"><span>Просмотры страниц</span><strong><%= num(tr.current.pageviews) %></strong><small><%= change(tr.current.pageviews, tr.previous.pageviews) %></small></article>
+  <article class="dash-card"><span>Отказы</span><strong><%= tr.current.bounceRate === null ? '—' : tr.current.bounceRate + '%' %></strong><small>Визиты с одной страницей · <%= tr.current.viewsPerVisit === null ? '—' : tr.current.viewsPerVisit %> стр. за визит</small></article>
+</div>
+
+<section class="dash-panel" aria-label="График посещаемости">
+  <div class="dash-section-heading"><h2><%= tr.hourly ? 'По часам' : 'По дням' %></h2><span><span style="display:inline-block;width:10px;height:10px;background:#059669;border-radius:2px"></span> посетители · <span style="display:inline-block;width:10px;height:10px;background:#a7f3d0;border-radius:2px"></span> просмотры</span></div>
+  <% const max = Math.max(1, ...tr.chart.map(b => b.views)); const n = tr.chart.length; const step = 100 / n; const every = Math.ceil(n / 12); %>
+  <svg viewBox="0 0 100 44" preserveAspectRatio="none" style="width:100%;height:220px;display:block" role="img" aria-label="Посетители и просмотры по <%= tr.hourly ? 'часам' : 'дням' %>">
+    <% tr.chart.forEach((b, i) => { const hv = b.views * 40 / max, hu = b.visitors * 40 / max; %>
+      <rect x="<%= (i * step + step * 0.12).toFixed(3) %>" y="<%= (40 - hv).toFixed(3) %>" width="<%= (step * 0.76).toFixed(3) %>" height="<%= hv.toFixed(3) %>" fill="#a7f3d0"><title><%= b.label %>: просмотров <%= b.views %>, посетителей <%= b.visitors %></title></rect>
+      <rect x="<%= (i * step + step * 0.26).toFixed(3) %>" y="<%= (40 - hu).toFixed(3) %>" width="<%= (step * 0.48).toFixed(3) %>" height="<%= hu.toFixed(3) %>" fill="#059669"><title><%= b.label %>: посетителей <%= b.visitors %>, просмотров <%= b.views %></title></rect>
+    <% }); %>
+    <line x1="0" y1="40" x2="100" y2="40" stroke="#d6d3d1" stroke-width="0.2"/>
+  </svg>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:#78716c;margin-top:4px"><% tr.chart.forEach((b, i) => { if (i % every === 0) { %><span><%= b.label %></span><% } }); %></div>
+</section>
+
+<section class="dash-panel" aria-label="Конверсия">
+  <div class="dash-section-heading"><h2>Конверсия</h2><span>Посетители — уникальные за день</span></div>
+  <div class="dash-cards">
+    <article class="dash-card"><span>Главная → подтверждённая заявка</span><strong><%= pct(dashboard.current.confirmed, tr.homeVisitors) %></strong><small><%= num(dashboard.current.confirmed) %> заявок из <%= num(tr.homeVisitors) %> посетителей главной</small></article>
+    <article class="dash-card"><span>Регистрация исполнителя</span><strong><%= pct(tr.registrations, tr.joinVisitors) %></strong><small><%= num(tr.registrations) %> регистраций из <%= num(tr.joinVisitors) %> посетителей /join</small></article>
+  </div>
+</section>
+
+<% bars('Источники визитов', tr.sources, tr.current.visits); %>
+<% bars('Страницы входа', tr.entries, tr.current.visits, item => item.label); %>
+<section class="dash-panel" aria-label="Страницы">
+  <div class="dash-section-heading"><h2>Страницы</h2><span>Тип страницы, а не адрес: в адресах заявок и кабинетов — секретные ссылки</span></div>
+  <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Страница</th><th>Просмотры</th><th>Посетители</th></tr></thead><tbody>
+    <% if (!tr.pages.length) { %><tr><td colspan="3">Нет данных за период.</td></tr><% } %>
+    <% tr.pages.forEach(p => { %><tr><td><%= p.label %></td><td><%= num(p.count) %></td><td><%= num(p.visitors) %></td></tr><% }); %>
+  </tbody></table></div>
+</section>
+<% bars('Устройства', tr.devices, tr.current.visits, item => DEVICES[item.name] || item.name); %>
+<% bars('Язык сайта', tr.langs, tr.current.visits, item => LANGS[item.name] || item.name); %>
+<% const regions = (() => { try { return new Intl.DisplayNames(['ru'], { type: 'region' }); } catch (e) { return null; } })(); %>
+<% bars('Страны', tr.countries, tr.current.visits, item => { if (item.name === '—') return 'Не определена'; try { return regions ? regions.of(item.name) : item.name; } catch (e) { return item.name; } }); %>
+<% bars('Браузеры', tr.browsers, tr.current.visits); %>
+
+<p class="dash-note">Как считаем. Без куки и без хранения IP: посетитель распознаётся по обезличенному отпечатку, который меняется каждые сутки, поэтому один человек в разные дни считается отдельно, а «посетители» за период — сумма уникальных за каждый день. Визит — просмотры без паузы дольше 30 минут. Не считаются боты, браузеры без JavaScript и сотрудники, открывавшие админку или кабинет менеджера на этом устройстве. Страна — по данным Cloudflare. Записи старше 400 дней удаляются.<% if (tr.since) { %> Данные собираются с <%= new Date(tr.since).toLocaleDateString('ru-RU', { timeZone: 'Asia/Tbilisi' }) %>.<% } %></p>
