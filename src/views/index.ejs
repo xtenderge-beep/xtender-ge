@@ -336,7 +336,7 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-reachable="<%= master.reachable ? 1 : 0 %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
 
                                       <%
                                         const ratingStars = Math.round(Number(master.rating) || 0);
@@ -379,7 +379,11 @@
                                       <% } %>
 
                                       <% if (master.description) { %>
-                                        <p class="text-xs text-stone-600 leading-snug -mt-1"><%= master.description %></p>
+                                        <%# Clamped to three lines so cards in a row stay close in height; the toggle appears only when text is cut (see syncDescriptionToggles). %>
+                                        <div class="catalog-card-description -mt-1">
+                                            <p class="text-xs text-stone-600 leading-snug"><%= master.description %></p>
+                                            <button type="button" class="catalog-description-toggle" data-more="<%= t('catalog_description_more') %>" data-less="<%= t('catalog_description_less') %>" aria-expanded="false" hidden><%= t('catalog_description_more') %></button>
+                                        </div>
                                       <% } %>
 
                                       <% if (master.reviews.length) { %>
@@ -406,7 +410,7 @@
 </div></div>
                                       <div class="catalog-card-bottom">
                                       <div class="reveal-contact-slot" data-master-id="<%= master.id %>">
-                                          <% if (master.contact_opened || (master.billing_accepted === true && master.balance_tetri >= catalogCallPriceTetri)) { %>
+                                          <% if (master.reachable) { %>
 <p class="catalog-contact-state"><%= master.contact_opened ? t('catalog_opened') : '' %></p>
 <% if (master.phone_display) { %><p class="catalog-card-phone"><i class="fa-solid fa-phone" aria-hidden="true"></i><span><%= master.phone_display %></span><% if (!master.contact_opened) { %><button type="button" class="reveal-contact-btn catalog-phone-reveal" data-master-id="<%= master.id %>" data-action="show"><%= t('catalog_show_number') %></button><% } %></p><% } %>
 <div class="catalog-contact-actions"><% (master.available_channels || ['call']).forEach(channel => { %>
@@ -688,7 +692,28 @@
             sizeFilterBar.classList.toggle('flex', activeCategory === 'van');
             catFilterBtns.forEach((btn) => styleFilterBtn(btn, btn.dataset.filterCat === activeCategory));
             sizeFilterBtns.forEach((btn) => styleFilterBtn(btn, btn.dataset.filterSize === activeSize));
+            syncDescriptionToggles();
         }
+
+        // «Показать полностью» есть только у описаний, которые не помещаются в три строки.
+        // Скрытую фильтром карточку измерить нельзя, поэтому пересчёт идёт после каждого фильтра и при смене ширины.
+        function syncDescriptionToggles() {
+            document.querySelectorAll('.catalog-card-description').forEach((box) => {
+                if (box.classList.contains('is-open')) return;
+                const text = box.querySelector('p');
+                if (!text.clientHeight) return;
+                box.querySelector('.catalog-description-toggle').hidden = text.scrollHeight <= text.clientHeight + 1;
+            });
+        }
+        document.querySelectorAll('.catalog-description-toggle').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const open = btn.parentElement.classList.toggle('is-open');
+                btn.textContent = open ? btn.dataset.less : btn.dataset.more;
+                btn.setAttribute('aria-expanded', String(open));
+            });
+        });
+        window.addEventListener('resize', syncDescriptionToggles);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncDescriptionToggles);
 
         function scrollToId(id) {
             const el = document.getElementById(id);
@@ -1249,7 +1274,7 @@
         function sortCatalogLanguages() {
             const language = document.getElementById('catalog-language').value;
             document.querySelectorAll('.home-master-grid').forEach(grid => {
-                Array.from(grid.children).sort((a,b) => Number(b.dataset.languages.split(' ').includes(language)) - Number(a.dataset.languages.split(' ').includes(language))).forEach(card => grid.append(card));
+                Array.from(grid.children).sort((a,b) => (Number(b.dataset.reachable) - Number(a.dataset.reachable)) || (Number(b.dataset.languages.split(' ').includes(language)) - Number(a.dataset.languages.split(' ').includes(language)))).forEach(card => grid.append(card));
             });
             document.querySelectorAll('.catalog-language-badge').forEach(b => b.classList.toggle('is-preferred', b.dataset.language === language));
             applyFilters();

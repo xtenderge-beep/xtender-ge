@@ -597,12 +597,17 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .catalog-form-benefit{padding:18px 20px;border:1px solid #dce5d7;border-radius:14px;background:#fff}.catalog-form-benefit h3{font-weight:750;font-size:16px}.catalog-form-benefit p{font-size:13px;line-height:1.65;color:#647269;margin:7px 0}.catalog-form-benefit a{font-size:13px;font-weight:750;color:#28693e}
 .home-page .master-card .reveal-contact-slot{margin-top:0}.catalog-contact-state:empty{display:none}
 
-/* Catalog card: initials and category beside the name; contacts follow the content (cards keep
-   their own height, tops aligned); the number shows its start until it is opened. */
+/* Catalog card: initials and category beside the name; cards in a row share one height (the
+   description is cut to three lines, contacts sit at the bottom); the number shows its start
+   until it is opened. */
 .catalog-card-head{display:flex;align-items:flex-start;gap:12px}
 .catalog-card-avatar{display:flex;align-items:center;justify-content:center;width:42px;height:42px;flex-shrink:0;border-radius:50%;background:#e6efe8;color:#2a624b;font-size:15px;font-weight:700;letter-spacing:.02em}
 .catalog-card-category{margin-top:2px;font-size:13px;line-height:1.4;color:#647269}
-.catalog-card-bottom{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid #edf0ea}
+.catalog-card-bottom{display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:14px;border-top:1px solid #edf0ea}
+.catalog-card-description p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.catalog-card-description.is-open p{display:block;overflow:visible}
+.home-page .catalog-description-toggle{margin-top:4px;padding:2px 0;font-size:13px;font-weight:650;color:#087e61;text-decoration:underline;text-underline-offset:3px}
+.home-page .catalog-description-toggle:hover{color:#06664d}
 .catalog-card-phone{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;font-size:15px;font-weight:650;color:#152e29;font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .catalog-card-phone i{font-size:12px;color:#087e61}
 .home-page .reveal-contact-slot .catalog-phone-reveal{margin-left:auto;padding:4px 0;border-radius:4px;font-size:13px;font-weight:650;color:#087e61;text-decoration:underline;text-underline-offset:3px;letter-spacing:0}
@@ -610,7 +615,6 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .catalog-card-foot{display:flex;align-items:center;gap:12px}
 .home-page .catalog-card-foot .review-leave-btn{color:#647269;font-weight:500}
 .home-page .catalog-card-foot .review-leave-btn:hover{color:#087e61}
-.home-master-grid{align-items:start}
 /* Number reveal dialog: why we ask for the phone, then the site's green primary button. */
 .reveal-points{display:flex;flex-direction:column;gap:8px;margin:0;padding:12px 14px;list-style:none;background:#f3f8f4;border-radius:12px;font-size:13px;line-height:1.5;color:#2f4a3d}
 .reveal-points li{display:flex;align-items:flex-start;gap:9px}
@@ -621,9 +625,11 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .home-page [role="dialog"] :has(> input){scroll-margin-bottom:24px}
 /* Fewer than 10 providers: all cards share one grid; category headings are hidden. */
 .catalog-groups{display:flex;flex-direction:column;gap:32px}
-.catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.catalog-groups.is-flat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .catalog-groups.is-flat>[data-group],.catalog-groups.is-flat .home-master-grid{display:contents}
 .catalog-groups.is-flat>[data-group]>h3{display:none}
+/* Cards still sit in their category blocks in the markup, so unreachable ones are moved to the end of the shared grid here. */
+.catalog-groups.is-flat .master-card[data-reachable="0"]{order:1}
 .catalog-groups.is-flat>[data-group].hidden{display:none}
 @media(max-width:1100px){.catalog-groups.is-flat{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:639px){.catalog-groups.is-flat{grid-template-columns:1fr}}

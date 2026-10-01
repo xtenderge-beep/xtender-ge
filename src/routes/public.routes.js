@@ -66,7 +66,12 @@ router.get('/', asyncHandler(async (req, res) => {
     m.contact_opened = history.has(m.id);
     // Full number only for a caller who already opened this provider; everyone else sees the masked start.
     m.phone_display = m.contact_opened ? formattedPhone(m.phone) : m.phone_masked;
+    // Whether the card shows contact buttons or «temporarily unavailable».
+    m.reachable = m.contact_opened || (m.billing_accepted === true && m.balance_tetri >= catalogCallPriceTetri);
   });
+  // Reachable providers go first, so a row of cards rarely mixes a tall card with buttons and a short
+  // «unavailable» one. The sort is stable: the language order from listMasters is kept inside each half.
+  masters.sort((a, b) => Number(b.reachable) - Number(a.reachable));
   const reviews = await reviewService.listApprovedForMasters(masters.map((m) => m.id));
   const reviewsByMaster = new Map();
   reviews.forEach((rv) => {
