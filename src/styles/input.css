@@ -412,10 +412,17 @@ html[lang="ka"] .hx-now { font-size:19px; letter-spacing:0; }
 .home-footer p { font-size:12px !important; line-height:1.7; margin-top:8px; max-width:430px; }
 .home-footer a { color:#53635a; font-size:13px; }
 .home-footer a:hover { color:var(--home-green); }
-.home-page #mobileNav { background:#fff; border-top:1px solid var(--home-line); padding:4px 8px max(4px,env(safe-area-inset-bottom)); box-shadow:0 -4px 24px #173e2808; }
-.home-page #mobileNav :is(button,a) { color:#728279; min-width:0; }
+/* Columns follow the label widths: Georgian labels are longer than an equal quarter of the screen.
+   A label that still does not fit wraps under its icon, and the icons stay on one line. */
+.home-page #mobileNav { background:#fff; border-top:1px solid var(--home-line); padding:4px 8px max(4px,env(safe-area-inset-bottom)); box-shadow:0 -4px 24px #173e2808; grid-template-columns:repeat(4,auto); }
+.home-page #mobileNav :is(button,a) { color:#728279; min-width:0; justify-content:flex-start; padding-left:4px; padding-right:4px; }
 .home-page #mobileNav button:first-child { color:var(--home-green); }
-.home-page #mobileNav span { font-size:11px; line-height:1.5; }
+.home-page #mobileNav span { font-size:11px; line-height:1.3; text-align:center; }
+html[lang="ka"] .home-page #mobileNav span { font-size:10px; }
+@media (max-width:340px) {
+  .home-page #mobileNav { padding-left:4px; padding-right:4px; }
+  .home-page #mobileNav :is(button,a) { padding-left:2px; padding-right:2px; }
+}
 .home-page #mobileNav i { font-size:17px; margin-bottom:3px; }
 .home-modal-open { overflow:hidden; }
 .home-page [role="dialog"] > div { max-height:calc(100dvh - 40px); overflow-y:auto; border-radius:20px; padding:30px; }
