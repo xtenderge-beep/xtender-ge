@@ -266,8 +266,23 @@ async function recordView(managerId, masterId) {
   } catch (e) { console.error('manager_master_views:', e.message); }
 }
 
+// Мессенджеры для каталога (WhatsApp, Viber, Telegram) менеджер заполняет за своего специалиста:
+// узнаёт их по телефону, а сам специалист в кабинет заходит редко. Только закреплённые за ним.
+async function updateMessengers(managerId, masterId, input) {
+  const masters = require('./master.service');
+  let saved;
+  try {
+    saved = await masters.updateMasterMessengers(Number(masterId), input, { managerId });
+  } catch (e) {
+    if (e.code === 'INVALID_CONTACT') throw fail('Проверьте номера WhatsApp и Viber (+код страны и номер) и имя Telegram.', 400);
+    throw e;
+  }
+  if (!saved) throw fail('Специалист не найден.', 404);
+  await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'edit_contact',$3)", [managerId, saved.id, masters.messengerSummary(saved.contact_channels)]);
+}
+
 async function detail(managerId, masterId) {
-  const master = (await pool.query('SELECT id,name,phone,category,balance_tetri,is_active,is_banned,banned_reason,banned_by_manager_id,is_subscribed,subscription_until,created_at FROM masters WHERE id=$1 AND manager_id=$2', [masterId, managerId])).rows[0];
+  const master = (await pool.query('SELECT id,name,phone,category,balance_tetri,is_active,is_banned,banned_reason,banned_by_manager_id,is_subscribed,subscription_until,created_at,contact_channels FROM masters WHERE id=$1 AND manager_id=$2', [masterId, managerId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   await recordView(managerId, master.id);
   const ledger = (await pool.query('SELECT b.id,b.amount_tetri,b.reason,b.created_at FROM balance_transactions b JOIN masters m ON m.id=b.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY b.created_at DESC,b.id DESC LIMIT 100', [masterId, managerId])).rows;
@@ -316,7 +331,7 @@ async function finances(id, value) {
   return {month,earned,paid,due:Number(earned)-Number(paid),totalDue:Number(allEarned)-Number(allPaid),commissions,payouts};
 }
 module.exports = { COOKIE,TTL,cookieOptions,token,hash,provision,login,session,detail,action,dashboard,finances,
-  issueMagicLink,consumeMagicLink,issueOrderLink,consumeOrderLink,reviewGet,updateDescription,approvePending,assignCategory,updateContact,rejectPending,requireHeadModerator,
+  issueMagicLink,consumeMagicLink,issueOrderLink,consumeOrderLink,reviewGet,updateDescription,approvePending,assignCategory,updateContact,updateMessengers,rejectPending,requireHeadModerator,
   logout: sid => redis.del('manager_session:'+sid) };
 
 

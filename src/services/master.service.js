@@ -638,17 +638,30 @@ async function contactHistory(callerPhone) {
 async function saveContacts(token, contacts, languages) {
   return (await pool.query('UPDATE masters SET contact_channels=$1::jsonb, spoken_languages=$2::jsonb WHERE master_token=$3 RETURNING id', [JSON.stringify(contacts), JSON.stringify(languages), token])).rows[0];
 }
-async function updateMasterWhatsapp(id, whatsapp) {
-  const parsed = require('../config/catalogContacts').parse({ whatsapp, viber: '', telegram: '' });
-  if (!parsed) {
-    const error = new Error('Invalid WhatsApp number'); error.code = 'INVALID_CONTACT'; throw error;
-  }
+// Мессенджеры для каталога за исполнителя заполняет администратор или его менеджер (сам исполнитель —
+// в кабинете, saveContacts). Поле, которого нет в input, сохраняет прежнее значение; пустая строка
+// убирает кнопку из каталога. С managerId исполнитель должен быть закреплён за этим менеджером.
+const MESSENGERS = ['whatsapp', 'viber', 'telegram'];
+async function updateMasterMessengers(id, input = {}, { managerId } = {}) {
+  if (!Number.isSafeInteger(id) || id <= 0) return null;
   return pool.withTransaction(async client => {
-    const master = (await client.query('SELECT id, contact_channels FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
-    if (!master) return null;
-    const contacts = { ...(master.contact_channels || {}), whatsapp: parsed.whatsapp };
-    return (await client.query('UPDATE masters SET contact_channels=$1::jsonb WHERE id=$2 RETURNING id', [JSON.stringify(contacts), id])).rows[0];
+    const master = (await client.query('SELECT id, manager_id, contact_channels FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    if (!master || (managerId !== undefined && master.manager_id !== Number(managerId))) return null;
+    // pg-mem отдаёт значение по умолчанию jsonb строкой, настоящий Postgres — объектом.
+    const current = (typeof master.contact_channels === 'string' ? JSON.parse(master.contact_channels) : master.contact_channels) || {};
+    const parsed = require('../config/catalogContacts').parse(Object.fromEntries(MESSENGERS.map(key => [key, input[key] === undefined ? current[key] || '' : input[key]])));
+    if (!parsed) {
+      const error = new Error('Invalid messenger contact'); error.code = 'INVALID_CONTACT'; throw error;
+    }
+    const contacts = { ...current, ...parsed };
+    await client.query('UPDATE masters SET contact_channels=$1::jsonb WHERE id=$2', [JSON.stringify(contacts), id]);
+    return { id, contact_channels: contacts };
   });
+}
+// Строка для журнала: что теперь указано.
+function messengerSummary(channels = {}) {
+  return 'Мессенджеры: ' + [['WhatsApp', channels.whatsapp], ['Viber', channels.viber], ['Telegram', channels.telegram && '@' + channels.telegram]]
+    .map(([label, value]) => label + ' ' + (value || 'нет')).join(', ');
 }
 // Empty string clears the override (falls back to automatic transliteration —
 // see providerName.resolve). Admin uses this when the auto-transliteration of a
@@ -662,7 +675,7 @@ async function updateMasterDisplayNameOverride(id, value) {
 }
 module.exports = {
   descriptionFor,
-  updateMasterWhatsapp,
+  updateMasterMessengers, messengerSummary,
   updateMasterDisplayNameOverride,
   contactHistory, saveContacts,
   registerMaster,

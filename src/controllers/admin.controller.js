@@ -236,7 +236,7 @@ async function masterDetail(req, res) {
     languageNames: require('../config/spokenLanguages').ruNames,
     autoDisplayName: require('../config/providerName').displayName(master.name),
     publicName: require('../config/providerName').resolve(master),
-    whatsappSaved: req.query.saved === 'whatsapp',
+    messengersSaved: req.query.saved === 'messengers',
     displayNameSaved: req.query.saved === 'displayname',
     notes: await adminService.masterNotes(id),
     followup: await adminService.isMasterFollowup(id),
@@ -318,17 +318,18 @@ async function updateMaster(req, res) {
   res.redirect(`/admin/masters/${id}`);
 }
 
-async function updateMasterWhatsapp(req, res) {
+async function updateMasterMessengers(req, res) {
   const id = Number(req.params.id);
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).send('Некорректный ID специалиста');
   try {
-    const updated = await masterService.updateMasterWhatsapp(id, req.body.whatsapp);
+    const updated = await masterService.updateMasterMessengers(id, { whatsapp: req.body.whatsapp, viber: req.body.viber, telegram: req.body.telegram });
     if (!updated) return res.status(404).send('Специалист не найден');
+    await audit.record(id, { action: 'edit_contact', body: masterService.messengerSummary(updated.contact_channels) });
   } catch (error) {
-    if (error.code === 'INVALID_CONTACT') return res.redirect(`/admin/masters/${id}?error=invalid_whatsapp#customer-whatsapp`);
+    if (error.code === 'INVALID_CONTACT') return res.redirect(`/admin/masters/${id}?error=invalid_messengers#customer-messengers`);
     throw error;
   }
-  return res.redirect(`/admin/masters/${id}?saved=whatsapp#customer-whatsapp`);
+  return res.redirect(`/admin/masters/${id}?saved=messengers#customer-messengers`);
 }
 
 async function updateMasterDisplayName(req, res) {
@@ -840,7 +841,7 @@ async function updateLegalPrivacy(req, res) {
 }
 
 module.exports = {
-  updateMasterWhatsapp,
+  updateMasterMessengers,
   updateMasterDisplayName,
   updatePaymentDetails,
   updateWelcomeBonus,

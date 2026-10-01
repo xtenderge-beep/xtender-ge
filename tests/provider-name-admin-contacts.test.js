@@ -53,7 +53,7 @@ let server;
   app.use(require('cookie-parser')());
   app.use('/admin', require('../src/routes/admin.routes'));
   server = await new Promise(resolve => { const s = app.listen(0, '127.0.0.1', () => resolve(s)); });
-  const endpoint = `http://127.0.0.1:${server.address().port}/admin/masters/${master.id}/whatsapp`;
+  const endpoint = `http://127.0.0.1:${server.address().port}/admin/masters/${master.id}/messengers`;
   const post = (body, loggedIn = true) => fetch(endpoint, {
     method:'POST', redirect:'manual', headers: loggedIn ? {cookie:`${auth.SESSION_COOKIE}=${session.cookieValue}`} : {},
     body:new URLSearchParams(body),
@@ -62,9 +62,9 @@ let server;
   assert.equal(response.headers.get('location'), '/admin/login');
   response = await post({whatsapp:'+995500000704'}); assert.equal(response.status, 403);
   response = await post({_csrf:csrf, whatsapp:'javascript:alert(1)'});
-  assert.ok(response.headers.get('location').includes('invalid_whatsapp'));
+  assert.ok(response.headers.get('location').includes('invalid_messengers'));
   response = await post({_csrf:csrf, whatsapp:'+995 (500) 000-704'});
-  assert.ok(response.headers.get('location').includes('saved=whatsapp'));
+  assert.ok(response.headers.get('location').includes('saved=messengers'));
   let saved = await masters.getMasterByToken(master.master_token);
   assert.equal(saved.name, master.name); assert.equal(saved.phone, master.phone);
   assert.deepEqual(saved.contact_channels, {whatsapp:'+995500000704',viber:'+995500000702',telegram:'example_name'});
@@ -74,16 +74,31 @@ let server;
   assert.equal(contacts.links(repeated).whatsapp, 'https://wa.me/995500000704');
   assert.equal(repeated.balance_tetri, 950);
   assert.equal((await pool.query("SELECT * FROM balance_transactions WHERE reason='catalog_call'")).rows.length, 1);
-  const html = await ejs.renderFile(path.join(__dirname, '../src/views/admin/_master-whatsapp.ejs'), {master:saved, csrfToken:csrf, error:null, whatsappSaved:true});
-  assert.ok(html.includes('value="+995500000704"'));
+  const html = await ejs.renderFile(path.join(__dirname, '../src/views/admin/_master-messengers.ejs'), {master:saved, csrfToken:csrf, error:null, messengersSaved:true});
+  for (const value of ['+995500000704', '+995500000702', 'example_name']) assert.ok(html.includes(`value="${value}"`));
   for (const script of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(script[1]);
   await post({_csrf:csrf, whatsapp:''});
   saved = await masters.getMasterByToken(master.master_token);
   assert.equal(contacts.links(saved).whatsapp, undefined);
   assert.equal(saved.contact_channels.telegram, 'example_name');
+  // Viber and Telegram are edited by the same form; a field that is not sent keeps its value.
+  response = await post({_csrf:csrf, whatsapp:'+995500000704', viber:'', telegram:'https://t.me/new_name'});
+  assert.ok(response.headers.get('location').includes('saved=messengers'));
+  saved = await masters.getMasterByToken(master.master_token);
+  assert.deepEqual(saved.contact_channels, {whatsapp:'+995500000704',viber:'',telegram:'new_name'});
+  assert.deepEqual(Object.keys(contacts.links(saved)), ['call','whatsapp','telegram']);
+  for (const bad of [{telegram:'bad name'}, {viber:'5990000'}, {whatsapp:['+995500000704','+995500000705']}]) {
+    await assert.rejects(() => masters.updateMasterMessengers(master.id, bad), {code:'INVALID_CONTACT'});
+  }
+  response = await post({_csrf:csrf, telegram:'bad name'});
+  assert.ok(response.headers.get('location').includes('invalid_messengers'));
+  assert.deepEqual((await masters.getMasterByToken(master.master_token)).contact_channels, saved.contact_channels);
+  assert.equal(await masters.updateMasterMessengers(999999, {whatsapp:''}), null);
+  const lastEvent = (await pool.query("SELECT action, body FROM master_admin_events WHERE master_id=$1 ORDER BY id DESC LIMIT 1", [master.id])).rows[0];
+  assert.deepEqual(lastEvent, {action:'edit_contact', body:'Мессенджеры: WhatsApp +995500000704, Viber нет, Telegram @new_name'});
 
   // --- Admin manual override of the transliterated display name ---
-  const nameEndpoint = endpoint.replace('/whatsapp', '/display-name');
+  const nameEndpoint = endpoint.replace('/messengers', '/display-name');
   const postName = (body, loggedIn = true) => fetch(nameEndpoint, {
     method:'POST', redirect:'manual', headers: loggedIn ? {cookie:`${auth.SESSION_COOKIE}=${session.cookieValue}`} : {},
     body:new URLSearchParams(body),
@@ -107,5 +122,5 @@ let server;
   assert.equal(saved.display_name_override, null);
   assert.equal((await masters.listMasters())[0].display_name, 'Giorgi Beridze');
 
-  console.log('PASS: Russian/Georgian display names, original data preserved, authenticated CSRF-protected admin WhatsApp editing, other channels preserved, no repeat charge, admin display-name override wins and clears back to automatic');
+  console.log('PASS: Russian/Georgian display names, original data preserved, authenticated CSRF-protected admin editing of WhatsApp, Viber and Telegram, unsent channels preserved, no repeat charge, admin display-name override wins and clears back to automatic');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { server?.close(); redis.disconnect(); });

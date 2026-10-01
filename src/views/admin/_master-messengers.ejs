@@ -1,0 +1,31 @@
+<% const channels = master.contact_channels || {}; %>
+<section id="customer-messengers" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
+  <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Мессенджеры для заказчиков</h2>
+  <p class="text-sm text-stone-500 mb-3">Заполненное поле даёт кнопку на карточке в каталоге, пустое её убирает. Указывайте то, что подтвердил специалист: номер мессенджера может отличаться от телефона для звонков. Специалист видит и меняет эти же поля в своём кабинете, вкладка «Профиль».</p>
+  <% if (error === 'invalid_messengers') { %><p role="alert" class="text-sm text-red-600 mb-3">Не сохранено. Номера WhatsApp и Viber — в международном формате: +код страны и номер, от 8 до 15 цифр. Telegram — имя пользователя: латиница, цифры и «_», от 5 знаков.</p><% } %>
+  <% if (typeof messengersSaved !== 'undefined' && messengersSaved) { %><p role="status" class="text-sm text-emerald-700 mb-3">Мессенджеры сохранены.</p><% } %>
+  <form method="POST" action="/admin/masters/<%= master.id %>/messengers" class="space-y-3">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <% [['whatsapp', 'WhatsApp'], ['viber', 'Viber']].forEach(([key, label]) => { %>
+    <div>
+      <label for="admin-<%= key %>" class="block text-xs font-bold text-stone-500"><%= label %></label>
+      <input id="admin-<%= key %>" type="tel" name="<%= key %>" maxlength="30" value="<%= channels[key] || '' %>" placeholder="+995 5XX XX XX XX" class="border border-stone-300 rounded-xl px-3 py-2 text-sm w-full">
+      <button type="button" data-messenger-primary="admin-<%= key %>" data-phone="<%= master.phone %>" class="mt-1 text-sm font-bold text-emerald-700">Подставить основной: <%= master.phone %></button>
+    </div>
+    <% }); %>
+    <div>
+      <label for="admin-telegram" class="block text-xs font-bold text-stone-500">Telegram</label>
+      <input id="admin-telegram" type="text" name="telegram" maxlength="64" value="<%= channels.telegram || '' %>" placeholder="@username" class="border border-stone-300 rounded-xl px-3 py-2 text-sm w-full">
+    </div>
+    <button type="submit" class="px-4 py-3 bg-emerald-600 text-white rounded-xl text-sm font-bold">Сохранить мессенджеры</button>
+  </form>
+  <p class="text-xs text-stone-500 mt-3">Номер для звонков не меняется. За повторное открытие контактов тем же заказчиком нового списания нет.</p>
+</section>
+<script>
+(() => {
+  document.querySelectorAll('[data-messenger-primary]').forEach((button) => button.addEventListener('click', () => {
+    const input = document.getElementById(button.dataset.messengerPrimary);
+    input.value = button.dataset.phone; input.focus();
+  }));
+})();
+</script>

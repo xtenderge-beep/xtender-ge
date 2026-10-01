@@ -145,7 +145,18 @@ router.get('/',wrap(async(req,res) => {
   res.render('manager/dashboard',await service.dashboard(req.managerSession.id,req.query.q,req.query.page));
 }));
 router.get('/finances',wrap(async(req,res) => res.render('manager/finances',await service.finances(req.managerSession.id,req.query.month))));
-router.get('/masters/:id',wrap(async(req,res) => res.render('manager/detail',await service.detail(req.managerSession.id,req.params.id))));
+router.get('/masters/:id',wrap(async(req,res) => res.render('manager/detail',{...await service.detail(req.managerSession.id,req.params.id),messengers:req.query.messengers || null})));
+// Раньше общего /masters/:id/:action: тот принимает только note/ban/unban.
+router.post('/masters/:id/messengers',wrap(async(req,res) => {
+  const page='/manager/masters/'+encodeURIComponent(req.params.id);
+  try {
+    await service.updateMessengers(req.managerSession.id,req.params.id,{whatsapp:req.body.whatsapp,viber:req.body.viber,telegram:req.body.telegram});
+    res.redirect(page+'?messengers=saved#messengers');
+  } catch(e) {
+    if (e.status !== 400) throw e;
+    res.redirect(page+'?messengers=invalid#messengers');
+  }
+}));
 router.post('/masters/:id/:action',wrap(async(req,res) => { await service.action(req.managerSession.id,req.params.id,req.params.action,req.body.body);res.redirect('/manager/masters/'+encodeURIComponent(req.params.id)); }));
 router.use((err,req,res,next) => {
   if (err.status || err.constructor.name === 'PartnerError') return res.status(err.status || 400).render('manager/error',{error:err.message});

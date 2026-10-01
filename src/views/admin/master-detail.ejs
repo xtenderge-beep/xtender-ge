@@ -144,7 +144,7 @@
 
 <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-3">Редактировать данные</h2>
-    <%- include('./_master-whatsapp') %>
+    <%- include('./_master-messengers') %>
     <%- include('./_master-display-name') %>
     <form method="POST" action="/admin/masters/<%= master.id %>/update" class="space-y-3">
         <input type="hidden" name="_csrf" value="<%= csrfToken %>">
