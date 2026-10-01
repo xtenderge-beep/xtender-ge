@@ -12,6 +12,14 @@
 <% const spokenCodes = main.concat(Object.keys(languageNames).filter(function (c) { return main.indexOf(c) === -1 && languageSummary.spoken[c]; })); %>
 <%# Фильтр по менеджеру: число — исполнители в текущем списке (с учётом «На модерации»), без учёта фильтра языка. %>
 <section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4" aria-label="Менеджеры исполнителей">
+    <% if (typeof statusSummary !== 'undefined') { %>
+    <p class="text-xs text-stone-500 mb-2">Статус</p>
+    <div class="flex flex-wrap gap-2 mb-3">
+        <% [['', 'Все', statusSummary.all], ['pending', 'На модерации', statusSummary.pending], ['active', 'Активные', statusSummary.active], ['banned', 'Заблокированные', statusSummary.banned]].forEach(function (s) { %>
+            <a href="<%= href({ status: s[0] }) %>" class="<%= chip(filter.status === s[0]) %>"><%= s[1] %> <b><%= s[2] %></b></a>
+        <% }); %>
+    </div>
+    <% } %>
     <p class="text-xs text-stone-500 mb-2">Менеджер</p>
     <div class="flex flex-wrap gap-2">
         <a href="<%= href({ manager: '' }) %>" class="<%= chip(!filter.manager) %>">Все</a>

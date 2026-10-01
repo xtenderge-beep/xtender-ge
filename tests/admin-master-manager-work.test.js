@@ -112,6 +112,19 @@ const adminService=require('../src/services/admin.service');
  assert.deepEqual(await audit.telegramActor({id:777,first_name:'X'}),{actor:'Bob',managerId:b});
  assert.deepEqual(await audit.telegramActor({id:888,first_name:'Ivan',username:'ivan'}),{actor:'Telegram: Ivan (@ivan)',managerId:null});
 
+ // Фильтр по статусу: «На модерации», «Активные», «Заблокированные» с числами.
+ const listFor=async status=>{let out;await adminController.mastersList({query:{status}},{render:(view,locals)=>{out=locals;}});return out;};
+ const allStatuses=await listFor(undefined);
+ assert.deepEqual(allStatuses.statusSummary,{all:3,pending:1,active:1,banned:1});
+ assert.deepEqual((await listFor('pending')).masters.map(m=>m.id),[pending]);
+ assert.deepEqual((await listFor('active')).masters.map(m=>m.id),[own]);
+ assert.deepEqual((await listFor('banned')).masters.map(m=>m.id),[alone]);
+ assert.equal((await listFor('junk')).masters.length,3,'unknown status shows everyone');
+ const statusHtml=ejs.render(fs.readFileSync(file,'utf8'),{...(await listFor('active')),csrfToken:'csrf'},
+  {filename:file,includer:(original,parsed)=>original==='./_header'||original==='./_footer'?{template:''}:{filename:parsed}});
+ assert.match(statusHtml,/href="\/admin\/masters\?status=pending"[^>]*>На модерации <b>1<\/b>/);
+ assert.match(statusHtml,/class="[^"]*bg-emerald-600[^"]*">Активные <b>1<\/b>/);
+
  // Удаление исполнителя убирает и его просмотры.
  await require('../src/services/master.service').deleteMaster(own);
  assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM manager_master_views WHERE master_id=$1',[own])).rows[0].n,0);

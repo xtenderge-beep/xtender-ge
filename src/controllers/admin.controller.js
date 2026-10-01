@@ -202,12 +202,15 @@ async function mastersList(req, res) {
   const { options, ruNames } = require('../config/spokenLanguages');
   // Фильтры приходят из адресной строки — принимаем только известные коды.
   const known = (value, codes) => (typeof value === 'string' && (value === 'none' || codes.includes(value)) ? value : '');
-  const filter = { status: req.query.status === 'pending' ? 'pending' : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
-  const scoped = filter.status === 'pending' ? masters.filter(m=>!m.is_active && !m.is_banned) : masters;
+  const filter = { status: ['pending', 'active', 'banned'].includes(req.query.status) ? req.query.status : '', lang: known(req.query.lang, Object.keys(options)), site: known(req.query.site, ['ka', 'ru', 'en']) };
+  const statusOf = m => m.is_banned ? 'banned' : m.is_active ? 'active' : 'pending';
+  const statusSummary = { all: masters.length, pending: 0, active: 0, banned: 0 };
+  masters.forEach(m => statusSummary[statusOf(m)]++);
+  const scoped = filter.status ? masters.filter(m => statusOf(m) === filter.status) : masters;
   const managerSummary = adminService.managerSummary(scoped);
   filter.manager = known(req.query.manager, managerSummary.managers.map(m => String(m.id)));
   const shown = adminService.filterByManager(adminService.filterByLanguage(scoped, filter), filter.manager);
-  res.render('admin/masters', { masters: shown, languageSummary: adminService.languageSummary(masters), managerSummary, languageNames: ruNames, filter });
+  res.render('admin/masters', { masters: shown, languageSummary: adminService.languageSummary(masters), managerSummary, statusSummary, languageNames: ruNames, filter });
 }
 
 async function masterDetail(req, res) {
