@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const supportService = require('./support.service');
 
 const settingsService = require('./settings.service');
+const { vanBodyLabel } = require('../config/serviceTypes');
 
 // Списания за лид (рассылка) и за показ номера (каталог) — два разных канала
 // монетизации, история баланса не различает их иначе как по reason. COALESCE(SUM(...))
@@ -155,11 +156,12 @@ async function listMastersAdmin() {
   const langs = new Map(langRows.rows.map(r => [r.id, r]));
   const work = await managerWorkByMaster();
   const followups = new Map((await pool.query('SELECT master_id, created_at FROM admin_master_followups')).rows.map(r => [r.master_id, r.created_at]));
+  const vans = new Map((await pool.query("SELECT master_id, attributes FROM master_services WHERE service_type='van'")).rows.map(r => [r.master_id, r.attributes]));
   return rows.map(m => {
     const l = langs.get(m.id) || {};
     const w = work(m.id, l.manager_id);
     return { ...m, spoken_languages: Array.isArray(l.spoken_languages) ? l.spoken_languages : [], registration_language: l.registration_language || null,
-      description: l.description || '', manager_id: l.manager_id || null, followup_at: followups.get(m.id) || null, ...adminWhatsapp(m.phone, l.contact_channels), ...w };
+      description: l.description || '', manager_id: l.manager_id || null, followup_at: followups.get(m.id) || null, van_body: vans.has(m.id) ? vanBodyLabel(vans.get(m.id)) : null, ...adminWhatsapp(m.phone, l.contact_channels), ...w };
   });
 }
 
@@ -303,7 +305,8 @@ async function getMasterDetail(id) {
   const workCities = await pool.query('SELECT c.id,c.name_ru FROM cities c JOIN master_cities mc ON mc.city_id = c.id WHERE mc.master_id = $1 ORDER BY c.sort_order, c.id', [id]);
   const services = await pool.query('SELECT service_type, attributes, requires_own_transport FROM master_services WHERE master_id = $1', [id]);
   const category = await require('./category.service').get(master.category);
-  return { ...master, category_label: category?.name_ru || master.category || 'Категория не назначена', services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
+  const van = services.rows.find(s => s.service_type === 'van');
+  return { ...master, category_label: category?.name_ru || master.category || 'Категория не назначена', van_body: van ? vanBodyLabel(van.attributes) : null, services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
 }
 
 async function getMasterBalanceHistory(masterId) {

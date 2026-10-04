@@ -213,7 +213,7 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
   assert.match(page, /язык не указан у 1/);
   const empty = await dispatch.preview(order4.token, 'movers', '', 'hy');
   assert.match(render('admin/dispatch.ejs', { token: order4.token, plan: empty, error: null, result: null, groups, speakLabels, emptyReason: dispatch.emptyReason, csrfToken: 'csrf' }), /говорят по-армянски\. Попробуйте другого адресата/);
-  const detail = render('admin/order-detail.ejs', { order: await admin.getOrderDetailAdmin(order3.token), groups, speakLabels, csrfToken: 'csrf', revisionNotice: null, activeCities: await require('../src/services/master.service').getActiveCities(), allCities: await require('../src/services/master.service').getWorkCities() });
+  const detail = render('admin/order-detail.ejs', { order: await admin.getOrderDetailAdmin(order3.token), transportSizes: await dispatch.transportSizes(order3), groups, speakLabels, csrfToken: 'csrf', revisionNotice: null, activeCities: await require('../src/services/master.service').getActiveCities(), allCities: await require('../src/services/master.service').getWorkCities() });
   assert.match(detail, /name="language"/);
   assert.match(detail, /Говорят по-английски/);
   assert.match(detail, /movers · говорят по-грузински/);

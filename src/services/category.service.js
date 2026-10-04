@@ -7,9 +7,10 @@ const toCategory = key => key === 'van' ? 'transport' : key;
 function fail(message, status = 400) { return Object.assign(new Error(message), { status }); }
 async function list(client = pool) { return (await client.query('SELECT * FROM service_categories ORDER BY sort_order, name_ru, slug')).rows.map(require('../config/junkBody').withBuiltInFields); }
 async function get(key, client = pool) { return require('../config/junkBody').withBuiltInFields((await client.query('SELECT * FROM service_categories WHERE slug=$1', [toType(key)])).rows[0] || null); }
-function validate(row, raw) {
+// vanSizes — актуальные пороги S…XXL для поля 'size'; без них действуют значения по умолчанию.
+function validate(row, raw, vanSizes) {
   if (!row || !row.is_active) return { attributes: {}, errors: ['category'] };
-  return base.validateAttributes(row.slug, raw || {}, row.fields);
+  return base.validateAttributes(row.slug, raw || {}, row.fields, vanSizes);
 }
 // Единицы в конфиге услуг записаны по-русски; известные переводим, остальные показываем как есть.
 const UNITS = { 'м³': { ka: 'მ³', en: 'm³' }, 'см': { ka: 'სმ', en: 'cm' }, 'м': { ka: 'მ', en: 'm' }, 'т': { ka: 'ტ', en: 't' }, 'кг': { ka: 'კგ', en: 'kg' } };
@@ -22,8 +23,8 @@ function view(row, lang = 'ru') {
       options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || f.optionLabels?.[value]?.ru || value})) })) };
 }
 // Есть ли у категории хоть одно 'size'-поле (сейчас только van) — единственное, что
-// реально не отдаётся в форму: значение проставляется легаси-колонкой vehicle_size
-// (см. admin/master-detail.ejs), а не этим движком, так что открывать его редактирование
+// реально не отдаётся в форму: буква считается по трём размерам кузова или выбирается
+// на глаз (см. admin/_master-service-fields.ejs), так что открывать его редактирование
 // сейчас означало бы менять конфиг, который ни на что не влияет. Остальные встроенные
 // категории (movers/tow/bucket_lift/junk) — обычные text/number/bool/enum поля,
 // редактируются через тот же parseFields, что и пользовательские категории.

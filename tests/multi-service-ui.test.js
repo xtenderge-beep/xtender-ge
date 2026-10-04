@@ -44,6 +44,8 @@ let server;
  await post('/admin/orders/ui-multi/needs',[['needs','transport'],['needs','movers'],['transportSize','L']]);
  const configured=await orders.getOrderByToken(o.token);assert.deepEqual(configured.target_categories,['transport','movers']);assert.equal(configured.requirements.transport_size,'L');
  const adminOrderPage=await get('/admin/orders/ui-multi');assert.match(adminOrderPage,/Что нужно клиенту/);
+ assert.match(adminOrderPage,/<option value="L" selected>L — кузов от Д380×Ш180×В180 см · исполнителей: 1<\/option>/);
+ assert.match(adminOrderPage,/Не ограничивать — исполнителей: 1<\/option>/);
  assert.match(adminOrderPage,/Нужен самосвал<input type="checkbox" name="needAttributes\[junk\]\[dump_body\]"/);
  assert.match(await get('/admin/orders/ui-multi/dispatch?category=transport&size=L'),/Получателей с достаточным балансом/);
  const plan=await require('../src/services/dispatch.service').preview(o.token,'transport','L');
@@ -55,7 +57,8 @@ let server;
  assert.match(managerPage,/Сохранить услуги/);
  assert.match(managerPage,/Батуми · выключен/);
  assert.match(managerPage,/name="spokenLanguages"/);
- assert.match(managerPage,/data-van-preset/);
+ assert.match(managerPage,/name="van_cargo_length_cm"/);
+ assert.match(managerPage,/<select name="vehicleSize"/);
  assert.match(managerPage,/name="junk_body_length_cm"/);
  assert.match(managerPage,/<input type="checkbox" name="junk_dump_body" > Самосвал — кузов поднимается и сам высыпает груз/);
  assert.ok(!managerPage.includes('vehicle_kind'),'the retired vehicle kind list is gone');
@@ -69,21 +72,21 @@ let server;
  assert.equal(require('../src/services/serviceRequirements.service').matches(junkAttrs,{payload_t:4},[{key:'payload_t',input:'number',match:'gte'}]),true);
  await assert.rejects(()=>masters.updateMasterProfile(junk.id,{name:junk.name,phone:junk.phone,services:[{type:'junk',attributes:{body_length_cm:'400',volume_m3:'8'}}]}),{code:'INVALID_SERVICE'});
  const portal=require('../src/services/managerPortal.service');
- await portal.assignCategory(manager.id,pending.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}},{type:'movers',attributes:{crew_size:2},requiresOwnTransport:true}]);
+ await portal.assignCategory(manager.id,pending.id,'van',{},'L',[{type:'van',attributes:{body:'closed'}},{type:'movers',attributes:{crew_size:2},requiresOwnTransport:true}]);
  const saved=await portal.reviewGet(manager.id,pending.id);assert.equal(saved.master.services.length,2);
  await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1',[m.id,manager.id]);
- await portal.assignCategory(manager.id,m.id,'van',{},'M',null,[{type:'van',attributes:{body:'closed'}}]);
+ await portal.assignCategory(manager.id,m.id,'van',{},'M',[{type:'van',attributes:{body:'closed'}}]);
  const updated=await portal.reviewGet(manager.id,m.id);
  assert.equal(updated.master.is_active,true);
  assert.equal(updated.master.services.length,1);
  assert.equal(updated.master.vehicle_size,'M');
  const stranger=(await pool.query("INSERT INTO managers(name,phone) VALUES('Чужой менеджер','+995500009555') RETURNING id")).rows[0].id;
- await assert.rejects(()=>portal.assignCategory(stranger,m.id,'van',{},'L',null,[{type:'van',attributes:{body:'closed'}}]),{status:403});
+ await assert.rejects(()=>portal.assignCategory(stranger,m.id,'van',{},'L',[{type:'van',attributes:{body:'closed'}}]),{status:403});
  await assert.rejects(()=>portal.requireHeadModerator(manager.id),{status:403});
  await pool.query('UPDATE managers SET is_head_moderator=true WHERE id=$1',[manager.id]);
  await portal.requireHeadModerator(manager.id);
  const managerHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/order-dispatch.ejs'),{
-  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,serviceRows:[{key:'movers',label:'Грузчики',count:2}],runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
+  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,serviceRows:[{key:'movers',label:'Грузчики',count:2}],transportSizes:await require('../src/services/dispatch.service').transportSizes(configured),runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
   activeCities:await masters.getActiveCities(),allCities:await masters.getWorkCities(),groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
   speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
  });
@@ -93,6 +96,22 @@ let server;
  assert.match(managerHtml,/Новых получателей: 2/);
  for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
+ // Три размера кузова в карточке администратора: букву ставит система, выбранная вручную не действует.
+ assert.equal((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['cityIds','1'],['spokenLanguages','ru'],['servicesForm','1'],['services','van'],['van_body','closed'],['van_cargo_length_cm','280'],['van_cargo_width_cm','170'],['van_cargo_height_cm','170'],['vehicleSize','XL']])).headers.get('location'),'/admin/masters/'+m.id);
+ const measuredPage=await get('/admin/masters/'+m.id);
+ assert.match(measuredPage,/Кузов: <b>M · Д280×Ш170×В170 см<\/b>/);
+ assert.match(measuredPage,/name="van_cargo_width_cm" data-van-cm min="1" max="2000" step="1" value="170"/);
+ assert.ok((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['cityIds','1'],['spokenLanguages','ru'],['servicesForm','1'],['services','van'],['van_body','closed'],['van_cargo_length_cm','280']])).headers.get('location').endsWith('error=service_required'));
+ assert.match(await get('/admin/masters'),/кузов <b class="text-stone-800">M · Д280×Ш170×В170 см<\/b>/);
+ // Пороги S…XXL сохраняются своей формой. Форму внутри формы браузер игнорирует: кнопка порогов отправляла форму категории, а кнопка категории оставалась без формы.
+ const vanPage=await get('/admin/categories/van'),categoryForm=vanPage.indexOf('action="/admin/categories/van"');
+ assert.ok(categoryForm>0 && !/<form\b/.test(vanPage.slice(categoryForm,vanPage.indexOf('</form>',categoryForm))),'the thresholds form is not nested in the category form');
+ assert.match(vanPage,/<input form="vanSizesForm" type="number" min="1" max="2000" name="length_M" value="260"/);
+ assert.match(vanPage,/<button form="vanSizesForm"/);
+ const thresholds=require('../src/config/serviceTypes').VAN_SIZES.flatMap(s=>[['length_'+s.code,String(s.code==='M'?300:s.length)],['width_'+s.code,String(s.width)],['height_'+s.code,String(s.height)]]);
+ assert.equal((await post('/admin/categories/van/size-thresholds',thresholds)).headers.get('location'),'/admin/categories/van?sizesSaved=1');
+ assert.match(await get('/admin/categories/van?sizesSaved=1'),/Класс изменился у исполнителей: 1\./);
+ assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'S');
  console.log('PASS: admin multi-service form, needs revision guard, dispatch result rendering, manager assignment, inline script syntax');
  if(process.env.PREVIEW_MULTISERVICE){console.log('PREVIEW '+base+'/admin/masters/'+m.id);console.log('ORDER '+base+'/admin/orders/ui-multi');console.log('MANAGER '+base+'/preview-manager');}
  else {await new Promise(resolve=>server.close(resolve));redis.disconnect();}

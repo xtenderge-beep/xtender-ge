@@ -428,10 +428,10 @@ async function topUpBalance(phone, amountTetri) {
   return pool.withTransaction((client) => adjustBalance({ phone, amountTetri, reason: 'topup' }, client));
 }
 
-// Редактирование профиля из админки — единственное место, где допускается менять
-// category/vehicle_size вручную (при саморегистрации на /join vehicle_size сознательно
-// остаётся NULL — «любой размер», см. HANDOFF.md; тут модератор может сузить конкретного
-// мастера до одного тира).
+// Редактирование профиля из админки и кабинета менеджера — единственное место, где
+// назначается размер кузова (при саморегистрации на /join он остаётся пустым — «размер
+// неизвестен»). Три размера кузова в характеристиках перевозки (cargo_*_cm) дают букву
+// по текущим порогам; без них действует буква vehicleSize, выбранная на глаз.
 async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds, spokenLanguages }) {
   rejectPhoneInText(description, priceText);
   const config = require('../config/serviceTypes');
@@ -439,6 +439,7 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
   const selected = services || [{ type: category === 'transport' ? 'van' : category, attributes: serviceAttributes }];
   const invalid = () => Object.assign(new Error('Выберите услуги и заполните обязательные характеристики'), { code: 'INVALID_SERVICE' });
   if (!Array.isArray(selected) || !selected.length || new Set(selected.map(s=>s.type)).size !== selected.length) throw invalid();
+  const vanSizes = selected.some(s=>s.type === 'van') ? await settingsService.getVanSizeThresholds() : undefined;
   const normalized = [];
   for (const item of selected) {
     const definition = await categories.get(item.type);
@@ -453,9 +454,10 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
         raw.volume_m3 = dimensions.tier;
       }
     }
-    const checked = categories.validate(definition, raw);
+    const checked = categories.validate(definition, raw, vanSizes);
     if (definition?.slug !== item.type || checked.errors.length) throw invalid();
-    if (item.type === 'van' && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
+    // Букву кузова ставит система по трём размерам; выбранная вручную действует, только пока размеров нет.
+    if (item.type === 'van' && !config.vanBody(checked.attributes) && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
     const requiresOwnTransport = item.requiresOwnTransport === true;
     if (requiresOwnTransport && (item.type !== 'movers' || !selected.some(s=>s.type === 'van'))) throw invalid();
     normalized.push({ type: item.type, attributes: checked.attributes, requiresOwnTransport });
@@ -494,6 +496,28 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
     }
     return rows[0];
   });
+}
+
+// После смены порогов S…XXL в /admin/categories/van: буквы исполнителей с записанными
+// размерами кузова пересчитываются по новым порогам. Букву, выбранную на глаз (размеров
+// нет), пересчитать не из чего — она остаётся. Возвращает число изменённых профилей.
+async function reclassifyVanSizes() {
+  const config = require('../config/serviceTypes');
+  const sizes = await settingsService.getVanSizeThresholds();
+  const { rows } = await pool.query("SELECT master_id, attributes FROM master_services WHERE service_type='van'");
+  let changed = 0;
+  for (const row of rows) {
+    const body = config.vanBody(row.attributes);
+    if (!body) continue;
+    const size = config.deriveVanSize(body[0], body[1], body[2], sizes);
+    if (size === row.attributes.size) continue;
+    await pool.withTransaction(async client => {
+      await client.query("UPDATE master_services SET attributes=$1::jsonb WHERE master_id=$2 AND service_type='van'", [JSON.stringify({ ...row.attributes, size }), row.master_id]);
+      await client.query("UPDATE masters SET vehicle_size=$1 WHERE id=$2 AND category='transport'", [size, row.master_id]);
+    });
+    changed++;
+  }
+  return changed;
 }
 
 // Админ стирает тестовый/мусорный профиль исполнителя целиком, чтобы освободить его
@@ -695,6 +719,7 @@ module.exports = {
   approveMaster,
   unapproveMaster,
   updateMasterProfile,
+  reclassifyVanSizes,
   deleteMaster,
   adjustBalance,
   chargeMastersForLead,

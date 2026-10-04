@@ -116,6 +116,27 @@ function deriveVanSize(lengthCm, widthCm, heightCm, sizes = VAN_SIZES) {
   return 'S'; // меньше минимума даже для S — не завышаем тир
 }
 
+// Точные внутренние размеры кузова van (см) — ключи в master_services.attributes рядом с
+// буквой size. Размеры вводит менеджер или администратор, букву по ним ставит система.
+const VAN_BODY_KEYS = ['cargo_length_cm', 'cargo_width_cm', 'cargo_height_cm'];
+
+// Три размера кузова [длина, ширина, высота] из сырого ввода или сохранённых характеристик.
+// null — размеры не введены; false — введены не все три или вне 1…2000 см.
+function vanBody(raw = {}) {
+  const values = VAN_BODY_KEYS.map(key => raw?.[key]);
+  if (values.every(v => v === undefined || v === null || v === '')) return null;
+  const nums = values.map(v => (v === undefined || v === null || v === '' ? NaN : Number(v)));
+  return nums.every(n => Number.isInteger(n) && n >= 1 && n <= 2000) ? nums : false;
+}
+
+// Подпись кузова для карточек и списков: «M · Д280×Ш170×В170 см», если размеры записаны;
+// «M · размеры не записаны», если букву выбрали на глаз; без буквы — «размер неизвестен».
+function vanBodyLabel(attrs = {}) {
+  const body = vanBody(attrs);
+  if (!attrs?.size) return 'размер неизвестен';
+  return body ? `${attrs.size} · Д${body[0]}×Ш${body[1]}×В${body[2]} см` : `${attrs.size} · размеры не записаны`;
+}
+
 function isKnownType(type) {
   return Object.prototype.hasOwnProperty.call(SERVICE_TYPES, type);
 }
@@ -127,19 +148,19 @@ function fieldsFor(type) {
 // Проверяет и нормализует сырой ввод формы под конфиг типа. Возвращает
 // { attributes, errors }. attributes — только валидные значения (для master_services);
 // errors — список ключей полей с проблемами (для показа на форме).
-// input:'size' — особый: читает cargo_length/width/height_cm и выводит тир через deriveVanSize.
-function validateAttributes(type, raw = {}, definedFields = fieldsFor(type)) {
+// input:'size' — особый: читает cargo_length/width/height_cm и выводит тир через deriveVanSize
+// по порогам sizes (актуальные — settings.service.getVanSizeThresholds). Размеры сохраняются
+// вместе с буквой; введены не все три или вне допустимого — ошибка поля.
+function validateAttributes(type, raw = {}, definedFields = fieldsFor(type), sizes = VAN_SIZES) {
   const attributes = {};
   const errors = [];
   for (const f of definedFields) {
     if (f.input === 'size') {
-      const size = deriveVanSize(raw.cargo_length_cm, raw.cargo_width_cm, raw.cargo_height_cm);
-      if (size) {
-        attributes[f.key] = size;
-        attributes.cargo_length_cm = Number(raw.cargo_length_cm) || null;
-        attributes.cargo_width_cm = Number(raw.cargo_width_cm) || null;
-        attributes.cargo_height_cm = Number(raw.cargo_height_cm) || null;
-      } else if (f.required) {
+      const body = vanBody(raw);
+      if (body) {
+        attributes[f.key] = deriveVanSize(body[0], body[1], body[2], sizes);
+        VAN_BODY_KEYS.forEach((key, index) => { attributes[key] = body[index]; });
+      } else if (body === false || f.required) {
         errors.push(f.key);
       }
       continue;
@@ -259,7 +280,10 @@ module.exports = {
   SERVICE_TYPE_ORDER,
   VAN_SIZES,
   VAN_SIZE_ORDER,
+  VAN_BODY_KEYS,
   vanSizeSpec,
+  vanBody,
+  vanBodyLabel,
   deriveVanSize,
   isKnownType,
   fieldsFor,

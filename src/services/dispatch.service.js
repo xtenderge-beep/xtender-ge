@@ -2,6 +2,8 @@ const orderService = require('./order.service');
 const settingsService = require('./settings.service');
 const pool = require('../config/db');
 const { parseDispatchLanguage, speaks, speakLabels, languageBreakdown } = require('../config/spokenLanguages');
+const { vanSizeSpec, vanBodyLabel } = require('../config/serviceTypes');
+const vanOf = master => master.services.find(s => s.service_type === 'van')?.attributes;
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
   if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !require('../config/serviceTypes').VAN_SIZE_ORDER.includes(size)))) throw new Error('Некорректная группа рассылки');
@@ -48,6 +50,8 @@ async function preview(token, category, size, languageRaw = '') {
   const pending=new Set((await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[order.id])).rows.map(d=>d.master_id));
   const fresh = eligible.filter(master => !received.has(master.id) && !pending.has(master.id));
   const recipients = language ? fresh.filter(master => speaks(master, language)) : fresh;
+  // В списке получателей перевозки модератор видит класс и размеры кузова каждого.
+  if (['transport', 'flatbed'].includes(category)) recipients.forEach(master => { master.van_body = vanBodyLabel(vanOf(master)); });
   const inScope = language ? eligible.filter(master => speaks(master, language)) : eligible;
   const previous = await pool.query(`SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
   const sentLanguages = previous.rows.map(row => row.language);
@@ -59,6 +63,21 @@ async function preview(token, category, size, languageRaw = '') {
     pending: inScope.filter(m=>pending.has(m.id)).length,
     // Сколько ещё не получивших говорит на каждом языке — для выбора адресата.
     languages: languageBreakdown(fresh),
+  };
+}
+// Варианты размера кузова для формы «Что нужно клиенту?»: что значит каждая буква и сколько
+// исполнителей перевозок получат заявку при её выборе. Считаются те, кому заявку можно
+// отправить сейчас (активны, допущены к списанию, работают в городе заявки); остальные
+// требования заявки не учитываются. unknown — исполнители без размера: они получают
+// заявку, только когда размер не ограничен.
+async function transportSizes(order) {
+  const thresholds = await settingsService.getVanSizeThresholds();
+  const price = await settingsService.getLeadPriceTetri();
+  const all = await orderService.getDispatchRecipients('transport', '', price, order.is_technical === true, '', { ...order, target_categories: [], requirements: {} });
+  const sizeOf = master => vanOf(master)?.size || '';
+  return {
+    total: all.length, unknown: all.filter(master => !sizeOf(master)).length,
+    sizes: thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds), count: all.filter(master => sizeOf(master) === t.code).length })),
   };
 }
 // Почему получателей нет — для сообщения модератору (Telegram и админка).
@@ -111,4 +130,4 @@ async function retry(token, runId, actor='admin') {
   await require('./telegram.service').updateMessage(order);
   return {count,price:plan.price,run:(await orderService.getOrderDispatches(order.id)).find(r=>r.id===context.runId)};
 }
-module.exports = { preview, dispatch, retry, validate, emptyReason };
+module.exports = { preview, dispatch, retry, validate, emptyReason, transportSizes };

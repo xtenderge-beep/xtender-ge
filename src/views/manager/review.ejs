@@ -30,11 +30,6 @@
   <h2>3. Выберите услуги</h2><p>Отметьте всё, что исполнитель реально выполняет. Характеристики выбранных услуг появятся ниже.</p>
   <div class="service-grid"><% categories.forEach(c=>{ %><label class="service-tile"><input type="checkbox" name="services" value="<%= c.type %>" <%= (master.services || []).some(s=>s.service_type===c.type) ? 'checked' : '' %>> <%= c.label %></label><% }); %></div>
   <h2>4. Уточните возможности</h2><p>Для грузчиков отдельно укажите, берут ли они заявки без своей машины.</p>
-  <div id="vehicleSizeField" hidden><label>Класс кузова<select name="vehicleSize"><option value="">Размер неизвестен</option><% vanSizes.forEach(s=>{ %><option value="<%= s.code %>" data-spec="<%= s.spec %>" data-length="<%= s.length %>" data-width="<%= s.width %>" data-height="<%= s.height %>" <%= master.vehicle_size === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option><% }); %></select></label>
-  <div data-van-dimensions class="service-grid"><span>Длина: <output data-dimension="length">—</output> см</span><span>Ширина: <output data-dimension="width">—</output> см</span><span>Высота: <output data-dimension="height">—</output> см</span></div>
-  <p data-van-preset aria-live="polite">Это минимальные габариты класса, а не точные размеры машины.</p>
-  <details><summary>Измерены точные внутренние размеры кузова?</summary><p>Укажите все три размера в см — система определит класс по ним.</p>
-  <label>Длина<input type="number" name="cargoLength" min="1" max="2000"></label><label>Ширина<input type="number" name="cargoWidth" min="1" max="2000"></label><label>Высота<input type="number" name="cargoHeight" min="1" max="2000"></label></details></div>
   <%- include('../admin/_master-service-fields', {master,serviceConfig:categories}) %>
   <div class="form-actions"><button type="submit" formaction="/manager/review/<%= master.id %>/assign" class="secondary-action">Сохранить услуги без одобрения</button><% if (!master.is_active) { %><button type="submit">Сохранить и одобрить исполнителя</button><% } %></div>
 </form>

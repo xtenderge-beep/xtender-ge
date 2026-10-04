@@ -26,20 +26,22 @@
 <% if(fieldsLocked){ %>
 <h2 class="font-bold">Размер кузова (S / M / L / XL / XXL)</h2>
 <p class="text-sm text-stone-500">Буквы фиксированы (на них завязана проверка в базе), но что каждая буква значит в сантиметрах — можно менять здесь, без участия разработчика. По умолчанию — минимумы тарифа «Грузовой» Яндекса.</p>
+<p class="text-sm text-stone-500">Машина получает самый большой класс, в который проходит по длине, ширине и высоте одновременно. После сохранения класс пересчитывается у исполнителей с записанными размерами кузова; класс, выбранный на глаз, не меняется.</p>
 <% if(sizeError){ %><p role="alert" class="text-sm text-red-600"><%= sizeError %></p><% } %>
-<form method="post" action="/admin/categories/<%= category.slug %>/size-thresholds" class="space-y-2">
-<input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<% if(typeof sizesSaved !== 'undefined' && sizesSaved !== null){ %><p role="status" class="text-sm text-emerald-700">Размеры сохранены. Класс изменился у исполнителей: <%= sizesSaved %>.</p><% } %>
+<%# Поля порогов привязаны к отдельной форме vanSizesForm (ниже, после формы категории): форму внутри формы браузер игнорирует. %>
+<div class="space-y-2">
 <% vanSizeThresholds.forEach(t=>{ %>
 <div class="flex flex-wrap items-end gap-2 border rounded-xl p-2.5">
   <div class="font-mono font-bold w-10"><%= t.code %></div>
-  <label class="text-xs">Длина, см<input type="number" min="1" max="2000" name="length_<%= t.code %>" value="<%= t.length %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
-  <label class="text-xs">Ширина, см<input type="number" min="1" max="2000" name="width_<%= t.code %>" value="<%= t.width %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
-  <label class="text-xs">Высота, см<input type="number" min="1" max="2000" name="height_<%= t.code %>" value="<%= t.height %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <label class="text-xs">Длина, см<input form="vanSizesForm" type="number" min="1" max="2000" name="length_<%= t.code %>" value="<%= t.length %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <label class="text-xs">Ширина, см<input form="vanSizesForm" type="number" min="1" max="2000" name="width_<%= t.code %>" value="<%= t.width %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
+  <label class="text-xs">Высота, см<input form="vanSizesForm" type="number" min="1" max="2000" name="height_<%= t.code %>" value="<%= t.height %>" required class="block w-24 border rounded-lg px-2 py-1.5 text-sm"></label>
   <span class="text-xs text-stone-400"><%= vanSizeSpec(t.code, vanSizeThresholds) %></span>
 </div>
 <% }); %>
-<button class="px-4 py-2 bg-stone-900 text-white rounded-xl text-sm">Сохранить размеры</button>
-</form>
+<button form="vanSizesForm" class="px-4 py-2 bg-stone-900 text-white rounded-xl text-sm">Сохранить размеры</button>
+</div>
 <% } %>
 <h2 class="font-bold">Характеристики для модератора</h2>
 <% if(fieldsLocked){ %><p class="text-sm">Поле «Размер» само по себе (буквы S/M/L/XL/XXL) настраивается в сантиметрах выше и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
@@ -51,6 +53,7 @@
 <template id="categoryFieldTemplate"><%- include('./_category-field',{field:{},index:'INDEX'}) %></template>
 <div><button class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Сохранить категорию</button></div>
 </form>
+<% if(fieldsLocked){ %><form id="vanSizesForm" method="post" action="/admin/categories/<%= category.slug %>/size-thresholds"><input type="hidden" name="_csrf" value="<%= csrfToken %>"></form><% } %>
 <% if(category){ %>
 <form method="POST" action="/admin/categories/<%= category.slug %>/delete" class="mt-4"
     onsubmit="return confirm('Удалить категорию «<%= category.name_ru %>» без возможности восстановления? Это возможно только если её сейчас никто не использует.')">

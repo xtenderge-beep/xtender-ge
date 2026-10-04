@@ -9,6 +9,25 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
     <label class="service-choice text-sm"><input type="checkbox" name="moversOwnTransport" <%= saved?.requires_own_transport ? 'checked' : '' %>> Погрузка только вместе со своим транспортом</label>
     <p class="text-xs">Без этой отметки принимает отдельные заявки на грузчиков. Для отметки нужно также выбрать перевозки.</p>
   <% } %>
+  <% if (svc.type === 'van' && typeof vanSizes !== 'undefined') { const measured = ['cargo_length_cm','cargo_width_cm','cargo_height_cm'].every(key => attrs[key]); const vanClass = attrs.size || master.vehicle_size || ''; %>
+    <div data-van-size data-tiers="<%= JSON.stringify(vanSizes.map(s => [s.code, s.length, s.width, s.height, s.spec])) %>">
+      <p class="text-sm"><b>Размер кузова</b></p>
+      <p class="text-sm">Впишите внутренние размеры кузова, как в объявлении исполнителя. Класс S / M / L / XL / XXL система поставит сама.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <% [['cargo_length_cm','Длина'],['cargo_width_cm','Ширина'],['cargo_height_cm','Высота']].forEach(([key,label])=>{ %>
+        <label class="text-sm"><%= label %>, см<input type="number" name="van_<%= key %>" data-van-cm min="1" max="2000" step="1" value="<%= attrs[key] ?? '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+        <% }); %>
+      </div>
+      <p class="text-sm" aria-live="polite"><b data-van-class></b></p>
+      <details <%= !measured && vanClass ? 'open' : '' %>><summary class="text-sm">Размеров нет — выбрать класс на глаз</summary>
+        <label class="text-sm">Класс кузова<select name="vehicleSize" class="block w-full border rounded-xl px-3 py-2">
+          <option value="">Размер неизвестен</option>
+          <% vanSizes.forEach(s => { %><option value="<%= s.code %>" <%= vanClass === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option><% }); %>
+        </select></label>
+        <p class="text-xs">«От» — минимум по длине, ширине и высоте одновременно. Выбор действует, пока три размера не введены.</p>
+      </details>
+    </div>
+  <% } %>
   <% if (svc.type === 'junk') { %>
     <% if (svc.fields.some(f => f.key === 'dump_body')) { %>
     <label class="service-choice text-sm"><input type="checkbox" name="junk_dump_body" <%= attrs.dump_body === true ? 'checked' : '' %>> Самосвал — кузов поднимается и сам высыпает груз</label>
@@ -47,7 +66,6 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
 <script>
 (() => {
  const choices = [...document.querySelectorAll('input[name=services]')];
- const sizeField = document.getElementById('vehicleSizeField');
  function update() {
   const types = choices.filter(input=>input.checked).map(input=>input.value);
   document.querySelectorAll('[data-service-panel]').forEach(panel => {
@@ -55,21 +73,26 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
    panel.hidden = !active;
    panel.querySelectorAll('input,select').forEach(input => input.disabled = !active);
   });
- if (sizeField) {
-   const showSize = types.includes('van');
-   sizeField.hidden = !showSize;
-   sizeField.querySelectorAll('input,select').forEach(input => input.disabled = !showSize);
-  }
   const summary = document.getElementById('admin-service-summary');
   if (summary) summary.textContent = types.length
    ? 'Выбрано: ' + choices.filter(input=>input.checked).map(input=>input.closest('label').textContent.trim()).join(' · ')
    : 'Услуги пока не выбраны.';
  }
  choices.forEach(input=>input.addEventListener('change', update)); update();
- if(sizeField){const select=sizeField.querySelector('select[name=vehicleSize]'), preset=sizeField.querySelector('[data-van-preset]');
-  const refresh=()=>{const data=select.selectedOptions[0]?.dataset || {};const spec=data.spec;preset.textContent=spec?'Минимум для класса: '+spec+'. Точные размеры машины не подтверждены.':'Выберите класс, чтобы увидеть минимальные габариты.';
-   sizeField.querySelectorAll('[data-dimension]').forEach(output=>{output.textContent=data[output.dataset.dimension] || '—';});};
-  select.addEventListener('change',refresh);refresh();}
+ // Превью класса кузова: итоговую букву ставит сервер по тем же порогам.
+ document.querySelectorAll('[data-van-size]').forEach(block=>{
+  const tiers=JSON.parse(block.dataset.tiers), inputs=[...block.querySelectorAll('[data-van-cm]')], select=block.querySelector('select[name=vehicleSize]'), output=block.querySelector('[data-van-class]');
+  const refresh=()=>{
+   const filled=inputs.filter(input=>input.value!=='').length, nums=inputs.map(input=>Number(input.value));
+   inputs.forEach(input=>input.required=filled>0);
+   if(filled===3 && nums.every(n=>n>=1)){
+    const tier=[...tiers].reverse().find(t=>nums[0]>=t[1] && nums[1]>=t[2] && nums[2]>=t[3]) || tiers[0];
+    output.textContent='Класс по размерам: '+tier[0]+' — кузов от '+tier[4]+'.';
+   } else if(filled) output.textContent='Введите все три размера — система определит класс.';
+   else output.textContent=select.value?'Класс выбран на глаз: '+select.value+'. Размеры не записаны.':'Размер неизвестен. Исполнитель получит только заявки, где размер не ограничен.';
+  };
+  inputs.forEach(input=>input.addEventListener('input',refresh));select.addEventListener('change',refresh);refresh();
+ });
  document.querySelectorAll('[data-junk-dimensions]').forEach(block=>{
   const inputs=[...block.querySelectorAll('input')], output=block.parentElement.querySelector('[data-junk-volume]');
   const refresh=()=>{const nums=inputs.map(input=>Number(input.value));output.textContent=nums.every(n=>n>0)?'Расчётный объём: '+(nums.reduce((a,b)=>a*b,1)/1e6).toFixed(2)+' м³ · класс подбора определится при сохранении':'Расчётный объём: укажите три размера';};

@@ -100,9 +100,8 @@ async function reviewGet(managerId, masterId) {
   const categories = await require('./category.service').configForView('ru');
   const { vanSizeSpec } = require('../config/serviceTypes');
   const thresholds = await require('./settings.service').getVanSizeThresholds();
-  // Полные пороги (не только текст) — чтобы review.ejs мог на клиенте прикинуть букву
-  // по введённым см ещё до отправки формы; итоговую букву всё равно пересчитывает
-  // сервер в approvePending, клиентский расчёт — только превью.
+  // Полные пороги (не только текст) — чтобы форма могла на клиенте показать букву по
+  // введённым см ещё до отправки; итоговую букву ставит сервер при сохранении.
   const vanSizes = thresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, thresholds) }));
   master.services=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[masterId])).rows;
   master.work_cities=(await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1',[masterId])).rows;
@@ -196,17 +195,17 @@ async function rejectPending(managerId, masterId, reason) {
 
 // Одобрение из быстрой карточки: закрепляет исполнителя за модератором (если ещё
 // ничей), проставляет категорию и пробует одобрить. Для van/transport менеджер вводит
-// см кузова (длина/ширина/высота) — букву S/M/L/XL/XXL сервер определяет сам через
-// deriveVanSize по актуальным порогам (см. settings.service.getVanSizeThresholds),
-// а не доверяет тому, что мог посчитать на клиенте JS (см. review.ejs — там только
-// превью). Явный vehicleSize остаётся как раньше — 'any' (без ограничения) или прямой
-// код, если см не переданы. Для прочих обязательных характеристик, которых тут нет в
+// см кузова (длина/ширина/высота) в характеристиках перевозки — букву S/M/L/XL/XXL по
+// ним ставит master.service.updateMasterProfile по актуальным порогам, а не клиентский
+// JS (там только превью). vehicleSize — буква на глаз, когда размеров нет: пустая строка
+// из формы значит «размер неизвестен», отсутствие поля — оставить прежнюю букву.
+// Для прочих обязательных характеристик, которых тут нет в
 // списке полей категории, просим открыть полную карточку в /admin, а не строим тут
 // дублирующую форму под все типы услуг (см. category.service — поля per-category).
 // Внутреннее ядро, без журналирования события — используется и «только категория»,
 // и первым шагом «категория и одобрить», а событие в manager_portal_events у них
 // разное (assign_category vs approve), поэтому пишет его каждый вызывающий сам.
-async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, allowActive = false, cityIds = undefined, spokenLanguages = undefined) {
+async function assignCategoryCore(managerId, masterId, category, attributes = {}, vehicleSize = null, services = undefined, allowActive = false, cityIds = undefined, spokenLanguages = undefined) {
   const master = (await pool.query('SELECT * FROM masters WHERE id=$1', [masterId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   if (master.is_banned) throw fail('Профиль заблокирован.', 409);
@@ -217,18 +216,10 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
     const claimed = await pool.query('UPDATE masters SET manager_id=$2 WHERE id=$1 AND manager_id IS NULL RETURNING id', [masterId, managerId]);
     if (!claimed.rows[0]) throw fail('Заявку уже забрал другой менеджер.', 409);
   }
-  let effectiveSize = vehicleSize;
-  if ((category === 'van' || services?.some(s=>s.type === 'van')) && cargoDimensions && cargoDimensions.length && cargoDimensions.width && cargoDimensions.height) {
-    const { deriveVanSize } = require('../config/serviceTypes');
-    const thresholds = await require('./settings.service').getVanSizeThresholds();
-    const derived = deriveVanSize(cargoDimensions.length, cargoDimensions.width, cargoDimensions.height, thresholds);
-    if (!derived) throw fail('Не удалось определить размер по введённым см — проверьте значения.', 400);
-    effectiveSize = derived;
-  }
   try {
     await require('./master.service').updateMasterProfile(masterId, {
       name: master.name, phone: master.phone, category,
-      vehicleType: master.vehicle_type, vehicleSize: effectiveSize || master.vehicle_size, isFlatbed: master.is_flatbed,
+      vehicleType: master.vehicle_type, vehicleSize: vehicleSize === '' ? null : vehicleSize || master.vehicle_size, isFlatbed: master.is_flatbed,
       priceText: master.price_text, description: master.description, serviceAttributes: attributes, services, cityIds, spokenLanguages,
     });
   } catch (e) {
@@ -245,13 +236,13 @@ async function assignCategoryCore(managerId, masterId, category, attributes = {}
 // не одобряя) и «Категория и одобрить» (то же самое + сразу approveMaster) — вместо
 // единственного пути, из-за которого приходилось уходить в общий список
 // /admin/masters, чтобы отдельно одобрить уже закреплённую заявку.
-async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, cityIds = undefined, spokenLanguages = undefined) {
-  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, true, cityIds, spokenLanguages);
+async function assignCategory(managerId, masterId, category, attributes = {}, vehicleSize = null, services = undefined, cityIds = undefined, spokenLanguages = undefined) {
+  const id = await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, services, true, cityIds, spokenLanguages);
   await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'assign_category',$3)", [managerId, masterId, 'Назначены услуги: ' + (services ? services.map(s=>s.type).join(', ') : category)]);
   return id;
 }
-async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, cargoDimensions = null, services = undefined, cityIds = undefined, spokenLanguages = undefined) {
-  await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, cargoDimensions, services, false, cityIds, spokenLanguages);
+async function approvePending(managerId, masterId, category, attributes = {}, vehicleSize = null, services = undefined, cityIds = undefined, spokenLanguages = undefined) {
+  await assignCategoryCore(managerId, masterId, category, attributes, vehicleSize, services, false, cityIds, spokenLanguages);
   const approved = await require('./master.service').approveMaster(masterId);
   if (!approved) throw fail('Не удалось одобрить — проверьте данные в полной карточке в админке.', 422);
   await pool.query("INSERT INTO manager_portal_events(manager_id,master_id,action,body) VALUES($1,$2,'approve',$3)", [managerId, masterId, 'Одобрены услуги: ' + (services ? services.map(s=>s.type).join(', ') : category)]);
@@ -285,6 +276,8 @@ async function detail(managerId, masterId) {
   const master = (await pool.query('SELECT id,name,phone,category,balance_tetri,is_active,is_banned,banned_reason,banned_by_manager_id,is_subscribed,subscription_until,created_at,contact_channels FROM masters WHERE id=$1 AND manager_id=$2', [masterId, managerId])).rows[0];
   if (!master) throw fail('Специалист не найден.', 404);
   await recordView(managerId, master.id);
+  const van = (await pool.query("SELECT attributes FROM master_services WHERE master_id=$1 AND service_type='van'", [masterId])).rows[0];
+  master.van_body = van ? require('../config/serviceTypes').vanBodyLabel(van.attributes) : null;
   const ledger = (await pool.query('SELECT b.id,b.amount_tetri,b.reason,b.created_at FROM balance_transactions b JOIN masters m ON m.id=b.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY b.created_at DESC,b.id DESC LIMIT 100', [masterId, managerId])).rows;
   const events = (await pool.query('SELECT e.action,e.body,e.created_at FROM manager_portal_events e JOIN masters m ON m.id=e.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY e.created_at DESC,e.id DESC LIMIT 100', [masterId, managerId])).rows;
   const activity = (await pool.query('SELECT v.order_id,v.event_type,v.viewed_at FROM order_views v JOIN masters m ON m.id=v.master_id WHERE m.id=$1 AND m.manager_id=$2 ORDER BY v.viewed_at DESC LIMIT 100', [masterId, managerId])).rows;

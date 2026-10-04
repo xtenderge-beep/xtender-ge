@@ -8,7 +8,7 @@
 <% if(plan) { %>
 <p class="font-bold"><%= plan.order.is_technical ? '🧪 ТЕСТ — только технические исполнители' : 'Обычная заявка — только реальные исполнители' %></p>
 <p><%= plan.order.description %></p>
-<% if(plan.recipients && plan.recipients.length) { %><details><summary>Показать получателей</summary><ul><% plan.recipients.forEach(m=>{ %><li>#<%= m.id %> · <%= m.phone %> · <%= m.telegram_id ? 'Telegram (резерв: SMS)' : 'SMS' %></li><% }) %></ul></details><% } %>
+<% if(plan.recipients && plan.recipients.length) { %><details><summary>Показать получателей</summary><ul><% plan.recipients.forEach(m=>{ %><li>#<%= m.id %> · <%= m.phone %> · <%= m.telegram_id ? 'Telegram (резерв: SMS)' : 'SMS' %><%= m.van_body ? ' · кузов ' + m.van_body : '' %></li><% }) %></ul></details><% } %>
 <p>Группа: <strong><%= groups[plan.category] %><%= plan.size ? ' · '+plan.size : '' %></strong></p>
 <% if(plan.criteria?.length){ %><p><strong>Требования этой потребности:</strong> <%= plan.criteria.map(item=>item.label+': '+item.value).join(' · ') %></p><% } else { %><p>Дополнительные характеристики не заданы: подбор идёт по услуге<%= plan.size?', размеру':'' %>.</p><% } %>
 <% if(plan.attributeExcluded){ %><p class="text-xs">Исключены по характеристикам: <strong><%= plan.attributeExcluded %></strong> исполнителей, которые в остальном допущены к рассылке.</p><% } %>

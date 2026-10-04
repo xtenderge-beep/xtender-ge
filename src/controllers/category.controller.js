@@ -9,7 +9,7 @@ async function form(req,res) {
  const fieldsLocked=categories.hasLockedField(category?.fields);
  const vanSizeThresholds=fieldsLocked ? await settingsService.getVanSizeThresholds() : null;
  res.render('admin/category-edit',{category,error:req.query.error || null,submitted:null,fieldsLocked,returnTo:masterReturn(req.query.returnTo),
-   vanSizeThresholds,vanSizeSpec,sizeError:req.query.sizeError || null});
+   vanSizeThresholds,vanSizeSpec,sizeError:req.query.sizeError || null,sizesSaved:/^\d+$/.test(req.query.sizesSaved || '') ? Number(req.query.sizesSaved) : null});
 }
 async function save(req,res) {
  const slug=req.params.slug || null;
@@ -22,7 +22,7 @@ async function save(req,res) {
    if(!error.status)throw error;
    const fieldsLocked=categories.hasLockedField(category?.fields);
    res.status(error.status).render('admin/category-edit',{category,error:error.message,submitted:input,fieldsLocked,returnTo:masterReturn(req.body.returnTo),
-     vanSizeThresholds:fieldsLocked ? await settingsService.getVanSizeThresholds() : null,vanSizeSpec,sizeError:null});
+     vanSizeThresholds:fieldsLocked ? await settingsService.getVanSizeThresholds() : null,vanSizeSpec,sizeError:null,sizesSaved:null});
  }
 }
 async function saveVanSizes(req,res) {
@@ -31,7 +31,8 @@ async function saveVanSizes(req,res) {
  const codes=require('../config/serviceTypes').VAN_SIZE_ORDER;
  const thresholds={};
  for(const code of codes) thresholds[code]={length:req.body['length_'+code],width:req.body['width_'+code],height:req.body['height_'+code]};
- try { await settingsService.setVanSizeThresholds(thresholds); res.redirect('/admin/categories/'+req.params.slug); }
+ // Буквы исполнителей с записанными размерами кузова сразу пересчитываются по новым порогам.
+ try { await settingsService.setVanSizeThresholds(thresholds); res.redirect('/admin/categories/'+req.params.slug+'?sizesSaved='+await require('../services/master.service').reclassifyVanSizes()); }
  catch(error) { if(!error.status)throw error; res.redirect('/admin/categories/'+req.params.slug+'?sizeError='+encodeURIComponent(error.message)); }
 }
 async function remove(req,res) {

@@ -86,6 +86,13 @@ const portal=require('../src/services/managerPortal.service');
   const review=await fetch(base+'/manager/review/'+own,{headers:{cookie:auth}});assert.equal(review.status,200);assert.match(await review.text(),/Перевести и сохранить/);
   const descriptionSave=await fetch(base+'/manager/review/'+own+'/description',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({_csrf:(await portal.session(auth.split('=')[1])).csrf,description:'Новые услуги',sourceLang:'ru'}),redirect:'manual'});
   assert.equal(descriptionSave.status,302);assert.equal((await pool.query('SELECT description FROM masters WHERE id=$1',[own])).rows[0].description,'Новые услуги');
+  // Форма услуг: три размера кузова приходят характеристиками перевозки, букву ставит сервер, а не выбор в списке.
+  const sized=await fetch(base+'/manager/review/'+own+'/assign',{method:'POST',headers:{cookie:auth},redirect:'manual',body:new URLSearchParams([['_csrf',(await portal.session(auth.split('=')[1])).csrf],['servicesForm','1'],['services','van'],['van_body','closed'],['van_cargo_length_cm','280'],['van_cargo_width_cm','170'],['van_cargo_height_cm','170'],['vehicleSize','XXL'],['cityIds','1'],['spokenLanguages','ru']])});
+  assert.equal(sized.headers.get('location'),'/manager/masters/'+own);
+  const vanAttributes=(await pool.query("SELECT attributes FROM master_services WHERE master_id=$1 AND service_type='van'",[own])).rows[0].attributes;
+  assert.equal(vanAttributes.size,'M');assert.equal(vanAttributes.cargo_length_cm,280);
+  assert.match(await (await fetch(base+'/manager/masters/'+own,{headers:{cookie:auth}})).text(),/Кузов: <strong>M · Д280×Ш170×В170 см<\/strong>/);
+  assert.match(await (await fetch(base+'/manager/review/'+own,{headers:{cookie:auth}})).text(),/name="van_cargo_height_cm" data-van-cm min="1" max="2000" step="1" value="170"/);
   assert.equal((await fetch(base+'/manager/masters/'+other,{headers:{cookie:auth}})).status,404);
   assert.equal((await fetch(base+'/manager/masters/'+own+'/ban',{method:'POST',headers:{cookie:auth},body:new URLSearchParams({body:'No csrf'})})).status,403);
   const sessionCsrf=(await portal.session(auth.split('=')[1])).csrf;

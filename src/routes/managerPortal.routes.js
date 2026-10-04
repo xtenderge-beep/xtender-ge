@@ -63,7 +63,7 @@ const dispatchPage=async(req,res,result=null)=>{
     try {const preview=await dispatchService.preview(order.token,key,'');return {key,label,count:preview.count,alreadySent:preview.alreadySent};}
     catch(e){return {key,label,count:null,error:e.message};}
   }));
-  res.render('manager/order-dispatch',{order,plan,result,error,serviceRows,activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups,serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
+  res.render('manager/order-dispatch',{order,plan,result,error,serviceRows,transportSizes:await dispatchService.transportSizes(order),activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups,serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
 };
 router.get('/orders',wrap(async(req,res)=>{
   const rows=(await require('../config/db').query("SELECT id,token,description,status,created_at FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT 100")).rows;
@@ -99,12 +99,10 @@ router.post('/review/:id/description',wrap(async(req,res) => {
 }));
 function reviewFormInput(req) {
   const attributes = Object.fromEntries(Object.entries(req.body).filter(([k]) => k.startsWith('attr_')).map(([k,v]) => [k.slice(5),v]));
-  const cargoDimensions = req.body.cargoLength || req.body.cargoWidth || req.body.cargoHeight
-    ? { length: req.body.cargoLength, width: req.body.cargoWidth, height: req.body.cargoHeight } : null;
   const services=req.body.servicesForm ? [].concat(req.body.services || []).filter(t=>typeof t === 'string').map(type=>({type,
     attributes:Object.fromEntries(Object.entries(req.body).filter(([k])=>k.startsWith(type+'_')).map(([k,v])=>[k.slice(type.length+1),v])),
     requiresOwnTransport:type === 'movers' && req.body.moversOwnTransport === 'on'})) : undefined;
-  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, cargoDimensions, services, [].concat(req.body.cityIds || []).map(Number), [].concat(req.body.spokenLanguages || [])];
+  return [services?.[0]?.type || req.body.category, attributes, req.body.vehicleSize, services, [].concat(req.body.cityIds || []).map(Number), [].concat(req.body.spokenLanguages || [])];
 }
 // Два действия одной формы (review.ejs, кнопки с разным formaction): «Только
 // категория» закрепляет заявку и сохраняет характеристики, не одобряя — модератор

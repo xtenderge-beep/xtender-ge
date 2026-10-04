@@ -432,7 +432,7 @@ async function orderDetail(req, res) {
   order.deliveryRuns = await orderService.getOrderDispatches(order.id);
   order.funnel = await orderService.getOrderFunnelStats(order.id);
   res.locals.dispatchError = req.query.dispatchError || null;
-  res.render('admin/order-detail', { order, activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(), groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
+  res.render('admin/order-detail', { order, transportSizes: await require('../services/dispatch.service').transportSizes(order), activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(), groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
 }
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
