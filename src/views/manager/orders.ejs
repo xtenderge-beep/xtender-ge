@@ -1,6 +1,55 @@
 <%- include('_header') %>
+<style>
+.order-totals{display:flex;gap:8px 18px;flex-wrap:wrap;margin:14px 0 4px;font-weight:600}
+.order-totals .warn{color:#a53030}
+.order-row{display:block;background:white;border:1px solid #dde3e2;border-left:5px solid #c8d2cf;border-radius:14px;padding:16px 20px;margin:12px 0;color:inherit;text-decoration:none}
+.order-row:hover{border-color:#08765f;border-left-color:#08765f}
+.order-row.is-waiting{border-left-color:#d08a00}.order-row.is-sent{border-left-color:#08765f}.order-row.is-nobody,.order-row.has-failed{border-left-color:#a53030}
+.order-row-head{display:flex;gap:6px 12px;align-items:center;flex-wrap:wrap}
+.order-row-head strong{color:#08765f;text-decoration:underline}
+.badge{display:inline-block;border-radius:999px;padding:3px 11px;font-size:13px;font-weight:700;white-space:nowrap}
+.badge-wait{background:#fff3d6;color:#7a5200}.badge-sent{background:#e2f4ee;color:#075d4b}.badge-bad{background:#fbe4e4;color:#8a2424}.badge-test{background:#eceff1;color:#3d4a52}
+.order-row-text{margin:10px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.order-row-facts{display:flex;gap:4px 18px;flex-wrap:wrap;margin:10px 0 0;font-size:14px}
+.order-row-facts .bad{color:#a53030;font-weight:700}.order-row-facts .soft{color:#7a5200;font-weight:600}
+@media(max-width:600px){.order-row{padding:14px 14px}}
+</style>
+<%
+  const ago = minutes => minutes < 60 ? minutes + ' мин' : minutes < 2880 ? Math.floor(minutes / 60) + ' ч' : Math.floor(minutes / 1440) + ' дн';
+  const when = value => new Date(value).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const waiting = orders.filter(order => order.state !== 'sent'), sent = orders.filter(order => order.state === 'sent');
+  const troubled = orders.filter(order => order.failed || order.pending || order.state === 'nobody').length;
+%>
 <h1>Заявки для рассылки</h1>
-<p>Подбор и отправка доступны главному модератору. Откройте заявку, проверьте каждую потребность и её характеристики до отправки.</p>
-<% if(!orders.length){ %><p>Открытых заявок сейчас нет.</p><% } %>
-<% orders.forEach(order=>{ %><div class="card"><a href="/manager/orders/<%= order.token %>"><strong>Заявка #<%= order.id %></strong></a> · <%= date(order.created_at) %><p class="pre"><%= order.description %></p></div><% }); %>
+<p class="muted">Открытые заявки и что с каждой происходит. Чтобы выбрать исполнителей и отправить, откройте заявку.</p>
+<% if(!orders.length){ %><p>Открытых заявок сейчас нет.</p><% } else { %>
+<p class="order-totals" id="order-totals"><span>Ждут рассылки: <%= waiting.length %></span><span>Разосланы: <%= sent.length %></span><% if(troubled){ %><span class="warn">С ошибками доставки: <%= troubled %></span><% } %></p>
+<% } %>
+<% [['Ждут рассылки', waiting], ['Разосланы — ждём откликов', sent]].forEach(([title, rows]) => { if(!rows.length) return; %>
+<h2><%= title %></h2>
+<% rows.forEach(order => { %>
+<a class="order-row is-<%= order.state %><%= order.failed ? ' has-failed' : '' %>" href="/manager/orders/<%= order.token %>" data-order="<%= order.id %>" data-state="<%= order.state %>">
+  <span class="order-row-head">
+    <strong>Заявка #<%= order.id %></strong>
+    <% if(order.state === 'sent'){ %><span class="badge badge-sent">Разослана <%= ago(order.minutes) %> назад</span>
+    <% } else if(order.state === 'nobody'){ %><span class="badge badge-bad">Отправляли — никто не получил</span>
+    <% } else { %><span class="badge badge-wait">Ждёт рассылки <%= ago(order.minutes) %></span><% } %>
+    <% if(order.is_technical){ %><span class="badge badge-test">🧪 тест</span><% } %>
+    <span class="muted">создана <%= when(order.created_at) %><% if(order.district_name){ %> · 📍 <%= order.district_name %><% } %></span>
+  </span>
+  <span class="order-row-text"><%= order.description %></span>
+  <% if(order.state !== 'waiting'){ %>
+  <span class="order-row-facts">
+    <% if(order.services.length){ %><span>Кому: <%= order.services.join(', ') %></span><% } %>
+    <% if(order.received){ %><span>Получили: <%= order.received %></span>
+      <% if(order.opened){ %><span>Открыли: <%= order.opened %></span><span>Связались с заказчиком: <%= order.contacted %></span>
+      <% } else { %><span class="<%= order.minutes >= 60 ? 'soft' : 'muted' %>">Пока никто не открыл</span><% } %>
+    <% } %>
+    <% if(order.failed){ %><span class="bad">Не доставлено: <%= order.failed %> — откройте и повторите отправку</span><% } %>
+    <% if(order.pending){ %><span class="soft">Доставка не подтверждена: <%= order.pending %></span><% } %>
+    <% if(order.closed.length){ %><span class="muted">Закрыто: <%= order.closed.join(', ') %></span><% } %>
+  </span>
+  <% } %>
+</a>
+<% }); }); %>
 </main></body></html>

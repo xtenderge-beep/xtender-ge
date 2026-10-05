@@ -894,6 +894,21 @@ CREATE TABLE IF NOT EXISTS site_visits (
 );
 CREATE INDEX IF NOT EXISTS idx_site_visits_created ON site_visits(created_at);
 
+-- Личная ссылка исполнителя на заявку (leadLink.service.js): ключ из SMS/Telegram открывает заявку и
+-- контакт заказчика без входа в кабинет, но только в первом браузере, где ссылкой воспользовались.
+-- Здесь только хеши ключа и устройства; новая отправка тому же исполнителю заменяет ключ.
+CREATE TABLE IF NOT EXISTS lead_links (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    key_hash VARCHAR(64) NOT NULL,
+    device_hash VARCHAR(64),
+    bound_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (order_id, master_id)
+);
+CREATE INDEX IF NOT EXISTS idx_lead_links_key ON lead_links(key_hash);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

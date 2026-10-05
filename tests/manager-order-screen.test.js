@@ -146,6 +146,30 @@ const names=service=>service.recipients.map(r=>r.name);
   assert.deepEqual(screen.rows.filter(row=>row.checked).map(row=>[row.key,row.locked]),[['transport',true],['movers',true],['tow',true],[plumbing,true]]);
   assert.equal(screen.runs.length,6);assert.equal(screen.names[vanM],'Фургон M');
   assert.equal(await dispatch.screen('no-such-order'),null);
+
+  // Список заявок: состояние каждой видно, не открывая её.
+  await orders.logView(order.id,vanM,'view');await orders.logView(order.id,mover,'view');
+  await pool.query("INSERT INTO order_views(order_id,master_id,event_type) VALUES($1,$2,'call')",[order.id,vanM]);
+  const lost=await provider('Не дошло',[van(dims(300,175,180))]);
+  const firstRun=(await pool.query('SELECT id FROM dispatch_runs WHERE order_id=$1 ORDER BY id LIMIT 1',[order.id])).rows[0].id;
+  await pool.query("INSERT INTO dispatch_deliveries(run_id,order_id,master_id,status) VALUES($1,$2,$3,'failed')",[firstRun,order.id,lost]);
+  await pool.query("INSERT INTO order_category_closures(order_id,category,closed_by,reason) VALUES($1,'movers','client','done')",[order.id]);
+  await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('screen-3','+995500006997','Закрытая','closed')");
+  const labels=await categories.groups(),list=await dispatch.orderList(),row=token=>list.find(item=>item.token===token);
+  assert.deepEqual(list.map(item=>item.token).sort(),['screen-1','screen-2'],'в списке только открытые заявки');
+  assert.deepEqual([row('screen-2').state,row('screen-2').received,row('screen-2').services],['waiting',0,[]]);
+  const listed=row('screen-1');
+  assert.deepEqual([listed.state,listed.received,listed.opened,listed.contacted,listed.failed,listed.pending],['sent',8,2,1,1,0]);
+  assert.deepEqual(listed.services,['transport','movers',plumbing,'tow'].map(key=>labels[key]));
+  assert.deepEqual(listed.closed,[labels.movers]);
+  assert.ok(!JSON.stringify(list).includes('+9955'),'телефон заказчика в список не попадает');
+  // Попытка была, но никто не получил: это не «ждёт рассылки».
+  await pool.query("INSERT INTO order_dispatches(order_id,category,vehicle_size) VALUES($1,'transport','L')",[legacy.id]);
+  assert.equal((await dispatch.orderList()).find(item=>item.token==='screen-2').state,'nobody');
+  const page=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/orders.ejs'),{orders:await dispatch.orderList(),manager:{name:'Тест'},csrf:'x',date:()=>'05.10.2026, 23:36'});
+  assert.match(page,/data-order="1" data-state="sent"/);assert.match(page,/Получили: 8/);assert.match(page,/Открыли: 2/);
+  assert.match(page,/Связались с заказчиком: 1/);assert.match(page,/Не доставлено: 1/);assert.match(page,/Отправляли — никто не получил/);
+  assert.match(page,/Ждут рассылки: 1/);assert.match(page,/Разосланы: 1/);assert.match(page,/С ошибками доставки: 2/);
   console.log('PASS: manager order screen — live plan, one-button send to several services, one charge per provider, widening keeps earlier recipients matched');
   redis.disconnect();
 })().catch(e=>{console.error(e);process.exitCode=1;redis.disconnect();});

@@ -249,14 +249,19 @@
           </div>
         <% } %>
 
+        <%# Личная ссылка уже привязана к другому браузеру: сразу говорим, что нужен вход по коду. %>
+        <% const linkIsTaken = typeof linkTaken !== 'undefined' && linkTaken && order.status === 'new'; %>
+        <% if (linkIsTaken) { %><div id="linkTaken" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium"><%= t('contact_link_taken') %></div><% } %>
         <div id="msg" class="hidden p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold"></div>
-        <a id="contactLogin" href="/master" class="hidden text-sm font-bold underline"><%= t('contact_signin') %></a>
+        <a id="contactLogin" href="/master?next=<%= encodeURIComponent('/order/' + order.token) %>" class="<%= linkIsTaken ? '' : 'hidden ' %>text-sm font-bold underline"><%= t('contact_signin') %></a>
       </div>
 
       <script>
         const T = <%- JSON.stringify(clientStrings) %>;
         const token = '<%= order.token %>';
         const masterId = <%- masterId ? JSON.stringify(masterId) : 'null' %>;
+        // Личный ключ из ссылки лида: с ним просмотр и контакт работают без входа в кабинет.
+        const leadKey = new URLSearchParams(location.search).get('k') || '';
         const msg = document.getElementById('msg');
 
         function logEvent(eventType) {
@@ -264,7 +269,7 @@
           fetch('/api/orders/' + token + '/log-view', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ masterId, eventType }),
+            body: JSON.stringify({ masterId, eventType, key: leadKey }),
             keepalive: true,
           }).catch(() => {});
         }
@@ -325,12 +330,13 @@
           try {
             const response = await fetch('/api/orders/' + token + '/contact', {
               method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ channel }),
+              body: JSON.stringify({ channel, key: leadKey }),
             });
             const data = await response.json();
             if (!response.ok || !data.success) {
               msg.textContent = data.message || T.contact_invalid;
-              msg.classList.remove('hidden');
+              // То же самое уже сказано в жёлтой подсказке над кнопкой «Войти» — не повторяем.
+              if (!(data.code === 'link_taken' && document.getElementById('linkTaken'))) msg.classList.remove('hidden');
               if (response.status === 401) document.getElementById('contactLogin').classList.remove('hidden');
               return;
             }

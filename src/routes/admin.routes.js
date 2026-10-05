@@ -73,7 +73,14 @@ router.post('/orders/:token/needs', verifyCsrf, asyncHandler(adminController.sav
 router.post('/orders/:token/retry-dispatch', verifyCsrf, asyncHandler(adminController.retryDispatch));
 router.get('/orders/:token/dispatch', asyncHandler(adminController.dispatchPreview));
 router.post('/orders/:token/dispatch', verifyCsrf, asyncHandler(adminController.dispatchOrder));
-router.get('/orders/:token', asyncHandler(adminController.orderDetail));
+router.get('/orders/:token', asyncHandler((req, res) => adminController.orderDetail(req, res)));
+// Экран заявки — те же действия, что в кабинете менеджера (см. managerPortal.routes.js).
+router.post('/orders/:token/preview', verifyCsrf, asyncHandler(adminController.orderPreview));
+router.post('/orders/:token/send', verifyCsrf, asyncHandler(adminController.orderSend));
+router.post('/orders/:token/text', verifyCsrf, asyncHandler(adminController.orderText));
+router.post('/orders/:token/note', verifyCsrf, asyncHandler(adminController.orderNote));
+router.post('/orders/:token/brief', verifyCsrf, asyncHandler(adminController.orderBrief));
+router.post('/orders/:token/retry', verifyCsrf, asyncHandler(adminController.orderRetry));
 router.post('/orders/:token/request-revision', verifyCsrf, asyncHandler(adminController.requestOrderRevision));
 router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
 router.post('/orders/:token/close-category', verifyCsrf, asyncHandler(adminController.closeOrderCategory));

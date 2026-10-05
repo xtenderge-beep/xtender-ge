@@ -297,6 +297,8 @@ async function statusPage(req, res) {
   const sessionToken = await masterSession.token(req);
   const master = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
   if (master && req.params.token && req.params.token !== sessionToken) return res.redirect('/master');
+  // Уже вошёл, а пришёл со страницы заявки — сразу обратно на заявку.
+  if (master && !req.params.token && orderReturn(req.query?.next, master.id)) return res.redirect(orderReturn(req.query.next, master.id));
   // Личный кабинет открывают по ссылке из SMS — часто в другом браузере/устройстве,
   // без куки `lang` этого сайта (или с чужой, унаследованной куки). Язык мастера,
   // записанный при регистрации, надёжнее: переключатель в кабинете обновляет именно
@@ -449,7 +451,13 @@ async function loginVerify(req, res) {
 
   await otpService.clearVerified(phone, MASTER_LOGIN_PURPOSE);
   await masterSession.start(req, res, master.master_token);
-  return res.json({ success: true, link: '/master' });
+  return res.json({ success: true, link: orderReturn(req.body.next, master.id) || '/master' });
+}
+
+// Исполнитель пришёл на вход со страницы заявки (нажал «Позвонить» без входа) — после входа
+// возвращаем его на эту заявку, а не в кабинет. Принимается только адрес страницы заявки.
+function orderReturn(next, masterId) {
+  return typeof next === 'string' && /^\/order\/[A-Za-z0-9_-]{1,40}$/.test(next) ? next + '?master=' + masterId : null;
 }
 
 // Исполнитель прикрепляет чек о банковском переводе — файл уходит модератору в

@@ -6,9 +6,11 @@
   // master.controller.js switchLanguage), а не общую куку: кабинет открывают по
   // ссылке из SMS, часто в другом браузере/устройстве без этой куки. На остальных
   // (/order, /o, ...) — общий /lang/:code (ставит куку и возвращает на страницу).
+  // Страница заказчика передаёт langHref («/o/<ссылка>?lang=»): её язык берётся из заявки, а не из
+  // общей куки, поэтому выбор флажком запоминает она сама (order.controller.js chooseOwnerLanguage).
   const _langs = [['ka', 'GE'], ['ru', 'RU'], ['en', 'EN']];
   const _hasAlt = typeof alternates !== 'undefined' && alternates;
-  const _masterHref = typeof masterLangHref !== 'undefined' && masterLangHref;
+  const _masterHref = (typeof langHref !== 'undefined' && langHref) || (typeof masterLangHref !== 'undefined' && masterLangHref);
 %>
 <div class="flex bg-stone-100 p-1 rounded-xl text-xs font-bold border border-stone-200">
   <% _langs.forEach(function (lf) { %>

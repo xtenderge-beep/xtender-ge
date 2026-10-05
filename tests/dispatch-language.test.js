@@ -16,7 +16,7 @@ stub('../src/services/sms.service', {
   sendOtp: async () => ({ providerMessageId: 'otp' }),
   sendOrderNotification: async (phone, text, context) => { sms.push({ phone, text, context }); return { ok: true, providerMessageId: 'sms-' + sms.length }; },
 });
-stub('../src/services/translation.service', { translateOrder: async () => null });
+stub('../src/services/translation.service', { translateOrder: async () => null, detectLang: () => 'ru' });
 const calls = [];
 stub('axios', { post: async (url, body) => { calls.push({ url, body }); return { data: { ok: true, result: { message_id: 1 } } }; } });
 
@@ -213,10 +213,12 @@ const go = (plan, language) => dispatch.dispatch(plan.order.token, 'movers', '',
   assert.match(page, /язык не указан у 1/);
   const empty = await dispatch.preview(order4.token, 'movers', '', 'hy');
   assert.match(render('admin/dispatch.ejs', { token: order4.token, plan: empty, error: null, result: null, groups, speakLabels, emptyReason: dispatch.emptyReason, csrfToken: 'csrf' }), /говорят по-армянски\. Попробуйте другого адресата/);
-  const detail = render('admin/order-detail.ejs', { order: await admin.getOrderDetailAdmin(order3.token), transportSizes: await dispatch.transportSizes(order3), groups, speakLabels, csrfToken: 'csrf', revisionNotice: null, activeCities: await require('../src/services/master.service').getActiveCities(), allCities: await require('../src/services/master.service').getWorkCities() });
-  assert.match(detail, /name="language"/);
-  assert.match(detail, /Говорят по-английски/);
-  assert.match(detail, /movers · говорят по-грузински/);
+  // Страница заявки в админке — общий экран с кабинетом менеджера: выбор языка и отправки по языкам.
+  const detail = await ejs.renderFile(path.join(views, 'admin/order-detail.ejs'), { ...await dispatch.screen(order3.token), result: null, error: null, csrfToken: 'csrf',
+    revisionNotice: null, notifiedMasters: (await admin.getOrderDetailAdmin(order3.token)).notifiedMasters, date: value => String(value) });
+  assert.match(detail, /<select name="language">/);
+  assert.match(detail, /Только кто говорит по-английски/);
+  assert.match(detail, /Грузчики · говорят по-грузински/);
 
   console.log('PASS: dispatch by spoken language (preview, charging, widening, missed leads, Telegram picker, webhook, admin form)');
 })().catch(e => { console.error(e); process.exitCode = 1; });

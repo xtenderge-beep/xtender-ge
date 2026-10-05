@@ -426,15 +426,39 @@ async function ordersList(req, res) {
   res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, kind, page, total: filtered.length });
 }
 
-async function orderDetail(req, res) {
-  res.locals.revisionNotice = req.query.revisionNotice === 'failed' ? 'failed' : req.query.revisionNotice === 'sent' ? 'sent' : null;
-  const order = await adminService.getOrderDetailAdmin(req.params.token);
-  if (!order) return res.status(404).send('Заявка не найдена');
-  order.deliveryRuns = await orderService.getOrderDispatches(order.id);
-  order.funnel = await orderService.getOrderFunnelStats(order.id);
-  res.locals.dispatchError = req.query.dispatchError || null;
-  res.render('admin/order-detail', { order, transportSizes: await require('../services/dispatch.service').transportSizes(order), activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(), groups: await require('../services/category.service').groups(), serviceConfig: await require('../services/category.service').configForView('ru'), speakLabels: require('../config/spokenLanguages').speakLabels });
+// Страница заявки у администратора — тот же экран, что в кабинете менеджера (partials/order-screen):
+// слева заявка, справа услуги с расчётом «кто получит» и одна кнопка отправки. Ниже — то, что есть
+// только у администратора: возврат на доработку, закрытие, удаление, телефоны получивших и списания.
+async function orderDetail(req, res, result = null) {
+  const screen = await dispatchService.screen(req.params.token, require('../config/spokenLanguages').parseDispatchLanguage(req.query.language) || '');
+  if (!screen) return res.status(404).send('Заявка не найдена');
+  const detail = await adminService.getOrderDetailAdmin(req.params.token);
+  res.render('admin/order-detail', { ...screen, result, error: req.query.error || req.query.dispatchError || null,
+    notifiedMasters: detail.notifiedMasters,
+    revisionNotice: ['failed', 'sent'].includes(req.query.revisionNotice) ? req.query.revisionNotice : null,
+    date: value => value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi' }) : '—' });
 }
+const orderPage = token => '/admin/orders/' + encodeURIComponent(token);
+// Пересчёт при каждом изменении формы: ничего не сохраняет и не отправляет.
+async function orderPreview(req, res) {
+  try { res.json(await dispatchService.previewForm(req.params.token, req.body)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+}
+// Одна кнопка: сохранить потребности и отправить заявку всем отмеченным услугам.
+async function orderSend(req, res) {
+  let result;
+  try { result = await dispatchService.sendForm(req.params.token, req.body, 'admin'); }
+  catch (e) { return res.redirect(orderPage(req.params.token) + '?error=' + encodeURIComponent(e.message)); }
+  return orderDetail(req, res, result);
+}
+const orderAction = action => async (req, res) => {
+  try { await action(req); res.redirect(orderPage(req.params.token)); }
+  catch (e) { if (e.status === 404) return res.status(404).send(e.message); res.redirect(orderPage(req.params.token) + '?error=' + encodeURIComponent(e.message)); }
+};
+const orderText = orderAction(req => require('../services/orderText.service').edit(req.params.token, req.body.description, 'admin', requestMeta(req)));
+const orderNote = orderAction(req => require('../services/orderText.service').clarify(req.params.token, req.body.note, 'admin', requestMeta(req)));
+const orderBrief = orderAction(req => require('../services/orderBrief.service').act(req.params.token, req.body.action));
+const orderRetry = orderAction(req => dispatchService.retry(req.params.token, req.body.runId, 'admin'));
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
 // исполнителя (в отличие от orderController.close): это административное действие,
@@ -869,6 +893,12 @@ module.exports = {
   correctBalance,
   ordersList,
   orderDetail,
+  orderPreview,
+  orderSend,
+  orderText,
+  orderNote,
+  orderBrief,
+  orderRetry,
   closeOrder,
   closeOrderCategory,
   deleteOrder,

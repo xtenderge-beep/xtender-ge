@@ -449,7 +449,7 @@
                 codeBtn.disabled = true;
                 fetch('/api/master/login/verify', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone: phone, code: code }),
+                    body: JSON.stringify({ phone: phone, code: code, next: new URLSearchParams(location.search).get('next') || '' }),
                 }).then(function (r) { return r.json(); })
                   .then(function (d) {
                       if (d.success && d.link) { window.location = d.link; return; }

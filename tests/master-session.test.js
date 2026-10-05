@@ -44,6 +44,14 @@ const { translate, clientStrings } = require('../src/config/i18n');
   await controller.loginVerify({body:{phone:'+995500000000',code:'1234'},cookies:{},headers:{},lang:'ru'},response);
   assert.equal(response.data.link,'/master');
   assert.equal(await session.token({cookies:{master_session:loginCookie}}),'token-a');
+  // Вход со страницы заявки возвращает на эту заявку; любой другой адрес возврата не принимается.
+  const loginFrom=async next=>{await controller.loginVerify({body:{phone:'+995500000000',code:'1234',next},cookies:{},headers:{},lang:'ru'},response);return response.data.link;};
+  assert.equal(await loginFrom('/order/YaIUcTaAE1'),'/order/YaIUcTaAE1?master=1');
+  for(const bad of ['//evil.example/order/x','https://evil.example','/order/x/../../admin','/order/x?master=2','/admin',{},''])assert.equal(await loginFrom(bad),'/master');
+  masterService.getMasterByToken = async token => token === 'token-a' ? master : null;
+  response.redirected=null;
+  await controller.statusPage({cookies:{master_session:loginCookie},params:{},query:{next:'/order/YaIUcTaAE1'},lang:'ru'},response);
+  assert.equal(response.redirected,'/order/YaIUcTaAE1?master=1','уже вошедший исполнитель сразу попадает на заявку');
   await controller.logout({cookies:{master_session:loginCookie}},response);
   assert.equal(response.redirected,'/master');
   assert.ok(response.cleared);

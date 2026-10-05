@@ -3,7 +3,8 @@ const consentLog = require('./consentLog.service');
 
 // The order lock is shared with full/category closure. Audit commits before the
 // contact leaves the server; closing cannot race a stale status check.
-async function reveal(token, masterToken, channel, meta = {}) {
+// access — как узнан исполнитель: вход в кабинет ('session') или личная ссылка ('link'); пишется в журнал.
+async function reveal(token, masterToken, channel, meta = {}, access = 'session') {
   if (!masterToken) return { status: 401, code: 'login' };
   if (!['call', 'whatsapp'].includes(channel)) return { status: 400, code: 'invalid' };
   return pool.withTransaction(async client => {
@@ -25,7 +26,7 @@ async function reveal(token, masterToken, channel, meta = {}) {
     await consentLog.recordAction({
       eventType: code ? 'ORDER_CONTACT_DENIED' : 'ORDER_CONTACT_RELEASED',
       phone: order.phone, masterId: master.id, orderId: order.id, meta,
-      metadata: { channel, category, order_status: order.status, reason: code,
+      metadata: { channel, category, order_status: order.status, reason: code, access,
         balance_transaction_id: charged?.id || null },
     }, client);
     if (code) return { status: code === 'forbidden' ? 403 : 409, code };

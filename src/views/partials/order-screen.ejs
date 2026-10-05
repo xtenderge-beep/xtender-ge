@@ -1,0 +1,224 @@
+<%
+  // Экран заявки: слева заявка, справа услуги с расчётом «кто получит» и одна кнопка отправки.
+  // Общий для кабинета менеджера и админки. Страница передаёт: base — адрес заявки для форм
+  // (…/orders/<ссылка>), listHref — список заявок, csrf, canCloseNeed — можно ли закрывать потребность,
+  // masterHref — начало ссылки на карточку исполнителя ('' — без ссылки).
+%>
+<style>
+.dispatch-layout{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}
+.order-brief{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;margin:0}
+.order-brief-text{font-size:19px;line-height:1.5;margin:12px 0}
+.order-brief-meta{color:#62716e;font-size:14px;line-height:1.6}
+.order-photos{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.order-photos img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid #dce5e1;display:block}
+.order-note{margin:12px 0;padding:10px 12px;border:1px solid #f0d58a;background:#fff8e1;border-radius:10px}
+.order-note p{margin:4px 0 0}
+.client-contact{margin:14px 0}
+.contact-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.contact-button{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:8px;background:#08765f;color:white;text-decoration:none;font-weight:600}
+.client-contact .muted{font-size:13px;margin:8px 0 0}
+.order-card{margin:14px 0;padding:12px 14px;border:1px solid #cfe3da;background:#f4faf7;border-radius:12px;font-size:15px}
+.order-card dl{margin:8px 0}.order-card dt{display:inline;font-weight:650}.order-card dd{display:inline;margin:0}.order-card dl div{padding:2px 0}
+.order-card p{margin:8px 0}
+.card-button{min-height:36px;padding:6px 12px;border-radius:8px;font-size:14px}
+.card-check{display:flex;align-items:flex-start;gap:8px;margin:10px 0}.card-check input{width:20px;height:20px;flex:none;margin:1px 0 0;padding:0;accent-color:#08765f}
+.card-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.order-edit{margin:14px 0 0;border-top:1px solid #dce5e1;padding-top:12px}
+.order-edit summary{cursor:pointer;font-weight:600;color:#075d4b}
+.order-edit textarea{font-size:15px}
+.needs-card{margin:0}
+.service-list{margin:14px 0 0}
+.service-row{border:1px solid #dce5e1;border-radius:12px;margin:8px 0;background:white}
+.service-row.is-on{border-color:#08765f;background:#f4faf7}
+.service-head{display:flex;align-items:center;gap:12px;margin:0;padding:12px 14px;cursor:pointer;min-height:48px}
+.service-head input{width:22px;height:22px;flex:none;accent-color:#08765f;margin:0;padding:0}
+.service-name{font-weight:650;flex:1}
+.service-count{color:#62716e;font-size:14px;white-space:nowrap}
+.service-row.is-on .service-count{color:#075d4b;font-weight:700;font-size:16px}
+.service-count.is-zero{color:#a53030 !important}
+.service-body{padding:0 14px 12px 48px}
+.service-fields{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:flex-end}
+.service-fields label{margin:6px 0}
+.service-fields select,.service-fields input[type=number]{display:block;margin-top:4px;max-width:220px}
+.service-fields label.check{display:flex;align-items:center;gap:8px;min-height:44px}
+.service-fields label.check input,.size-choice input{width:20px;height:20px;flex:none;margin:0;padding:0;accent-color:#08765f}
+.need-hint{margin:2px 0 8px;font-size:14px}
+.size-choices{margin:10px 0 4px}
+.service-body .size-choice{display:flex;align-items:flex-start;gap:10px;margin:8px 0;cursor:pointer}
+.service-recipients{margin:10px 0 0;padding:0;list-style:none;font-size:15px}
+.service-recipients li{padding:3px 0}
+.service-note{margin:8px 0 0;font-size:14px}
+.send-bar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:12px -20px -20px;padding:14px 20px;background:white;border-top:1px solid #dce5e1;border-radius:0 0 14px 14px}
+.send-options{display:flex;flex-wrap:wrap;gap:0 24px}
+.send-total{flex:1;min-width:200px;font-weight:700;font-size:17px}
+.send-bar button{min-width:300px}
+.send-bar button:disabled{background:#b7c4c0;cursor:default}
+@media(max-width:900px){.dispatch-layout{display:block}.order-brief{position:static;max-height:none;margin-bottom:14px}.order-brief-text{font-size:17px}.service-body{padding-left:14px}.send-bar{margin:12px -14px -14px;padding:10px 14px}.send-total{font-size:15px;min-width:0;flex-basis:100%}.send-bar button{width:100%;min-width:0}}
+</style>
+<%
+  const statusLabels={accepted:'Принято каналом',failed:'Ошибка',pending:'В обработке / неизвестно',skipped:'Пропущено'};
+  const reasonLabels={eligibility_changed:'изменился допуск или баланс',need_closed:'потребность закрыта',service_changed:'услуги больше не подходят',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'есть незавершённая отправка',channel_rejected:'канал отклонил отправку',result_unknown:'результат неизвестен — нужна проверка',before_send_error:'ошибка до отправки'};
+  const cityName=allCities.find(city=>city.id===(order.city_id||activeCities.find(c=>c.slug==='tbilisi')?.id))?.name_ru||'Тбилиси';
+  const sentAny=runs.length>0, transportSent=needs.locked.categories.includes('transport');
+%>
+<a href="<%= listHref %>">← Все заявки</a>
+<% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
+<% if(result){ %><div class="card" role="status"><strong>Отправлено: <%= result.count %>. Списано: <%= (result.count*result.price/100).toFixed(2) %> ₾.</strong>
+<ul><% result.results.forEach(item=>{ %><li><%= item.label %><%= item.size?' · класс '+item.size:'' %>: <%= item.error?'не отправлено — '+item.error:item.count?'принято каналом '+item.count:'новых получателей не осталось — они получили заявку по другой услуге' %></li><% }); %></ul>
+Принятие Telegram/SMS не означает прочтение. Отклики видны ниже.</div><% } %>
+<div class="dispatch-layout">
+<section class="card order-brief" aria-label="Заявка">
+  <div class="order-brief-meta"><strong>Заявка #<%= order.id %></strong><% if(order.is_technical){ %> · 🧪 техническая<% } %><br>
+  <%= cityName %><%= order.district_name?' · '+order.district_name:'' %> · <%= date(order.created_at) %><% if(requestLanguage){ %><br>Язык заявки: <%= (languageNames[requestLanguage]||requestLanguage).toLowerCase() %><% } %></div>
+  <p class="order-brief-text pre"><%= order.description %></p>
+  <% if(order.client_description){ %><details class="muted"><summary>Текст поправил менеджер — показать, как написал клиент</summary><p class="pre"><%= order.client_description %></p></details><% } %>
+  <% if(order.manager_note){ %><div class="order-note"><b>Уточнение менеджера</b><p class="pre"><%= order.manager_note %></p></div><% } %>
+  <% if(photos.length){ %><div class="order-photos"><% photos.forEach(file=>{ %><a href="<%= file.file_path %>" target="_blank" rel="noopener"><img src="<%= file.file_path %>" alt="Фото к заявке"></a><% }); %></div><% } %>
+  <% documents.forEach(file=>{ %><p><a href="<%= file.file_path %>" target="_blank" rel="noopener"><%= file.original_name %></a></p><% }); %>
+  <% if(order.phone){ %><div class="client-contact">Клиент: <strong><%= order.phone %></strong>
+    <div class="contact-actions"><a class="contact-button" href="tel:<%= order.phone %>">Позвонить</a><% if(whatsappUrl){ %><a class="contact-button" href="<%= whatsappUrl %>" target="_blank" rel="noopener">Написать в WhatsApp</a><% } %></div>
+    <% if(whatsappUrl){ %><p class="muted">В WhatsApp откроется готовое сообщение на языке заявки<%= brief?.questions?' с вопросами, которых не хватает':'' %>. Писать будете со своего номера.</p><% } %></div><% } %>
+  <% if(brief){ const fieldLabels={what:'Что',from:'Откуда',to:'Куда',access:'Этаж и доступ',size:'Размеры и вес',when:'Когда',budget:'Бюджет',other:'Ещё'}; %>
+  <div class="order-card" id="order-brief-card"><b>Кратко</b> <span class="muted">— собрал ИИ из текста заявки, проверьте</span>
+    <% if(briefLines.length){ %><dl><% briefLines.forEach(line=>{ %><div><dt><%= fieldLabels[line.key] %>:</dt> <dd><%= line.text %></dd></div><% }); %></dl><% } else { %><p class="muted">Разложить текст по полям не получилось.</p><% } %>
+    <% if(brief.missing.length){ %><p><b>В заявке не указано:</b> <%= brief.missing.join('; ') %>.</p><% } %>
+    <% if(open && (briefServices.length || brief.sizes.length)){ %><p><b>ИИ предлагает:</b> <%= briefServices.map(item=>item.label).join(', ') %><%= brief.sizes.length?(briefServices.length?' · ':'')+'класс кузова '+brief.sizes.join(', '):'' %>
+      <button type="button" class="secondary-action card-button" data-apply-brief="<%= JSON.stringify({services:briefServices.map(item=>item.key),sizes:brief.sizes}) %>">Отметить предложенное</button></p><% } %>
+    <% if(open && !sentAny){ %><input type="hidden" name="briefShown" value="1" form="needs-form"><label class="card-check"><input type="checkbox" name="shareBrief" form="needs-form" checked> Показывать карточку исполнителям вместе с заявкой</label>
+    <% } else if(open){ %><form method="post" action="<%= base %>/brief" class="card-line"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="<%= brief.shared?'hide':'share' %>"><span><%= brief.shared?'Исполнители видят карточку.':'Исполнители карточку не видят.' %></span> <button class="secondary-action card-button"><%= brief.shared?'Скрыть':'Показать исполнителям' %></button></form><% } %>
+    <% if(open && briefEnabled){ %><form method="post" action="<%= base %>/brief" class="card-line"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="refresh"><button class="secondary-action card-button">Пересобрать карточку</button></form><% } %>
+  </div>
+  <% } else if(open && briefEnabled){ %><form method="post" action="<%= base %>/brief"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="refresh"><button class="secondary-action">Собрать карточку «Кратко»</button></form><% } %>
+  <% if(open){ %><details class="order-edit" <%= typeof editOpen!=='undefined'&&editOpen?'open':'' %>><summary>Поправить заявку после разговора с клиентом</summary>
+    <% if(canEditText){ %><form method="post" action="<%= base %>/text"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Текст заявки<textarea name="description" rows="6" minlength="10" maxlength="5000" required><%= order.description %></textarea></label>
+      <p class="muted">Исходный текст клиента сохранится. После первой отправки текст уже не переписывается.</p><button class="secondary-action">Сохранить текст</button></form>
+    <% } else { %><p class="muted">Заявка уже отправлялась, исполнители получили её в этом виде, поэтому текст не переписывается. Добавьте уточнение — они увидят его на странице заявки.</p><% } %>
+    <form method="post" action="<%= base %>/note"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Уточнение для исполнителей<textarea name="note" rows="3" maxlength="2000" placeholder="Например: 3 этаж без лифта, после 18:00"><%= order.manager_note||'' %></textarea></label>
+      <p class="muted">Показывается отдельным блоком под текстом заявки: его видят исполнители и сам клиент. Пустое поле убирает уточнение.</p><button class="secondary-action">Сохранить уточнение</button></form>
+  </details><% } %>
+  <% if(!open){ %><p><strong>Заявка закрыта или ещё не подтверждена — рассылка недоступна.</strong></p><% } %>
+</section>
+<div>
+<form id="needs-form" class="card needs-card" autocomplete="off" method="post" action="<%= base %>/send" data-preview="<%= base %>/preview" data-plan="<%= JSON.stringify(planView||{services:[],total:0,charge:0,price:0,revision:0,sizes:[]}) %>" onsubmit="this.querySelector('[data-send]').disabled=true">
+<input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="revision" value="<%= planView?planView.revision:0 %>"><input type="hidden" name="expectedTotal"><input type="hidden" name="expectedPrice">
+<h2 style="margin-top:0">Что нужно клиенту и кто получит заявку</h2>
+<p class="muted">Отметьте услуги из заявки и уточните требования. Список получателей и сумма пересчитываются сразу, отправка — одной кнопкой внизу.<% if(sentAny){ %> Заявка уже отправлялась: отправленные услуги и их требования не меняются, можно добавить услугу или класс кузова.<% } %></p>
+<div class="send-options"><label>Город заявки <select name="cityId" <%= sentAny||!open?'disabled':'' %>><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id||(!order.city_id&&city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
+<label>Кому отправить <select name="language"><option value="">Всем подходящим</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>" <%= language===code?'selected':'' %>>Только кто говорит <%= label %></option><% }); %></select></label></div>
+<div class="service-list">
+<% rows.forEach(row=>{ const fixed=row.locked||row.closed; %>
+<div class="service-row" data-service="<%= row.key %>" data-available="<%= row.available %>">
+  <label class="service-head"><input type="checkbox" name="needs" value="<%= row.key %>" <%= row.checked?'checked':'' %> <%= fixed||!open?'disabled data-fixed':'' %>><span class="service-name"><%= row.label %></span><span class="service-count" data-count></span></label>
+  <div class="service-body" data-body hidden>
+    <% if(row.closed){ %><p class="muted">Эта потребность закрыта: новых получателей не будет.</p><% } %>
+    <% if(row.fields.length){ %><div class="service-fields">
+    <% row.fields.forEach(f=>{ const name='needAttributes['+row.key+']['+f.key+']', label=f.need?.label||f.label, off=fixed?'disabled data-fixed':''; %>
+      <% if(f.input==='bool'){ %><label class="check"><input type="checkbox" name="<%= name %>" <%= row.values[f.key]===true?'checked':'' %> <%- off %>> <%= label %></label>
+      <% } else if(f.input==='enum'){ %><label><%= label %><select name="<%= name %>" <%- off %>><option value="">Не важно</option><% f.options.forEach(o=>{ %><option value="<%= o.value %>" <%= row.values[f.key]===o.value?'selected':'' %>><%= o.label %></option><% }); %></select></label>
+      <% } else { %><label><%= label %><%= f.unit?', '+f.unit:'' %><input type="number" step="any" name="<%= name %>" value="<%= row.values[f.key]??'' %>" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="Не важно" <%- off %>></label><% } %>
+    <% }); %></div>
+    <% row.fields.filter(f=>f.need?.hint).forEach(f=>{ %><p class="muted need-hint"><b><%= f.need.label||f.label %>.</b> <%= f.need.hint %></p><% }); %><% } %>
+    <% if(row.key==='transport'){ %><div class="size-choices"><strong>Размер кузова</strong> <span class="muted">— отметьте все подходящие классы</span>
+      <% sizes.forEach(size=>{ const was=needs.locked.sizes.includes(size.code)||needs.locked.anySize; %><label class="size-choice"><input type="checkbox" name="transportSize" value="<%= size.code %>" <%= needs.sizes.includes(size.code)?'checked':'' %> <%= was||row.closed?'disabled data-fixed':'' %>> <span><b><%= size.code %></b> — кузов от <%= size.spec %> · <span data-size-count="<%= size.code %>"></span></span></label><% }); %>
+      <% if(transportSent && needs.locked.sizes.length && !row.closed){ %><label class="size-choice"><input type="checkbox" name="transportAny"> <span><b>Любой размер</b> — снять ограничение по классу · <span data-any-count></span></span></label><% } %>
+      <p class="muted need-hint" data-size-hint></p>
+    </div><% } %>
+    <ul class="service-recipients" data-recipients></ul>
+    <p class="service-note muted" data-note></p>
+  </div>
+</div>
+<% }); %>
+</div>
+<div class="send-bar">
+  <div class="send-total" data-total aria-live="polite"></div>
+  <button type="submit" data-send disabled>Отправить</button>
+</div>
+</form>
+
+<% if(sentAny){ %><section class="card"><h2>Отправки и отклики</h2>
+<p>Просмотров: <strong><%= funnel.view %></strong> · нажатий «Позвонить»: <strong><%= funnel.call %></strong> · WhatsApp: <strong><%= funnel.whatsapp %></strong> · нажали хотя бы один контакт: <strong><%= funnel.contacted||0 %></strong>.</p>
+<% if(funnelByCategory.length){ %><ul><% funnelByCategory.forEach(item=>{ %><li><%= groups[item.category]||(item.category==='legacy'?'Архив: услуга неизвестна':item.category) %>: уведомлены <%= item.received %> · просмотров <%= item.view %> · звонок <%= item.call %> · WhatsApp <%= item.whatsapp %></li><% }); %></ul><% } %>
+<p class="muted">Принятие Telegram/SMS не означает прочтение. Просмотр и нажатие контакта не подтверждают договорённость с клиентом. Один исполнитель может подходить нескольким услугам.</p>
+<% runs.forEach(run=>{ %><div class="card"><strong>Отправка #<%= run.id %> · <%= run.legacy?'архивная рассылка':groups[run.category]||run.category %><%= run.vehicle_size?' · класс '+run.vehicle_size:'' %><%= run.language?' · говорят '+(speakLabels[run.language]||run.language):'' %></strong> · <%= date(run.created_at) %>
+<p>Выбрано: <%= run.selected %> · принято каналом: <%= run.accepted %> (Telegram: <%= run.telegram %>, SMS: <%= run.sms %>) · ошибки: <%= run.failed %> · пропущено: <%= run.skipped %> · в обработке / неизвестно: <%= run.pending %></p>
+<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ %><li><% if(masterHref){ %><a href="<%= masterHref+d.master_id %>"><%= names[d.master_id]||'Исполнитель' %></a><% } else { %><%= names[d.master_id]||'Исполнитель' %><% } %> (#<%= d.master_id %>) · <%= statusLabels[d.status]||d.status %><%= d.channel?' · '+d.channel:'' %><%= d.reason?' · '+(reasonLabels[d.reason]||d.reason):'' %></li><% }); %></ul></details>
+<% if(open && !run.legacy && run.deliveries.some(d=>d.status==='failed'&&!d.retry_run_id)){ %><form method="post" action="<%= base %>/retry"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="runId" value="<%= run.id %>"><button>Повторить подтверждённые ошибки</button></form><% } %></div><% }); %>
+</section><% } %>
+<% if(open && sentAny && canCloseNeed && order.target_categories.length>1){ %><details class="card"><summary>Отметить закрытую потребность</summary><p>Используйте после подтверждения, что по этой услуге новые предложения уже не нужны.</p><% order.target_categories.filter(key=>!closedCategories.includes(key)).forEach(key=>{ %><form method="post" action="<%= base %>/close-category" class="form-actions"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= key %>"><button type="submit" class="secondary-action">Закрыть «<%= key==='flatbed'?'🚛 Перевозки — бортовая машина':groups[key]||key %>»</button></form><% }); %></details><% } %>
+</div>
+</div>
+<script>
+(()=>{
+ const form=document.getElementById('needs-form'), rows=[...form.querySelectorAll('[data-service]')];
+ const total=form.querySelector('[data-total]'), send=form.querySelector('[data-send]');
+ const money=tetri=>(tetri/100).toFixed(2)+' ₾';
+ const people=n=>n+' '+(n%10===1&&n%100!==11?'исполнителю':'исполнителям');
+ // Отмеченная услуга раскрывает свои вопросы; у неотмеченной поля выключены и в форму не попадают.
+ const toggle=()=>rows.forEach(row=>{
+  const on=row.querySelector('input[name=needs]').checked, body=row.querySelector('[data-body]');
+  row.classList.toggle('is-on',on); body.hidden=!on;
+  body.querySelectorAll('input,select').forEach(field=>{ if(!field.hasAttribute('data-fixed')) field.disabled=!on; });
+ });
+ const paint=plan=>{
+  if(plan.error){ total.textContent=plan.error; send.disabled=true; send.textContent='Отправить'; return; }
+  const services=Object.fromEntries(plan.services.map(service=>[service.key,service]));
+  rows.forEach(row=>{
+   const on=row.querySelector('input[name=needs]').checked, service=services[row.dataset.service], count=row.querySelector('[data-count]');
+   const list=row.querySelector('[data-recipients]'), note=row.querySelector('[data-note]');
+   list.textContent=''; note.textContent=''; count.classList.remove('is-zero');
+   if(!on||!service){ count.textContent='доступно: '+row.dataset.available; return; }
+   const sent=service.sent.length>0;
+   count.textContent=service.closed?'закрыта':service.count?'получат: '+service.count:sent?'отправлено':'получат: 0';
+   count.classList.toggle('is-zero',!service.closed&&!service.count&&!sent);
+   service.recipients.slice(0,12).forEach(person=>{ const item=document.createElement('li'); item.textContent=person.name+(person.body?' — '+person.body:''); list.appendChild(item); });
+   if(service.recipients.length>12){ const more=document.createElement('li'); more.textContent='и ещё '+(service.recipients.length-12); list.appendChild(more); }
+   const notes=[];
+   if(sent) notes.push(row.dataset.service==='transport'?(service.sent.includes('')?'Уже отправлено машинам любого размера.':'Уже отправлено классам: '+service.sent.join(', ')+'.'):'Уже отправлено.');
+   if(service.alreadyReceived) notes.push('Уже получили эту заявку: '+service.alreadyReceived+'.');
+   if(service.otherLanguage) notes.push('Не подходят по языку: '+service.otherLanguage+' — они получат заявку, если выбрать «Всем подходящим».');
+   if(service.unfunded) notes.push('Подходят, но не получат: '+service.unfunded+' — не хватает баланса или не подтверждены тарифы.');
+   if(!service.closed&&!service.count&&!service.alreadyReceived&&!service.unfunded&&!service.otherLanguage) notes.push('Подходящих исполнителей нет. Ослабьте требования или снимите услугу.');
+   note.textContent=notes.join(' ');
+   if(service.sizes){
+    service.sizes.forEach(size=>{ const cell=row.querySelector('[data-size-count="'+size.code+'"]'); if(cell) cell.textContent='исполнителей: '+size.count+(size.sent?' · отправлено':''); });
+    const any=row.querySelector('[data-any-count]'); if(any) any.textContent='исполнителей: '+service.anyCount;
+    const hint=row.querySelector('[data-size-hint]');
+    if(hint) hint.textContent=(plan.sizes.length?'Заявку получат только машины отмеченных классов.':'Класс не отмечен — заявку получат машины любого размера ('+service.anyCount+').')+' «От» — минимум сразу по длине, ширине и высоте.'+(service.unknown?' Без размера: '+service.unknown+' — они получают заявку, только когда класс не отмечен.':'');
+   }
+  });
+  form.elements.expectedTotal.value=plan.total; form.elements.expectedPrice.value=plan.price; form.elements.revision.value=plan.revision;
+  // Включённый отбор по языку виден рядом с итогом: без него нули выглядят как пустая база.
+  const filter=plan.language?' · '+form.elements.language.selectedOptions[0].textContent.trim().toLowerCase():'';
+  total.textContent=(plan.total?'Получат: '+plan.total+' · спишется '+money(plan.charge):(plan.services.length?'Новых получателей нет':'Отметьте услуги из заявки'))+filter;
+  send.disabled=!plan.total; send.textContent=plan.total?'Отправить '+people(plan.total)+' и списать '+money(plan.charge):'Отправить';
+ };
+ let timer, request=0;
+ const refresh=()=>{
+  toggle(); clearTimeout(timer); send.disabled=true;
+  timer=setTimeout(async()=>{
+   const id=++request; total.textContent='Считаю…'; send.disabled=true;
+   let plan;
+   try { plan=await (await fetch(form.dataset.preview,{method:'POST',body:new URLSearchParams(new FormData(form))})).json(); }
+   catch(error){ plan={error:'Не удалось пересчитать. Проверьте соединение и измените выбор ещё раз.'}; }
+   if(id===request) paint(plan);
+  },200);
+ };
+ // Enter в поле не должен отправлять заявку: отправка только кнопкой.
+ form.addEventListener('keydown',event=>{ if(event.key==='Enter'&&event.target.tagName!=='BUTTON') event.preventDefault(); });
+ form.addEventListener('change',refresh);
+ form.addEventListener('input',event=>{ if(event.target.type==='number') refresh(); });
+ // «Отметить предложенное»: подсказка ИИ сама ничего не отмечает — только по кнопке менеджера.
+ document.querySelectorAll('[data-apply-brief]').forEach(button=>button.addEventListener('click',()=>{
+  const suggestion=JSON.parse(button.dataset.applyBrief);
+  suggestion.services.forEach(key=>{ const box=form.querySelector('[data-service="'+key+'"] input[name=needs]'); if(box&&!box.disabled) box.checked=true; });
+  toggle();
+  suggestion.sizes.forEach(size=>{ const box=form.querySelector('input[name=transportSize][value="'+size+'"]'); if(box&&!box.disabled) box.checked=true; });
+  refresh();
+ }));
+ toggle(); paint(JSON.parse(form.dataset.plan));
+ // Страница из кэша браузера («Назад») приходит с прежними отметками — пересчитываем под них.
+ window.addEventListener('pageshow',event=>{ if(event.persisted) refresh(); });
+})();
+</script>

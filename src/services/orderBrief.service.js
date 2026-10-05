@@ -133,10 +133,19 @@ async function setShared(token, shared) {
   });
 }
 
+// Кнопки карточки на экране заявки (кабинет менеджера и админка): пересобрать, показать, скрыть.
+async function act(token, action) {
+  if (action === 'refresh') {
+    const order = (await pool.query('SELECT id FROM orders WHERE token=$1', [token])).rows[0];
+    if (!order) throw Object.assign(new Error('Заявка не найдена.'), { status: 404 });
+    if (!await refresh(order.id)) throw new Error('Карточку собрать не удалось. Попробуйте ещё раз позже.');
+  } else if (!await setShared(token, action === 'share')) throw new Error('Карточка ещё не собрана.');
+}
+
 // Строки карточки на нужном языке; если перевода поля нет — на языке, который есть.
 function lines(brief, lang) {
   if (!brief?.fields) return [];
   return FIELDS.filter(key => brief.fields[key]).map(key => ({ key, text: brief.fields[key][lang] || brief.fields[key].ru || Object.values(brief.fields[key])[0] }));
 }
 
-module.exports = { FIELDS, enabled, useModel, buildPrompt, sanitize, generate, refresh, read, setShared, lines };
+module.exports = { FIELDS, enabled, useModel, buildPrompt, sanitize, generate, refresh, read, setShared, act, lines };

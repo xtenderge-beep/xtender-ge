@@ -65,7 +65,7 @@ const ids=plan=>plan.recipients.map(m=>m.id).sort((a,b)=>a-b);
   const originalToken=sessions.token;
   sessions.token=async()=>combined.master_token;
   let locals;
-  await controller.show({params:{token:o.token},cookies:{},query:{},lang:'ru'}, {set(){},render(view,data){locals=data;}});
+  await controller.show({params:{token:o.token},cookies:{},query:{},lang:'ru'}, {locals:{},set(){},render(view,data){locals=data;}});
   sessions.token=originalToken;
   const i18n=require('../src/config/i18n');
   const html=await require('ejs').renderFile(path.join(__dirname,'../src/views/order.ejs'),{

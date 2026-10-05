@@ -51,7 +51,9 @@ const res = () => ({ statusCode: 200, headers: {}, set(k,v) { this.headers[k]=v;
   }]));
   let contactRequests=0;
   const browser=vm.createContext({document:{getElementById:id=>elements[id]||null,querySelectorAll:()=>[]},window:{location:{href:''}},
+    URLSearchParams,location:{search:'?k=link-key-from-sms'},
     fetch:async(url,options)=>{assert.ok(url.endsWith('/contact'));assert.equal(options.cache,'no-store');contactRequests++;
+      assert.equal(JSON.parse(options.body).key,'link-key-from-sms','the personal key from the lead link goes with every contact request');
       return {ok:contactRequests===1,status:contactRequests===1?200:409,json:async()=>contactRequests===1?{success:true,url:'tel:'+order.phone}:{success:false,message:'Closed'}};},
   });
   vm.runInContext(browserScript,browser);

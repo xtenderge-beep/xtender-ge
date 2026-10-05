@@ -473,7 +473,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const rates = await billing.pricing(client, true);
       const billingConsent = await billing.permission(master.id, rates, client);
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
-      const link = getBaseUrl() + '/order/' + order.token + '?master=' + master.id;
+      // Личная ссылка: ключ открывает заявку и контакт без входа, но только в первом браузере (leadLink.service).
+      const link = getBaseUrl() + '/order/' + order.token + '?k=' + await require('./leadLink.service').issue(order.id, master.id, client);
       let receipt = null;
       attempted = true;
       let channel = 'telegram';

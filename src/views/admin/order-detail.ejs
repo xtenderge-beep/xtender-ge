@@ -1,126 +1,43 @@
-<%- include('./_header', { active: 'orders' }) %>
-<% if(order.is_technical) { %><p class="p-4 bg-amber-50 text-amber-800 font-bold">🧪 Тестовая заявка. Рассылка только техническим исполнителям. Исключена из рабочей статистики.</p><% } %>
-<% if(['pending_review','new'].includes(order.status)) { %><form method="post" action="/admin/orders/<%= order.token %>/refresh-categories" class="mb-3"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="px-3 py-2 border rounded-xl text-sm">Обновить категории в сообщениях Telegram</button></form><% } %>
+<%- include('../manager/_header', { adminBar: true }) %>
+<%
+  // Страница заявки у администратора: тот же экран, что в кабинете менеджера, и ниже блок
+  // «Только для администратора» — действия и сведения, которых у менеджера нет.
+  const statusText = order.status === 'closed' ? 'Закрыта' : order.status === 'needs_revision' ? 'Возвращена заказчику на доработку'
+    : order.status === 'unverified' ? 'Телефон заказчика не подтверждён' : order.first_dispatched_at ? 'В работе' : 'Ждёт рассылки';
+  const openNeeds = (order.target_categories || []).filter(key => !closedCategories.includes(key));
+%>
+<style>
+.admin-only h2{margin-top:0}.admin-only form{margin:0}.admin-only .row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}
+.admin-only .plain{background:#edf3f1;color:#075d4b}.admin-only table td{vertical-align:top}
+.admin-note{background:#fff3d6;border:1px solid #f0d58c;border-radius:14px;padding:14px 18px;margin:14px 0}
+</style>
+<% if(order.is_technical){ %><p class="admin-note"><strong>🧪 Тестовая заявка.</strong> Рассылка только техническим исполнителям. В рабочую статистику не входит.</p><% } %>
+<% if(revisionNotice){ %><p class="admin-note" role="status"><%= revisionNotice === 'sent' ? 'Заявка возвращена на доработку. SMS со ссылкой отправлена.' : 'Заявка возвращена на доработку, но SMS отправить не удалось. Клиент увидит комментарий на странице своей заявки.' %></p><% } %>
+<% if(order.revision_reason){ %><div class="admin-note"><b>Комментарий для доработки</b><p class="pre"><%= order.revision_reason %></p><small><%= order.status === 'needs_revision' ? 'Ожидаем исправления от клиента' : 'Клиент повторно отправил заявку либо её статус изменён' %></small></div><% } %>
+<%- include('../partials/order-screen', { base: '/admin/orders/' + order.token, listHref: '/admin/orders', csrf: csrfToken, canCloseNeed: false, masterHref: '/admin/masters/' }) %>
 
-<% if(typeof dispatchError !== 'undefined' && dispatchError) { %><p role="alert" class="p-3 bg-amber-50"><%= dispatchError %></p><% } %>
-<% if(order.status === 'pending_review' && !order.first_dispatched_at) { %>
-<section class="admin-dispatch"><h2>Что нужно клиенту?</h2><p>Отметьте все потребности до рассылки. Клиент сможет закрыть каждую отдельно.</p>
-<form method="post" action="/admin/orders/<%= order.token %>/needs"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
-<label class="block my-3">Город заявки <select name="cityId" required><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id || (!order.city_id && city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
-<% Object.entries(groups).forEach(([key,label])=>{ const svc=serviceConfig.find(s=>s.type===(key==='transport'||key==='flatbed'?'van':key)); const fields=(svc?.fields || []).filter(f=>f.input!=='size' && f.input!=='text' && f.match && f.match!=='ignore' && !(key==='flatbed'&&f.key==='body')); const values=order.requirements?.services?.[key] || {}; %>
-<fieldset data-need-panel="<%= key %>" class="border rounded-xl p-3 my-2"><legend><label><input type="checkbox" name="needs" value="<%= key %>" <%= (order.target_categories || []).includes(key) ? 'checked' : '' %>> <%= label %></label></legend>
-<div data-need-fields class="space-y-2"><% fields.forEach(f=>{ %>
-<label class="block text-sm"><%= f.need?.label || f.label %><% if(f.input==='enum'){ %><select name="needAttributes[<%= key %>][<%= f.key %>]"><option value="">Не ограничивать</option><% f.options.forEach(o=>{ %><option value="<%= o.value %>" <%= values[f.key]===o.value?'selected':'' %>><%= o.label %></option><% }); %></select><% } else if(f.input==='number'){ %><input type="number" step="any" name="needAttributes[<%= key %>][<%= f.key %>]" value="<%= values[f.key] ?? '' %>" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="Не ограничивать"> <%= f.unit || '' %><% } else if(f.input==='bool'){ %><input type="checkbox" name="needAttributes[<%= key %>][<%= f.key %>]" <%= values[f.key]===true?'checked':'' %>><% } %></label><% if(f.need?.hint){ %><p class="text-xs text-stone-600"><%= f.need.hint %></p><% } %>
-<% }); %><% if(key==='transport'){ %><label class="block text-sm">Размер кузова <select name="transportSize"><option value="">Не ограничивать — исполнителей: <%= transportSizes.total %></option><% transportSizes.sizes.forEach(size=>{ %><option value="<%= size.code %>" <%= order.requirements?.transport_size === size.code ? 'selected' : '' %>><%= size.code %> — кузов от <%= size.spec %> · исполнителей: <%= size.count %></option><% }); %></select></label><p class="text-xs text-stone-600">Выберите самый маленький класс, куда груз точно влезет: заявку получат только машины этого класса. «От» — минимум сразу по длине, ширине и высоте. Числа — кому заявку можно отправить сейчас.<% if(transportSizes.unknown){ %> Без размера: <%= transportSizes.unknown %> — получат её только при «Не ограничивать».<% } %></p><% } %></div></fieldset><% }); %>
-<script>(()=>{const update=()=>document.querySelectorAll('[data-need-panel]').forEach(panel=>{const active=panel.querySelector('input[name=needs]').checked;panel.querySelector('[data-need-fields]').hidden=!active;panel.querySelectorAll('[data-need-fields] input,[data-need-fields] select').forEach(input=>input.disabled=!active)});document.querySelectorAll('input[name=needs]').forEach(input=>input.addEventListener('change',update));update()})()</script>
-<button>Сохранить потребности</button></form></section><% } %>
-<a href="/admin/orders" class="text-xs font-bold text-stone-500 hover:text-stone-800">&larr; Все заявки</a>
-
-<% if (revisionNotice) { %><p class="mt-3 p-3 rounded-xl bg-amber-50"><%= revisionNotice === 'sent' ? 'Заявка возвращена на доработку. SMS со ссылкой отправлена.' : 'Заявка возвращена на доработку, но SMS отправить не удалось. Клиент увидит комментарий на странице своей заявки.' %></p><% } %>
-<% if (order.revision_reason) { %><section class="mt-3 p-4 rounded-xl bg-amber-50"><b>Комментарий для доработки</b><p style="white-space:pre-wrap"><%= order.revision_reason %></p><small><%= order.status === 'needs_revision' ? 'Ожидаем исправления от клиента' : 'Клиент повторно отправил заявку либо её статус изменён' %></small></section><% } %>
-<% if (order.status === 'pending_review' && !order.first_dispatched_at) { %><section class="mt-3 p-4 rounded-xl border border-stone-200"><h2 class="font-bold">Вернуть заказчику на доработку</h2><form method="POST" action="/admin/orders/<%= order.token %>/request-revision"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><label for="revision-reason" class="block text-sm mt-2">Что нужно исправить или уточнить?</label><textarea id="revision-reason" name="reason" required minlength="5" maxlength="1000" rows="3" class="w-full p-3 border border-stone-200 rounded-xl"></textarea><button class="mt-2 px-3 py-2 bg-stone-900 text-white rounded-xl">Вернуть на доработку и уведомить клиента</button></form></section><% } %>
-<div class="mt-3 bg-white rounded-2xl border border-stone-200 p-5">
-    <div class="flex items-center justify-between flex-wrap gap-2">
-        <h1 class="text-lg font-black text-stone-900">Заявка #<%= order.id %></h1>
-        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
-            <%= order.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
-            <%= order.status === 'closed' ? 'Закрыта' : order.status === 'needs_revision' ? 'Нужны уточнения' : order.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>
-        </span>
-    </div>
-    <p class="text-sm text-stone-800 mt-3"><%= order.description %></p>
-    <p class="text-sm">Город заявки: <strong><%= allCities.find(city=>city.id===order.city_id)?.name_ru || 'Тбилиси (старая заявка)' %></strong></p>
-    <p class="text-xs text-stone-500 mt-2">
-        Создана: <%= new Date(order.created_at).toLocaleString('ru') %>
-        <% if (order.closed_at) { %> · Закрыта: <%= new Date(order.closed_at).toLocaleString('ru') %><% } %>
-    </p>
-
-    <% const multiCategory = (order.target_categories||[]).length > 1; %>
-    <div class="mt-3 flex flex-wrap gap-2">
-      <% if (order.status !== 'closed') { %>
-        <% if (multiCategory) { %>
-          <% order.target_categories.filter(function(c){ return !(order.closedCategories||[]).includes(c); }).forEach(function(c) { %>
-            <form method="POST" action="/admin/orders/<%= order.token %>/close-category">
-                <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-                <input type="hidden" name="category" value="<%= c %>">
-                <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition">
-                    Закрыть «<%= groups[c] || c %>»
-                </button>
-            </form>
-          <% }); %>
-        <% } %>
-        <form method="POST" action="/admin/orders/<%= order.token %>/close">
-            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-            <button type="submit" class="px-3 py-2 <%= multiCategory ? 'bg-white hover:bg-red-50 text-red-600 border border-red-200' : 'bg-stone-900 hover:bg-stone-800 text-white' %> text-xs font-bold rounded-xl transition">
-                <%= multiCategory ? 'Закрыть всю заявку' : 'Закрыть заявку' %> (без SMS клиенту)
-            </button>
-        </form>
-      <% } %>
-      <form method="POST" action="/admin/orders/<%= order.token %>/delete"
-          onsubmit="return confirm('Удалить эту заявку без возможности восстановления?')">
-          <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-          <button type="submit" class="px-3 py-2 bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-bold rounded-xl transition">
-              Удалить заявку
-          </button>
-      </form>
-    </div>
+<section class="card admin-only" id="admin-only">
+<h2>Только для администратора</h2>
+<p>Состояние: <strong><%= statusText %></strong> · создана <%= date(order.created_at) %><% if(order.closed_at){ %> · закрыта <%= date(order.closed_at) %><% } %></p>
+<% if(order.status === 'pending_review' && !order.first_dispatched_at){ %>
+<details><summary>Вернуть заказчику на доработку</summary>
+<form method="post" action="/admin/orders/<%= order.token %>/request-revision"><input type="hidden" name="_csrf" value="<%= csrfToken %>">
+<label>Что нужно исправить или уточнить?<textarea name="reason" required minlength="5" maxlength="1000" rows="3"></textarea></label>
+<button>Вернуть на доработку и уведомить клиента</button></form></details>
+<% } %>
+<div class="row">
+<% if(open){ %><form method="post" action="/admin/orders/<%= order.token %>/refresh-categories"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="plain">Обновить сообщения в Telegram</button></form><% } %>
+<% if(order.status !== 'closed'){ %>
+<% if(openNeeds.length > 1){ openNeeds.forEach(key => { %><form method="post" action="/admin/orders/<%= order.token %>/close-category"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= key %>"><button class="plain">Закрыть «<%= groups[key] || key %>»</button></form><% }); } %>
+<form method="post" action="/admin/orders/<%= order.token %>/close" onsubmit="return confirm('Закрыть заявку? Клиенту SMS не уйдёт.')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="plain"><%= openNeeds.length > 1 ? 'Закрыть всю заявку' : 'Закрыть заявку' %> (без SMS клиенту)</button></form>
+<% } %>
+<form method="post" action="/admin/orders/<%= order.token %>/delete" onsubmit="return confirm('Удалить эту заявку без возможности восстановления?')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="danger">Удалить заявку</button></form>
 </div>
-
-<% if(['pending_review','new'].includes(order.status)) { %><section class="admin-dispatch"><h2>Отправить заявку исполнителям</h2><p>Выберите группу. На следующем шаге — число получателей и стоимость перед отправкой.</p><form class="admin-filter" method="GET" action="/admin/orders/<%= order.token %>/dispatch"><select name="category" aria-label="Группа исполнителей"><% Object.entries(groups).filter(([value])=>!(order.closedCategories||[]).includes(value) && (!order.requirements?.configured || order.target_categories.includes(value))).forEach(([value,label])=>{ %><option value="<%= value %>"><%= label %></option><% }) %></select><select name="size" aria-label="Размер кузова"><option value="">Все размеры</option><% transportSizes.sizes.forEach(size=>{ %><option value="<%= size.code %>"><%= size.code %> — кузов от <%= size.spec %> · исполнителей: <%= size.count %></option><% }) %></select><select name="language" aria-label="Кому отправить"><option value="">Все исполнители</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>">Говорят <%= label %></option><% }) %></select><button>Рассчитать рассылку</button></form><p class="text-xs">Размер применяется только к перевозкам. Для остальных групп выберите «Все размеры».</p><p class="text-xs">«Все исполнители» — как раньше. Если выбрать язык, заявку получат только те, кто отметил его при регистрации. Потом её можно отправить и всем: уже получившие второй раз не платят.</p></section><% } %>
-<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
-    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Воронка</h2>
-    <p class="text-sm text-stone-700">👀 Просмотров: <%= order.funnel.view %> · Нажатий «Позвонить»: <%= order.funnel.call %> · Нажатий WhatsApp: <%= order.funnel.whatsapp %></p>
-    <p>Нажали хотя бы один контакт: <%= order.funnel.contacted || 0 %> уникальных исполнителей.</p>
-    <% if ((order.funnelByCategory||[]).length) { %>
-      <h3 class="text-xs font-bold text-stone-500 mt-3 mb-1">По услугам, предложенным получателям</h3>
-      <ul class="text-sm text-stone-700 space-y-1">
-        <% order.funnelByCategory.forEach(function (row) { %>
-          <li>
-            <span class="font-bold"><%= groups[row.category] || (row.category === 'legacy' ? 'Архив: услуга неизвестна' : row.category) || '—' %></span><% if ((order.closedCategories||[]).includes(row.category)) { %> · <span class="text-stone-400 font-bold">закрыта</span><% } %>
-            — уведомлены <%= row.received %> · 👀 <%= row.view %> · 📞 <%= row.call %> · 💬 <%= row.whatsapp %>
-            <% if (row.received) { %>· <span class="font-bold">нажали контакт <%= row.contacted %> из <%= row.received %> (<%= Math.min(100, Math.round(row.contacted / row.received * 100)) %>%)</span><% } %>
-          </li>
-        <% }); %>
-      </ul>
-      <p class="text-xs text-stone-500 mt-2">«Уведомлены» — канал принял сообщение. Нажатие контакта не подтверждает разговор или сделку. Один человек может входить в несколько групп; действие не означает интерес именно к этой услуге.</p>
-    <% } %>
-</div>
-
-<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
-    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Рассылка по категориям</h2>
-    <% if (!order.dispatches.length) { %>
-      <p class="text-sm text-stone-500">Ещё не распределена модератором.</p>
-    <% } else { %>
-      <ul class="text-sm text-stone-700 space-y-1">
-          <% order.dispatches.forEach(function (d) { %>
-            <li><%= d.category %><% if (d.vehicle_size) { %> (<%= d.vehicle_size %>)<% } %><% if (d.language) { %> · говорят <%= speakLabels[d.language] || d.language %><% } %> — <%= new Date(d.dispatched_at).toLocaleString('ru') %><% if ((order.closedCategories||[]).includes(d.category)) { %> · <span class="text-stone-400 font-bold">закрыта</span><% } %></li>
-          <% }); %>
-      </ul>
-    <% } %>
-</div>
-
-<div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
-    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-2">Уведомлённые мастера (списан баланс)</h2>
-    <% if (!order.notifiedMasters.length) { %>
-      <p class="text-sm text-stone-500">Пока никто не уведомлён.</p>
-    <% } else { %>
-      <ul class="text-sm text-stone-700 space-y-1">
-          <% order.notifiedMasters.forEach(function (nm) { %>
-            <li>
-                <a href="/admin/masters/<%= nm.master_id %>" class="font-bold text-emerald-700 hover:underline"><%= nm.name %></a>
-                (<%= nm.phone %>) — <%= (nm.amount_tetri / 100).toFixed(2) %> ₾ · <%= new Date(nm.created_at).toLocaleString('ru') %>
-            </li>
-          <% }); %>
-      </ul>
-    <% } %>
-</div>
-
-<section class="admin-dispatch" id="dispatch-results"><h2>Результаты рассылок</h2>
-<p>Принятие Telegram/SMS не подтверждает прочтение. Неопределённый результат не повторяется автоматически.</p>
-<% const reasons={eligibility_changed:'Изменился допуск или баланс',need_closed:'Потребность закрыта',service_changed:'Услуги больше не подходят',language_changed:'Изменился язык',already_received:'Уже уведомлён',prior_attempt_pending:'Есть незавершённая отправка',channel_rejected:'Канал отклонил отправку',result_unknown:'Результат неизвестен — нужна проверка',before_send_error:'Ошибка до отправки'}; (order.deliveryRuns || []).forEach(run=>{ %>
-<article class="border rounded-xl p-3 mt-3"><b>Рассылка #<%= run.id %> · <%= run.legacy ? 'Архивная рассылка (группа не сохранена)' : groups[run.category] || run.category %> <%= run.vehicle_size %></b>
-<p><%= new Date(run.created_at).toLocaleString('ru') %> · <%= run.initiated_by || 'Ранее' %><%= run.retry_of ? ' · повтор #'+run.retry_of : '' %></p>
-<p>Выбрано: <%= run.selected %> · Принято: <%= run.accepted %> (Telegram: <%= run.telegram %>, SMS: <%= run.sms %>) · Ошибки: <%= run.failed %> · Пропущено: <%= run.skipped %> · В обработке / неизвестно: <%= run.pending %></p>
-<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ %><li><a href="/admin/masters/<%= d.master_id %>">Исполнитель #<%= d.master_id %></a> · <%= ({accepted:'Принято каналом',failed:'Ошибка',pending:'В обработке / неизвестно',skipped:'Пропущено'})[d.status] || d.status %> <%= d.channel || '' %> <%= reasons[d.reason] || '' %><%= d.retry_run_id ? ' · повтор в рассылке #'+d.retry_run_id : '' %> · <%= (d.matched_categories || []).map(c=>groups[c] || c).join(', ') %></li><% }); %></ul></details>
-<% if(!run.legacy && run.deliveries.some(d=>d.status === 'failed' && !d.retry_run_id) && ['new','pending_review'].includes(order.status)) { %><form method="post" action="/admin/orders/<%= order.token %>/retry-dispatch"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="runId" value="<%= run.id %>"><button>Повторить подтверждённые ошибки</button></form><% } %>
-</article><% }); %></section>
-<%- include('./_footer') %>
+<h3>Кто получил заявку и сколько списано</h3>
+<% if(!notifiedMasters.length){ %><p class="muted">Пока никто не получил.</p><% } else { %>
+<div class="scroll"><table><thead><tr><th>Исполнитель</th><th>Телефон</th><th>Списано</th><th>Когда</th></tr></thead><tbody>
+<% notifiedMasters.forEach(row => { %><tr><td><a href="/admin/masters/<%= row.master_id %>"><%= row.name %></a></td><td><%= row.phone %></td><td><%= (Math.abs(row.amount_tetri) / 100).toFixed(2) %> ₾</td><td><%= date(row.created_at) %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
+</section>
+</main></body></html>

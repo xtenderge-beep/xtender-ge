@@ -55,13 +55,14 @@ const EN_TEXT = 'Need a move from Vake to Saburtalo, 2-bedroom apartment';
   orderService.getOrderFiles = async () => [];
   orderService.getClosedCategories = async () => [];
   orderService.getOrderFunnelStats = async () => ({ view: 0, call: 0, whatsapp: 0 });
+  orderService.getCustomerLanguage = async (current, fallback) => fallback;
   masterService.getMasterById = async () => master;
   masterService.getMasterByToken = async () => master;
   const masterSession = require('../src/services/masterSession.service');
   masterSession.token = async req => req.cookies.testSession ? 'mt-5' : null;
   settingsService.getLeadPriceTetri = async () => 50;
   const call = async (query, cookies = {}) => {
-    const res = { set() {}, render(view, data) { this.data = data; return this; } };
+    const res = { locals: {}, set() {}, render(view, data) { this.data = data; return this; } };
     if (query.master) cookies = { ...cookies, testSession: true };
     await controller.show({ params: { token: order.token }, query, cookies, lang: 'ka' }, res);
     return res.data;
@@ -83,9 +84,12 @@ const EN_TEXT = 'Need a move from Vake to Saburtalo, 2-bedroom apartment';
   assert.equal(data.requestLang, 'ru', 'label is shown to anyone who is not the owner');
   assert.equal(data.langAdvice, false, 'but the advice needs a known provider');
 
-  data = await call({ master: '5' }, { ['order_' + order.token]: order.owner_token });
+  data = await call({}, { ['order_' + order.token]: order.owner_token });
   assert.equal(data.requestLang, null, 'owner wrote it himself: no label');
   assert.equal(data.langAdvice, false);
+  // Своя ссылка лида у вошедшего исполнителя — страница исполнителя, даже если браузер помнит заказчика.
+  data = await call({ master: '5' }, { ['order_' + order.token]: order.owner_token });
+  assert.equal(data.requestLang, 'ru');
 
   // --- Страница: метка и совет на трёх языках, старой серой строки больше нет.
   const renderOrder = (lang, locals) => ejs.renderFile(path.join(__dirname, '../src/views/order.ejs'), {

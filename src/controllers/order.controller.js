@@ -14,6 +14,7 @@ const translationService = require('../services/translation.service');
 const catalogSession = require('../services/catalogSession.service');
 const masterSession = require('../services/masterSession.service');
 const orderContact = require('../services/orderContact.service');
+const leadLink = require('../services/leadLink.service');
 const redis = require('../config/redis');
 const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
@@ -69,6 +70,26 @@ const MY_ORDERS_MAX = 20;
 
 function ownerCookieName(token) {
   return `order_${token}`;
+}
+
+// Язык страницы заказчика — тот, на котором был сайт при оформлении заявки (записан при
+// подтверждении SMS). Общая кука `lang` для этого не годится: её ставит любая открытая страница
+// сайта, и ссылка из SMS открывалась на языке последней такой страницы или по-грузински.
+// Флажок в шапке — явный выбор: он запоминается для этой заявки и дальше главнее.
+const PAGE_LANGS = ['ka', 'ru', 'en'];
+const LANG_COOKIE_OPTS = { maxAge: 365 * 24 * 60 * 60 * 1000, sameSite: 'lax' };
+const ownerLangCookie = token => `olang_${token}`;
+async function ownerLanguage(req, order) {
+  const chosen = req.cookies[ownerLangCookie(order.token)];
+  if (PAGE_LANGS.includes(chosen)) return chosen;
+  return orderService.getCustomerLanguage(order, PAGE_LANGS.includes(order.source_lang) ? order.source_lang : req.lang);
+}
+function chooseOwnerLanguage(req, res, order, page) {
+  if (!PAGE_LANGS.includes(req.query.lang)) return false;
+  res.cookie(ownerLangCookie(order.token), req.query.lang, LANG_COOKIE_OPTS);
+  res.cookie('lang', req.query.lang, LANG_COOKIE_OPTS);
+  res.redirect(page);
+  return true;
 }
 
 function readMyOrderTokens(req) {
@@ -808,27 +829,46 @@ async function show(req, res) {
     });
   }
 
-  const isOwner = req.cookies[ownerCookieName(token)] === order.owner_token;
   const sessionToken = await masterSession.token(req);
   const sessionMaster = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
-  const masterId = !isOwner && sessionMaster ? sessionMaster.id : null;
+  // Исполнителя определяет вход в кабинет или личный ключ из ссылки лида (?k=, leadLink.service):
+  // ключ действует, пока ссылкой не воспользовались в другом браузере. Вход главнее чужой ссылки.
+  // Номер исполнителя в ссылке (?master=<id>) сам ничего не даёт.
+  const link = await leadLink.look(req, order, req.query.k);
+  const linkMaster = !sessionMaster && link && link.state !== 'taken' ? await masterOfLink(link.masterId) : null;
+  const provider = sessionMaster || linkMaster;
+  // В одном браузере могут быть и кука заказчика этой заявки, и исполнитель. Своя ссылка лида
+  // открывает страницу исполнителя, а не заказчика.
+  const ownLead = Boolean(linkMaster) || (Boolean(sessionMaster) && (String(req.query.master || '') === String(sessionMaster.id) || link?.masterId === sessionMaster.id));
+  const isOwner = !ownLead && req.cookies[ownerCookieName(token)] === order.owner_token;
+  if (isOwner && chooseOwnerLanguage(req, res, order, '/order/' + order.token)) return;
+  // Исполнитель открывает ссылку из SMS часто в браузере без куки языка — тогда язык его кабинета.
+  // То же для ссылки, уже привязанной к другому браузеру: подсказку о входе читает, скорее всего, он сам.
+  const speaker = provider || (link && !req.cookies.lang ? await masterService.getMasterById(link.masterId) : null);
+  const pageLang = isOwner ? await ownerLanguage(req, order)
+    : speaker && !req.cookies.lang && PAGE_LANGS.includes(speaker.language) ? speaker.language : req.lang;
+  if (pageLang !== req.lang) {
+    res.locals.lang = pageLang;
+    res.locals.t = translate(pageLang);
+  }
+  const masterId = !isOwner && provider ? provider.id : null;
   const files = await orderService.getOrderFiles(order.id);
   const funnel = isOwner ? await orderService.getOrderFunnelStats(order.id) : null;
   const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
-  const categoryLabels = (order.target_categories || []).length ? await categoryLabelMap(req.lang) : {};
+  const categoryLabels = (order.target_categories || []).length ? await categoryLabelMap(pageLang) : {};
 
   // Плашка «баланс · мой аккаунт» + предупреждение о низком балансе — только для мастера,
-  // открывшего лид по своей ссылке (?master=<id>), не для владельца заявки. Категорию
+  // вошедшего в кабинет: по ключу из ссылки баланс и кабинет не показываются. Категорию
   // мастера передаём отдельно от masterAccount (тот остаётся null для забаненных) — она
   // нужна, чтобы понять, закрыта ли именно ЕГО категория заявки, независимо от бана.
   let masterAccount = null;
   let masterCategory = null;
   let m = null;
   if (masterId && !isOwner) {
-    m = sessionMaster;
+    m = provider;
     if (m) {
       masterCategory = m.category;
-      if (!m.is_banned) {
+      if (sessionMaster && !m.is_banned) {
         const leadPriceTetri = await settingsService.getLeadPriceTetri();
         masterAccount = {
           token: m.master_token,
@@ -844,12 +884,14 @@ async function show(req, res) {
   const requestLang = isOwner ? null : requestLanguage.ofOrder(order);
 
   return res.render('order', {
-    ...revisionLocals(order, req.lang),
+    ...revisionLocals(order, pageLang),
     order,
     files,
     isOwner,
     masterId,
     masterCategory,
+    langHref: isOwner ? '/order/' + order.token + '?lang=' : null,
+    linkTaken: !isOwner && !provider && link?.state === 'taken',
     noMatchingNeeds: !!m && !(await require('../services/serviceMatching.service').openMatches(m,order)).length,
     funnel,
     masterAccount,
@@ -862,7 +904,7 @@ async function show(req, res) {
     categoryLabels,
     createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
-    clientStrings: clientStrings(req.lang),
+    clientStrings: clientStrings(pageLang),
   });
 }
 
@@ -894,16 +936,13 @@ async function showByOwnerToken(req, res) {
     maxAge: COOKIE_MAX_AGE_MS,
   });
   rememberOrderToken(req, res, order.token);
+  if (chooseOwnerLanguage(req, res, order, '/o/' + order.owner_token)) return;
 
   const files = await orderService.getOrderFiles(order.id);
   const funnel = await orderService.getOrderFunnelStats(order.id);
   const closedCategories = (order.target_categories || []).length ? await orderService.getClosedCategories(order.id) : [];
 
-  // Заказчик без явно выбранного языка (нет куки — пришёл из SMS) видит свою заявку на
-  // языке, на котором её писал (source_lang). Если флажок в шапке нажимал — уважаем выбор.
-  const ownerLang = req.cookies.lang
-    ? req.lang
-    : (['ka', 'ru', 'en'].includes(order.source_lang) ? order.source_lang : req.lang);
+  const ownerLang = await ownerLanguage(req, order);
   res.locals.lang = ownerLang;
   res.locals.t = translate(ownerLang);
   const categoryLabels = (order.target_categories || []).length ? await categoryLabelMap(ownerLang) : {};
@@ -924,6 +963,7 @@ async function showByOwnerToken(req, res) {
     whatsappText: buildWhatsappText(order),
     noteTexts: require('../services/orderText.service').noteTexts(order),
     recipientsCount: (await orderService.getChargedMasterIds(order.id)).size,
+    langHref: '/o/' + order.owner_token + '?lang=',
     clientStrings: clientStrings(ownerLang),
   });
 }
@@ -1022,16 +1062,38 @@ async function closeCategory(req, res) {
 }
 
 
+// Исполнитель по личной ссылке: те же поля, что у вошедшего в кабинет.
+async function masterOfLink(masterId) {
+  const found = await masterService.getMasterById(masterId);
+  return found?.master_token ? masterService.getMasterByToken(found.master_token) : null;
+}
+
+// Кто действует на странице заявки как исполнитель: вошедший в кабинет или владелец личной ссылки.
+// Действие со страницы привязывает свободную ссылку к этому браузеру. Вход главнее: чужая ссылка
+// не даёт вошедшему исполнителю действовать за другого.
+async function leadActor(req, res, order) {
+  const sessionToken = await masterSession.token(req);
+  const sessionMaster = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
+  const key = req.body?.key;
+  if (sessionMaster) {
+    // Своя ссылка привязывается и при входе, чтобы пересланная копия уже не открылась.
+    if ((await leadLink.look(req, order, key))?.masterId === sessionMaster.id) await leadLink.claim(req, res, order, key);
+    return { master: sessionMaster, access: 'session' };
+  }
+  const masterId = await leadLink.claim(req, res, order, key);
+  const master = masterId ? await masterOfLink(masterId) : null;
+  return master ? { master, access: 'link' } : null;
+}
+
 async function logView(req, res) {
   masterSession.noStore(res);
   const { token } = req.params;
-  const sessionToken = await masterSession.token(req);
-  const master = sessionToken ? await masterService.getMasterByToken(sessionToken) : null;
+  const order = await orderService.getOrderByToken(token);
+  const master = (await leadActor(req, res, order))?.master;
   if (!master || master.is_banned) return res.status(401).json({ success: false });
   // Contact actions are recorded only by the server when it actually releases a contact.
   if (req.body.eventType !== 'view') return res.status(400).json({ success: false });
 
-  const order = await orderService.getOrderByToken(token);
   if (!order) {
     return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   }
@@ -1044,9 +1106,13 @@ async function logView(req, res) {
 
 async function revealContact(req, res) {
   masterSession.noStore(res);
-  const result = await orderContact.reveal(req.params.token, await masterSession.token(req), req.body.channel, requestMeta(req));
-  if (result.status !== 200) return res.status(result.status).json({ success: false, code: result.code,
-    message: clientStrings(req.lang)['contact_' + result.code] });
+  const order = await orderService.getOrderByToken(req.params.token);
+  const actor = await leadActor(req, res, order);
+  const result = await orderContact.reveal(req.params.token, actor?.master.master_token || null, req.body.channel, requestMeta(req), actor?.access);
+  // Ссылкой уже воспользовались в другом браузере — говорим об этом, а не просто «войдите».
+  const code = result.code === 'login' && (await leadLink.look(req, order, req.body.key))?.state === 'taken' ? 'link_taken' : result.code;
+  if (result.status !== 200) return res.status(result.status).json({ success: false, code,
+    message: clientStrings(req.lang)['contact_' + code] });
   const phone = toE164(result.order.phone);
   const url = req.body.channel === 'call' ? `tel:${phone}`
     : `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(buildWhatsappText(result.order))}`;

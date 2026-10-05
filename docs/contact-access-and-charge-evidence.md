@@ -72,3 +72,53 @@ and should also be verified against staging PostgreSQL before deployment.
 
 Registration UX, tariff acceptance and the combined dispute export are described
 in `provider-consent-and-billing.md`. Refund policy remains a separate decision.
+
+## Lead link in the client's browser and return after sign-in (2026-10-06)
+
+One browser can hold both the order owner cookie and a provider session. The owner
+cookie used to win, so a provider opening their lead in the browser that created
+the order saw the client page without contact buttons. Now a lead link whose
+`master` parameter equals the signed-in provider opens the provider page. The
+parameter still grants nothing by itself: without a session, or with another
+provider's number, the page stays the owner page (`order.controller.show`).
+
+The sign-in link shown after a 401 on a contact button carries
+`/master?next=/order/<token>`. After SMS sign-in the provider returns to that
+order instead of the cabinet; an already signed-in provider is redirected at
+once. Only an order page path is accepted as a return target
+(`master.controller.orderReturn`).
+
+## Personal lead link (2026-10-06)
+
+Owner decision 2026-10-06. The lead link sent by SMS or Telegram is now
+`/order/<token>?k=<key>` (`leadLink.service.js`, table `lead_links`). The key is
+22 random URL-safe characters, one per order and provider; the table keeps only
+SHA-256 hashes of the key and of the device cookie. The exact SMS text with the
+link is still kept in the charge evidence (`LEAD_CHARGE_ACCEPTED.message_body`).
+
+- The key identifies the provider on the order page without a cabinet sign-in:
+  the page shows the provider view, records the view and releases the contact.
+  It never shows the balance or a cabinet link, and it grants no cabinet access.
+- The contact rules are unchanged: `orderContact.reveal` still requires an
+  active, not banned provider with a lead charge for this order, the same
+  technical group and an open matching need. The audit event records how the
+  provider was recognised: `access: 'link'` or `'session'`.
+- **First browser only.** The first action from the page (the view logged by
+  the page script, Call or WhatsApp — a POST) binds the key to that browser
+  through the `lead_device` cookie (httpOnly, one per browser for all leads).
+  Opening the page with a GET binds nothing, so link-preview robots in
+  messengers cannot take the link. In any other browser the same link shows the
+  order text, the notice `contact_link_taken` and the sign-in link; the contact
+  request returns 401 with code `link_taken`.
+- A cabinet session outranks the key: a signed-in provider acts as themselves,
+  another provider's link is neither usable nor bound in their browser. The
+  provider's own unused link is bound to the browser where they are signed in.
+- Sending again to the same provider replaces the key and clears the binding;
+  the old link stops working.
+- Known limit, accepted by the owner: a link forwarded before the provider
+  opens it is bound to whoever opens it first. The provider then signs in with
+  an SMS code on their own device. A provider can always forward the phone
+  number itself; the key only stops the link from working as a pass for others.
+
+Without a language cookie the provider page opens in the provider's saved
+cabinet language (`masters.language`).

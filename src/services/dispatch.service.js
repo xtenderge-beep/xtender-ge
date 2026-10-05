@@ -244,6 +244,52 @@ async function screen(token, languageRaw = '') {
     funnel: await orderService.getOrderFunnelStats(order.id), funnelByCategory: await orderService.getOrderFunnelByCategory(order.id), speakLabels,
   };
 }
+// Форма экрана заявки одна и та же в кабинете менеджера и в админке: расчёт и отправка по её полям.
+const formInput = body => ({ needs: body.needs, needAttributes: body.needAttributes, transportSize: body.transportSize, transportAny: body.transportAny, cityId: body.cityId });
+const previewForm = async (token, body) => planView(await planNeeds(token, formInput(body), body.language || ''));
+async function sendForm(token, body, actor) {
+  const expected = body.expectedTotal ? { total: body.expectedTotal, price: body.expectedPrice, revision: body.revision } : null;
+  // Галочка «Показывать карточку исполнителям» есть в форме, только когда карточка собрана.
+  const shareBrief = body.briefShown ? body.shareBrief === 'on' : undefined;
+  return sendNeeds(token, formInput(body), expected, body.language || '', { actor, shareBrief });
+}
+// Список открытых заявок с кратким состоянием каждой, чтобы менеджер видел его, не открывая заявку:
+// ждёт рассылки или разослана, каким услугам, сколько исполнителей получили, открыли и связались,
+// есть ли недоставленные. Шесть запросов на весь список, а не на каждую заявку.
+async function orderList(limit = 100) {
+  const orders = (await pool.query("SELECT id, token, description, status, created_at, first_dispatched_at, is_technical, district_name FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT " + Number(limit))).rows;
+  if (!orders.length) return [];
+  const ids = orders.map(order => order.id), list = ids.map((_, index) => '$' + (index + 1)).join(',');
+  const [charges, deliveries, views, closures, sent] = await Promise.all([
+    pool.query("SELECT order_id, master_id FROM balance_transactions WHERE reason='lead_charge' AND order_id IN (" + list + ')', ids),
+    pool.query('SELECT order_id, master_id, status FROM dispatch_deliveries WHERE order_id IN (' + list + ') ORDER BY id', ids),
+    pool.query('SELECT order_id, master_id, event_type FROM order_views WHERE order_id IN (' + list + ')', ids),
+    pool.query('SELECT order_id, category FROM order_category_closures WHERE order_id IN (' + list + ')', ids),
+    pool.query('SELECT order_id, category FROM order_dispatches WHERE order_id IN (' + list + ') ORDER BY dispatched_at, id', ids),
+  ]);
+  const groups = await require('./category.service').groups();
+  const of = (result, id) => result.rows.filter(row => row.order_id === id);
+  const unique = values => [...new Set(values)];
+  const labels = rows => unique(rows.map(row => row.category)).map(key => groups[key] || key);
+  const now = Date.now();
+  return orders.map(order => {
+    const received = new Set(of(charges, order.id).map(row => row.master_id));
+    // Считается последняя попытка по исполнителю: повтор после сбоя заменяет прежний результат.
+    const last = new Map(of(deliveries, order.id).map(row => [row.master_id, row.status]));
+    const outcome = status => [...last].filter(([master, value]) => value === status && !received.has(master)).length;
+    const seen = of(views, order.id), attempted = of(sent, order.id);
+    return {
+      id: order.id, token: order.token, description: order.description, created_at: order.created_at,
+      is_technical: order.is_technical, district_name: order.district_name,
+      state: received.size ? 'sent' : attempted.length ? 'nobody' : 'waiting',
+      services: labels(attempted), closed: labels(of(closures, order.id)),
+      received: received.size, failed: outcome('failed'), pending: outcome('pending'),
+      opened: unique(seen.map(row => row.master_id).filter(Boolean)).length,
+      contacted: unique(seen.filter(row => ['call', 'whatsapp'].includes(row.event_type)).map(row => row.master_id)).length,
+      minutes: Math.max(0, Math.floor((now - new Date(order.first_dispatched_at || order.created_at).getTime()) / 60000)),
+    };
+  });
+}
 // Почему получателей нет — для сообщения модератору (Telegram и админка).
 function emptyReason(plan) {
   if (plan.pending > 0) return 'Есть отправки в обработке или с неопределённым результатом. Проверьте результаты';
@@ -294,4 +340,4 @@ async function retry(token, runId, actor='admin') {
   await require('./telegram.service').updateMessage(order);
   return {count,price:plan.price,run:(await orderService.getOrderDispatches(order.id)).find(r=>r.id===context.runId)};
 }
-module.exports = { preview, dispatch, retry, validate, emptyReason, transportSizes, availability, planNeeds, planView, sendNeeds, screen };
+module.exports = { preview, dispatch, retry, validate, emptyReason, transportSizes, availability, planNeeds, planView, sendNeeds, screen, orderList, previewForm, sendForm };

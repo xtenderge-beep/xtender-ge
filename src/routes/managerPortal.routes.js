@@ -51,24 +51,19 @@ const dispatchPage=async(req,res,result=null)=>{
   if(!screen)return res.status(404).send('Заявка не найдена');
   res.render('manager/order-dispatch',{...screen,result,error:req.query.error || null});
 };
-const needsInput=req=>({needs:req.body.needs,needAttributes:req.body.needAttributes,transportSize:req.body.transportSize,transportAny:req.body.transportAny,cityId:req.body.cityId});
 router.get('/orders',wrap(async(req,res)=>{
-  const rows=(await require('../config/db').query("SELECT id,token,description,status,created_at FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT 100")).rows;
-  res.render('manager/orders',{orders:rows});
+  res.render('manager/orders',{orders:await dispatchService.orderList()});
 }));
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
 // Пересчёт при каждом изменении формы: ничего не сохраняет и не отправляет.
 router.post('/orders/:token/preview',wrap(async(req,res)=>{
-  try {res.json(dispatchService.planView(await dispatchService.planNeeds(req.params.token,needsInput(req),req.body.language || '')));}
+  try {res.json(await dispatchService.previewForm(req.params.token,req.body));}
   catch(e){res.status(400).json({error:e.message});}
 }));
 // Одна кнопка: сохранить потребности и отправить заявку всем отмеченным услугам.
 router.post('/orders/:token/send',wrap(async(req,res)=>{
   try {
-    const expected=req.body.expectedTotal ? {total:req.body.expectedTotal,price:req.body.expectedPrice,revision:req.body.revision} : null;
-    // Галочка «Показывать карточку исполнителям» есть в форме, только когда карточка собрана.
-    const shareBrief=req.body.briefShown ? req.body.shareBrief==='on' : undefined;
-    return dispatchPage(req,res,await dispatchService.sendNeeds(req.params.token,needsInput(req),expected,req.body.language || '',{actor:'manager:'+req.managerSession.id,shareBrief}));
+    return dispatchPage(req,res,await dispatchService.sendForm(req.params.token,req.body,'manager:'+req.managerSession.id));
   } catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
@@ -89,14 +84,7 @@ const orderAction=action=>wrap(async(req,res)=>{
 const actor=req=>'manager:'+req.managerSession.id;
 router.post('/orders/:token/text',orderAction(req=>require('../services/orderText.service').edit(req.params.token,req.body.description,actor(req),require('../config/requestMeta').requestMeta(req))));
 router.post('/orders/:token/note',orderAction(req=>require('../services/orderText.service').clarify(req.params.token,req.body.note,actor(req),require('../config/requestMeta').requestMeta(req))));
-router.post('/orders/:token/brief',orderAction(async req=>{
-  const briefs=require('../services/orderBrief.service');
-  if(req.body.action==='refresh') {
-    const order=await orderService.getOrderByToken(req.params.token);
-    if(!order)throw Object.assign(new Error('Заявка не найдена.'),{status:404});
-    if(!await briefs.refresh(order.id))throw new Error('Карточку собрать не удалось. Попробуйте ещё раз позже.');
-  } else if(!await briefs.setShared(req.params.token,req.body.action==='share'))throw new Error('Карточка ещё не собрана.');
-}));
+router.post('/orders/:token/brief',orderAction(req=>require('../services/orderBrief.service').act(req.params.token,req.body.action)));
 router.post('/orders/:token/retry',wrap(async(req,res)=>{
   try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
