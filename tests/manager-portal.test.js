@@ -127,6 +127,15 @@ const portal=require('../src/services/managerPortal.service');
   const dispatchRuns=async()=>(await pool.query('SELECT COUNT(*)::int AS n FROM dispatch_runs')).rows[0].n,runsBefore=await dispatchRuns();
   assert.match(decodeURIComponent((await orderPost('send',[['_csrf',orderCsrf],['needs','transport']])).headers.get('location')),/error=Отправлять некому/);
   assert.equal(await dispatchRuns(),runsBefore,'без получателей отправка не создаётся');
+  // Правка заявки менеджером: уточнение сохраняется, текст разосланной заявки не переписывается, без CSRF — отказ.
+  assert.equal((await orderPost('note',[['note','Без токена']])).status,403);
+  assert.equal((await orderPost('note',[['_csrf',orderCsrf],['note','Клиент уточнил: 3 этаж без лифта']])).headers.get('location'),'/manager/orders/portal-order');
+  assert.equal((await pool.query("SELECT manager_note FROM orders WHERE token='portal-order'")).rows[0].manager_note,'Клиент уточнил: 3 этаж без лифта');
+  assert.match(await (await fetch(base+'/manager/orders/portal-order',{headers:{cookie:telegramCookie}})).text(),/Уточнение менеджера<\/b><p class="pre">Клиент уточнил: 3 этаж без лифта/);
+  assert.match(decodeURIComponent((await orderPost('text',[['_csrf',orderCsrf],['description','Совсем другой текст заявки после рассылки']])).headers.get('location')),/error=Заявка уже отправлялась исполнителям/);
+  assert.match(decodeURIComponent((await orderPost('brief',[['_csrf',orderCsrf],['action','refresh']])).headers.get('location')),/error=Карточку собрать не удалось/);
+  assert.match(decodeURIComponent((await orderPost('brief',[['_csrf',orderCsrf],['action','share']])).headers.get('location')),/error=Карточка ещё не собрана/);
+  assert.equal((await fetch(base+'/manager/orders/no-such-order/note',{method:'POST',headers:{cookie:telegramCookie},body:new URLSearchParams([['_csrf',orderCsrf],['note','x']]),redirect:'manual'})).status,404);
   assert.equal((await fetch(base+'/manager/order-auth/'+magic,{redirect:'manual'})).status,302);
   await pool.query('UPDATE managers SET web_enabled=true WHERE id=$1',[a]);
   const session=await portal.session(auth.split('=')[1]);

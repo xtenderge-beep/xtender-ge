@@ -29,6 +29,8 @@ const messages = {
   tgOwnNumber: ['Отправьте свой номер кнопкой «{button}».', 'Send your own number with the “{button}” button.', 'გამოგზავნეთ თქვენი ნომერი ღილაკით «{button}».'],
   tgNotRegistered: ['На этот номер не зарегистрирован профиль исполнителя. Регистрация: {link}', 'No provider profile is registered for this number. Register here: {link}', 'ამ ნომერზე შემსრულებლის პროფილი რეგისტრირებული არ არის. რეგისტრაცია: {link}'],
   tgQuestionSent: ['✅ Вопрос отправлен модератору. Ответ придёт сюда и в кабинет.', '✅ Your question was sent to the moderator. The reply will arrive here and in your account.', '✅ შეკითხვა მოდერატორს გაეგზავნა. პასუხი აქაც მოვა და კაბინეტშიც.'],
+  // Первая строка сообщения, которым менеджер начинает переписку с заказчиком в WhatsApp.
+  clarifyGreeting: ['Здравствуйте! Это Xtender. Уточняем вашу заявку №{id}.', 'Hello! This is Xtender. We are clarifying your request #{id}.', 'გამარჯობა! ეს არის Xtender. ვაზუსტებთ თქვენს განაცხადს №{id}.'],
   alreadyReviewed: ['Вы уже оставили отзыв об этом исполнителе.', 'You have already reviewed this provider.', 'თქვენ უკვე შეაფასეთ ეს შემსრულებელი.'],
 };
 // SMS stays Latin. The gateway sends any non-Latin text as UCS-2 (short segments) and has garbled it

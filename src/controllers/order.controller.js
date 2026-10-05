@@ -23,6 +23,12 @@ const { parseDispatchLanguage } = require('../config/spokenLanguages');
 
 // Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
 // (он сам писал заявку) + текст заявки в оригинале. Уходит в wa.me/<номер>?text=...
+// Карточка «Кратко» для страницы заявки: по языкам, и только если менеджер разрешил показ исполнителям.
+function briefCardFor(order) {
+  const briefs = require('../services/orderBrief.service'), brief = briefs.read(order);
+  return brief?.shared ? Object.fromEntries(['ka', 'ru', 'en'].map((lang) => [lang, briefs.lines(brief, lang)])) : null;
+}
+
 function buildWhatsappText(order) {
   const lang = requestLanguage.ofOrder(order) || 'ru';
   return translate(lang)('order_wa_template').replace('{text}', order.description || '');
@@ -141,6 +147,8 @@ async function create(req, res) {
     } catch (err) {
       console.error('Failed to notify moderator:', err.message);
     }
+    // Карточка «Кратко» для менеджера — после уведомления, чтобы его не задерживать. Не бросает.
+    await require('../services/orderBrief.service').refresh(order.id);
   })();
 
   return res.json({
@@ -846,6 +854,8 @@ async function show(req, res) {
     funnel,
     masterAccount,
     requestLang,
+    noteTexts: require('../services/orderText.service').noteTexts(order),
+    briefCard: briefCardFor(order),
     langAdvice: requestLanguage.needsAdvice(requestLang, m),
     targetCategories: order.target_categories || [],
     closedCategories,
@@ -912,6 +922,8 @@ async function showByOwnerToken(req, res) {
     categoryLabels,
     createdMinutesAgo: minutesSince(order.created_at),
     whatsappText: buildWhatsappText(order),
+    noteTexts: require('../services/orderText.service').noteTexts(order),
+    recipientsCount: (await orderService.getChargedMasterIds(order.id)).size,
     clientStrings: clientStrings(ownerLang),
   });
 }

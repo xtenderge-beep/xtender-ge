@@ -897,6 +897,15 @@ CREATE INDEX IF NOT EXISTS idx_site_visits_created ON site_visits(created_at);
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';
+-- Правка заявки менеджером после разговора с заказчиком (orderText.service). client_description —
+-- текст, как его написал заказчик, если менеджер переписал заявку до первой рассылки. manager_note —
+-- уточнение отдельным блоком: после рассылки текст не переписывается, только дополняется.
+-- brief — карточка «Кратко», которую ИИ собирает из текста заявки (orderBrief.service); исполнители
+-- видят её только после того, как менеджер разрешил показ (brief.shared).
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS client_description TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS manager_note TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS manager_note_translations JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS brief JSONB;
 ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS category VARCHAR(80);
 ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS vehicle_size VARCHAR(10) NOT NULL DEFAULT '';
 ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS language VARCHAR(5) NOT NULL DEFAULT '';

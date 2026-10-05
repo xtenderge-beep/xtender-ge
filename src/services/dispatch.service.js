@@ -171,6 +171,7 @@ async function sendNeeds(token, input, expected = null, languageRaw = '', contex
   }
   if (!plan.total) throw new Error('Отправлять некому: новых получателей нет.');
   await orderNeeds.apply(token, input);
+  if (context.shareBrief !== undefined) await require('./orderBrief.service').setShared(token, context.shareBrief === true);
   const results = [];
   for (const service of plan.services) for (const group of service.groups.filter(item => item.sendable)) {
     const result = { key: service.key, label: service.label, size: group.size, count: 0 };
@@ -178,7 +179,7 @@ async function sendNeeds(token, input, expected = null, languageRaw = '', contex
     try {
       const fresh = await preview(token, service.key, group.size, plan.language);
       // Ноль — когда все подходящие уже получили заявку по другой услуге или классу этой же отправки.
-      if (fresh.count) result.count = (await dispatch(token, service.key, group.size, { price: fresh.price, count: fresh.count, revision: fresh.order.revision_version || 0 }, plan.language, { ...context })).count;
+      if (fresh.count) result.count = (await dispatch(token, service.key, group.size, { price: fresh.price, count: fresh.count, revision: fresh.order.revision_version || 0 }, plan.language, { actor: context.actor })).count;
     } catch (error) { result.error = error.message; }
   }
   return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price };
@@ -224,11 +225,21 @@ async function screen(token, languageRaw = '') {
   const thresholds = await settingsService.getVanSizeThresholds();
   const files = await orderService.getOrderFiles(order.id);
   const image = file => String(file.mime_type || '').startsWith('image/');
+  // Карточка «Кратко» и связь с заказчиком. В WhatsApp уходит приветствие на языке заявки и, если
+  // ИИ нашёл пробелы, готовые вопросы — менеджер правит текст уже в переписке.
+  const briefService = require('./orderBrief.service'), brief = briefService.read(order);
+  const requestLang = require('../config/requestLanguage').ofOrder(order);
+  const digits = String(order.phone || '').replace(/\D/g, '');
+  const greeting = require('../config/service-message-copy')('clarifyGreeting', requestLang || 'ru', { id: order.id });
   return {
+    brief, briefLines: briefService.lines(brief, 'ru'), briefEnabled: briefService.enabled(),
+    briefServices: (brief?.services || []).filter(key => Object.hasOwn(groups, key)).map(key => ({ key, label: groups[key] })),
+    whatsappUrl: digits.length >= 8 ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent(greeting + (brief?.questions ? ' ' + brief.questions : '')) : null,
+    canEditText: order.status === 'pending_review' && !order.first_dispatched_at,
     order, open, rows, needs, runs, names, groups, closedCategories: closed, planView: plan ? planView(plan) : null, language: plan?.language || '',
     sizes: thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds) })),
     photos: files.filter(image), documents: files.filter(file => !image(file)),
-    requestLanguage: require('../config/requestLanguage').ofOrder(order), languageNames: require('../config/spokenLanguages').ruNames,
+    requestLanguage: requestLang, languageNames: require('../config/spokenLanguages').ruNames,
     activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(),
     funnel: await orderService.getOrderFunnelStats(order.id), funnelByCategory: await orderService.getOrderFunnelByCategory(order.id), speakLabels,
   };

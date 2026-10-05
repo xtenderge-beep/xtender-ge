@@ -6,6 +6,21 @@
 .order-brief-meta{color:#62716e;font-size:14px;line-height:1.6}
 .order-photos{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .order-photos img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid #dce5e1;display:block}
+.order-note{margin:12px 0;padding:10px 12px;border:1px solid #f0d58a;background:#fff8e1;border-radius:10px}
+.order-note p{margin:4px 0 0}
+.client-contact{margin:14px 0}
+.contact-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.contact-button{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:8px;background:#08765f;color:white;text-decoration:none;font-weight:600}
+.client-contact .muted{font-size:13px;margin:8px 0 0}
+.order-card{margin:14px 0;padding:12px 14px;border:1px solid #cfe3da;background:#f4faf7;border-radius:12px;font-size:15px}
+.order-card dl{margin:8px 0}.order-card dt{display:inline;font-weight:650}.order-card dd{display:inline;margin:0}.order-card dl div{padding:2px 0}
+.order-card p{margin:8px 0}
+.card-button{min-height:36px;padding:6px 12px;border-radius:8px;font-size:14px}
+.card-check{display:flex;align-items:flex-start;gap:8px;margin:10px 0}.card-check input{width:20px;height:20px;flex:none;margin:1px 0 0;padding:0;accent-color:#08765f}
+.card-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:8px 0}
+.order-edit{margin:14px 0 0;border-top:1px solid #dce5e1;padding-top:12px}
+.order-edit summary{cursor:pointer;font-weight:600;color:#075d4b}
+.order-edit textarea{font-size:15px}
 .needs-card{margin:0}
 .service-list{margin:14px 0 0}
 .service-row{border:1px solid #dce5e1;border-radius:12px;margin:8px 0;background:white}
@@ -51,9 +66,33 @@
   <div class="order-brief-meta"><strong>Заявка #<%= order.id %></strong><% if(order.is_technical){ %> · 🧪 техническая<% } %><br>
   <%= cityName %><%= order.district_name?' · '+order.district_name:'' %> · <%= date(order.created_at) %><% if(requestLanguage){ %><br>Язык заявки: <%= (languageNames[requestLanguage]||requestLanguage).toLowerCase() %><% } %></div>
   <p class="order-brief-text pre"><%= order.description %></p>
+  <% if(order.client_description){ %><details class="muted"><summary>Текст поправил менеджер — показать, как написал клиент</summary><p class="pre"><%= order.client_description %></p></details><% } %>
+  <% if(order.manager_note){ %><div class="order-note"><b>Уточнение менеджера</b><p class="pre"><%= order.manager_note %></p></div><% } %>
   <% if(photos.length){ %><div class="order-photos"><% photos.forEach(file=>{ %><a href="<%= file.file_path %>" target="_blank" rel="noopener"><img src="<%= file.file_path %>" alt="Фото к заявке"></a><% }); %></div><% } %>
   <% documents.forEach(file=>{ %><p><a href="<%= file.file_path %>" target="_blank" rel="noopener"><%= file.original_name %></a></p><% }); %>
-  <% if(order.phone){ %><p>Клиент: <a href="tel:<%= order.phone %>"><%= order.phone %></a></p><% } %>
+  <% if(order.phone){ %><div class="client-contact">Клиент: <strong><%= order.phone %></strong>
+    <div class="contact-actions"><a class="contact-button" href="tel:<%= order.phone %>">Позвонить</a><% if(whatsappUrl){ %><a class="contact-button" href="<%= whatsappUrl %>" target="_blank" rel="noopener">Написать в WhatsApp</a><% } %></div>
+    <% if(whatsappUrl){ %><p class="muted">В WhatsApp откроется готовое сообщение на языке заявки<%= brief?.questions?' с вопросами, которых не хватает':'' %>. Писать будете со своего номера.</p><% } %></div><% } %>
+  <% if(brief){ const fieldLabels={what:'Что',from:'Откуда',to:'Куда',access:'Этаж и доступ',size:'Размеры и вес',when:'Когда',budget:'Бюджет',other:'Ещё'}; %>
+  <div class="order-card" id="order-brief-card"><b>Кратко</b> <span class="muted">— собрал ИИ из текста заявки, проверьте</span>
+    <% if(briefLines.length){ %><dl><% briefLines.forEach(line=>{ %><div><dt><%= fieldLabels[line.key] %>:</dt> <dd><%= line.text %></dd></div><% }); %></dl><% } else { %><p class="muted">Разложить текст по полям не получилось.</p><% } %>
+    <% if(brief.missing.length){ %><p><b>В заявке не указано:</b> <%= brief.missing.join('; ') %>.</p><% } %>
+    <% if(open && (briefServices.length || brief.sizes.length)){ %><p><b>ИИ предлагает:</b> <%= briefServices.map(item=>item.label).join(', ') %><%= brief.sizes.length?(briefServices.length?' · ':'')+'класс кузова '+brief.sizes.join(', '):'' %>
+      <button type="button" class="secondary-action card-button" data-apply-brief="<%= JSON.stringify({services:briefServices.map(item=>item.key),sizes:brief.sizes}) %>">Отметить предложенное</button></p><% } %>
+    <% if(open && !sentAny){ %><input type="hidden" name="briefShown" value="1" form="needs-form"><label class="card-check"><input type="checkbox" name="shareBrief" form="needs-form" checked> Показывать карточку исполнителям вместе с заявкой</label>
+    <% } else if(open){ %><form method="post" action="/manager/orders/<%= order.token %>/brief" class="card-line"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="<%= brief.shared?'hide':'share' %>"><span><%= brief.shared?'Исполнители видят карточку.':'Исполнители карточку не видят.' %></span> <button class="secondary-action card-button"><%= brief.shared?'Скрыть':'Показать исполнителям' %></button></form><% } %>
+    <% if(open && briefEnabled){ %><form method="post" action="/manager/orders/<%= order.token %>/brief" class="card-line"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="refresh"><button class="secondary-action card-button">Пересобрать карточку</button></form><% } %>
+  </div>
+  <% } else if(open && briefEnabled){ %><form method="post" action="/manager/orders/<%= order.token %>/brief"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="action" value="refresh"><button class="secondary-action">Собрать карточку «Кратко»</button></form><% } %>
+  <% if(open){ %><details class="order-edit" <%= typeof editOpen!=='undefined'&&editOpen?'open':'' %>><summary>Поправить заявку после разговора с клиентом</summary>
+    <% if(canEditText){ %><form method="post" action="/manager/orders/<%= order.token %>/text"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Текст заявки<textarea name="description" rows="6" minlength="10" maxlength="5000" required><%= order.description %></textarea></label>
+      <p class="muted">Исходный текст клиента сохранится. После первой отправки текст уже не переписывается.</p><button class="secondary-action">Сохранить текст</button></form>
+    <% } else { %><p class="muted">Заявка уже отправлялась, исполнители получили её в этом виде, поэтому текст не переписывается. Добавьте уточнение — они увидят его на странице заявки.</p><% } %>
+    <form method="post" action="/manager/orders/<%= order.token %>/note"><input type="hidden" name="_csrf" value="<%= csrf %>">
+      <label>Уточнение для исполнителей<textarea name="note" rows="3" maxlength="2000" placeholder="Например: 3 этаж без лифта, после 18:00"><%= order.manager_note||'' %></textarea></label>
+      <p class="muted">Показывается отдельным блоком под текстом заявки: его видят исполнители и сам клиент. Пустое поле убирает уточнение.</p><button class="secondary-action">Сохранить уточнение</button></form>
+  </details><% } %>
   <% if(!open){ %><p><strong>Заявка закрыта или ещё не подтверждена — рассылка недоступна.</strong></p><% } %>
 </section>
 <div>
@@ -165,6 +204,14 @@
  form.addEventListener('keydown',event=>{ if(event.key==='Enter'&&event.target.tagName!=='BUTTON') event.preventDefault(); });
  form.addEventListener('change',refresh);
  form.addEventListener('input',event=>{ if(event.target.type==='number') refresh(); });
+ // «Отметить предложенное»: подсказка ИИ сама ничего не отмечает — только по кнопке менеджера.
+ document.querySelectorAll('[data-apply-brief]').forEach(button=>button.addEventListener('click',()=>{
+  const suggestion=JSON.parse(button.dataset.applyBrief);
+  suggestion.services.forEach(key=>{ const box=form.querySelector('[data-service="'+key+'"] input[name=needs]'); if(box&&!box.disabled) box.checked=true; });
+  toggle();
+  suggestion.sizes.forEach(size=>{ const box=form.querySelector('input[name=transportSize][value="'+size+'"]'); if(box&&!box.disabled) box.checked=true; });
+  refresh();
+ }));
  toggle(); paint(JSON.parse(form.dataset.plan));
  // Страница из кэша браузера («Назад») приходит с прежними отметками — пересчитываем под них.
  window.addEventListener('pageshow',event=>{ if(event.persisted) refresh(); });

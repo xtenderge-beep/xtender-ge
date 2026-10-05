@@ -66,7 +66,9 @@ router.post('/orders/:token/preview',wrap(async(req,res)=>{
 router.post('/orders/:token/send',wrap(async(req,res)=>{
   try {
     const expected=req.body.expectedTotal ? {total:req.body.expectedTotal,price:req.body.expectedPrice,revision:req.body.revision} : null;
-    return dispatchPage(req,res,await dispatchService.sendNeeds(req.params.token,needsInput(req),expected,req.body.language || '',{actor:'manager:'+req.managerSession.id}));
+    // Галочка «Показывать карточку исполнителям» есть в форме, только когда карточка собрана.
+    const shareBrief=req.body.briefShown ? req.body.shareBrief==='on' : undefined;
+    return dispatchPage(req,res,await dispatchService.sendNeeds(req.params.token,needsInput(req),expected,req.body.language || '',{actor:'manager:'+req.managerSession.id,shareBrief}));
   } catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
@@ -76,6 +78,24 @@ router.post('/orders/:token/needs',wrap(async(req,res)=>{
 router.post('/orders/:token/dispatch',wrap(async(req,res)=>{
   try {const result=await dispatchService.dispatch(req.params.token,req.body.category,req.body.size || '',{price:req.body.price,count:req.body.count,revision:req.body.revision},req.body.language || '',{actor:'manager:'+req.managerSession.id});return dispatchPage(req,res,result);}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
+// Правка заявки после разговора с заказчиком: переписать текст (до первой рассылки) или добавить
+// уточнение; пересобрать карточку «Кратко» и решить, видят ли её исполнители.
+const orderAction=action=>wrap(async(req,res)=>{
+  const page='/manager/orders/'+encodeURIComponent(req.params.token);
+  try {await action(req);res.redirect(page);}
+  catch(e){if(e.status===404)return res.status(404).send(e.message);res.redirect(page+'?error='+encodeURIComponent(e.message));}
+});
+const actor=req=>'manager:'+req.managerSession.id;
+router.post('/orders/:token/text',orderAction(req=>require('../services/orderText.service').edit(req.params.token,req.body.description,actor(req),require('../config/requestMeta').requestMeta(req))));
+router.post('/orders/:token/note',orderAction(req=>require('../services/orderText.service').clarify(req.params.token,req.body.note,actor(req),require('../config/requestMeta').requestMeta(req))));
+router.post('/orders/:token/brief',orderAction(async req=>{
+  const briefs=require('../services/orderBrief.service');
+  if(req.body.action==='refresh') {
+    const order=await orderService.getOrderByToken(req.params.token);
+    if(!order)throw Object.assign(new Error('Заявка не найдена.'),{status:404});
+    if(!await briefs.refresh(order.id))throw new Error('Карточку собрать не удалось. Попробуйте ещё раз позже.');
+  } else if(!await briefs.setShared(req.params.token,req.body.action==='share'))throw new Error('Карточка ещё не собрана.');
 }));
 router.post('/orders/:token/retry',wrap(async(req,res)=>{
   try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
