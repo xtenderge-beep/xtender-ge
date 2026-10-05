@@ -458,6 +458,19 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
     if (definition?.slug !== item.type || checked.errors.length) throw invalid();
     // Букву кузова ставит система по трём размерам; выбранная вручную действует, только пока размеров нет.
     if (item.type === 'van' && !config.vanBody(checked.attributes) && config.VAN_SIZE_ORDER.includes(vehicleSize)) checked.attributes.size = vehicleSize;
+    if (item.type === 'van') {
+      // Остальные машины исполнителя: у каждой свои размеры, тип кузова и гидроборт, проверка та же.
+      const blank = Object.fromEntries(config.VAN_VEHICLE_KEYS.map(key => [key, undefined]));
+      const more = config.moreVanVehicleInputs(raw).map(vehicle => {
+        if (!vehicle || typeof vehicle !== 'object' || Array.isArray(vehicle)) throw invalid();
+        const one = categories.validate(definition, { ...raw, ...blank, ...vehicle }, vanSizes);
+        if (one.errors.length) throw invalid();
+        if (!config.vanBody(one.attributes) && config.VAN_SIZE_ORDER.includes(vehicle.size)) one.attributes.size = vehicle.size;
+        return Object.fromEntries(config.VAN_VEHICLE_KEYS.filter(key => one.attributes[key] !== undefined).map(key => [key, one.attributes[key]]));
+      });
+      if (more.length >= config.MAX_VAN_VEHICLES) throw invalid();
+      if (more.length) checked.attributes.more_vehicles = more;
+    }
     const requiresOwnTransport = item.requiresOwnTransport === true;
     if (requiresOwnTransport && (item.type !== 'movers' || !selected.some(s=>s.type === 'van'))) throw invalid();
     normalized.push({ type: item.type, attributes: checked.attributes, requiresOwnTransport });
@@ -505,15 +518,20 @@ async function reclassifyVanSizes() {
   const config = require('../config/serviceTypes');
   const sizes = await settingsService.getVanSizeThresholds();
   const { rows } = await pool.query("SELECT master_id, attributes FROM master_services WHERE service_type='van'");
+  // У исполнителя может быть несколько машин: пересчитывается каждая с размерами.
+  const resize = vehicle => {
+    const body = config.vanBody(vehicle);
+    return body ? { ...vehicle, size: config.deriveVanSize(body[0], body[1], body[2], sizes) } : vehicle;
+  };
   let changed = 0;
   for (const row of rows) {
-    const body = config.vanBody(row.attributes);
-    if (!body) continue;
-    const size = config.deriveVanSize(body[0], body[1], body[2], sizes);
-    if (size === row.attributes.size) continue;
+    const { more_vehicles: more, ...first } = row.attributes || {};
+    const next = { ...resize(first), ...(Array.isArray(more) ? { more_vehicles: more.map(resize) } : {}) };
+    const letters = attributes => config.vanVehicles(attributes).map(vehicle => vehicle.size || '').join(',');
+    if (letters(next) === letters(row.attributes)) continue;
     await pool.withTransaction(async client => {
-      await client.query("UPDATE master_services SET attributes=$1::jsonb WHERE master_id=$2 AND service_type='van'", [JSON.stringify({ ...row.attributes, size }), row.master_id]);
-      await client.query("UPDATE masters SET vehicle_size=$1 WHERE id=$2 AND category='transport'", [size, row.master_id]);
+      await client.query("UPDATE master_services SET attributes=$1::jsonb WHERE master_id=$2 AND service_type='van'", [JSON.stringify(next), row.master_id]);
+      await client.query("UPDATE masters SET vehicle_size=$1 WHERE id=$2 AND category='transport'", [next.size || null, row.master_id]);
     });
     changed++;
   }

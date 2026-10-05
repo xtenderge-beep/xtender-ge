@@ -275,7 +275,8 @@ async function getMasterCountsByCategory(isTechnical = false) {
     const recipients=await getDispatchRecipients(category,'',price,isTechnical);
     if(category === 'transport') {
       const sizes=new Map();
-      recipients.forEach(m=>{const size=m.services.find(s=>s.service_type === 'van')?.attributes?.size || null; sizes.set(size,(sizes.get(size)||0)+1);});
+      // Исполнитель с несколькими машинами входит в каждый свой класс.
+      recipients.forEach(m=>{const own=[...new Set(require('../config/serviceTypes').vanVehicles(m.services.find(s=>s.service_type === 'van')?.attributes).map(v=>v.size).filter(Boolean))]; for(const size of own.length ? own : [null]) sizes.set(size,(sizes.get(size)||0)+1);});
       for(const [vehicle_size,count] of sizes) counts.push({category,vehicle_size,count});
     } else counts.push({category,vehicle_size:null,count:recipients.length});
   }

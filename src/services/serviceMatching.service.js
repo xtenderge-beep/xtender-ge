@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { vanVehicles } = require('../config/serviceTypes');
 const toType = category => ['transport', 'flatbed'].includes(category) ? 'van' : category;
 const toCategory = type => type === 'van' ? 'transport' : type;
 
@@ -9,13 +10,18 @@ async function servicesFor(master, client = pool, suppliedRows = null) {
   return master.category ? [{ service_type: toType(master.category), attributes: { size: master.vehicle_size, body: master.is_flatbed ? 'flatbed' : 'closed' }, requires_own_transport: false }] : [];
 }
 
+// Машины исполнителя, подходящие под потребность. У перевозки их может быть несколько, и
+// одна машина должна подойти целиком: размер, тип кузова и требования заявки вместе.
+// У остальных услуг «машина» одна — сами характеристики услуги.
+function fitting(service, category, size = '', requirements = {}) {
+  const candidates = service.service_type === 'van' ? vanVehicles(service.attributes || {}) : [service.attributes || {}];
+  return candidates.filter(a => (category !== 'flatbed' || a.body === 'flatbed') && (!size || a.size === size) &&
+    require('./serviceRequirements.service').matches(a, requirements?.services?.[category], requirements?.rules?.[category]));
+}
+
 function matches(services, category, size = '', openCategories = [], requirements = {}) {
   const service = services.find(s => s.service_type === toType(category));
-  if (!service) return false;
-  const a = service.attributes || {};
-  if (category === 'flatbed' && a.body !== 'flatbed') return false;
-  if (size && a.size !== size) return false;
-  if (!require('./serviceRequirements.service').matches(a, requirements?.services?.[category], requirements?.rules?.[category])) return false;
+  if (!service || !fitting(service, category, size, requirements).length) return false;
   if (service.requires_own_transport) {
     return openCategories.some(c => ['transport', 'flatbed'].includes(c) && matches(services, c, requirements?.transport_size || '', openCategories, requirements));
   }
@@ -45,4 +51,4 @@ async function coversCity(master, order, client = pool) {
   return master.city_id ? master.city_id === city.id : city.slug === 'tbilisi';
 }
 
-module.exports = { servicesFor, matches, openMatches, coversCity, toType, toCategory };
+module.exports = { servicesFor, matches, fitting, openMatches, coversCity, toType, toCategory };

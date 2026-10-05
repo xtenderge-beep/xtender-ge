@@ -2,8 +2,8 @@ const orderService = require('./order.service');
 const settingsService = require('./settings.service');
 const pool = require('../config/db');
 const { parseDispatchLanguage, speaks, speakLabels, languageBreakdown } = require('../config/spokenLanguages');
-const { vanSizeSpec, vanBodyLabel } = require('../config/serviceTypes');
-const vanOf = master => master.services.find(s => s.service_type === 'van')?.attributes;
+const { vanSizeSpec, vanVehicles, vanVehicleLabel } = require('../config/serviceTypes');
+const vanOf = master => master.services.find(s => s.service_type === 'van');
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
   if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !require('../config/serviceTypes').VAN_SIZE_ORDER.includes(size)))) throw new Error('Некорректная группа рассылки');
@@ -50,8 +50,13 @@ async function preview(token, category, size, languageRaw = '') {
   const pending=new Set((await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[order.id])).rows.map(d=>d.master_id));
   const fresh = eligible.filter(master => !received.has(master.id) && !pending.has(master.id));
   const recipients = language ? fresh.filter(master => speaks(master, language)) : fresh;
-  // В списке получателей перевозки модератор видит класс и размеры кузова каждого.
-  if (['transport', 'flatbed'].includes(category)) recipients.forEach(master => { master.van_body = vanBodyLabel(vanOf(master)); });
+  // В списке получателей перевозки модератор видит, какая машина исполнителя подошла; если машин
+  // у него больше, это тоже видно.
+  if (['transport', 'flatbed'].includes(category)) recipients.forEach(master => {
+    const van = vanOf(master), total = vanVehicles(van.attributes).length;
+    const fitting = require('./serviceMatching.service').fitting(van, category, size, order.requirements);
+    master.van_body = fitting.map(vanVehicleLabel).join('; ') + (total > fitting.length ? ' (всего машин: ' + total + ')' : '');
+  });
   const inScope = language ? eligible.filter(master => speaks(master, language)) : eligible;
   const previous = await pool.query(`SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3`, [order.id, category, size || '']);
   const sentLanguages = previous.rows.map(row => row.language);
@@ -68,16 +73,17 @@ async function preview(token, category, size, languageRaw = '') {
 // Варианты размера кузова для формы «Что нужно клиенту?»: что значит каждая буква и сколько
 // исполнителей перевозок получат заявку при её выборе. Считаются те, кому заявку можно
 // отправить сейчас (активны, допущены к списанию, работают в городе заявки); остальные
-// требования заявки не учитываются. unknown — исполнители без размера: они получают
-// заявку, только когда размер не ограничен.
+// требования заявки не учитываются. Исполнитель с несколькими машинами считается в
+// каждом своём классе. unknown — исполнители, у которых размер неизвестен у всех машин: они
+// получают заявку, только когда размер не ограничен.
 async function transportSizes(order) {
   const thresholds = await settingsService.getVanSizeThresholds();
   const price = await settingsService.getLeadPriceTetri();
   const all = await orderService.getDispatchRecipients('transport', '', price, order.is_technical === true, '', { ...order, target_categories: [], requirements: {} });
-  const sizeOf = master => vanOf(master)?.size || '';
+  const classes = new Map(all.map(master => [master.id, vanVehicles(vanOf(master)?.attributes).map(vehicle => vehicle.size).filter(Boolean)]));
   return {
-    total: all.length, unknown: all.filter(master => !sizeOf(master)).length,
-    sizes: thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds), count: all.filter(master => sizeOf(master) === t.code).length })),
+    total: all.length, unknown: all.filter(master => !classes.get(master.id).length).length,
+    sizes: thresholds.map(t => ({ code: t.code, spec: vanSizeSpec(t.code, thresholds), count: all.filter(master => classes.get(master.id).includes(t.code)).length })),
   };
 }
 // Почему получателей нет — для сообщения модератору (Telegram и админка).

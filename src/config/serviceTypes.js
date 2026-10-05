@@ -129,12 +129,47 @@ function vanBody(raw = {}) {
   return nums.every(n => Number.isInteger(n) && n >= 1 && n <= 2000) ? nums : false;
 }
 
-// Подпись кузова для карточек и списков: «M · Д280×Ш170×В170 см», если размеры записаны;
-// «M · размеры не записаны», если букву выбрали на глаз; без буквы — «размер неизвестен».
+// У исполнителя перевозок может быть несколько машин. Первая лежит в характеристиках
+// услуги на верхнем уровне (как до появления списка), остальные — в more_vehicles.
+// У каждой машины свои класс, размеры, тип кузова и гидроборт; прочие характеристики
+// перевозки (например, «с грузчиками») общие.
+const VAN_VEHICLE_KEYS = ['size', ...VAN_BODY_KEYS, 'body', 'tail_lift'];
+const MAX_VAN_VEHICLES = 10;
+
+// Все машины исполнителя. Каждая — полный набор характеристик для подбора: общие плюс свои.
+function vanVehicles(attrs = {}) {
+  const { more_vehicles: more, ...first } = attrs || {};
+  const shared = Object.fromEntries(Object.entries(first).filter(([key]) => !VAN_VEHICLE_KEYS.includes(key)));
+  return [first, ...(Array.isArray(more) ? more : []).map(vehicle => ({ ...shared, ...vehicle }))];
+}
+
+// Дополнительные машины из сырого ввода: массив more_vehicles (вызов из кода) или поля
+// формы more_<номер>_<ключ>, по порядку номеров. Полностью пустой блок формы — не машина.
+function moreVanVehicleInputs(raw = {}) {
+  if (Array.isArray(raw.more_vehicles)) return raw.more_vehicles;
+  const byIndex = new Map();
+  for (const [key, value] of Object.entries(raw)) {
+    const field = /^more_(\d+)_(.+)$/.exec(key);
+    if (!field) continue;
+    const index = Number(field[1]);
+    byIndex.set(index, { ...byIndex.get(index), [field[2]]: value });
+  }
+  return [...byIndex.keys()].sort((a, b) => a - b).map(index => byIndex.get(index))
+    .filter(vehicle => Object.values(vehicle).some(value => value !== undefined && value !== null && value !== ''));
+}
+
+// Подпись одной машины: «M · Д280×Ш170×В170 см», если размеры записаны; «M · размеры не
+// записаны», если букву выбрали на глаз; без буквы — «размер неизвестен». Бортовая помечена.
+function vanVehicleLabel(vehicle = {}) {
+  const body = vanBody(vehicle);
+  const size = !vehicle?.size ? 'размер неизвестен'
+    : body ? `${vehicle.size} · Д${body[0]}×Ш${body[1]}×В${body[2]} см` : `${vehicle.size} · размеры не записаны`;
+  return vehicle?.body === 'flatbed' ? size + ' · борт' : size;
+}
+
+// Подпись кузова для карточек и списков: все машины исполнителя через «;».
 function vanBodyLabel(attrs = {}) {
-  const body = vanBody(attrs);
-  if (!attrs?.size) return 'размер неизвестен';
-  return body ? `${attrs.size} · Д${body[0]}×Ш${body[1]}×В${body[2]} см` : `${attrs.size} · размеры не записаны`;
+  return vanVehicles(attrs).map(vanVehicleLabel).join('; ');
 }
 
 function isKnownType(type) {
@@ -281,8 +316,13 @@ module.exports = {
   VAN_SIZES,
   VAN_SIZE_ORDER,
   VAN_BODY_KEYS,
+  VAN_VEHICLE_KEYS,
+  MAX_VAN_VEHICLES,
   vanSizeSpec,
   vanBody,
+  vanVehicles,
+  moreVanVehicleInputs,
+  vanVehicleLabel,
   vanBodyLabel,
   deriveVanSize,
   isKnownType,

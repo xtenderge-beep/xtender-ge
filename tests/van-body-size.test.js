@@ -81,14 +81,70 @@ const ready=async m=>{await masters.approveMaster(m.id);await pool.query('UPDATE
   assert.equal(await legacy(managed.id),'XL');
   assert.equal((await portal.detail(manager,managed.id)).master.van_body,'XL · Д400×Ш190×В200 см');
 
+  // Несколько машин у одного исполнителя: у каждой свои класс, кузов и гидроборт, «с грузчиками» общее.
+  const fleet=await register();
+  await save(fleet,{...body('180','120','110'),with_helpers:'on',more_vehicles:[body('280','170','170'),{body:'flatbed',tail_lift:'on',size:'XL'}]},null);
+  const fleetVan=await van(fleet.id);
+  assert.equal(fleetVan.size,'S');assert.equal(await legacy(fleet.id),'S');
+  assert.deepEqual(fleetVan.more_vehicles,[{size:'M',cargo_length_cm:280,cargo_width_cm:170,cargo_height_cm:170,body:'closed',tail_lift:false},{size:'XL',body:'flatbed',tail_lift:true}]);
+  assert.deepEqual(config.vanVehicles(fleetVan).map(v=>[v.size,v.body,v.tail_lift,v.with_helpers]),[['S','closed',false,true],['M','closed',false,true],['XL','flatbed',true,true]]);
+  assert.equal(config.vanBodyLabel(fleetVan),'S · Д180×Ш120×В110 см; M · Д280×Ш170×В170 см; XL · размеры не записаны · борт');
+  const vanCategory=await require('../src/services/category.service').get('van');
+  assert.deepEqual(require('../src/services/category.service').badges(vanCategory,fleetVan,'ru'),['S · M · XL','Закрытый','Борт (открытый)','Гидроборт (подъёмник)','Приезжаю с грузчиками']);
+  assert.deepEqual(require('../src/services/category.service').badges(vanCategory,await van(estimated.id),'ru'),['L','Закрытый'],'одна машина — бейджи как раньше');
+  // Те же машины полями формы: van_more_<номер>_<поле>, номера с пропусками, пустой блок — не машина.
+  const fromForm=await register();
+  await save(fromForm,{body:'closed',cargo_length_cm:'',cargo_width_cm:'',cargo_height_cm:'',more_2_body:'flatbed',more_2_size:'L',
+    more_5_cargo_length_cm:'520',more_5_cargo_width_cm:'210',more_5_cargo_height_cm:'210',more_5_body:'closed',more_5_tail_lift:'on',more_5_size:'S',
+    more_7_cargo_length_cm:'',more_7_cargo_width_cm:'',more_7_cargo_height_cm:'',more_7_body:'',more_7_size:''},'M');
+  assert.deepEqual(await van(fromForm.id),{size:'M',body:'closed',tail_lift:false,with_helpers:false,
+    more_vehicles:[{size:'L',body:'flatbed',tail_lift:false},{size:'XXL',cargo_length_cm:520,cargo_width_cm:210,cargo_height_cm:210,body:'closed',tail_lift:true}]});
+  // Убрали дополнительные машины — список исчезает.
+  await save(fromForm,{body:'closed'},'M');
+  assert.equal((await van(fromForm.id)).more_vehicles,undefined);
+  // Машина без типа кузова, с неполными размерами и одиннадцатая машина не сохраняются.
+  await assert.rejects(()=>save(fromForm,{body:'closed',more_vehicles:[{size:'L'}]},'M'),{code:'INVALID_SERVICE'});
+  await assert.rejects(()=>save(fromForm,{body:'closed',more_1_body:'closed',more_1_cargo_length_cm:'300'},'M'),{code:'INVALID_SERVICE'});
+  await assert.rejects(()=>save(fromForm,{body:'closed',more_vehicles:Array(config.MAX_VAN_VEHICLES).fill({body:'closed',size:'S'})},'M'),{code:'INVALID_SERVICE'});
+  await save(fromForm,{body:'closed',more_vehicles:Array(config.MAX_VAN_VEHICLES-1).fill({body:'closed',size:'S'})},'M');
+  assert.equal(config.vanVehicles(await van(fromForm.id)).length,config.MAX_VAN_VEHICLES);
+  await save(fromForm,{body:'closed'},'M');
+
+  // Подбор: заявку получает тот, у кого подходит хотя бы одна машина, причём одна машина — целиком.
+  await ready(fleet);
+  const fleetOrder=(await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('van-fleet','+995500007998','Шкаф и коробки','pending_review') RETURNING *")).rows[0];
+  const forFleet=async(category,size)=>(await dispatch.preview(fleetOrder.token,category,size)).recipients.find(m=>m.id===fleet.id);
+  assert.equal((await forFleet('transport','M')).van_body,'M · Д280×Ш170×В170 см (всего машин: 3)');
+  assert.equal(await forFleet('transport','L'),undefined,'класса L у него нет');
+  assert.equal((await forFleet('flatbed','')).van_body,'XL · размеры не записаны · борт (всего машин: 3)');
+  assert.equal((await forFleet('transport','')).van_body,'S · Д180×Ш120×В110 см; M · Д280×Ш170×В170 см; XL · размеры не записаны · борт');
+  const matching=require('../src/services/serviceMatching.service'),liftRule=[{key:'tail_lift',input:'bool',match:'flag',options:[]}];
+  const fleetServices=[{service_type:'van',attributes:fleetVan}];
+  assert.equal(matching.matches(fleetServices,'transport','M',['transport'],{services:{transport:{tail_lift:true}},rules:{transport:liftRule}}),false,'гидроборт есть только у XL, а не у M');
+  assert.equal(matching.matches(fleetServices,'transport','XL',['transport'],{services:{transport:{tail_lift:true}},rules:{transport:liftRule}}),true);
+  const sized=await dispatch.transportSizes(fleetOrder);
+  assert.deepEqual(sized.sizes.map(s=>[s.code,s.count]),[['S',1],['M',2],['L',1],['XL',1],['XXL',0]],'исполнитель с тремя машинами считается в каждом своём классе');
+  assert.equal(sized.total,4);assert.equal(sized.unknown,1);
+  // Списание одно на заявку: получил по классу M — в рассылку той же заявки классу XL уже не входит.
+  const balance=async()=>(await pool.query('SELECT balance_tetri FROM masters WHERE id=$1',[fleet.id])).rows[0].balance_tetri;
+  const before=await balance(),planM=await dispatch.preview(fleetOrder.token,'transport','M');
+  await dispatch.dispatch(fleetOrder.token,'transport','M',{price:planM.price,count:planM.count,revision:0});
+  assert.equal(await balance(),before-planM.price);
+  const planXL=await dispatch.preview(fleetOrder.token,'transport','XL');
+  assert.equal(planXL.recipients.some(m=>m.id===fleet.id),false);assert.equal(planXL.alreadyReceived,1);
+  await assert.rejects(()=>dispatch.dispatch(fleetOrder.token,'transport','XL',{price:planXL.price,count:planXL.count,revision:0}),/уже получили эту заявку/);
+  assert.equal(await balance(),before-planM.price,'второго списания за ту же заявку нет');
+  assert.equal((await pool.query("SELECT COUNT(*)::int AS n FROM balance_transactions WHERE master_id=$1 AND order_id=$2 AND reason='lead_charge'",[fleet.id,fleetOrder.id])).rows[0].n,1);
+
   // Смена порогов: буквы по записанным размерам пересчитываются, выбранные на глаз остаются.
   const thresholds=Object.fromEntries(config.VAN_SIZES.map(s=>[s.code,{length:s.length,width:s.width,height:s.height}]));
   thresholds.M.length=300;
   await settings.setVanSizeThresholds(thresholds);
-  assert.equal(await masters.reclassifyVanSizes(),1);
+  assert.equal(await masters.reclassifyVanSizes(),2);
   assert.equal((await van(measured.id)).size,'S');assert.equal(await legacy(measured.id),'S');
   assert.equal((await van(estimated.id)).size,'L');
   assert.equal((await van(managed.id)).size,'XL');
+  assert.deepEqual(config.vanVehicles(await van(fleet.id)).map(v=>v.size),['S','S','XL'],'у исполнителя с несколькими машинами пересчитана каждая с размерами');
   assert.equal(await masters.reclassifyVanSizes(),0,'повторный пересчёт ничего не меняет');
   // Новое сохранение считает по действующим порогам, не по значениям из кода.
   const later=await register();
@@ -106,6 +162,21 @@ const ready=async m=>{await masters.approveMaster(m.id);await pool.query('UPDATE
   assert.match(html,/<option value="M" >M — от Д300×Ш130×В150 см<\/option>/);
   assert.match(html,/<option value="XL" selected>/);
   for(const script of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
-  console.log('PASS: van body dimensions set the class, manual class only without dimensions, order size choices, reclassify on threshold change');
+  // Список машин в форме: первая — прежними полями, остальные — van_more_<номер>_*, заготовка для «Добавить машину».
+  const fleetHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/admin/_master-service-fields.ejs'),{
+    master:{vehicle_size:'S',services:[{service_type:'van',attributes:await van(fleet.id)}]},
+    serviceConfig:await require('../src/services/category.service').configForView('ru'),
+    vanSizes:sizes.map(s=>({...s,spec:config.vanSizeSpec(s.code,sizes)})),maxVanVehicles:config.MAX_VAN_VEHICLES,
+  });
+  const count=text=>fleetHtml.split(text).length-1;
+  assert.equal(count('data-van-vehicle="'),4,'три машины и заготовка');
+  assert.match(fleetHtml,/name="van_more_1_cargo_length_cm" data-van-cm min="1" max="2000" step="1" value="280"/);
+  assert.match(fleetHtml,/<select name="van_more_2_size" data-van-manual[^>]*>\s*<option value="">Размер неизвестен<\/option>[\s\S]*?<option value="XL" selected>/);
+  assert.match(fleetHtml,/<select name="van_more_2_body" required[^>]*>[\s\S]*?<option value="flatbed" selected>/);
+  assert.match(fleetHtml,/name="van_more_2_tail_lift" checked/);
+  assert.match(fleetHtml,/name="van_more_INDEX_body"/);
+  assert.equal(count('name="van_body"'),1);assert.equal(count('name="vehicleSize"'),1);assert.equal(count('name="van_with_helpers"'),1);
+  assert.match(fleetHtml,/data-van-vehicles data-max="10"/);
+  console.log('PASS: van body dimensions set the class, manual class only without dimensions, several vehicles per provider, order size choices, one charge per order, reclassify on threshold change');
   redis.disconnect();
 })().catch(e=>{console.error(e);process.exitCode=1;redis.disconnect();});

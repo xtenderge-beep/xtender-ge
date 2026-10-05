@@ -336,7 +336,7 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-reachable="<%= master.reachable ? 1 : 0 %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-reachable="<%= master.reachable ? 1 : 0 %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>" data-vehicles="<%= master.van_vehicles ? JSON.stringify(master.van_vehicles) : '' %>">
 
                                       <%
                                         const ratingStars = Math.round(Number(master.rating) || 0);
@@ -666,14 +666,13 @@
                 const container=[...document.querySelectorAll('[data-group]')].find(g=>g.dataset.group === target)?.querySelector('.home-master-grid');
                 if(show && container) container.appendChild(card);
                 const serviceAttributes = JSON.parse(card.dataset.serviceAttributes || '{}');
-                if (show && activeCategory === 'van' && activeSize !== 'all') {
-                    show = (serviceAttributes.van?.size || card.dataset.size) === activeSize;
-                }
                 const panel = document.querySelector('[data-catalog-field-panel="' + activeCategory + '"]');
-                if (show && panel) {
-                    const rules = JSON.parse(panel.dataset.rules);
-                    const attrs = serviceAttributes[activeCategory] || {};
-                    for (const rule of rules) {
+                // У исполнителя перевозок может быть несколько машин: размер и характеристики должна пройти одна и та же машина.
+                const variants = activeCategory === 'van' && card.dataset.vehicles ? JSON.parse(card.dataset.vehicles) : [serviceAttributes[activeCategory] || {}];
+                if (show) show = variants.some((attrs) => {
+                    if (activeCategory === 'van' && activeSize !== 'all' && (attrs.size || (variants.length === 1 ? card.dataset.size : '')) !== activeSize) return false;
+                    if (!panel) return true;
+                    for (const rule of JSON.parse(panel.dataset.rules)) {
                         const input = [...panel.querySelectorAll('[data-catalog-field]')].find(el => el.dataset.catalogField === rule.key);
                         const requested = input.type === 'checkbox' ? input.checked : input.value;
                         if (requested === '' || requested === false) continue;
@@ -682,9 +681,10 @@
                             rule.match === 'flag' && actual !== true ||
                             rule.match === 'exact' && (rule.input === 'number' ? Number(actual) !== Number(requested) : actual !== requested) ||
                             rule.match === 'gte' && rule.input === 'number' && !(Number(actual) >= Number(requested)) ||
-                            rule.match === 'gte' && rule.input === 'enum' && (!rule.options.includes(actual) || rule.options.indexOf(actual) < rule.options.indexOf(requested))) { show = false; break; }
+                            rule.match === 'gte' && rule.input === 'enum' && (!rule.options.includes(actual) || rule.options.indexOf(actual) < rule.options.indexOf(requested))) return false;
                     }
-                }
+                    return true;
+                });
                 if (document.getElementById('catalog-only-language').checked && !card.dataset.languages.split(' ').includes(document.getElementById('catalog-language').value)) show = false;
                 card.classList.toggle('hidden', !show);
             });

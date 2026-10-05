@@ -98,7 +98,7 @@ async function reviewGet(managerId, masterId) {
   if (master.manager_id && master.manager_id !== Number(managerId)) throw fail('Заявка уже закреплена за другим менеджером.', 403);
   if (master.is_active && !master.manager_id) throw fail('Активный специалист не закреплён за вами.', 403);
   const categories = await require('./category.service').configForView('ru');
-  const { vanSizeSpec } = require('../config/serviceTypes');
+  const { vanSizeSpec, MAX_VAN_VEHICLES } = require('../config/serviceTypes');
   const thresholds = await require('./settings.service').getVanSizeThresholds();
   // Полные пороги (не только текст) — чтобы форма могла на клиенте показать букву по
   // введённым см ещё до отправки; итоговую букву ставит сервер при сохранении.
@@ -106,7 +106,7 @@ async function reviewGet(managerId, masterId) {
   master.services=(await pool.query('SELECT * FROM master_services WHERE master_id=$1',[masterId])).rows;
   master.work_cities=(await pool.query('SELECT city_id FROM master_cities WHERE master_id=$1',[masterId])).rows;
   await recordView(managerId, master.id);
-  return { master, categories, vanSizes, descriptionSourceLang:master.description_source_lang || require('./translation.service').detectLang(master.description), descriptionTranslations:typeof master.description_translations==='string' ? JSON.parse(master.description_translations) : master.description_translations || {}, workCities: await require('./master.service').getWorkCities(), languageNames: require('../config/spokenLanguages').ruNames };
+  return { master, categories, vanSizes, maxVanVehicles: MAX_VAN_VEHICLES, descriptionSourceLang:master.description_source_lang || require('./translation.service').detectLang(master.description), descriptionTranslations:typeof master.description_translations==='string' ? JSON.parse(master.description_translations) : master.description_translations || {}, workCities: await require('./master.service').getWorkCities(), languageNames: require('../config/spokenLanguages').ruNames };
 }
 
 async function updateDescription(managerId, masterId, description, sourceLang) {

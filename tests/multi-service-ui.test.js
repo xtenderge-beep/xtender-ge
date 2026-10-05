@@ -103,6 +103,13 @@ let server;
  assert.match(measuredPage,/name="van_cargo_width_cm" data-van-cm min="1" max="2000" step="1" value="170"/);
  assert.ok((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['cityIds','1'],['spokenLanguages','ru'],['servicesForm','1'],['services','van'],['van_body','closed'],['van_cargo_length_cm','280']])).headers.get('location').endsWith('error=service_required'));
  assert.match(await get('/admin/masters'),/кузов <b class="text-stone-800">M · Д280×Ш170×В170 см<\/b>/);
+ // Вторая машина исполнителя приходит полями van_more_<номер>_*; подпись показывает обе.
+ assert.equal((await post('/admin/masters/'+m.id+'/update',[['name',m.name],['phone',m.phone],['cityIds','1'],['spokenLanguages','ru'],['servicesForm','1'],['services','van'],['van_body','closed'],['van_cargo_length_cm','280'],['van_cargo_width_cm','170'],['van_cargo_height_cm','170'],['vehicleSize',''],
+  ['van_more_1_cargo_length_cm','400'],['van_more_1_cargo_width_cm','200'],['van_more_1_cargo_height_cm','200'],['van_more_1_size',''],['van_more_1_body','flatbed'],['van_more_1_tail_lift','on']])).headers.get('location'),'/admin/masters/'+m.id);
+ const fleetPage=await get('/admin/masters/'+m.id);
+ assert.match(fleetPage,/Кузов: <b>M · Д280×Ш170×В170 см; XL · Д400×Ш200×В200 см · борт<\/b>/);
+ assert.match(fleetPage,/name="van_more_1_cargo_height_cm" data-van-cm min="1" max="2000" step="1" value="200"/);
+ assert.match(fleetPage,/\+ Добавить машину/);
  // Пороги S…XXL сохраняются своей формой. Форму внутри формы браузер игнорирует: кнопка порогов отправляла форму категории, а кнопка категории оставалась без формы.
  const vanPage=await get('/admin/categories/van'),categoryForm=vanPage.indexOf('action="/admin/categories/van"');
  assert.ok(categoryForm>0 && !/<form\b/.test(vanPage.slice(categoryForm,vanPage.indexOf('</form>',categoryForm))),'the thresholds form is not nested in the category form');

@@ -64,11 +64,16 @@ function badges(row, attributes, lang) {
     const payload = a.payload_t ? `${lang==='ka'?'ტვირთამწეობა':lang==='en'?'Payload':'Грузоподъёмность'}: ${a.payload_t} ${unitFor('т', lang)}` : null;
     return [kind,volume,dimensions,payload].filter(Boolean);
   }
+  // У перевозки может быть несколько машин: классы, типы кузова и гидроборт собираются со всех.
+  const vehicles = row.slug === 'van' ? base.vanVehicles(a) : [a];
   return view(row,lang).fields.flatMap(f=> {
-    const v=a[f.key];if(v === undefined || v === null || v === '' || v === false) return [];
+    const values=[...new Set(vehicles.map(vehicle=>vehicle[f.key]).filter(v=>v !== undefined && v !== null && v !== '' && v !== false))];
+    if(!values.length) return [];
+    const v=values[0];
     if(f.input==='bool') return [f.label];
-    if(f.input==='enum') return [f.options.find(o=>o.value===v)?.label || String(v)];
+    if(f.input==='enum') return values.map(value=>f.options.find(o=>o.value===value)?.label || String(value));
     if(f.input==='text') return [f.label+': '+v];
+    if(f.input==='size' && values.length>1) return [f.options.map(o=>o.value).filter(code=>values.includes(code)).join(' · ')];
     return [String(v)+(f.unit ? ' '+f.unit : '')];
   });
 }

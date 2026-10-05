@@ -84,6 +84,13 @@ router.get('/', asyncHandler(async (req, res) => {
   const categories = await categoryService.list();
   masters.forEach(m => { m.badges = [...(m.services || []).filter(s=>s.service_type !== m.service_type).map(s=>{const c=categories.find(c=>c.slug===s.service_type);return c?.['name_'+locale] || c?.name_ru || s.service_type;}), ...categoryService.badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale)]; });
 
+  // Несколько машин у исполнителя перевозок: фильтры каталога проверяют каждую машину отдельно.
+  masters.forEach(m => {
+    const van = m.service_type === 'van' ? m.attributes : (m.services || []).find(s => s.service_type === 'van')?.attributes;
+    const vehicles = van ? require('../config/serviceTypes').vanVehicles(van) : [];
+    m.van_vehicles = vehicles.length > 1 ? vehicles : null;
+  });
+
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
   const inviteToken = req.cookies.order_invite;

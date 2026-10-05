@@ -227,12 +227,13 @@ async function masterDetail(req, res) {
   const managers = await managerService.list();
   const currentManager = master.manager_id ? await managerService.getById(master.manager_id) : null;
   const partnerReferrer = master.referral_manager_id ? await require('../services/partner.service').getManager(master.referral_manager_id) : null;
-  const { vanSizeSpec } = require('../config/serviceTypes');
+  const { vanSizeSpec, MAX_VAN_VEHICLES } = require('../config/serviceTypes');
   const vanSizeThresholds = await settingsService.getVanSizeThresholds();
   res.render('admin/master-detail', {
     serviceConfig: await require('../services/category.service').configForView('ru'),
     workCities: await masterService.getWorkCities(),
     vanSizes: vanSizeThresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
+    maxVanVehicles: MAX_VAN_VEHICLES,
     languageNames: require('../config/spokenLanguages').ruNames,
     autoDisplayName: require('../config/providerName').displayName(master.name),
     publicName: require('../config/providerName').resolve(master),

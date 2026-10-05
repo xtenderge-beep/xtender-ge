@@ -1,0 +1,27 @@
+<%# Одна машина исполнителя перевозок. index 0 — первая (имена полей как до появления списка машин), число — дополнительная (van_more_<число>_*), 'INDEX' — заготовка для кнопки «Добавить машину». %>
+<% const prefix = index === 0 ? 'van_' : 'van_more_' + index + '_'; const measured = ['cargo_length_cm','cargo_width_cm','cargo_height_cm'].every(key => vehicle[key]); %>
+<div class="van-vehicle" data-van-vehicle="<%= index %>">
+  <p class="van-vehicle-head text-sm"><b>Машина <span data-van-number><%= number %></span></b><% if (index !== 0) { %><button type="button" data-van-remove class="secondary-action px-2 py-1 border rounded-lg text-xs">Убрать машину</button><% } %></p>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+    <% [['cargo_length_cm','Длина'],['cargo_width_cm','Ширина'],['cargo_height_cm','Высота']].forEach(([key,label])=>{ %>
+    <label class="text-sm"><%= label %>, см<input type="number" name="<%= prefix %><%= key %>" data-van-cm min="1" max="2000" step="1" value="<%= vehicle[key] ?? '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+    <% }); %>
+  </div>
+  <p class="text-sm" aria-live="polite"><b data-van-class></b></p>
+  <details <%= !measured && vehicle.size ? 'open' : '' %>><summary class="text-sm">Размеров нет — выбрать класс на глаз</summary>
+    <label class="text-sm">Класс кузова<select name="<%= index === 0 ? 'vehicleSize' : prefix + 'size' %>" data-van-manual class="block w-full border rounded-xl px-3 py-2">
+      <option value="">Размер неизвестен</option>
+      <% vanSizes.forEach(s => { %><option value="<%= s.code %>" <%= vehicle.size === s.code ? 'selected' : '' %>><%= s.code %> — от <%= s.spec %></option><% }); %>
+    </select></label>
+    <p class="text-xs">«От» — минимум по длине, ширине и высоте одновременно. Выбор действует, пока три размера не введены.</p>
+  </details>
+  <% if (bodyField) { %>
+  <label class="block text-sm"><%= bodyField.label %> *
+    <select name="<%= prefix %>body" required class="block w-full border rounded-xl px-3 py-2">
+      <option value="">Выберите</option>
+      <% bodyField.options.forEach(o => { %><option value="<%= o.value %>" <%= vehicle.body === o.value ? 'selected' : '' %>><%= o.label %></option><% }); %>
+    </select>
+  </label>
+  <% } %>
+  <% if (liftField) { %><label class="service-choice text-sm"><%= liftField.label %><input type="checkbox" name="<%= prefix %>tail_lift" <%= vehicle.tail_lift ? 'checked' : '' %>></label><% } %>
+</div>
