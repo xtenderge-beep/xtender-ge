@@ -1,44 +1,173 @@
 <%- include('_header') %>
-<style>.dispatch-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-top:1px solid #dce5e1}.dispatch-row>div{flex:1;min-width:180px}.dispatch-row p{margin:4px 0 0}.dispatch-row form{flex:0 1 440px}.dispatch-row .flow-fields label{flex:1 1 180px}.need-hint{margin:-4px 0 10px;font-size:14px}.need-item[data-need-panel=transport]:has(input[name=needs]:checked){grid-column:span 2}.size-choices{margin:10px 0}.need-fields .size-choice{display:flex;align-items:flex-start;gap:10px;margin:8px 0;cursor:pointer}.size-choice input{width:20px;height:20px;flex:none;margin:1px 0 0;padding:0;accent-color:#08765f}@media(max-width:600px){.dispatch-row{display:block}.dispatch-row form{margin-top:12px}.dispatch-row button{width:100%}}</style>
-<a href="/manager/orders">← Все заявки</a><h1>Заявка #<%= order.id %></h1>
-<p class="pre"><%= order.description %></p>
-<p>Город заявки: <strong><%= allCities.find(city=>city.id===order.city_id)?.name_ru || 'Тбилиси (старая заявка)' %></strong></p>
-<% if(order.is_technical){ %><p>🧪 Техническая заявка: рассылка только техническим исполнителям.</p><% } %>
-<% if(manager.is_head_moderator && (order.target_categories||[]).length>1){ %><details class="card"><summary>Отметить закрытую потребность</summary><p>Используйте после подтверждения, что по этой услуге новые предложения уже не нужны.</p><% order.target_categories.filter(key=>!(order.closedCategories||[]).includes(key)).forEach(key=>{ %><form method="post" action="/manager/orders/<%= order.token %>/close-category" class="form-actions"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= key %>"><button type="submit" class="secondary-action">Закрыть «<%= key==='flatbed'?'🚛 Перевозки — бортовая машина':groups[key]||key %>»</button></form><% }); %></details><% } %>
+<style>
+.dispatch-layout{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}
+.order-brief{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto;margin:0}
+.order-brief-text{font-size:19px;line-height:1.5;margin:12px 0}
+.order-brief-meta{color:#62716e;font-size:14px;line-height:1.6}
+.order-photos{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.order-photos img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid #dce5e1;display:block}
+.needs-card{margin:0}
+.service-list{margin:14px 0 0}
+.service-row{border:1px solid #dce5e1;border-radius:12px;margin:8px 0;background:white}
+.service-row.is-on{border-color:#08765f;background:#f4faf7}
+.service-head{display:flex;align-items:center;gap:12px;margin:0;padding:12px 14px;cursor:pointer;min-height:48px}
+.service-head input{width:22px;height:22px;flex:none;accent-color:#08765f;margin:0;padding:0}
+.service-name{font-weight:650;flex:1}
+.service-count{color:#62716e;font-size:14px;white-space:nowrap}
+.service-row.is-on .service-count{color:#075d4b;font-weight:700;font-size:16px}
+.service-count.is-zero{color:#a53030 !important}
+.service-body{padding:0 14px 12px 48px}
+.service-fields{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:flex-end}
+.service-fields label{margin:6px 0}
+.service-fields select,.service-fields input[type=number]{display:block;margin-top:4px;max-width:220px}
+.service-fields label.check{display:flex;align-items:center;gap:8px;min-height:44px}
+.service-fields label.check input,.size-choice input{width:20px;height:20px;flex:none;margin:0;padding:0;accent-color:#08765f}
+.need-hint{margin:2px 0 8px;font-size:14px}
+.size-choices{margin:10px 0 4px}
+.service-body .size-choice{display:flex;align-items:flex-start;gap:10px;margin:8px 0;cursor:pointer}
+.service-recipients{margin:10px 0 0;padding:0;list-style:none;font-size:15px}
+.service-recipients li{padding:3px 0}
+.service-note{margin:8px 0 0;font-size:14px}
+.send-bar{position:sticky;bottom:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:12px -20px -20px;padding:14px 20px;background:white;border-top:1px solid #dce5e1;border-radius:0 0 14px 14px}
+.send-options{display:flex;flex-wrap:wrap;gap:0 24px}
+.send-total{flex:1;min-width:200px;font-weight:700;font-size:17px}
+.send-bar button{min-width:300px}
+.send-bar button:disabled{background:#b7c4c0;cursor:default}
+@media(max-width:900px){.dispatch-layout{display:block}.order-brief{position:static;max-height:none;margin-bottom:14px}.order-brief-text{font-size:17px}.service-body{padding-left:14px}.send-bar{margin:12px -14px -14px;padding:10px 14px}.send-total{font-size:15px;min-width:0;flex-basis:100%}.send-bar button{width:100%;min-width:0}}
+</style>
+<%
+  const statusLabels={accepted:'Принято каналом',failed:'Ошибка',pending:'В обработке / неизвестно',skipped:'Пропущено'};
+  const reasonLabels={eligibility_changed:'изменился допуск или баланс',need_closed:'потребность закрыта',service_changed:'услуги больше не подходят',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'есть незавершённая отправка',channel_rejected:'канал отклонил отправку',result_unknown:'результат неизвестен — нужна проверка',before_send_error:'ошибка до отправки'};
+  const cityName=allCities.find(city=>city.id===(order.city_id||activeCities.find(c=>c.slug==='tbilisi')?.id))?.name_ru||'Тбилиси';
+  const sentAny=runs.length>0, transportSent=needs.locked.categories.includes('transport');
+%>
+<a href="/manager/orders">← Все заявки</a>
 <% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
-<% if(result){ %><div class="card" role="status">Принято каналом: <strong><%= result.count %></strong>. Списано: <strong><%= (result.count*result.price/100).toFixed(2) %> ₾</strong>. Просмотры и нажатия контактов видны ниже; это не подтверждение сделки.</div><% } %>
-<% if(order.status==='pending_review' && !order.first_dispatched_at){ %>
-<section class="card"><h2>1. Что нужно клиенту?</h2><p>Отметьте услуги и уточните требования только для них. «Бортовая машина» — вариант перевозки с открытым кузовом.</p>
-<form method="post" action="/manager/orders/<%= order.token %>/needs"><input type="hidden" name="_csrf" value="<%= csrf %>">
-<label>Город заявки<select name="cityId" required><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id || (!order.city_id && city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
-<div class="need-grid">
-<% Object.entries(groups).forEach(([key,label])=>{const svc=serviceConfig.find(s=>s.type===(key==='transport'||key==='flatbed'?'van':key));const fields=(svc?.fields||[]).filter(f=>f.input!=='size'&&f.input!=='text'&&f.match&&f.match!=='ignore'&&!(key==='flatbed'&&f.key==='body'));const values=order.requirements?.services?.[key]||{}; %>
-<fieldset data-need-panel="<%= key %>" class="need-item"><legend><label><input type="checkbox" name="needs" value="<%= key %>" <%= (order.target_categories||[]).includes(key)?'checked':'' %>> <%= key==='flatbed'?'🚛 Перевозки — бортовая машина':label %></label></legend><div data-need-fields class="need-fields">
-<% fields.forEach(f=>{ %><label><%= f.need?.label||f.label %> <% if(f.input==='enum'){ %><select name="needAttributes[<%= key %>][<%= f.key %>]"><option value="">Не ограничивать</option><% f.options.forEach(o=>{ %><option value="<%= o.value %>" <%= values[f.key]===o.value?'selected':'' %>><%= o.label %></option><% }); %></select><% } else if(f.input==='number'){ %><input type="number" step="any" name="needAttributes[<%= key %>][<%= f.key %>]" value="<%= values[f.key]??'' %>" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="Не ограничивать"> <%= f.unit||'' %><% } else if(f.input==='bool'){ %><input type="checkbox" name="needAttributes[<%= key %>][<%= f.key %>]" <%= values[f.key]===true?'checked':'' %>><% } %></label><% if(f.need?.hint){ %><p class="muted need-hint"><%= f.need.hint %></p><% } %><% }); %>
-<% if(key==='transport'){ %><div class="size-choices" role="radiogroup" aria-label="Размер кузова"><strong>Размер кузова</strong>
-<label class="size-choice"><input type="radio" name="transportSize" value="" <%= order.requirements?.transport_size?'':'checked' %>> <span>Не ограничивать · исполнителей: <%= transportSizes.total %></span></label>
-<% transportSizes.sizes.forEach(size=>{ %><label class="size-choice"><input type="radio" name="transportSize" value="<%= size.code %>" <%= order.requirements?.transport_size===size.code?'checked':'' %>> <span><b><%= size.code %></b> — кузов от <%= size.spec %> · исполнителей: <%= size.count %></span></label><% }); %></div>
-<p class="muted need-hint">Выберите самый маленький класс, куда груз точно влезет: заявку получат только машины этого класса. «От» — минимум сразу по длине, ширине и высоте. Числа — кому заявку можно отправить сейчас.<% if(transportSizes.unknown){ %> Без размера: <%= transportSizes.unknown %> — получат её только при «Не ограничивать».<% } %></p><% } %>
-</div></fieldset><% }); %></div><p class="selection-summary" id="need-summary" aria-live="polite"></p><div class="form-actions"><button>Сохранить и перейти к подбору →</button></div></form></section>
-<script>(()=>{const panels=[...document.querySelectorAll('[data-need-panel]')];const update=()=>{const selected=[];panels.forEach(panel=>{const choice=panel.querySelector('input[name=needs]');const active=choice.checked;if(active)selected.push(choice.closest('label').textContent.trim());panel.querySelector('[data-need-fields]').hidden=!active;panel.querySelectorAll('[data-need-fields] input,[data-need-fields] select').forEach(input=>input.disabled=!active)});document.getElementById('need-summary').textContent=selected.length?'Выбрано: '+selected.join(' · '):'Пока ни одна услуга не выбрана.'};panels.forEach(panel=>panel.querySelector('input[name=needs]').addEventListener('change',update));update()})()</script>
-<% } %>
-<% if(['pending_review','new'].includes(order.status)){ %><section class="card" id="dispatch-selection"><h2>2. Подобрать получателей</h2>
-<% if(!order.requirements?.configured){ %><p>Сначала сохраните потребности и характеристики выше, затем рассчитывайте рассылку.</p><% } else { %>
-<p>Для каждой потребности показано число новых получателей при выборе «Все подходящие». Выберите язык при необходимости, затем проверьте итоговую стоимость.</p>
-<% if(!serviceRows.length){ %><p>Открытых потребностей для рассылки нет.</p><% } %>
-<% serviceRows.forEach(row=>{ %><div class="dispatch-row"><div><strong><%= row.key==='flatbed'?'🚛 Перевозки — бортовая машина':row.label %></strong><p class="muted"><%= row.error|| (row.alreadySent?'Всем подходящим уже отправляли':'Новых получателей: '+row.count) %></p></div><form method="get" action="/manager/orders/<%= order.token %>#dispatch-review" class="flow-fields"><input type="hidden" name="category" value="<%= row.key %>"><label>Язык исполнителей<select name="language"><option value="">Все подходящие</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>" <%= plan?.category===row.key&&plan?.language===code?'selected':'' %>>Говорят <%= label %></option><% }); %></select></label><button <%= row.error?'disabled':'' %>>Рассчитать →</button></form></div><% }) %>
-<% } %></section><% } %>
-<% if(plan){ %><section class="card" id="dispatch-review"><h2>3. Проверить и отправить: <%= plan.category==='flatbed'?'🚛 Перевозки — бортовая машина':groups[plan.category]||plan.category %></h2>
-<p>Требования: <%= plan.criteria.length?plan.criteria.map(item=>item.label+': '+item.value).join(' · '):'дополнительные характеристики не заданы' %>.</p>
-<p class="review-total">Получат уведомление: <%= plan.count %></p><p>Уже получили: <%= plan.alreadyReceived %> · Отправка в обработке: <%= plan.pending %> · Исключены по характеристикам: <%= plan.attributeExcluded %>.</p>
-<p>Цена одному: <%= (plan.price/100).toFixed(2) %> ₾. Расчётное списание: <strong><%= (plan.count*plan.price/100).toFixed(2) %> ₾</strong>.</p>
-<% if(plan.recipients.length){ %><details><summary>Показать получателей</summary><ul><% plan.recipients.forEach(m=>{ %><li>#<%= m.id %> · <%= m.phone %> · <%= m.telegram_id?'Telegram, резерв SMS':'SMS' %><%= m.van_body?' · кузов '+m.van_body:'' %></li><% }); %></ul></details><% } %>
-<% if(plan.alreadySent){ %><p>Эта рассылка уже запускалась.</p><% } else if(plan.count){ %><form method="post" action="/manager/orders/<%= order.token %>/dispatch" class="form-actions" onsubmit="this.querySelector('button').disabled=true"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="language" value="<%= plan.language %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="count" value="<%= plan.count %>"><input type="hidden" name="revision" value="<%= plan.order.revision_version||0 %>"><button>Отправить <%= plan.count %> исполнителям и списать <%= (plan.count*plan.price/100).toFixed(2) %> ₾</button></form><% } else { %><p>Подходящих получателей сейчас нет.</p><% } %></section><% } %>
-<section class="card"><h2>Результаты</h2><p>Просмотров: <strong><%= funnel.view %></strong> · Нажатий «Позвонить»: <strong><%= funnel.call %></strong> · WhatsApp: <strong><%= funnel.whatsapp %></strong> · Нажали хотя бы один контакт: <strong><%= funnel.contacted||0 %></strong>.</p>
-<% if(funnelByCategory.length){ %><ul><% funnelByCategory.forEach(row=>{ %><li><%= groups[row.category]||row.category %>: уведомлены <%= row.received %> · просмотров <%= row.view %> · звонок <%= row.call %> · WhatsApp <%= row.whatsapp %></li><% }); %></ul><% } %>
-<p>Принятие Telegram/SMS не означает прочтение. Просмотр и нажатие контакта не подтверждают договорённость с клиентом. Один исполнитель может подходить нескольким услугам.</p>
-<% if(!runs.length){ %><p>Рассылок ещё нет.</p><% } %>
-<% runs.forEach(run=>{ %><div class="card"><strong>#<%= run.id %> · <%= groups[run.category]||run.category %></strong><p>Выбрано: <%= run.selected %> · Принято: <%= run.accepted %> (Telegram: <%= run.telegram %>, SMS: <%= run.sms %>) · Ошибки: <%= run.failed %> · Пропущено: <%= run.skipped %> · В обработке / неизвестно: <%= run.pending %></p>
-<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ %><li>Исполнитель #<%= d.master_id %> · <%= d.status %> · <%= d.reason||'' %></li><% }); %></ul></details>
-<% if(run.deliveries.some(d=>d.status==='failed'&&!d.retry_run_id)){ %><form method="post" action="/manager/orders/<%= order.token %>/retry"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="runId" value="<%= run.id %>"><button>Повторить подтверждённые ошибки</button></form><% } %></div><% }); %></section>
+<% if(result){ %><div class="card" role="status"><strong>Отправлено: <%= result.count %>. Списано: <%= (result.count*result.price/100).toFixed(2) %> ₾.</strong>
+<ul><% result.results.forEach(item=>{ %><li><%= item.label %><%= item.size?' · класс '+item.size:'' %>: <%= item.error?'не отправлено — '+item.error:item.count?'принято каналом '+item.count:'новых получателей не осталось — они получили заявку по другой услуге' %></li><% }); %></ul>
+Принятие Telegram/SMS не означает прочтение. Отклики видны ниже.</div><% } %>
+<div class="dispatch-layout">
+<section class="card order-brief" aria-label="Заявка">
+  <div class="order-brief-meta"><strong>Заявка #<%= order.id %></strong><% if(order.is_technical){ %> · 🧪 техническая<% } %><br>
+  <%= cityName %><%= order.district_name?' · '+order.district_name:'' %> · <%= date(order.created_at) %><% if(requestLanguage){ %><br>Язык заявки: <%= (languageNames[requestLanguage]||requestLanguage).toLowerCase() %><% } %></div>
+  <p class="order-brief-text pre"><%= order.description %></p>
+  <% if(photos.length){ %><div class="order-photos"><% photos.forEach(file=>{ %><a href="<%= file.file_path %>" target="_blank" rel="noopener"><img src="<%= file.file_path %>" alt="Фото к заявке"></a><% }); %></div><% } %>
+  <% documents.forEach(file=>{ %><p><a href="<%= file.file_path %>" target="_blank" rel="noopener"><%= file.original_name %></a></p><% }); %>
+  <% if(order.phone){ %><p>Клиент: <a href="tel:<%= order.phone %>"><%= order.phone %></a></p><% } %>
+  <% if(!open){ %><p><strong>Заявка закрыта или ещё не подтверждена — рассылка недоступна.</strong></p><% } %>
+</section>
+<div>
+<form id="needs-form" class="card needs-card" autocomplete="off" method="post" action="/manager/orders/<%= order.token %>/send" data-preview="/manager/orders/<%= order.token %>/preview" data-plan="<%= JSON.stringify(planView||{services:[],total:0,charge:0,price:0,revision:0,sizes:[]}) %>" onsubmit="this.querySelector('[data-send]').disabled=true">
+<input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="revision" value="<%= planView?planView.revision:0 %>"><input type="hidden" name="expectedTotal"><input type="hidden" name="expectedPrice">
+<h2 style="margin-top:0">Что нужно клиенту и кто получит заявку</h2>
+<p class="muted">Отметьте услуги из заявки и уточните требования. Список получателей и сумма пересчитываются сразу, отправка — одной кнопкой внизу.<% if(sentAny){ %> Заявка уже отправлялась: отправленные услуги и их требования не меняются, можно добавить услугу или класс кузова.<% } %></p>
+<div class="send-options"><label>Город заявки <select name="cityId" <%= sentAny||!open?'disabled':'' %>><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id||(!order.city_id&&city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
+<label>Кому отправить <select name="language"><option value="">Всем подходящим</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>" <%= language===code?'selected':'' %>>Только кто говорит <%= label %></option><% }); %></select></label></div>
+<div class="service-list">
+<% rows.forEach(row=>{ const fixed=row.locked||row.closed; %>
+<div class="service-row" data-service="<%= row.key %>" data-available="<%= row.available %>">
+  <label class="service-head"><input type="checkbox" name="needs" value="<%= row.key %>" <%= row.checked?'checked':'' %> <%= fixed||!open?'disabled data-fixed':'' %>><span class="service-name"><%= row.label %></span><span class="service-count" data-count></span></label>
+  <div class="service-body" data-body hidden>
+    <% if(row.closed){ %><p class="muted">Эта потребность закрыта: новых получателей не будет.</p><% } %>
+    <% if(row.fields.length){ %><div class="service-fields">
+    <% row.fields.forEach(f=>{ const name='needAttributes['+row.key+']['+f.key+']', label=f.need?.label||f.label, off=fixed?'disabled data-fixed':''; %>
+      <% if(f.input==='bool'){ %><label class="check"><input type="checkbox" name="<%= name %>" <%= row.values[f.key]===true?'checked':'' %> <%- off %>> <%= label %></label>
+      <% } else if(f.input==='enum'){ %><label><%= label %><select name="<%= name %>" <%- off %>><option value="">Не важно</option><% f.options.forEach(o=>{ %><option value="<%= o.value %>" <%= row.values[f.key]===o.value?'selected':'' %>><%= o.label %></option><% }); %></select></label>
+      <% } else { %><label><%= label %><%= f.unit?', '+f.unit:'' %><input type="number" step="any" name="<%= name %>" value="<%= row.values[f.key]??'' %>" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="Не важно" <%- off %>></label><% } %>
+    <% }); %></div>
+    <% row.fields.filter(f=>f.need?.hint).forEach(f=>{ %><p class="muted need-hint"><b><%= f.need.label||f.label %>.</b> <%= f.need.hint %></p><% }); %><% } %>
+    <% if(row.key==='transport'){ %><div class="size-choices"><strong>Размер кузова</strong> <span class="muted">— отметьте все подходящие классы</span>
+      <% sizes.forEach(size=>{ const was=needs.locked.sizes.includes(size.code)||needs.locked.anySize; %><label class="size-choice"><input type="checkbox" name="transportSize" value="<%= size.code %>" <%= needs.sizes.includes(size.code)?'checked':'' %> <%= was||row.closed?'disabled data-fixed':'' %>> <span><b><%= size.code %></b> — кузов от <%= size.spec %> · <span data-size-count="<%= size.code %>"></span></span></label><% }); %>
+      <% if(transportSent && needs.locked.sizes.length && !row.closed){ %><label class="size-choice"><input type="checkbox" name="transportAny"> <span><b>Любой размер</b> — снять ограничение по классу · <span data-any-count></span></span></label><% } %>
+      <p class="muted need-hint" data-size-hint></p>
+    </div><% } %>
+    <ul class="service-recipients" data-recipients></ul>
+    <p class="service-note muted" data-note></p>
+  </div>
+</div>
+<% }); %>
+</div>
+<div class="send-bar">
+  <div class="send-total" data-total aria-live="polite"></div>
+  <button type="submit" data-send disabled>Отправить</button>
+</div>
+</form>
+
+<% if(sentAny){ %><section class="card"><h2>Отправки и отклики</h2>
+<p>Просмотров: <strong><%= funnel.view %></strong> · нажатий «Позвонить»: <strong><%= funnel.call %></strong> · WhatsApp: <strong><%= funnel.whatsapp %></strong> · нажали хотя бы один контакт: <strong><%= funnel.contacted||0 %></strong>.</p>
+<% if(funnelByCategory.length){ %><ul><% funnelByCategory.forEach(item=>{ %><li><%= groups[item.category]||(item.category==='legacy'?'Архив: услуга неизвестна':item.category) %>: уведомлены <%= item.received %> · просмотров <%= item.view %> · звонок <%= item.call %> · WhatsApp <%= item.whatsapp %></li><% }); %></ul><% } %>
+<p class="muted">Принятие Telegram/SMS не означает прочтение. Просмотр и нажатие контакта не подтверждают договорённость с клиентом. Один исполнитель может подходить нескольким услугам.</p>
+<% runs.forEach(run=>{ %><div class="card"><strong>Отправка #<%= run.id %> · <%= run.legacy?'архивная рассылка':groups[run.category]||run.category %><%= run.vehicle_size?' · класс '+run.vehicle_size:'' %><%= run.language?' · говорят '+(speakLabels[run.language]||run.language):'' %></strong> · <%= date(run.created_at) %>
+<p>Выбрано: <%= run.selected %> · принято каналом: <%= run.accepted %> (Telegram: <%= run.telegram %>, SMS: <%= run.sms %>) · ошибки: <%= run.failed %> · пропущено: <%= run.skipped %> · в обработке / неизвестно: <%= run.pending %></p>
+<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ %><li><%= names[d.master_id]||'Исполнитель' %> (#<%= d.master_id %>) · <%= statusLabels[d.status]||d.status %><%= d.channel?' · '+d.channel:'' %><%= d.reason?' · '+(reasonLabels[d.reason]||d.reason):'' %></li><% }); %></ul></details>
+<% if(open && !run.legacy && run.deliveries.some(d=>d.status==='failed'&&!d.retry_run_id)){ %><form method="post" action="/manager/orders/<%= order.token %>/retry"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="runId" value="<%= run.id %>"><button>Повторить подтверждённые ошибки</button></form><% } %></div><% }); %>
+</section><% } %>
+<% if(open && sentAny && manager.is_head_moderator && order.target_categories.length>1){ %><details class="card"><summary>Отметить закрытую потребность</summary><p>Используйте после подтверждения, что по этой услуге новые предложения уже не нужны.</p><% order.target_categories.filter(key=>!closedCategories.includes(key)).forEach(key=>{ %><form method="post" action="/manager/orders/<%= order.token %>/close-category" class="form-actions"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= key %>"><button type="submit" class="secondary-action">Закрыть «<%= key==='flatbed'?'🚛 Перевозки — бортовая машина':groups[key]||key %>»</button></form><% }); %></details><% } %>
+</div>
+</div>
+<script>
+(()=>{
+ const form=document.getElementById('needs-form'), rows=[...form.querySelectorAll('[data-service]')];
+ const total=form.querySelector('[data-total]'), send=form.querySelector('[data-send]');
+ const money=tetri=>(tetri/100).toFixed(2)+' ₾';
+ const people=n=>n+' '+(n%10===1&&n%100!==11?'исполнителю':'исполнителям');
+ // Отмеченная услуга раскрывает свои вопросы; у неотмеченной поля выключены и в форму не попадают.
+ const toggle=()=>rows.forEach(row=>{
+  const on=row.querySelector('input[name=needs]').checked, body=row.querySelector('[data-body]');
+  row.classList.toggle('is-on',on); body.hidden=!on;
+  body.querySelectorAll('input,select').forEach(field=>{ if(!field.hasAttribute('data-fixed')) field.disabled=!on; });
+ });
+ const paint=plan=>{
+  if(plan.error){ total.textContent=plan.error; send.disabled=true; send.textContent='Отправить'; return; }
+  const services=Object.fromEntries(plan.services.map(service=>[service.key,service]));
+  rows.forEach(row=>{
+   const on=row.querySelector('input[name=needs]').checked, service=services[row.dataset.service], count=row.querySelector('[data-count]');
+   const list=row.querySelector('[data-recipients]'), note=row.querySelector('[data-note]');
+   list.textContent=''; note.textContent=''; count.classList.remove('is-zero');
+   if(!on||!service){ count.textContent='доступно: '+row.dataset.available; return; }
+   const sent=service.sent.length>0;
+   count.textContent=service.closed?'закрыта':service.count?'получат: '+service.count:sent?'отправлено':'получат: 0';
+   count.classList.toggle('is-zero',!service.closed&&!service.count&&!sent);
+   service.recipients.slice(0,12).forEach(person=>{ const item=document.createElement('li'); item.textContent=person.name+(person.body?' — '+person.body:''); list.appendChild(item); });
+   if(service.recipients.length>12){ const more=document.createElement('li'); more.textContent='и ещё '+(service.recipients.length-12); list.appendChild(more); }
+   const notes=[];
+   if(sent) notes.push(row.dataset.service==='transport'?(service.sent.includes('')?'Уже отправлено машинам любого размера.':'Уже отправлено классам: '+service.sent.join(', ')+'.'):'Уже отправлено.');
+   if(service.alreadyReceived) notes.push('Уже получили эту заявку: '+service.alreadyReceived+'.');
+   if(service.otherLanguage) notes.push('Не подходят по языку: '+service.otherLanguage+' — они получат заявку, если выбрать «Всем подходящим».');
+   if(service.unfunded) notes.push('Подходят, но не получат: '+service.unfunded+' — не хватает баланса или не подтверждены тарифы.');
+   if(!service.closed&&!service.count&&!service.alreadyReceived&&!service.unfunded&&!service.otherLanguage) notes.push('Подходящих исполнителей нет. Ослабьте требования или снимите услугу.');
+   note.textContent=notes.join(' ');
+   if(service.sizes){
+    service.sizes.forEach(size=>{ const cell=row.querySelector('[data-size-count="'+size.code+'"]'); if(cell) cell.textContent='исполнителей: '+size.count+(size.sent?' · отправлено':''); });
+    const any=row.querySelector('[data-any-count]'); if(any) any.textContent='исполнителей: '+service.anyCount;
+    const hint=row.querySelector('[data-size-hint]');
+    if(hint) hint.textContent=(plan.sizes.length?'Заявку получат только машины отмеченных классов.':'Класс не отмечен — заявку получат машины любого размера ('+service.anyCount+').')+' «От» — минимум сразу по длине, ширине и высоте.'+(service.unknown?' Без размера: '+service.unknown+' — они получают заявку, только когда класс не отмечен.':'');
+   }
+  });
+  form.elements.expectedTotal.value=plan.total; form.elements.expectedPrice.value=plan.price; form.elements.revision.value=plan.revision;
+  // Включённый отбор по языку виден рядом с итогом: без него нули выглядят как пустая база.
+  const filter=plan.language?' · '+form.elements.language.selectedOptions[0].textContent.trim().toLowerCase():'';
+  total.textContent=(plan.total?'Получат: '+plan.total+' · спишется '+money(plan.charge):(plan.services.length?'Новых получателей нет':'Отметьте услуги из заявки'))+filter;
+  send.disabled=!plan.total; send.textContent=plan.total?'Отправить '+people(plan.total)+' и списать '+money(plan.charge):'Отправить';
+ };
+ let timer, request=0;
+ const refresh=()=>{
+  toggle(); clearTimeout(timer); send.disabled=true;
+  timer=setTimeout(async()=>{
+   const id=++request; total.textContent='Считаю…'; send.disabled=true;
+   let plan;
+   try { plan=await (await fetch(form.dataset.preview,{method:'POST',body:new URLSearchParams(new FormData(form))})).json(); }
+   catch(error){ plan={error:'Не удалось пересчитать. Проверьте соединение и измените выбор ещё раз.'}; }
+   if(id===request) paint(plan);
+  },200);
+ };
+ // Enter в поле не должен отправлять заявку: отправка только кнопкой.
+ form.addEventListener('keydown',event=>{ if(event.key==='Enter'&&event.target.tagName!=='BUTTON') event.preventDefault(); });
+ form.addEventListener('change',refresh);
+ form.addEventListener('input',event=>{ if(event.target.type==='number') refresh(); });
+ toggle(); paint(JSON.parse(form.dataset.plan));
+ // Страница из кэша браузера («Назад») приходит с прежними отметками — пересчитываем под них.
+ window.addEventListener('pageshow',event=>{ if(event.persisted) refresh(); });
+})();
+</script>
 </main></body></html>

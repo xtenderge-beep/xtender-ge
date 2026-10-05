@@ -98,6 +98,18 @@ const SERVICE_TYPES = {
   },
 };
 
+// Подписи характеристик на экране «Что нужно клиенту?» — от лица заказчика («нужен гидроборт»),
+// а не исполнителя («приезжаю с грузчиками»). Экраны менеджера и администратора только на русском.
+const NEED_WORDING = {
+  van: {
+    tail_lift: { label: 'Нужен гидроборт (подъёмник)' },
+    with_helpers: {
+      label: 'Нужна машина с грузчиками',
+      hint: 'Ставьте, если клиенту нужен один исполнитель: водитель приезжает со своими грузчиками. Если грузчиков можно нанять отдельно, отметьте услугу «Грузчики».',
+    },
+  },
+};
+
 // Порядок в UI (форма, каталог, кнопки рассылки).
 const SERVICE_TYPE_ORDER = ['van', 'movers', 'tow', 'bucket_lift'];
 
@@ -313,6 +325,7 @@ function attributeBadges(type, attrs, t) {
 module.exports = {
   SERVICE_TYPES,
   SERVICE_TYPE_ORDER,
+  NEED_WORDING,
   VAN_SIZES,
   VAN_SIZE_ORDER,
   VAN_BODY_KEYS,

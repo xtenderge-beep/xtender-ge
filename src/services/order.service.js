@@ -389,28 +389,36 @@ function dispatchFilter(category, vehicleSize, isTechnical = false) {
  return { activeWhere, catParams, catClause };
 }
 // language: '' — все исполнители группы, иначе только отметившие этот язык при регистрации.
-async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '', order = null) {
+// options.withUnfunded — для расчёта на экране менеджера: вернуть и тех, кто подходит, но не может
+// получить заявку (не хватает баланса или не разрешено списание); у каждого поле funded.
+// Рассылка этот режим не использует.
+async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '', order = null, options = {}) {
   const catalog = require('./category.service');
   const definition = await catalog.get(category);
   if (!definition?.is_active) return [];
   const rates = await billing.pricing();
   if (rates.leadPriceTetri !== leadPrice) return [];
   const allowed = await billing.eligibleIds(rates);
-  const rows=(await pool.query('SELECT * FROM masters WHERE is_technical=$1 AND is_active=true AND is_subscribed=true AND is_banned=false AND balance_tetri >= $2', [isTechnical,leadPrice])).rows;
+  // Порядок по id: список получателей на экране и очерёдность отправки не зависят от того, как база хранит строки.
+  const rows=(await pool.query('SELECT * FROM masters WHERE is_technical=$1 AND is_active=true AND is_subscribed=true AND is_banned=false ORDER BY id', [isTechnical])).rows;
   const closed=order ? await getClosedCategories(order.id) : [];
   const open=[...new Set([...(Array.isArray(order?.target_categories) ? order.target_categories : []),category])].filter(c=>!closed.includes(c));
   if(!open.includes(category)) return [];
   const result=[];
   const active=new Set((await catalog.list()).filter(d=>d.is_active).map(d=>d.slug));
   const allServices=(await pool.query('SELECT * FROM master_services')).rows;
+  const inCity=order ? await matching.cityCoverage(order) : null;
+  // Класс кузова: явно выбранный для этой рассылки, иначе все классы, подходящие заявке.
+  const needSizes=matching.needSizes(order?.requirements);
+  const size=vehicleSize || (category === 'transport' ? needSizes : '');
   for(const master of rows) {
-    if(!allowed.has(master.id) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
-    if(order && !(await matching.coversCity(master,order))) continue;
+    const funded=master.balance_tetri >= leadPrice && allowed.has(master.id);
+    if((!funded && !options.withUnfunded) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
+    if(inCity && !inCity(master)) continue;
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
-    const size=vehicleSize || (category === 'transport' ? order?.requirements?.transport_size : '') || '';
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;
     if(!definition.is_builtin && catalog.validate(definition,services.find(s=>s.service_type === definition.slug)?.attributes).errors.length) continue;
-    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? order?.requirements?.transport_size || '' : '',open,order?.requirements))});
+    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded} : {})});
   }
   return result;
 }
@@ -453,7 +461,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       if (closed.rows.length) { skipReason='need_closed'; return; }
       const openMatches=await matching.openMatches(master,live,client);
       const liveServices=await matching.servicesFor(master,client);
-      if (!openMatches.includes(category) || !matching.matches(liveServices,category,vehicleSize || (category === 'transport' ? live.requirements?.transport_size : '') || '',openMatches,live.requirements)) { skipReason='service_changed'; return; }
+      if (!openMatches.includes(category) || !matching.matches(liveServices,category,vehicleSize || (category === 'transport' ? matching.needSizes(live.requirements) : ''),openMatches,live.requirements)) { skipReason='service_changed'; return; }
       if (language && !speaks(master,language)) { skipReason='language_changed'; return; }
       await client.query('UPDATE dispatch_deliveries SET matched_categories=$3::jsonb,service_snapshot=$4::jsonb WHERE run_id=$1 AND master_id=$2',[run.id,master.id,JSON.stringify(openMatches),JSON.stringify(liveServices)]);
       // The master lock serializes concurrent attempts, including direct retries

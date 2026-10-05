@@ -85,15 +85,21 @@ let server;
  await assert.rejects(()=>portal.requireHeadModerator(manager.id),{status:403});
  await pool.query('UPDATE managers SET is_head_moderator=true WHERE id=$1',[manager.id]);
  await portal.requireHeadModerator(manager.id);
+ // Экран менеджера по заявке: услуги списком с расчётом «кто получит», одна кнопка отправки.
  const managerHtml=await require('ejs').renderFile(path.join(__dirname,'../src/views/manager/order-dispatch.ejs'),{
-  manager:{...manager,is_head_moderator:true},csrf:'test',order:{...configured,closedCategories:[]},plan:null,result:null,error:null,serviceRows:[{key:'movers',label:'Грузчики',count:2}],transportSizes:await require('../src/services/dispatch.service').transportSizes(configured),runs:[],funnel:{view:0,call:0,whatsapp:0,contacted:0},funnelByCategory:[],
-  activeCities:await masters.getActiveCities(),allCities:await masters.getWorkCities(),groups:await require('../src/services/category.service').groups(),serviceConfig:await require('../src/services/category.service').configForView('ru'),
-  speakLabels:require('../src/config/spokenLanguages').speakLabels,date:v=>String(v),money:v=>String(v),
+  ...await require('../src/services/dispatch.service').screen(o.token),manager:{...manager,is_head_moderator:true},csrf:'test',result:null,error:null,date:v=>String(v),money:v=>String(v),
  });
- assert.match(managerHtml,/Что нужно клиенту/);
- assert.match(managerHtml,/Нужен самосвал <input type="checkbox" name="needAttributes\[junk\]\[dump_body\]"/);
- assert.match(managerHtml,/class="muted need-hint">Ставьте, только если в заявке прямо просят самосвал/);
- assert.match(managerHtml,/Новых получателей: 2/);
+ assert.match(managerHtml,/Что нужно клиенту и кто получит заявку/);
+ assert.match(managerHtml,/<input type="checkbox" name="needAttributes\[junk\]\[dump_body\]"[^>]*> Нужен самосвал/);
+ assert.match(managerHtml,/Ставьте, только если в заявке прямо просят самосвал/);
+ assert.match(managerHtml,/> Нужна машина с грузчиками<\/label>/,'требования перевозки названы от лица заказчика');
+ assert.ok(!managerHtml.includes('data-service="flatbed"'),'отдельной строки «бортовая» в новых заявках нет: это «Перевозки» с типом кузова');
+ assert.match(managerHtml,/<input type="checkbox" name="needs" value="transport" checked disabled data-fixed>/,'разосланная услуга отмечена и не снимается');
+ assert.match(managerHtml,/<input type="checkbox" name="transportSize" value="L" checked disabled data-fixed>/,'разосланный класс кузова не снимается');
+ assert.match(managerHtml,/<input type="checkbox" name="transportSize" value="XL"  >/,'другой класс можно добавить');
+ assert.match(managerHtml,/name="transportAny"/,'ограничение по классу можно снять');
+ assert.match(managerHtml,/Отправки и отклики/);
+ assert.match(managerHtml,/Демо исполнитель \(#\d+\) · Принято каналом/,'в отправках имена и статусы по-русски');
  for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  // Три размера кузова в карточке администратора: букву ставит система, выбранная вручную не действует.

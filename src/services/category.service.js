@@ -18,7 +18,7 @@ function unitFor(unit, lang) { return (unit && UNITS[unit]?.[lang]) || unit; }
 function view(row, lang = 'ru') {
   const t = translate(lang);
   return { type: row.slug, label: row['name_'+lang] || row.name_ru, icon: row.icon, active: row.is_active,
-    fields: row.fields.map(f => ({ ...f, unit: unitFor(f.unit, lang), min: f.min ?? null, max: f.max ?? null,
+    fields: row.fields.map(f => ({ ...f, need: f.need || base.NEED_WORDING[row.slug]?.[f.key], unit: unitFor(f.unit, lang), min: f.min ?? null, max: f.max ?? null,
       label: f.labels?.[lang] || f.labels?.ru || t('svc_'+row.slug+'_'+f.key),
       options: (f.options || []).map(value => ({value, label: f.optionLabels?.[value]?.[lang] || f.optionLabels?.[value]?.ru || value})) })) };
 }

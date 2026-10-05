@@ -45,31 +45,30 @@ router.use(wrap(async(req,res,next) => {
 router.post('/logout',wrap(async(req,res) => { await service.logout(req.cookies[service.COOKIE]); res.clearCookie(service.COOKIE,service.cookieOptions);res.redirect('/manager/login'); }));
 const dispatchService=require('../services/dispatch.service');
 const orderService=require('../services/order.service');
-const categoryService=require('../services/category.service');
+// Экран менеджера по заявке: слева заявка, справа услуги с расчётом «кто получит» и одна кнопка отправки.
 const dispatchPage=async(req,res,result=null)=>{
-  const order=await orderService.getOrderByToken(req.params.token);
-  if(!order)return res.status(404).send('Заявка не найдена');
-  if(typeof order.target_categories==='string') {
-    try {order.target_categories=JSON.parse(order.target_categories);} catch {order.target_categories=[];}
-  }
-  if(!Array.isArray(order.target_categories)) order.target_categories=[];
-  if(typeof order.requirements==='string') order.requirements=JSON.parse(order.requirements);
-  order.closedCategories=await orderService.getClosedCategories(order.id);
-  let plan=null,error=req.query.error || null;
-  if(req.query.category)try {plan=await dispatchService.preview(order.token,req.query.category,req.query.size || '',req.query.language || '');}catch(e){error=e.message;}
-  const groups=await categoryService.groups();
-  const serviceRows=await Promise.all(Object.entries(groups).filter(([key])=>(order.target_categories||[]).includes(key)&&!order.closedCategories.includes(key)).map(async ([key,label])=>{
-    if(!order.requirements?.configured || !['pending_review','new'].includes(order.status)) return {key,label,count:null};
-    try {const preview=await dispatchService.preview(order.token,key,'');return {key,label,count:preview.count,alreadySent:preview.alreadySent};}
-    catch(e){return {key,label,count:null,error:e.message};}
-  }));
-  res.render('manager/order-dispatch',{order,plan,result,error,serviceRows,transportSizes:await dispatchService.transportSizes(order),activeCities:await require('../services/master.service').getActiveCities(),allCities:await require('../services/master.service').getWorkCities(),groups,serviceConfig:await categoryService.configForView('ru'),runs:await orderService.getOrderDispatches(order.id),funnel:await orderService.getOrderFunnelStats(order.id),funnelByCategory:await orderService.getOrderFunnelByCategory(order.id),speakLabels:require('../config/spokenLanguages').speakLabels});
+  const screen=await dispatchService.screen(req.params.token,require('../config/spokenLanguages').parseDispatchLanguage(req.query.language) || '');
+  if(!screen)return res.status(404).send('Заявка не найдена');
+  res.render('manager/order-dispatch',{...screen,result,error:req.query.error || null});
 };
+const needsInput=req=>({needs:req.body.needs,needAttributes:req.body.needAttributes,transportSize:req.body.transportSize,transportAny:req.body.transportAny,cityId:req.body.cityId});
 router.get('/orders',wrap(async(req,res)=>{
   const rows=(await require('../config/db').query("SELECT id,token,description,status,created_at FROM orders WHERE status IN ('pending_review','new') ORDER BY created_at DESC LIMIT 100")).rows;
   res.render('manager/orders',{orders:rows});
 }));
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
+// Пересчёт при каждом изменении формы: ничего не сохраняет и не отправляет.
+router.post('/orders/:token/preview',wrap(async(req,res)=>{
+  try {res.json(dispatchService.planView(await dispatchService.planNeeds(req.params.token,needsInput(req),req.body.language || '')));}
+  catch(e){res.status(400).json({error:e.message});}
+}));
+// Одна кнопка: сохранить потребности и отправить заявку всем отмеченным услугам.
+router.post('/orders/:token/send',wrap(async(req,res)=>{
+  try {
+    const expected=req.body.expectedTotal ? {total:req.body.expectedTotal,price:req.body.expectedPrice,revision:req.body.revision} : null;
+    return dispatchPage(req,res,await dispatchService.sendNeeds(req.params.token,needsInput(req),expected,req.body.language || '',{actor:'manager:'+req.managerSession.id}));
+  } catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{
   try {await require('../services/orderNeeds.service').save(req.params.token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'#dispatch-selection');}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}

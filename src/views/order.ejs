@@ -149,7 +149,7 @@
           <ul class="space-y-2 text-sm" aria-label="<%= t('label_request') %>">
             <% targetCategories.forEach(c => { const closed = order.status === 'closed' || closedCategories.includes(c); %>
               <li class="flex items-center justify-between gap-3 border-b border-stone-100 pb-2">
-                <span><%= categoryLabels[c] || c %><%= c === 'transport' && order.requirements?.transport_size ? ' · '+order.requirements.transport_size : '' %></span>
+                <% const sizes = c === 'transport' ? (Array.isArray(order.requirements?.transport_sizes) ? order.requirements.transport_sizes : [order.requirements?.transport_size]).filter(Boolean) : []; %><span><%= categoryLabels[c] || c %><%= sizes.length ? ' · ' + sizes.join(', ') : '' %></span>
                 <span class="<%= closed ? 'text-stone-500' : 'text-emerald-700' %>"><%= t(closed ? 'order_need_closed' : 'order_need_open') %></span>
               </li>
             <% }); %>

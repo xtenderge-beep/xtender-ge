@@ -117,6 +117,16 @@ const portal=require('../src/services/managerPortal.service');
   const telegramCookie=entry.headers.get('set-cookie').split(';')[0];
   const orderPage=await fetch(base+'/manager/orders/portal-order',{headers:{cookie:telegramCookie}});
   assert.equal(orderPage.status,200);assert.match(await orderPage.text(),/Заявка #/);
+  // Экран заявки: пересчёт получателей и отправка одной кнопкой — только с CSRF-токеном сессии.
+  const orderCsrf=(await portal.session(telegramCookie.split('=')[1])).csrf,orderPost=(path,pairs)=>fetch(base+'/manager/orders/portal-order/'+path,{method:'POST',headers:{cookie:telegramCookie},body:new URLSearchParams(pairs),redirect:'manual'});
+  assert.equal((await orderPost('preview',[['needs','transport']])).status,403);
+  const calculated=await orderPost('preview',[['_csrf',orderCsrf],['needs','transport'],['transportSize','M']]);
+  assert.equal(calculated.status,200);const calculation=await calculated.json();
+  assert.deepEqual(calculation.sizes,['M']);assert.equal(calculation.services[0].key,'transport');assert.equal(calculation.total,0);
+  assert.equal((await orderPost('preview',[['_csrf',orderCsrf],['needs','no-such-service']])).status,400);
+  const dispatchRuns=async()=>(await pool.query('SELECT COUNT(*)::int AS n FROM dispatch_runs')).rows[0].n,runsBefore=await dispatchRuns();
+  assert.match(decodeURIComponent((await orderPost('send',[['_csrf',orderCsrf],['needs','transport']])).headers.get('location')),/error=Отправлять некому/);
+  assert.equal(await dispatchRuns(),runsBefore,'без получателей отправка не создаётся');
   assert.equal((await fetch(base+'/manager/order-auth/'+magic,{redirect:'manual'})).status,302);
   await pool.query('UPDATE managers SET web_enabled=true WHERE id=$1',[a]);
   const session=await portal.session(auth.split('=')[1]);
