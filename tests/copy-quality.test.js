@@ -39,6 +39,7 @@ const dynamic = [
   ...[1, 2, 3].flatMap(n => [`home_step${n}_title`, `home_step${n}_body`]),
   ...['ready', 'pending', 'billing_pending', 'low', 'disabled'].flatMap(state => [`provider_${state}`, `provider_${state}_hint`]),
   'provider_billing_review_hint', 'order_lang_ka', 'order_lang_ru', 'order_lang_en',
+  ...[1, 2, 3, 4].map(n => `vehicle_hint_step${n}`),
   'pay_awaiting', 'pay_received', 'pay_reviewing', 'pay_credited', 'pay_rejected', 'pay_cancelled',
 ];
 for (const key of dynamic) for (const lang of LANGS) assert.ok(dictionaries[lang][key], `${lang}:${key} must exist`);

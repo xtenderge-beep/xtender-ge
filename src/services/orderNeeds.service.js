@@ -4,6 +4,7 @@ const orderService = require('./order.service');
 const { VAN_SIZE_ORDER } = require('../config/serviceTypes');
 const requirementsService = require('./serviceRequirements.service');
 const { needSizes } = require('./serviceMatching.service');
+const vehicleHint = require('../config/vehicleHint');
 
 const INVALID = 'Выберите потребности и корректный размер транспорта';
 
@@ -15,7 +16,8 @@ function parseSizes(rawSize, categories) {
 }
 
 // transport_sizes — все подходящие классы; transport_size остаётся для прежних читателей, когда класс один.
-const requirementsOf = (sizes, details) => ({ configured: true, transport_size: sizes.length === 1 ? sizes[0] : '', transport_sizes: sizes, ...details });
+// moversVehicle — отметка «Клиенту нужна и машина» (config/vehicleHint.js); ключ пишется, только когда она стоит.
+const requirementsOf = (sizes, details, moversVehicle = false) => ({ configured: true, transport_size: sizes.length === 1 ? sizes[0] : '', transport_sizes: sizes, ...details, ...(moversVehicle ? { [vehicleHint.FLAG]: true } : {}) });
 
 async function cityFor(order, rawCityId) {
   const cities = await require('./master.service').getActiveCities();
@@ -49,7 +51,9 @@ async function save(token, rawCategories, rawSize, rawAttributes, rawCityId) {
 // доступ к контакту заказчика (orderContact.service). Поэтому разосланные услуги и их требования
 // не меняются; к разосланным классам кузова можно добавить другие или снять ограничение по
 // размеру; новые услуги можно добавить, а ещё не разосланные — изменить или убрать.
-// input: needs, needAttributes, transportSize (классы), transportAny (любой размер), cityId.
+// Отметка «Клиенту нужна и машина» на подбор не влияет: до отправки грузчикам её задаёт форма,
+// после — отдельное действие setMoversVehicle, форма её уже не меняет.
+// input: needs, needAttributes, transportSize (классы), transportAny (любой размер), cityId, moversVehicle.
 async function draft(order, input = {}, client = pool) {
   const groups = await categoryService.groups();
   const submitted = [...new Set([].concat(input.needs || []))];
@@ -71,8 +75,10 @@ async function draft(order, input = {}, client = pool) {
     sentSizes = stored ? needSizes(stored) : direct.includes('') ? [] : VAN_SIZE_ORDER.filter(size => direct.includes(size));
     sizes = !sentSizes.length || input.transportAny ? [] : VAN_SIZE_ORDER.filter(size => sentSizes.includes(size) || chosen.includes(size));
   }
+  const moversVehicle = locked.includes('movers') ? vehicleHint.flagged(order)
+    : categories.includes('movers') && (input.moversVehicle === true || input.moversVehicle === 'on');
   return {
-    categories, sizes, details,
+    categories, sizes, details, moversVehicle,
     cityId: sent.length ? order.city_id || await cityFor(order, null) : await cityFor(order, input.cityId),
     // Что уже разослано и потому не редактируется; anySize — перевозка разослана без ограничения по размеру.
     locked: { categories: locked, sizes: sentSizes, anySize: locked.includes('transport') && !sentSizes.length },
@@ -85,6 +91,7 @@ function storedInput(order) {
   const text = value => value === true ? 'on' : String(value);
   return {
     needs: Array.isArray(order.target_categories) ? order.target_categories : [],
+    moversVehicle: vehicleHint.flagged(order),
     transportSize: needSizes(order.requirements),
     needAttributes: Object.fromEntries(Object.entries(services).map(([key, values]) => [key, Object.fromEntries(Object.entries(values || {}).map(([field, value]) => [field, text(value)]))])),
   };
@@ -100,7 +107,7 @@ async function apply(token, input) {
     if (!order || !['pending_review','new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
     const next = await draft(order, input, client);
     if (!next.categories.length) throw new Error('Отметьте хотя бы одну услугу');
-    const requirements = requirementsOf(next.sizes, next.details);
+    const requirements = requirementsOf(next.sizes, next.details, next.moversVehicle);
     const before = [Array.isArray(order.target_categories) ? order.target_categories : [], order.requirements?.configured ? order.requirements : null, order.city_id];
     if (stable(before) === stable([next.categories, requirements, next.cityId])) return false;
     await client.query('UPDATE orders SET target_categories=$2,requirements=$3::jsonb,city_id=$4,revision_version=revision_version+1 WHERE token=$1',
@@ -112,4 +119,18 @@ async function apply(token, input) {
   return order;
 }
 
-module.exports = {save, draft, apply, storedInput, requirementsOf};
+// Включает и выключает подсказку грузчику о машине у заявки, которая грузчикам уже отправлена.
+// Получатели от отметки не зависят, поэтому версия заявки не растёт.
+async function setMoversVehicle(token, shown) {
+  await pool.withTransaction(async client => {
+    const order = (await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
+    if (!order || !['pending_review','new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
+    if (!(Array.isArray(order.target_categories) ? order.target_categories : []).includes('movers')) throw new Error('В заявке нет услуги «Грузчики»');
+    // pg-mem отдаёт jsonb строкой.
+    const requirements = { ...(typeof order.requirements === 'string' ? JSON.parse(order.requirements) : order.requirements) };
+    if (shown) requirements[vehicleHint.FLAG] = true; else delete requirements[vehicleHint.FLAG];
+    await client.query('UPDATE orders SET requirements=$2::jsonb WHERE token=$1',[token,JSON.stringify(requirements)]);
+  });
+}
+
+module.exports = {save, draft, apply, storedInput, requirementsOf, setMoversVehicle};

@@ -245,7 +245,7 @@ async function screen(token, languageRaw = '') {
   };
 }
 // Форма экрана заявки одна и та же в кабинете менеджера и в админке: расчёт и отправка по её полям.
-const formInput = body => ({ needs: body.needs, needAttributes: body.needAttributes, transportSize: body.transportSize, transportAny: body.transportAny, cityId: body.cityId });
+const formInput = body => ({ needs: body.needs, needAttributes: body.needAttributes, transportSize: body.transportSize, transportAny: body.transportAny, cityId: body.cityId, moversVehicle: body.moversVehicle });
 const previewForm = async (token, body) => planView(await planNeeds(token, formInput(body), body.language || ''));
 async function sendForm(token, body, actor) {
   const expected = body.expectedTotal ? { total: body.expectedTotal, price: body.expectedPrice, revision: body.revision } : null;

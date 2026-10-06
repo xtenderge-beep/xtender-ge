@@ -458,6 +458,7 @@ const orderAction = action => async (req, res) => {
 const orderText = orderAction(req => require('../services/orderText.service').edit(req.params.token, req.body.description, 'admin', requestMeta(req)));
 const orderNote = orderAction(req => require('../services/orderText.service').clarify(req.params.token, req.body.note, 'admin', requestMeta(req)));
 const orderBrief = orderAction(req => require('../services/orderBrief.service').act(req.params.token, req.body.action));
+const orderVehicleHint = orderAction(req => require('../services/orderNeeds.service').setMoversVehicle(req.params.token, req.body.vehicleHint === 'on'));
 const orderRetry = orderAction(req => dispatchService.retry(req.params.token, req.body.runId, 'admin'));
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -898,6 +899,7 @@ module.exports = {
   orderText,
   orderNote,
   orderBrief,
+  orderVehicleHint,
   orderRetry,
   closeOrder,
   closeOrderCategory,

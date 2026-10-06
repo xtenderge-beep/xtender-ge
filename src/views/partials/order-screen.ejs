@@ -60,6 +60,7 @@
   const reasonLabels={eligibility_changed:'изменился допуск или баланс',need_closed:'потребность закрыта',service_changed:'услуги больше не подходят',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'есть незавершённая отправка',channel_rejected:'канал отклонил отправку',result_unknown:'результат неизвестен — нужна проверка',before_send_error:'ошибка до отправки'};
   const cityName=allCities.find(city=>city.id===(order.city_id||activeCities.find(c=>c.slug==='tbilisi')?.id))?.name_ru||'Тбилиси';
   const sentAny=runs.length>0, transportSent=needs.locked.categories.includes('transport');
+  const vehicleFlag=order.requirements?.movers_need_vehicle===true;
 %>
 <a href="<%= listHref %>">← Все заявки</a>
 <% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
@@ -109,7 +110,7 @@
 <label>Кому отправить <select name="language"><option value="">Всем подходящим</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>" <%= language===code?'selected':'' %>>Только кто говорит <%= label %></option><% }); %></select></label></div>
 <div class="service-list">
 <% rows.forEach(row=>{ const fixed=row.locked||row.closed; %>
-<div class="service-row" data-service="<%= row.key %>" data-available="<%= row.available %>">
+<div class="service-row" data-service="<%= row.key %>" data-available="<%= row.available %>" <%= row.closed?'data-closed':'' %>>
   <label class="service-head"><input type="checkbox" name="needs" value="<%= row.key %>" <%= row.checked?'checked':'' %> <%= fixed||!open?'disabled data-fixed':'' %>><span class="service-name"><%= row.label %></span><span class="service-count" data-count></span></label>
   <div class="service-body" data-body hidden>
     <% if(row.closed){ %><p class="muted">Эта потребность закрыта: новых получателей не будет.</p><% } %>
@@ -120,6 +121,12 @@
       <% } else { %><label><%= label %><%= f.unit?', '+f.unit:'' %><input type="number" step="any" name="<%= name %>" value="<%= row.values[f.key]??'' %>" <%= f.min==null?'':'min="'+f.min+'"' %> <%= f.max==null?'':'max="'+f.max+'"' %> placeholder="Не важно" <%- off %>></label><% } %>
     <% }); %></div>
     <% row.fields.filter(f=>f.need?.hint).forEach(f=>{ %><p class="muted need-hint"><b><%= f.need.label||f.label %>.</b> <%= f.need.hint %></p><% }); %><% } %>
+    <%# Отметка «Клиенту нужна и машина» (config/vehicleHint.js): грузчик без своей машины видит на странице заявки, как её вызвать. До отправки грузчикам — галочка этой формы, после — кнопка. Открытые «Перевозки» включают подсказку сами. %>
+    <% if(row.key==='movers' && open && !row.closed){ const viaTransport=rows.some(item=>['transport','flatbed'].includes(item.key)&&item.checked&&!item.closed), shown=vehicleFlag||viaTransport; %>
+      <% if(!row.locked){ %><div class="service-fields"><label class="check"><input type="checkbox" name="moversVehicle" data-vehicle-box <%= shown?'checked':'' %>> Клиенту нужна и машина</label></div>
+      <% } else { %><p class="card-line"><span>Подсказка о машине: <b><%= shown?'показывается':'не показывается' %></b><%= viaTransport?' — в заявке открыты «Перевозки»':'' %></span><% if(!viaTransport){ %> <button type="submit" class="secondary-action card-button" formaction="<%= base %>/vehicle-hint" name="vehicleHint" value="<%= vehicleFlag?'off':'on' %>"><%= vehicleFlag?'Убрать подсказку':'Клиенту нужна и машина — показать' %></button><% } %></p><% } %>
+      <p class="muted need-hint"><b>Клиенту нужна и машина.</b> Грузчик без своей машины увидит на странице заявки подсказку: грузовую можно вызвать в Yandex Go самому или объяснить это клиенту. Если отмечены «Перевозки», подсказка включается сама. Работает для заявок в Тбилиси.</p>
+    <% } %>
     <% if(row.key==='transport'){ %><div class="size-choices"><strong>Размер кузова</strong> <span class="muted">— отметьте все подходящие классы</span>
       <% sizes.forEach(size=>{ const was=needs.locked.sizes.includes(size.code)||needs.locked.anySize; %><label class="size-choice"><input type="checkbox" name="transportSize" value="<%= size.code %>" <%= needs.sizes.includes(size.code)?'checked':'' %> <%= was||row.closed?'disabled data-fixed':'' %>> <span><b><%= size.code %></b> — кузов от <%= size.spec %> · <span data-size-count="<%= size.code %>"></span></span></label><% }); %>
       <% if(transportSent && needs.locked.sizes.length && !row.closed){ %><label class="size-choice"><input type="checkbox" name="transportAny"> <span><b>Любой размер</b> — снять ограничение по классу · <span data-any-count></span></span></label><% } %>
@@ -156,11 +163,16 @@
  const money=tetri=>(tetri/100).toFixed(2)+' ₾';
  const people=n=>n+' '+(n%10===1&&n%100!==11?'исполнителю':'исполнителям');
  // Отмеченная услуга раскрывает свои вопросы; у неотмеченной поля выключены и в форму не попадают.
- const toggle=()=>rows.forEach(row=>{
-  const on=row.querySelector('input[name=needs]').checked, body=row.querySelector('[data-body]');
-  row.classList.toggle('is-on',on); body.hidden=!on;
-  body.querySelectorAll('input,select').forEach(field=>{ if(!field.hasAttribute('data-fixed')) field.disabled=!on; });
- });
+ const toggle=()=>{
+  rows.forEach(row=>{
+   const on=row.querySelector('input[name=needs]').checked, body=row.querySelector('[data-body]');
+   row.classList.toggle('is-on',on); body.hidden=!on;
+   body.querySelectorAll('input,select').forEach(field=>{ if(!field.hasAttribute('data-fixed')) field.disabled=!on; });
+  });
+  // Отмеченные «Перевозки» сами включают подсказку грузчику о машине: галочка стоит и не снимается.
+  const vehicle=form.querySelector('[data-vehicle-box]');
+  if(vehicle&&rows.some(row=>['transport','flatbed'].includes(row.dataset.service)&&!row.hasAttribute('data-closed')&&row.querySelector('input[name=needs]').checked)){ vehicle.checked=true; vehicle.disabled=true; }
+ };
  const paint=plan=>{
   if(plan.error){ total.textContent=plan.error; send.disabled=true; send.textContent='Отправить'; return; }
   const services=Object.fromEntries(plan.services.map(service=>[service.key,service]));

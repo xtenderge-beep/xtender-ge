@@ -20,6 +20,7 @@ const { clientStrings, translate } = require('../config/i18n');
 const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const requestLanguage = require('../config/requestLanguage');
+const vehicleHint = require('../config/vehicleHint');
 const { parseDispatchLanguage } = require('../config/spokenLanguages');
 
 // Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
@@ -28,6 +29,17 @@ const { parseDispatchLanguage } = require('../config/spokenLanguages');
 function briefCardFor(order) {
   const briefs = require('../services/orderBrief.service'), brief = briefs.read(order);
   return brief?.shared ? Object.fromEntries(['ka', 'ru', 'en'].map((lang) => [lang, briefs.lines(brief, lang)])) : null;
+}
+
+// Подсказка грузчику о машине (config/vehicleHint.js). Город заявки читается, только когда она
+// нужна; заявка без города — прежняя тбилисская, как и в подборе исполнителей.
+async function vehicleHintFor(order, closedCategories, matched, master, lang) {
+  const open = (order.target_categories || []).filter((category) => !closedCategories.includes(category));
+  const wanted = vehicleHint.flagged(order);
+  const ownsVehicle = wanted && master ? (await require('../services/serviceMatching.service').servicesFor(master)).some((service) => service.service_type === 'van') : false;
+  if (!vehicleHint.needed(open, matched, wanted, ownsVehicle)) return null;
+  const city = order.city_id ? (await masterService.getWorkCities()).find((item) => item.id === order.city_id)?.slug : 'tbilisi';
+  return vehicleHint.available(city) ? { url: vehicleHint.guideUrl(lang) } : null;
 }
 
 function buildWhatsappText(order) {
@@ -882,6 +894,8 @@ async function show(req, res) {
   // Язык заявки — метка для всех, кроме владельца; совет «пишите на языке заявки» — только
   // исполнителю, у которого этого языка нет (см. config/requestLanguage.js).
   const requestLang = isOwner ? null : requestLanguage.ofOrder(order);
+  // Услуги заявки, по которым исполнитель ей сейчас подходит.
+  const matched = m ? await require('../services/serviceMatching.service').openMatches(m, order) : [];
 
   return res.render('order', {
     ...revisionLocals(order, pageLang),
@@ -892,7 +906,8 @@ async function show(req, res) {
     masterCategory,
     langHref: isOwner ? '/order/' + order.token + '?lang=' : null,
     linkTaken: !isOwner && !provider && link?.state === 'taken',
-    noMatchingNeeds: !!m && !(await require('../services/serviceMatching.service').openMatches(m,order)).length,
+    noMatchingNeeds: !!m && !matched.length,
+    vehicleHint: await vehicleHintFor(order, closedCategories, matched, m, pageLang),
     funnel,
     masterAccount,
     requestLang,

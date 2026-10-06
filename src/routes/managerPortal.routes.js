@@ -85,6 +85,8 @@ const actor=req=>'manager:'+req.managerSession.id;
 router.post('/orders/:token/text',orderAction(req=>require('../services/orderText.service').edit(req.params.token,req.body.description,actor(req),require('../config/requestMeta').requestMeta(req))));
 router.post('/orders/:token/note',orderAction(req=>require('../services/orderText.service').clarify(req.params.token,req.body.note,actor(req),require('../config/requestMeta').requestMeta(req))));
 router.post('/orders/:token/brief',orderAction(req=>require('../services/orderBrief.service').act(req.params.token,req.body.action)));
+// Подсказка грузчику о машине (config/vehicleHint.js) у заявки, уже отправленной грузчикам.
+router.post('/orders/:token/vehicle-hint',orderAction(req=>require('../services/orderNeeds.service').setMoversVehicle(req.params.token,req.body.vehicleHint==='on')));
 router.post('/orders/:token/retry',wrap(async(req,res)=>{
   try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
