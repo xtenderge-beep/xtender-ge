@@ -5,7 +5,8 @@ const { parseDispatchLanguage, speaks, speakLabels, languageBreakdown } = requir
 const { vanSizeSpec, vanVehicles, vanVehicleLabel } = require('../config/serviceTypes');
 const matching = require('./serviceMatching.service');
 const orderNeeds = require('./orderNeeds.service');
-const vanOf = master => master.services.find(s => s.service_type === 'van');
+const toolsHint = require('../config/toolsHint');
+const vanOf =master => master.services.find(s => s.service_type === 'van');
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
   if (!Object.hasOwn(groups, category) || (size && (category !== 'transport' || !require('../config/serviceTypes').VAN_SIZE_ORDER.includes(size)))) throw new Error('Некорректная группа рассылки');
@@ -218,6 +219,8 @@ async function screen(token, languageRaw = '') {
     key, label: key === 'flatbed' ? '🚛 Перевозки — бортовая машина' : label,
     fields: (config.find(svc => svc.type === matching.toType(key))?.fields || []).filter(f => f.input !== 'size' && f.input !== 'text' && f.match && f.match !== 'ignore' && !(key === 'flatbed' && f.key === 'body')),
     values: needs.details.services?.[key] || {}, checked: needs.categories.includes(key), locked: !open || needs.locked.categories.includes(key), closed: closed.includes(key), available: available[key] ?? 0,
+    // Отметка «Нужен инструмент» (config/toolsHint.js): у каких услуг она есть и где уже стоит.
+    toolsEligible: toolsHint.eligible(key), toolsNeeded: toolsHint.marked(order).includes(key),
   }));
   const runs = await orderService.getOrderDispatches(order.id);
   const ids = [...new Set(runs.flatMap(run => run.deliveries.map(delivery => delivery.master_id)))];
@@ -245,7 +248,7 @@ async function screen(token, languageRaw = '') {
   };
 }
 // Форма экрана заявки одна и та же в кабинете менеджера и в админке: расчёт и отправка по её полям.
-const formInput = body => ({ needs: body.needs, needAttributes: body.needAttributes, transportSize: body.transportSize, transportAny: body.transportAny, cityId: body.cityId, moversVehicle: body.moversVehicle });
+const formInput = body => ({ needs: body.needs, needAttributes: body.needAttributes, transportSize: body.transportSize, transportAny: body.transportAny, cityId: body.cityId, moversVehicle: body.moversVehicle, toolsNeeded: body.toolsNeeded });
 const previewForm = async (token, body) => planView(await planNeeds(token, formInput(body), body.language || ''));
 async function sendForm(token, body, actor) {
   const expected = body.expectedTotal ? { total: body.expectedTotal, price: body.expectedPrice, revision: body.revision } : null;

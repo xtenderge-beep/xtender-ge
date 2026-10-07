@@ -234,19 +234,11 @@
             <i class="fa-solid fa-list-check text-[10px]"></i><%= t('my_orders_nav') %>
           </a>
         <% } else { %>
-          <%# Грузчику без своей машины, когда заявке нужна и машина (config/vehicleHint.js): заявку можно взять, машину вызвать в Yandex Go. %>
-          <% if (typeof vehicleHint !== 'undefined' && vehicleHint) { %>
-            <div id="vehicleHint" class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-stone-800 leading-relaxed">
-              <div class="flex items-center gap-2 font-bold"><i class="fa-solid fa-truck text-emerald-600 shrink-0"></i><span><%= t('vehicle_hint_title') %></span></div>
-              <p class="mt-1"><%= t('vehicle_hint_lead') %></p>
-              <details class="group mt-2">
-                <summary class="flex items-center gap-1.5 font-bold text-emerald-700 cursor-pointer"><span><%= t('vehicle_hint_how') %></span><i class="fa-solid fa-chevron-down text-[11px] transition group-open:rotate-180 shrink-0"></i></summary>
-                <ol class="mt-2 pl-5 list-decimal space-y-1.5"><% ['vehicle_hint_step1', 'vehicle_hint_step2', 'vehicle_hint_step3', 'vehicle_hint_step4'].forEach(function (key) { %><li><%= t(key) %></li><% }); %></ol>
-                <p class="mt-2 text-xs text-stone-600"><%= t('vehicle_hint_limits') %></p>
-                <a href="<%= vehicleHint.url %>" target="_blank" rel="noopener" class="mt-2 inline-block font-bold text-emerald-700"><span class="underline"><%= t('vehicle_hint_link') %></span> <i class="fa-solid fa-arrow-right text-xs"></i></a>
-              </details>
-            </div>
-          <% } %>
+          <%# Подсказки над кнопками связи (partials/order-hint.ejs). Грузчику без своей машины, когда заявке нужна и машина:
+              грузовую можно вызвать в Yandex Go (config/vehicleHint.js). Исполнителю услуги, для которой нужен инструмент:
+              его можно взять в прокат (config/toolsHint.js). %>
+          <% if (typeof vehicleHint !== 'undefined' && vehicleHint) { %><%- include('partials/order-hint', { id: 'vehicleHint', icon: 'fa-solid fa-truck', prefix: 'vehicle_hint', url: vehicleHint.url }) %><% } %>
+          <% if (typeof toolsHint !== 'undefined' && toolsHint) { %><%- include('partials/order-hint', { id: 'toolsHint', icon: 'fa-solid fa-screwdriver-wrench', prefix: 'tools_hint', url: toolsHint.url }) %><% } %>
           <% if (typeof langAdvice !== 'undefined' && langAdvice) { %>
             <div id="langAdvice" class="p-3 rounded-2xl bg-stone-50 border border-stone-200 text-xs text-stone-700 leading-relaxed flex items-start gap-2">
               <i class="fa-brands fa-whatsapp text-emerald-500 mt-0.5 shrink-0"></i><span><%= t('order_lang_advice') %></span>

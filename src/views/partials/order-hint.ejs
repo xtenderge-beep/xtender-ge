@@ -1,0 +1,13 @@
+<%# Подсказка исполнителю над кнопками связи: заголовок, одна фраза и свёрнутые шаги со ссылкой.
+    Страница передаёт id блока, классы значка (icon), адрес ссылки (url) и начало ключей текста (prefix):
+    <prefix>_title, _lead, _how, _step1…_step4, _limits, _link. %>
+<div id="<%= id %>" class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-stone-800 leading-relaxed">
+  <div class="flex items-center gap-2 font-bold"><i class="<%= icon %> text-emerald-600 shrink-0"></i><span><%= t(prefix + '_title') %></span></div>
+  <p class="mt-1"><%= t(prefix + '_lead') %></p>
+  <details class="group mt-2">
+    <summary class="flex items-center gap-1.5 font-bold text-emerald-700 cursor-pointer"><span><%= t(prefix + '_how') %></span><i class="fa-solid fa-chevron-down text-[11px] transition group-open:rotate-180 shrink-0"></i></summary>
+    <ol class="mt-2 pl-5 list-decimal space-y-1.5"><% [1, 2, 3, 4].forEach(function (n) { %><li><%= t(prefix + '_step' + n) %></li><% }); %></ol>
+    <p class="mt-2 text-xs text-stone-600"><%= t(prefix + '_limits') %></p>
+    <a href="<%= url %>" target="_blank" rel="noopener" class="mt-2 inline-block font-bold text-emerald-700"><span class="underline"><%= t(prefix + '_link') %></span> <i class="fa-solid fa-arrow-right text-xs"></i></a>
+  </details>
+</div>

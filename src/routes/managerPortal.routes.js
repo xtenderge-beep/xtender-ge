@@ -87,6 +87,8 @@ router.post('/orders/:token/note',orderAction(req=>require('../services/orderTex
 router.post('/orders/:token/brief',orderAction(req=>require('../services/orderBrief.service').act(req.params.token,req.body.action)));
 // Подсказка грузчику о машине (config/vehicleHint.js) у заявки, уже отправленной грузчикам.
 router.post('/orders/:token/vehicle-hint',orderAction(req=>require('../services/orderNeeds.service').setMoversVehicle(req.params.token,req.body.vehicleHint==='on')));
+// Подсказка о прокате инструмента (config/toolsHint.js): кнопка называет услугу и новое состояние, «<услуга>:on».
+router.post('/orders/:token/tools-hint',orderAction(req=>{const [category,state]=String(req.body.toolsHint||'').split(':');return require('../services/orderNeeds.service').setToolsNeeded(req.params.token,category,state==='on');}));
 router.post('/orders/:token/retry',wrap(async(req,res)=>{
   try {await dispatchService.retry(req.params.token,req.body.runId,'manager:'+req.managerSession.id);res.redirect('/manager/orders/'+encodeURIComponent(req.params.token));}
   catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}

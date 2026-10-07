@@ -21,6 +21,7 @@ const { toE164 } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
 const requestLanguage = require('../config/requestLanguage');
 const vehicleHint = require('../config/vehicleHint');
+const toolsHint = require('../config/toolsHint');
 const { parseDispatchLanguage } = require('../config/spokenLanguages');
 
 // Заготовка сообщения для WhatsApp-кнопки исполнителя: приветствие на языке заказчика
@@ -31,15 +32,22 @@ function briefCardFor(order) {
   return brief?.shared ? Object.fromEntries(['ka', 'ru', 'en'].map((lang) => [lang, briefs.lines(brief, lang)])) : null;
 }
 
-// Подсказка грузчику о машине (config/vehicleHint.js). Город заявки читается, только когда она
-// нужна; заявка без города — прежняя тбилисская, как и в подборе исполнителей.
+// Город заявки для подсказок исполнителю. Заявка без города — прежняя тбилисская, как и в подборе.
+const citySlugOf = async (order) => (order.city_id ? (await masterService.getWorkCities()).find((item) => item.id === order.city_id)?.slug : 'tbilisi');
+
+// Подсказка грузчику о машине (config/vehicleHint.js). Город заявки читается, только когда она нужна.
 async function vehicleHintFor(order, closedCategories, matched, master, lang) {
   const open = (order.target_categories || []).filter((category) => !closedCategories.includes(category));
   const wanted = vehicleHint.flagged(order);
   const ownsVehicle = wanted && master ? (await require('../services/serviceMatching.service').servicesFor(master)).some((service) => service.service_type === 'van') : false;
   if (!vehicleHint.needed(open, matched, wanted, ownsVehicle)) return null;
-  const city = order.city_id ? (await masterService.getWorkCities()).find((item) => item.id === order.city_id)?.slug : 'tbilisi';
-  return vehicleHint.available(city) ? { url: vehicleHint.guideUrl(lang) } : null;
+  return vehicleHint.available(await citySlugOf(order)) ? { url: vehicleHint.guideUrl(lang) } : null;
+}
+
+// Подсказка о прокате инструмента (config/toolsHint.js) исполнителю услуги, у которой стоит отметка менеджера.
+async function toolsHintFor(order, matched) {
+  if (!toolsHint.needed(order, matched)) return null;
+  return toolsHint.available(await citySlugOf(order)) ? { url: toolsHint.catalogUrl } : null;
 }
 
 function buildWhatsappText(order) {
@@ -908,6 +916,7 @@ async function show(req, res) {
     linkTaken: !isOwner && !provider && link?.state === 'taken',
     noMatchingNeeds: !!m && !matched.length,
     vehicleHint: await vehicleHintFor(order, closedCategories, matched, m, pageLang),
+    toolsHint: await toolsHintFor(order, matched),
     funnel,
     masterAccount,
     requestLang,

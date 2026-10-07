@@ -459,6 +459,11 @@ const orderText = orderAction(req => require('../services/orderText.service').ed
 const orderNote = orderAction(req => require('../services/orderText.service').clarify(req.params.token, req.body.note, 'admin', requestMeta(req)));
 const orderBrief = orderAction(req => require('../services/orderBrief.service').act(req.params.token, req.body.action));
 const orderVehicleHint = orderAction(req => require('../services/orderNeeds.service').setMoversVehicle(req.params.token, req.body.vehicleHint === 'on'));
+// Кнопка называет услугу и новое состояние: «<услуга>:on».
+const orderToolsHint = orderAction(req => {
+  const [category, state] = String(req.body.toolsHint || '').split(':');
+  return require('../services/orderNeeds.service').setToolsNeeded(req.params.token, category, state === 'on');
+});
 const orderRetry = orderAction(req => dispatchService.retry(req.params.token, req.body.runId, 'admin'));
 
 // Закрытие от лица модератора — намеренно без SMS клиенту с приглашением оценить
@@ -900,6 +905,7 @@ module.exports = {
   orderNote,
   orderBrief,
   orderVehicleHint,
+  orderToolsHint,
   orderRetry,
   closeOrder,
   closeOrderCategory,

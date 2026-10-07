@@ -81,6 +81,7 @@ router.post('/orders/:token/text', verifyCsrf, asyncHandler(adminController.orde
 router.post('/orders/:token/note', verifyCsrf, asyncHandler(adminController.orderNote));
 router.post('/orders/:token/brief', verifyCsrf, asyncHandler(adminController.orderBrief));
 router.post('/orders/:token/vehicle-hint', verifyCsrf, asyncHandler(adminController.orderVehicleHint));
+router.post('/orders/:token/tools-hint', verifyCsrf, asyncHandler(adminController.orderToolsHint));
 router.post('/orders/:token/retry', verifyCsrf, asyncHandler(adminController.orderRetry));
 router.post('/orders/:token/request-revision', verifyCsrf, asyncHandler(adminController.requestOrderRevision));
 router.post('/orders/:token/close', verifyCsrf, asyncHandler(adminController.closeOrder));
