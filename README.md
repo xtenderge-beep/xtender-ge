@@ -7,6 +7,7 @@
 20.09.2026, релиз `b4b00be`). Партнёрская программа:
 [docs/manager-partners.md](docs/manager-partners.md). Аналитика и возврат
 заявок на исправление: [docs/admin-analytics.md](docs/admin-analytics.md).
+Google Analytics и цели для Google Ads: [docs/google-analytics.md](docs/google-analytics.md).
 Заявка из нескольких категорий (закрытие по категориям, воронка по группам
 исполнителей): [docs/multi-category-orders.md](docs/multi-category-orders.md).
 Снимок состояния уточняет и заменяет исторические описания ниже там, где они расходятся.
