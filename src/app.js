@@ -15,6 +15,7 @@ const { normalizeLang, translate } = require('./config/i18n');
 const asyncHandler = require('./middleware/asyncHandler');
 const pool = require('./config/db');
 const adminAuth = require('./config/adminAuth');
+const googleTag = require('./config/googleTag');
 
 const app = express();
 
@@ -55,6 +56,8 @@ app.use((req, res, next) => {
   // исполнителя, иначе «Работа». Наличие cookie — подсказка, не гарантия (протухший
   // токен самоисправится на /master).
   res.locals.isRememberedProvider = Boolean(req.cookies.master_session);
+  // Google Analytics только на открытых страницах; на остальных идентификатор пуст.
+  res.locals.googleTagId = googleTag.idFor(req.path);
   next();
 });
 

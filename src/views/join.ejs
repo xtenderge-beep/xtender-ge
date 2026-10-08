@@ -248,6 +248,17 @@
         }
         if (descriptionInput) descriptionInput.addEventListener('focus', enterSignupCompose);
 
+        // Google Analytics (public/js/google-tag.js): шаги регистрации исполнителя.
+        // Шаг считается один раз за открытие страницы; без Google на странице вызовы ничего не делают.
+        const trackedSteps = new Set();
+        function trackStep(name, params) {
+            if (trackedSteps.has(name)) return;
+            trackedSteps.add(name);
+            if (window.xtTrack) window.xtTrack(name, params);
+        }
+        // Перед уходом со страницы: ждёт, пока Google примет событие (не дольше 0,8 с).
+        const trackSent = (name, params) => new Promise((resolve) => (window.xtTrack ? window.xtTrack(name, params, resolve) : resolve()));
+
         function showMsg(text, isError) {
             const el = document.getElementById('formMsg');
             if (!text) { el.classList.add('hidden'); return; }
@@ -344,7 +355,9 @@
         }
 
         function nextSignupStep() {
-            if (!signupBusy && signupStep < LAST_STEP && validateSignupStep(signupStep)) changeSignupStep(signupStep + 1);
+            if (signupBusy || signupStep >= LAST_STEP || !validateSignupStep(signupStep)) return;
+            trackStep('provider_signup_start');
+            changeSignupStep(signupStep + 1);
         }
 
         document.getElementById('detailsStep').addEventListener('input', function () {
@@ -410,6 +423,7 @@
             const data = await res.json();
             if (!data.success) return showSignupError(data, T.js_err_send_code);
             consentChallenge = data.challengeId; consentVerified = false;
+            trackStep('provider_signup_code_sent');
 
             showMsg(isResend === true ? T.js_ok_code_sent : '', false);
             document.getElementById('otpSentTo').textContent = T.otp_sent_to.replace('{phone}', payload.phone);
@@ -486,6 +500,9 @@
             // Профиль на модерации и первые вопросы («как приходят заявки», billing)
             // теперь отвечает сам кабинет (guide-блок открыт для профиля на проверке) —
             // отдельный промежуточный экран здесь только откладывал вход в кабинет.
+            // Регистрация завершена — конверсия. В кабинете Google Analytics нет (в его адресе
+            // секретная ссылка), поэтому событие уходит до перехода.
+            await trackSent('sign_up', { method: 'sms' });
             window.location.href = data.link;
             } catch (_) {
                 showMsg(T.provider_signup_network, true);

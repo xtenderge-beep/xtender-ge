@@ -1,0 +1,2 @@
+<%# Google Analytics: только на открытых страницах, см. src/config/googleTag.js. %>
+<% if (typeof googleTagId !== 'undefined' && googleTagId) { %><script src="/js/google-tag.js" data-id="<%= googleTagId %>" defer></script><% } %>

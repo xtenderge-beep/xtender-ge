@@ -617,6 +617,17 @@
         const phoneStep = document.getElementById('phoneStep');
         const otpStep = document.getElementById('otpStep');
 
+        // Google Analytics (public/js/google-tag.js): шаги формы заявки и показа номера в каталоге.
+        // Шаг считается один раз за открытие страницы; без Google на странице вызовы ничего не делают.
+        const trackedSteps = new Set();
+        function trackStep(name, params) {
+            if (trackedSteps.has(name)) return;
+            trackedSteps.add(name);
+            if (window.xtTrack) window.xtTrack(name, params);
+        }
+        // Перед уходом со страницы: ждёт, пока Google примет событие (не дольше 0,8 с).
+        const trackSent = (name, params) => new Promise((resolve) => (window.xtTrack ? window.xtTrack(name, params, resolve) : resolve()));
+
         function showMsg(text, isError) {
             if (!text) {
                 formMsg.classList.add('hidden');
@@ -796,6 +807,7 @@
         }
 
         function goToPhoneStep() {
+            trackStep('lead_form_phone_step');
             showMsg('');
             exitCompose();
             detailsStep.classList.add('hidden');
@@ -845,6 +857,7 @@
         }
 
         if (composeInput) composeInput.addEventListener('focus', enterCompose);
+        if (composeInput) composeInput.addEventListener('input', () => trackStep('lead_form_start'));
 
         // --- Мобильная форма: чипсы категорий + клавиатура vs нижнее меню ---
         (function () {
@@ -919,6 +932,7 @@
                 if (data.success) {
                     pendingOrderToken = data.token;
                     consentChallenge = data.challengeId; consentVerified = false;
+                    trackStep('lead_form_code_sent');
                     showMsg(T.js_ok_code_sent, false);
                     phoneStep.classList.add('hidden');
                     otpStep.classList.remove('hidden');
@@ -949,6 +963,9 @@
                 res = await fetch('/api/orders', { method: 'POST', body: formData });
                 data = await res.json();
                 if (data.success) {
+                    // Заявка создана — главная конверсия. На странице заявки Google Analytics нет
+                    // (в её адресе секретная ссылка), поэтому событие уходит до перехода.
+                    await trackSent('generate_lead', { lead_type: 'order' });
                     if (data.ownerLink) { window.location.href = data.ownerLink; return; }
                     showLiveOrder(data.token, data.id);
                 } else { showMsg(data.message || T.js_err_create_order, true); }
@@ -1267,7 +1284,12 @@
             const res = await fetch('/api/masters/' + masterId + '/reveal-phone', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || T.contacts_error);
-            if (data.success) { showRevealedContact(masterId, data); return { handled: true, contacts: data.contacts, data }; }
+            if (data.success) {
+                // Номер открыт впервые: заказчик получил контакт исполнителя из каталога.
+                if (!data.alreadyOpened && window.xtTrack) window.xtTrack('catalog_contact_open');
+                showRevealedContact(masterId, data);
+                return { handled: true, contacts: data.contacts, data };
+            }
             if (data.needsVerification) return { handled: false, phone: null };
             showRevealUnavailable(masterId);
             return { handled: true, phone: null };
@@ -1290,6 +1312,7 @@
                 const masterId = btn.dataset.masterId;
                 const action = btn.dataset.action;
                 const slot = btn.closest('.reveal-contact-slot');
+                trackStep('catalog_contact_start');
                 slot.querySelectorAll('.reveal-contact-btn').forEach((b) => { b.disabled = true; });
                 let res;
                 try {
@@ -1328,6 +1351,7 @@
                 });
                 const data = await res.json();
                 if (data.success) {
+                    trackStep('catalog_code_sent');
                     revealMsg(T.js_ok_code_sent, false);
                     revealShowStep('code');
                 } else {
