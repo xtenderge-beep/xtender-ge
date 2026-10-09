@@ -909,6 +909,23 @@ CREATE TABLE IF NOT EXISTS lead_links (
 );
 CREATE INDEX IF NOT EXISTS idx_lead_links_key ON lead_links(key_hash);
 
+-- Страницы под рекламу и поиск: одна задача заказчика — одна страница /s/<slug> (landingPage.service.js,
+-- /admin/landings). categories — группы рассылки, чьих получателей считает число на первом экране;
+-- content — тексты по языкам (первый экран, заголовок вкладки и описание для поиска, статья).
+-- Строк здесь не добавляем: файл выполняется при каждом старте, и вставка вернула бы страницу,
+-- которую администратор удалил. Начальные три страницы один раз записывает сам сервис.
+CREATE TABLE IF NOT EXISTS landing_pages (
+    id SERIAL PRIMARY KEY,
+    slug VARCHAR(80) NOT NULL UNIQUE,
+    admin_name VARCHAR(120) NOT NULL,
+    categories JSONB NOT NULL DEFAULT '[]',
+    content JSONB NOT NULL DEFAULT '{}',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 100,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

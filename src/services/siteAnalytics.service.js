@@ -19,13 +19,13 @@ const tbilisiDate = ms => new Date(ms + 4 * HOUR).toISOString().slice(0, 10);
 // Тип страницы вместо адреса: токены из адресов никогда не попадают в базу.
 const PAGES = [
   [/^\/$/, 'home'], [/^\/join$/, 'join'], [/^\/guides\/request$/, 'guide'],
-  [/^\/terms$/, 'terms'], [/^\/privacy$/, 'privacy'], [/^\/my-orders$/, 'my_orders'],
+  [/^\/terms$/, 'terms'], [/^\/privacy$/, 'privacy'], [/^\/my-orders$/, 'my_orders'], [/^\/s\/[a-z0-9-]+$/, 'landing'],
   [/^\/order\/[^/]+$/, 'lead'], [/^\/o\/[^/]+$/, 'client_order'], [/^\/review\/[^/]+$/, 'review'],
   [/^\/master$/, 'provider_login'], [/^\/master\/[^/]+\/topups(\/|$)/, 'provider_topup'],
   [/^\/master\/[^/]+$/, 'provider_cabinet'], [/^\/[id]\/[^/]+$/, 'manager_link'],
 ];
 const PAGE_LABELS = {
-  home: 'Главная', join: 'Регистрация исполнителя', guide: 'Гайд «Как оставить заявку»', terms: 'Оферта',
+  home: 'Главная', landing: 'Страница под рекламу и поиск', join: 'Регистрация исполнителя', guide: 'Гайд «Как оставить заявку»', terms: 'Оферта',
   privacy: 'Политика конфиденциальности', my_orders: 'Мои заявки', lead: 'Заявка (открыл исполнитель)',
   client_order: 'Страница заявки заказчика', review: 'Отзыв', provider_login: 'Вход исполнителя',
   provider_topup: 'Пополнение баланса', provider_cabinet: 'Кабинет исполнителя', manager_link: 'Ссылка менеджера', other: 'Другое',

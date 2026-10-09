@@ -1,0 +1,128 @@
+<%- include('./_header',{active:'landings'}) %>
+<%
+  const LANG_TITLES = { ka: 'Грузинский', ru: 'Русский', en: 'Английский' };
+  const text = (lang, field) => (value.content && value.content[lang] && value.content[lang][field]) || '';
+  const articleOn = (lang) => { const v = value.content && value.content[lang] && value.content[lang].article_on; return v === true || v === 'on'; };
+  const chosen = [].concat(value.categories || []);
+  const input = 'block w-full border rounded-xl px-3 py-2 mt-1';
+  const hint = 'mt-1 text-xs text-stone-500';
+%>
+<a href="/admin/landings" class="text-sm">← Страницы под рекламу и поиск</a>
+<h1 class="text-2xl font-bold mt-3"><%= page ? page.admin_name : 'Новая страница' %></h1>
+<% if (saved) { %><p role="status" class="mt-3 text-sm text-emerald-700">Сохранено. Изменения уже на сайте.</p><% } %>
+<% if (error) { %><p role="alert" class="mt-3 text-red-600 font-semibold"><%= error %></p><% } %>
+
+<form method="post" action="/admin/landings<%= page ? '/' + page.id : '' %>" class="mt-4 space-y-5">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+  <section class="bg-white border rounded-xl p-5 space-y-4">
+    <h2 class="font-bold">Страница</h2>
+    <label class="block text-sm">Название в этом списке
+      <input required maxlength="120" name="admin_name" value="<%= value.admin_name || '' %>" class="<%= input %>">
+    </label>
+    <label class="block text-sm">Адрес
+      <span class="flex items-center gap-1 mt-1"><span class="font-mono text-sm text-stone-500">xtender.ge/s/</span><input required maxlength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" name="slug" value="<%= value.slug || '' %>" class="flex-1 border rounded-xl px-3 py-2 font-mono text-sm"></span>
+    </label>
+    <p class="<%= hint %>">Поисковый запрос латиницей через дефис: <code>avejis-gadazidva</code>. Когда на адрес уже идёт реклама или его нашёл Google, менять его не стоит: старые ссылки перестанут открываться.</p>
+    <fieldset>
+      <legend class="text-sm">Кого считать в числе на первом экране</legend>
+      <div class="mt-1 flex flex-wrap gap-x-5 gap-y-1">
+        <% groups.forEach(function (group) { %>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="categories" value="<%= group.key %>" <%= chosen.includes(group.key) ? 'checked' : '' %>><%= group.label %></label>
+        <% }); %>
+      </div>
+      <p class="<%= hint %>">Число — это исполнители отмеченных групп, которым такая заявка ушла бы прямо сейчас: профиль активен, баланса хватает, город Тбилиси. Сейчас их <b><%= group %></b>. Если меньше <%= minGroup %>, страница показывает фразу без числа.</p>
+    </fieldset>
+    <div class="flex flex-wrap items-end gap-5">
+      <label class="text-sm">Порядок в списке<input type="number" name="sort_order" min="0" max="10000" value="<%= value.sort_order ?? 100 %>" class="block w-28 border rounded-xl px-3 py-2 mt-1"></label>
+      <label class="flex items-center gap-2 text-sm pb-2"><input type="checkbox" name="is_active" <%= value.is_active ? 'checked' : '' %>>Страница включена</label>
+    </div>
+    <p class="<%= hint %>">Выключенная страница ведёт на главную и исчезает из карты сайта и ссылок.</p>
+  </section>
+
+  <% ['ka', 'ru', 'en'].forEach(function (lang, index) { %>
+  <details class="bg-white border rounded-xl p-5" <%= index === 0 || text(lang, 'title') ? 'open' : '' %>>
+    <summary class="cursor-pointer font-bold">
+      <%= LANG_TITLES[lang] %>
+      <span class="ml-2 text-sm font-normal text-stone-500"><%= languages.includes(lang) ? 'заполнен' : 'не заполнен — на этом языке страницы нет' %></span>
+      <% if (page && languages.includes(lang)) { %><a class="ml-2 text-sm font-normal underline text-emerald-700" target="_blank" rel="noopener" href="<%= lang === 'ka' ? '/s/' + page.slug + '?lang=ka' : '/' + lang + '/s/' + page.slug %>">открыть страницу</a><% } %>
+    </summary>
+
+    <h3 class="mt-4 text-sm font-bold uppercase text-stone-500">Первый экран</h3>
+    <div class="mt-2 grid gap-3 sm:grid-cols-2">
+      <label class="block text-sm">Заголовок
+        <input maxlength="<%= limits.title %>" name="content[<%= lang %>][title]" value="<%= text(lang, 'title') %>" class="<%= input %>">
+        <span class="<%= hint %> block">Повторяет запрос слово в слово.</span>
+      </label>
+      <label class="block text-sm">Вторая часть заголовка, зелёным
+        <input maxlength="<%= limits.accent %>" name="content[<%= lang %>][accent]" value="<%= text(lang, 'accent') %>" class="<%= input %>">
+        <span class="<%= hint %> block">Обычно город. Можно оставить пустым.</span>
+      </label>
+    </div>
+    <label class="block text-sm mt-3">Фраза с числом
+      <input maxlength="<%= limits.post %>" name="content[<%= lang %>][post]" value="<%= text(lang, 'post') %>" class="<%= input %>">
+      <span class="<%= hint %> block">На месте <code>{count}</code> страница ставит число исполнителей. Слова в квадратных скобках выделяются зелёным: <code>…[{count} грузчиков]…</code></span>
+    </label>
+    <% if (lang === 'ru') { %>
+    <label class="block text-sm mt-3">Фраза для чисел на 1 (21, 31, 41…)
+      <input maxlength="<%= limits.post_one %>" name="content[<%= lang %>][post_one]" value="<%= text(lang, 'post_one') %>" class="<%= input %>">
+      <span class="<%= hint %> block">По-русски «из 21 грузчика», а не «из 21 грузчиков». Если пусто, берётся обычная фраза.</span>
+    </label>
+    <% } %>
+    <label class="block text-sm mt-3">Фраза без числа
+      <input maxlength="<%= limits.post_plain %>" name="content[<%= lang %>][post_plain]" value="<%= text(lang, 'post_plain') %>" class="<%= input %>">
+      <span class="<%= hint %> block">Показывается, когда исполнителей меньше <%= minGroup %>. Без <code>{count}</code>.</span>
+    </label>
+    <label class="block text-sm mt-3">Вторая строка фразы
+      <input maxlength="<%= limits.choose %>" name="content[<%= lang %>][choose]" value="<%= text(lang, 'choose') %>" class="<%= input %>">
+    </label>
+    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+      <label class="block text-sm">Первая строка под формой
+        <input maxlength="<%= limits.fact1 %>" name="content[<%= lang %>][fact1]" value="<%= text(lang, 'fact1') %>" class="<%= input %>">
+      </label>
+      <label class="block text-sm">Вторая строка под формой
+        <input maxlength="<%= limits.fact2 %>" name="content[<%= lang %>][fact2]" value="<%= text(lang, 'fact2') %>" class="<%= input %>">
+      </label>
+    </div>
+    <label class="block text-sm mt-3">Пример в поле заявки
+      <input maxlength="<%= limits.placeholder %>" name="content[<%= lang %>][placeholder]" value="<%= text(lang, 'placeholder') %>" class="<%= input %>">
+      <span class="<%= hint %> block">Показывает, что писать: что, откуда и куда, когда, за сколько.</span>
+    </label>
+
+    <h3 class="mt-6 text-sm font-bold uppercase text-stone-500">Для поиска</h3>
+    <label class="block text-sm mt-2">Заголовок вкладки <span class="text-xs text-stone-500" data-count-for="seo_title_<%= lang %>"></span>
+      <input id="seo_title_<%= lang %>" maxlength="<%= limits.seo_title %>" name="content[<%= lang %>][seo_title]" value="<%= text(lang, 'seo_title') %>" class="<%= input %>">
+      <span class="<%= hint %> block">Строка, которую Google показывает ссылкой. Целиком видны примерно первые 60 знаков. Если пусто — «Заголовок | xtender.ge».</span>
+    </label>
+    <label class="block text-sm mt-3">Описание для поиска <span class="text-xs text-stone-500" data-count-for="seo_description_<%= lang %>"></span>
+      <textarea id="seo_description_<%= lang %>" rows="3" maxlength="<%= limits.seo_description %>" name="content[<%= lang %>][seo_description]" class="<%= input %>"><%= text(lang, 'seo_description') %></textarea>
+      <span class="<%= hint %> block">Текст под ссылкой в Google. Целиком видны примерно первые 155 знаков. Если пусто — общее описание сайта.</span>
+    </label>
+
+    <h3 class="mt-6 text-sm font-bold uppercase text-stone-500">Статья под первым экраном</h3>
+    <label class="flex items-center gap-2 text-sm mt-2"><input type="checkbox" name="content[<%= lang %>][article_on]" <%= articleOn(lang) ? 'checked' : '' %>>Показывать статью на странице</label>
+    <textarea rows="18" maxlength="<%= limits.article %>" name="content[<%= lang %>][article]" spellcheck="false" class="mt-2 w-full font-mono text-xs leading-relaxed border rounded-xl p-3"><%= text(lang, 'article') %></textarea>
+    <p class="<%= hint %>"><code>## Заголовок</code> — заголовок раздела · <code>- пункт</code> — строка списка · любая другая строка — абзац · пустая строка разделяет части.</p>
+  </details>
+  <% }); %>
+
+  <button type="submit" class="px-5 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl">Сохранить</button>
+</form>
+
+<% if (page) { %>
+<form method="post" action="/admin/landings/<%= page.id %>/delete" class="mt-8" onsubmit="return confirm('Удалить страницу «<%= page.admin_name.replace(/['\\]/g, '') %>»? Её адрес перестанет открываться.')">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+  <button type="submit" class="text-sm text-red-600 underline">Удалить страницу</button>
+</form>
+<% } %>
+
+<script>
+  // Счётчик знаков у полей для поиска.
+  document.querySelectorAll('[data-count-for]').forEach(function (label) {
+    var field = document.getElementById(label.getAttribute('data-count-for'));
+    var show = function () { label.textContent = '· ' + field.value.length + ' зн.'; };
+    field.addEventListener('input', show);
+    show();
+  });
+</script>
+<%- include('./_footer') %>

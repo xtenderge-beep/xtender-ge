@@ -12,9 +12,9 @@ assert.equal(tag.resolveId({GA_MEASUREMENT_ID:''}),'');
 for(const bad of ['UA-1234-1','G-abc','"><script>','GTM-ABCDE']) assert.equal(tag.resolveId({GA_MEASUREMENT_ID:bad}),'',bad);
 
 // Открытые страницы получают метку; страницы с секретными ссылками в адресе, кабинеты и админка — нет.
-for(const p of ['/','/ru','/en/','/join','/ru/join','/en/guides/request','/terms','/ru/privacy']) assert.equal(tag.idFor(p,ID),ID,p);
+for(const p of ['/','/ru','/en/','/join','/ru/join','/en/guides/request','/terms','/ru/privacy','/s/avejis-gadazidva','/ru/s/tvirtis-gadazidva','/en/s/a1/']) assert.equal(tag.idFor(p,ID),ID,p);
 for(const p of ['/o/SECRET','/order/abc','/master','/master/tok','/master/tok/topups/5','/review/tok','/my-orders','/z/tok','/admin',
-  '/manager/orders','/ru/o/x','/joinx','/de/join']) assert.equal(tag.idFor(p,ID),'',p);
+  '/manager/orders','/ru/o/x','/joinx','/de/join','/s','/s/','/s/Tok_en','/s/a/b','/sx/a']) assert.equal(tag.idFor(p,ID),'',p);
 assert.equal(tag.idFor('/',''),'');
 
 const views=path.join(__dirname,'../src/views'),view=f=>fs.readFileSync(path.join(views,f),'utf8');

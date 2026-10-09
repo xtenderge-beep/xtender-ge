@@ -33,6 +33,14 @@ router.post('/categories', verifyCsrf, asyncHandler(categories.save));
 router.post('/categories/:slug', verifyCsrf, asyncHandler(categories.save));
 router.post('/categories/:slug/delete', verifyCsrf, asyncHandler(categories.remove));
 router.post('/categories/:slug/size-thresholds', verifyCsrf, asyncHandler(categories.saveVanSizes));
+// Страницы под рекламу и поиск (/s/<slug>).
+const landings = require('../controllers/landing.controller');
+router.get('/landings', asyncHandler(landings.index));
+router.get('/landings/new', asyncHandler(landings.form));
+router.get('/landings/:id(\\d+)', asyncHandler(landings.form));
+router.post('/landings', verifyCsrf, asyncHandler(landings.save));
+router.post('/landings/:id(\\d+)', verifyCsrf, asyncHandler(landings.save));
+router.post('/landings/:id(\\d+)/delete', verifyCsrf, asyncHandler(landings.remove));
 router.post('/orders/:token/refresh-categories', verifyCsrf, asyncHandler(categories.refreshOrder));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',asyncHandler(crm.show));

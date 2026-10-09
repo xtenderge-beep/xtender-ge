@@ -1,34 +1,43 @@
 <!DOCTYPE html>
 <html lang="<%= lang %>" class="h-full bg-stone-50 scroll-smooth">
 <head>
+    <%
+      // Страница под рекламу и поиск (/s/<slug>, landingPage.service.js): свой первый экран, заголовок
+      // вкладки, описание для поиска и статья; на телефоне от формы остаётся одно поле.
+      // Без неё (landing не передан) — общая главная, как была.
+      const topic = typeof landing !== 'undefined' && landing ? landing : null;
+      const pageTitle = topic ? topic.seoTitle : t('site_title_index');
+      const pageDescription = (topic && topic.seoDescription) || t('meta_description_index');
+    %>
     <%- include('partials/head', {
-      title: t('site_title_index'),
-      metaDescription: t('meta_description_index'),
+      title: pageTitle,
+      metaDescription: pageDescription,
       viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
     }) %>
 
     <link rel="canonical" href="<%= seo.canonical %>">
-    <link rel="alternate" hreflang="ka" href="<%= seo.alternates.ka %>">
-    <link rel="alternate" hreflang="ru" href="<%= seo.alternates.ru %>">
-    <link rel="alternate" hreflang="en" href="<%= seo.alternates.en %>">
+    <%# У страницы задачи языков может быть меньше трёх: поисковикам объявляются только существующие. %>
+    <% Object.entries(seo.hreflang || seo.alternates).forEach(function (pair) { %>
+    <link rel="alternate" hreflang="<%= pair[0] %>" href="<%= pair[1] %>">
+    <% }); %>
     <link rel="alternate" hreflang="x-default" href="<%= seo.xDefault %>">
 
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="xtender.ge">
-    <meta property="og:title" content="<%= t('site_title_index') %>">
-    <meta property="og:description" content="<%= t('meta_description_index') %>">
+    <meta property="og:title" content="<%= pageTitle %>">
+    <meta property="og:description" content="<%= pageDescription %>">
     <meta property="og:url" content="<%= seo.canonical %>">
 
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="<%= t('site_title_index') %>">
-    <meta name="twitter:description" content="<%= t('meta_description_index') %>">
+    <meta name="twitter:title" content="<%= pageTitle %>">
+    <meta name="twitter:description" content="<%= pageDescription %>">
 
     <%
       const orgJsonLd = {
         '@context': 'https://schema.org',
         '@type': 'MovingCompany',
         name: 'xtender.ge',
-        url: seo.canonical,
+        url: topic ? seo.canonical.split('/s/')[0] + (lang === 'ka' ? '/' : '') : seo.canonical,
         areaServed: {
           '@type': 'City',
           name: 'Tbilisi',
@@ -52,8 +61,35 @@
     %>
     <script type="application/ld+json"><%- JSON.stringify(orgJsonLd) %></script>
     <script type="application/ld+json"><%- JSON.stringify(faqJsonLd) %></script>
+    <% if (topic) {
+      // Страница задачи описывает одну услугу и своё место на сайте. Тексты приходят из админки,
+      // поэтому знак «меньше» заменяется кодом: строка не должна закрыть тег script.
+      const topicName = [topic.title, topic.accent].filter(Boolean).join(' ');
+      const safeJson = (value) => JSON.stringify(value).split('<').join(String.fromCharCode(92) + 'u003c');
+      const serviceJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'Service',
+        name: topicName,
+        serviceType: topic.title,
+        description: pageDescription,
+        url: seo.canonical,
+        areaServed: { '@type': 'City', name: 'Tbilisi' },
+        provider: { '@type': 'Organization', name: 'xtender.ge', url: orgJsonLd.url },
+      };
+      const breadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'xtender.ge', item: orgJsonLd.url },
+          { '@type': 'ListItem', position: 2, name: topicName, item: seo.canonical },
+        ],
+      };
+    %>
+    <script type="application/ld+json"><%- safeJson(serviceJsonLd) %></script>
+    <script type="application/ld+json"><%- safeJson(breadcrumbJsonLd) %></script>
+    <% } %>
 </head>
-<body class="home-page font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+<body class="home-page<%= topic ? ' home-topic' : '' %> font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
 
     <% const homePrefix = lang === 'ka' ? '' : '/' + lang; %>
@@ -75,9 +111,22 @@
       <div class="home-shell">
         <div class="home-hero-layout">
           <div class="home-hero-head">
+            <% if (topic) {
+              // The offer as a picture: the members of the group, then one sentence in two beats.
+              const topicMore = topic.count - topic.initials.length;
+            %>
+            <h1 class="home-hero-title"><%= topic.title %><% if (topic.accent) { %> <span><%= topic.accent %></span><% } %></h1>
+            <div class="home-usp">
+              <% if (topic.initials.length) { %>
+              <span class="home-usp-avatars" aria-hidden="true"><% topic.initials.forEach(function (letter) { %><span><%= letter %></span><% }); %><% if (topicMore > 0) { %><span class="home-usp-more">+<%= topicMore %></span><% } %></span>
+              <% } %>
+              <p class="home-usp-text"><span class="home-usp-post"><%= topic.post[0] %><% if (topic.post.length > 1) { %><b><%= topic.post[1] %></b><%= topic.post[2] %><% } %></span> <span class="home-usp-choose"><%= topic.choose %></span></p>
+            </div>
+            <% } else { %>
             <h1 class="home-hero-title"><%= t('home_hero_title') %> <span><%= t('home_hero_title_accent') %></span></h1>
             <%# One short line on every screen: the offer only. How it works opens on demand (home-explainer). %>
             <p class="home-hero-lead"><%= t('home_hero_lead_short') %></p>
+            <% } %>
           </div>
                     <section id="post-section" class="home-request scroll-mt-20" aria-labelledby="home-form-title">
                         <div class="composer-card">
@@ -118,7 +167,7 @@
                                 </div>
 
                                 <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
-                                    <textarea id="freeformInput" rows="5" aria-describedby="home-description-hint" placeholder="<%= t('freeform_placeholder') %>"
+                                    <textarea id="freeformInput" rows="5" aria-describedby="home-description-hint" placeholder="<%= topic ? topic.placeholder : t('freeform_placeholder') %>"
                                         class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"></textarea>
 
                                     <div id="attachmentsPreview" class="hidden flex-wrap gap-1.5 pt-2"></div>
@@ -175,8 +224,17 @@
 
                     </section>
           <div id="seo-hero" class="home-intro">
+            <% if (topic && topic.facts.length) { %>
+            <ul class="home-usp-facts">
+              <% topic.facts.forEach(function (fact) { %>
+              <li><i class="fa-solid fa-check" aria-hidden="true"></i><%= fact %></li>
+              <% }); %>
+            </ul>
+            <% } %>
             <%- include('partials/home-explainer') %>
-            <% if (masters.length) {
+            <% if (topic) { %>
+            <%# The group above already shows who is there; the catalog stays one tap away in the menu. %>
+            <% } else if (masters.length) {
               const stripCount = masters.length, m10 = stripCount % 10, m100 = stripCount % 100;
               const stripForm = lang === 'ru'
                 ? (m10 === 1 && m100 !== 11 ? 'one' : (m10 >= 2 && m10 <= 4 && !(m100 >= 12 && m100 <= 14) ? 'few' : 'many'))
@@ -254,6 +312,16 @@
             </div>
           </div>
         </section>
+
+        <% if (topic && topic.article.length) { %>
+        <%# Статья страницы задачи: как устроена работа для этой задачи. Формат как у оферты: заголовки, абзацы, списки. %>
+        <article class="home-article">
+          <% topic.article.forEach(function (block) { %>
+          <% if (block.h) { %><h2><%= block.h %></h2><% } else if (block.ul) { %><ul><% block.ul.forEach(function (item) { %><li><%= item %></li><% }); %></ul><% } else if (block.p) { %><p><%= block.p %></p><% } %>
+          <% }); %>
+          <a class="home-article-cta" href="#post-section"><%= t('explainer_cta') %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a>
+        </article>
+        <% } %>
 
                     <section id="masters-section" class="home-catalog space-y-5 scroll-mt-24">
 
@@ -448,6 +516,12 @@
                               </div>
                             <% }); %>
                         </div>
+                        <% if (typeof landingLinks !== 'undefined' && landingLinks.length) { %>
+                        <%# Страницы задач: ссылки с главной и между собой. %>
+                        <nav class="home-task-links" aria-label="<%= t('home_services_title') %>">
+                          <% landingLinks.forEach(function (link) { %><a href="<%= link.href %>"><%= link.title %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><% }); %>
+                        </nav>
+                        <% } %>
                     </section>
 
 

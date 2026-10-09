@@ -2,7 +2,8 @@ const consentService = require('../services/consent.service');
 const express = require('express');
 const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const serviceTypes = require('../config/serviceTypes');
-const { buildSeo } = require('../config/seo');
+const { buildSeo, localizedPath, sitemapXml } = require('../config/seo');
+const landingPages = require('../services/landingPage.service');
 const { SERVICE_REQUISITES } = require('../config/legal');
 const legalContent = require('../config/legal-content');
 const legalContentService = require('../services/legalContent.service');
@@ -49,9 +50,20 @@ function redirectToCookieLocale(req, res, path) {
   return true;
 }
 
-router.get('/', asyncHandler(async (req, res) => {
-  if (redirectToCookieLocale(req, res, '')) return;
-  const locale = resolveLocale(req, res, '/');
+// Сбой в страницах задач не должен ронять главную и карту сайта: тогда они выходят без этих страниц.
+async function publishedLandings() {
+  try {
+    return await landingPages.published();
+  } catch (error) {
+    console.error('Landing pages unavailable:', error.message);
+    return [];
+  }
+}
+
+// Главная и страницы под рекламу и поиск (/s/<slug>) — один шаблон. У страницы свой первый экран,
+// заголовок вкладки, описание для поиска и статья; каталог, форма и остальное общие.
+// page — строка landing_pages или null для главной.
+async function renderHome(req, res, locale, page) {
   const catalogCities = await masterService.getActiveCities();
   const catalogCity = catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
   const [masters, catalogCallPriceTetri] = await Promise.all([
@@ -99,8 +111,15 @@ router.get('/', asyncHandler(async (req, res) => {
     if (invite) prefillPhone = invite.phone;
   }
 
+  // Ссылки на страницы задач: с главной и между собой, чтобы поисковик и человек находили их все.
+  const landingLinks = (await publishedLandings())
+    .filter(item => item.id !== page?.id && item.languages.includes(locale))
+    .map(item => ({ href: localizedPath(locale, '/s/' + item.slug), title: [item.content[locale].title, item.content[locale].accent].filter(Boolean).join(' ') }));
+
   res.render('index', {
     consent: await consentService.bundle('client', locale),
+    landing: page ? await landingPages.view(page, locale, catalogCity?.id) : null,
+    landingLinks,
     masters,
     catalogCities,
     catalogCity,
@@ -110,6 +129,51 @@ router.get('/', asyncHandler(async (req, res) => {
     catalogGroups: await categoryService.catalogGroups(locale),
     catalogServiceConfig: await categoryService.configForView(locale),
   });
+}
+
+router.get('/', asyncHandler(async (req, res) => {
+  if (redirectToCookieLocale(req, res, '')) return;
+  await renderHome(req, res, resolveLocale(req, res, '/'), null);
+}));
+
+// Страница под рекламу и поиск. Параметры адреса (gclid, utm_*) при переадресациях сохраняются:
+// по ним Google связывает клик с заявкой.
+router.get('/s/:slug', asyncHandler(async (req, res, next) => {
+  const page = await landingPages.getBySlug(req.params.slug);
+  if (!page) return next();
+  const path = '/s/' + page.slug;
+  const wanted = normalizeLang(req.params.locale);
+  const query = new URLSearchParams(req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?') + 1) : '');
+  const to = (lang, suffix) => {
+    if (lang === 'ka') query.set('lang', 'ka'); else query.delete('lang');
+    const rest = query.toString();
+    return localizedPath(lang, suffix) + (rest ? '?' + rest : '');
+  };
+  const langs = page.is_active ? landingPages.languages(page) : [];
+  // Выключенная страница не тупик для рекламы: ведёт на главную.
+  if (!langs.length) return res.redirect(302, to(wanted, '/'));
+  // Тот же порядок, что у остальных страниц (redirectToCookieLocale): адрес без языка и запомненный
+  // ru/en — уводим на языковую версию, но только если страница на этом языке есть.
+  if (!req.params.locale && req.query.lang !== 'ka') {
+    const remembered = normalizeLang(req.cookies.lang);
+    if (remembered !== 'ka' && langs.includes(remembered)) return res.redirect(302, to(remembered, path));
+  }
+  if (!langs.includes(wanted)) return res.redirect(302, to(langs.includes('ka') ? 'ka' : langs[0], path));
+
+  const locale = resolveLocale(req, res, path);
+  const seo = res.locals.seo, homeLinks = buildSeo(locale, '/').alternates;
+  // Поисковикам объявляем только языки, на которых страница есть; переключатель языка с остальных
+  // ведёт на главную.
+  seo.hreflang = Object.fromEntries(langs.map(lang => [lang, seo.alternates[lang]]));
+  seo.xDefault = seo.hreflang.ka || seo.hreflang[langs[0]];
+  for (const lang of Object.keys(seo.alternates)) if (!langs.includes(lang)) seo.alternates[lang] = homeLinks[lang];
+  await renderHome(req, res, locale, page);
+}));
+
+// Карта сайта собирается на лету: в ней постоянные страницы и включённые страницы задач.
+router.get('/sitemap.xml', asyncHandler(async (req, res, next) => {
+  if (req.params.locale) return next();
+  res.type('application/xml').send(sitemapXml(await publishedLandings()));
 }));
 
 // Персональная ссылка менеджера для заказчика. Ставим куку с токеном приглашения,

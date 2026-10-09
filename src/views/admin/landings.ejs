@@ -1,0 +1,28 @@
+<%- include('./_header',{active:'landings'}) %>
+<div class="flex items-center justify-between gap-3">
+  <h1 class="text-2xl font-bold">Страницы под рекламу и поиск</h1>
+  <a href="/admin/landings/new" class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Добавить страницу</a>
+</div>
+<p class="mt-3 text-sm text-stone-600 max-w-3xl">Одна задача заказчика — одна страница: свой заголовок, своя фраза первого экрана, свои заголовок и описание для поиска, своя статья. На эти адреса ведёт реклама. Общая главная от них не зависит.</p>
+<% if (removed) { %><p role="status" class="mt-3 text-sm text-emerald-700">Страница удалена.</p><% } %>
+<div class="mt-5 space-y-3">
+<% pages.forEach(function (page) { %>
+  <div class="p-4 bg-white border rounded-xl">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <a href="/admin/landings/<%= page.id %>" class="font-bold text-stone-900 underline"><%= page.admin_name %></a>
+      <span class="text-sm <%= page.is_active ? 'text-emerald-700' : 'text-stone-500' %>"><%= page.is_active ? 'Включена' : 'Выключена' %></span>
+    </div>
+    <p class="mt-1 text-sm text-stone-600 font-mono">xtender.ge/s/<%= page.slug %></p>
+    <p class="mt-1 text-sm text-stone-500">
+      В группе сейчас: <b><%= page.group %></b><% if (page.group < minGroup) { %> — меньше <%= minGroup %>, поэтому на странице фраза без числа<% } %>
+      · Языки:
+      <% if (!page.languages.length) { %>не заполнены<% } %>
+      <% page.languages.forEach(function (lang) { %>
+        <a class="underline text-emerald-700" target="_blank" rel="noopener" href="<%= lang === 'ka' ? '/s/' + page.slug + '?lang=ka' : '/' + lang + '/s/' + page.slug %>"><%= { ka: 'грузинский', ru: 'русский', en: 'английский' }[lang] %></a>
+      <% }); %>
+    </p>
+  </div>
+<% }); %>
+<% if (!pages.length) { %><p class="text-sm text-stone-500">Страниц пока нет.</p><% } %>
+</div>
+<%- include('./_footer') %>

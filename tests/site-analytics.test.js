@@ -13,7 +13,7 @@ const PC='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, l
  // Адрес → тип страницы; секретные токены не сохраняются.
  for(const [p,page] of [['/','home'],['/ru','home'],['/en/join','join'],['/ru/guides/request','guide'],['/o/AbCdEf123','client_order'],
    ['/order/xyz?x=1','lead'],['/master/tok123','provider_cabinet'],['/master/tok/topups/5','provider_topup'],['/master','provider_login'],
-   ['/i/tok','manager_link'],['/review/tok','review'],['/wp-admin','other'],['/terms/','terms']]) assert.equal(sa.classifyPage(p),page,p);
+   ['/i/tok','manager_link'],['/review/tok','review'],['/s/avejis-gadazidva','landing'],['/ru/s/tvirtis-gadazidva/','landing'],['/wp-admin','other'],['/terms/','terms']]) assert.equal(sa.classifyPage(p),page,p);
  // Источник: utm важнее реферера, внутренние переходы — не источник.
  assert.equal(sa.parseSource('https://www.google.com/search?q=x','', 'xtender.ge'),'Google');
  assert.equal(sa.parseSource('https://l.facebook.com/l.php','', 'xtender.ge'),'Facebook');
