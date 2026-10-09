@@ -117,7 +117,8 @@
             %>
             <h1 class="home-hero-title"><%= topic.title %><% if (topic.accent) { %> <span><%= topic.accent %></span><% } %></h1>
             <div class="home-usp">
-              <% if (topic.initials.length) { %>
+              <%# Кружки идут вместе с числом: маленькая группа без числа с одним-двумя кружками выглядит пустой. %>
+              <% if (topic.count && topic.initials.length) { %>
               <span class="home-usp-avatars" aria-hidden="true"><% topic.initials.forEach(function (letter) { %><span><%= letter %></span><% }); %><% if (topicMore > 0) { %><span class="home-usp-more">+<%= topicMore %></span><% } %></span>
               <% } %>
               <p class="home-usp-text"><span class="home-usp-post"><%= topic.post[0] %><% if (topic.post.length > 1) { %><b><%= topic.post[1] %></b><%= topic.post[2] %><% } %></span> <span class="home-usp-choose"><%= topic.choose %></span></p>

@@ -246,6 +246,14 @@ function startSite() {
       for (const page of [moving, cargo, junk]) assert.ok(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/s/${page.slug}">${page.content[lang].title} ${page.content[lang].accent}<i`), `${lang}: homepage links to ${page.slug}`);
       for (const other of LANGS) assert.ok(html.includes(`<link rel="alternate" hreflang="${other}" href="https://xtender.test${other === 'ka' ? '/' : '/' + other}">`), `${lang}: homepage hreflang ${other}`);
     }
+    // Маленькая группа: фраза без числа и без кружков (на проде 2026-10-09 так вышла страница груза).
+    const realGroup = orders.getDispatchRecipients;
+    orders.getDispatchRecipients = async () => [{ id: 1, name: 'Avto' }, { id: 2, name: 'Beka' }];
+    const small = await (await get('/ru/s/tvirtis-gadazidva')).text();
+    orders.getDispatchRecipients = realGroup;
+    assert.ok(small.includes('<span class="home-usp-post">Разместите пост в группе <b>водителей</b></span>'), 'a small group gets the phrase without a number');
+    assert.doesNotMatch(small, /home-usp-avatars|home-usp-more/, 'and no circles');
+
     // Прежний параметр ?for= ничего не включает: страницы живут по своим адресам.
     assert.match(await (await get('/?lang=ka&for=moving')).text(), /<body class="home-page font-sans /);
 
