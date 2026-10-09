@@ -82,7 +82,10 @@ for(const name of ['lead_form_start','lead_form_phone_step','lead_form_code_sent
 for(const name of ['provider_signup_start','provider_signup_code_sent','sign_up']) assert.ok(join.includes("'"+name+"'"),name);
 assert.ok(home.indexOf("await trackSent('generate_lead'")<home.indexOf('window.location.href = data.ownerLink')&&home.includes("await trackSent('generate_lead'"));
 assert.ok(join.indexOf("await trackSent('sign_up'")<join.indexOf('window.location.href = data.link')&&join.includes("await trackSent('sign_up'"));
-for(const call of (home+join).match(/(?:trackStep|trackSent|xtTrack)\('[a-z_]+'[^)]*\)/g)) assert.ok(!/phone|description|token|masterId|code\b/i.test(call.replace(/^[A-Za-z.]+\('[a-z_]+'/,'')),call);
+// Строка «страница есть на вашем языке» считает нажатия на кнопку: в событии только язык.
+const suggest=fs.readFileSync(path.join(__dirname,'../public/js/lang-suggest.js'),'utf8');
+assert.ok(suggest.includes("window.xtTrack('language_suggest_click', { language: language })"));
+for(const call of (home+join+suggest).match(/(?:trackStep|trackSent|xtTrack)\('[a-z_]+'[^)]*\)/g)) assert.ok(!/phone|description|token|masterId|code\b/i.test(call.replace(/^[A-Za-z.]+\('[a-z_]+'/,'')),call);
 
 // Политика конфиденциальности называет Google Analytics на трёх языках, в данных и в получателях.
 const legal=require('../src/config/legal-content');

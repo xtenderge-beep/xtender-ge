@@ -87,6 +87,24 @@ function startSite() {
   // Заголовки ka повторяют поисковые запросы слово в слово, адрес — запрос латиницей.
   assert.deepEqual(pages.map(page => page.content.ka.title), ['ავეჯის გადაზიდვა', 'ტვირთის გადაზიდვა', 'სამშენებლო ნაგვის გატანა']);
 
+  // Слова запроса под заголовком английской версии появились позже страниц (на проде страницы уже были):
+  // в начальную страницу они дописываются один раз и только в пустое поле.
+  assert.deepEqual(pages.map(page => page.content.en.query || ''), ['Avejis gadazidva, mushebi', '', '']);
+  const older = JSON.parse(JSON.stringify(pages[0].content));
+  delete older.en.query;
+  await pool.query('UPDATE landing_pages SET content=$1::jsonb WHERE id=$2', [JSON.stringify(older), pages[0].id]);
+  await settings.setSetting('landing_query_words_added', '');
+  delete require.cache[servicePath];
+  landingPages = require(servicePath);
+  const topped = (await landingPages.list())[0];
+  assert.equal(topped.content.en.query, 'Avejis gadazidva, mushebi', 'a page created before the field gets the words once');
+  assert.equal(topped.content.ka.query || '', '', 'only where the seed has them');
+  await landingPages.save(topped.id, { ...topped, is_active: true, content: { ...topped.content, en: { ...topped.content.en, query: '' } } });
+  delete require.cache[servicePath];
+  landingPages = require(servicePath);
+  assert.equal((await landingPages.list())[0].content.en.query, '', 'a field the owner cleared stays empty after a restart');
+  await landingPages.save(topped.id, { ...topped, is_active: true });
+
   const cargoId = pages[1].id;
   await landingPages.remove(cargoId);
   const junkPage = pages[2];
@@ -111,7 +129,7 @@ function startSite() {
   const price = { ru: /цен/i, en: /price|quote/i, ka: /(?<!უ)ფას/ };
   for (const page of pages) for (const lang of LANGS) {
     const text = page.content[lang];
-    for (const field of ['title', 'accent', 'post', 'post_one', 'post_plain', 'choose', 'fact1', 'fact2', 'placeholder', 'seo_title', 'seo_description']) {
+    for (const field of ['title', 'accent', 'query', 'post', 'post_one', 'post_plain', 'choose', 'fact1', 'fact2', 'placeholder', 'seo_title', 'seo_description']) {
       assert.doesNotMatch(text[field] || '', speed[lang], `${page.slug}/${lang}/${field} promises a speed`);
       assert.doesNotMatch(text[field] || '', price[lang], `${page.slug}/${lang}/${field} promises a price`);
     }
@@ -215,8 +233,12 @@ function startSite() {
       assert.match(head, /googletagmanager|google-tag\.js|G-TEST123456/, `${where}: the Google tag is on the page ads lead to`);
 
       assert.match(html, /<body class="home-page home-topic /, `${where}: marked as a task page`);
+      assert.equal(html.includes('<body class="home-page home-topic home-topic-query '), lang === 'en', `${where}: the mark for the query line`);
       assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${where}: exactly one h1`);
-      assert.ok(html.includes(`<h1 class="home-hero-title">${text.title} <span>${text.accent}</span></h1>`), `${where}: the headline`);
+      // Английская версия — куда ведёт реклама по грузинским запросам: в заголовке стоит и сам запрос латиницей.
+      // Слова заданы в админке, а где поле пустое — берутся из адреса страницы.
+      const queryWords = lang === 'en' ? ` <span class="home-hero-query">${{ 'avejis-gadazidva': 'Avejis gadazidva, mushebi', 'tvirtis-gadazidva': 'Tvirtis gadazidva', 'samsheneblo-nagvis-gatana': 'Samsheneblo nagvis gatana' }[page.slug]}</span>` : '';
+      assert.ok(html.includes(`<h1 class="home-hero-title">${text.title} <span>${text.accent}</span>${queryWords}</h1>`), `${where}: the headline`);
       const count = (await landingPages.view(page, lang, tbilisi)).count;
       const [before, bold, after] = text.post.replace('{count}', count).split(/[\[\]]/);
       assert.ok(html.includes(`<span class="home-usp-post">${before}<b>${bold}</b>${after}</span> <span class="home-usp-choose">${text.choose}</span>`), `${where}: the sentence with the real number`);
@@ -269,6 +291,27 @@ function startSite() {
     assert.ok(single.includes('<link rel="alternate" hreflang="ru" href="https://xtender.test/ru/s/test-page">') && single.includes('<link rel="alternate" hreflang="x-default" href="https://xtender.test/ru/s/test-page">'));
     assert.doesNotMatch(single, /hreflang="(ka|en)"/, 'languages the page does not have are not announced');
     assert.match(single, /<a href="https:\/\/xtender\.test\/\?lang=ka" aria-label="GE"/, 'the switch leads to the homepage for a missing language');
+
+    // Подсказка «страница есть на вашем языке»: скрыта, пока её не покажет скрипт, и знает только
+    // языки, на которых страница есть.
+    const suggest = html => { const m = html.match(/id="langSuggest"( hidden)? data-page-lang="[a-z]{2}" data-mode="(choose|hint)" data-links="([^"]*)"/); return { hidden: Boolean(m[1]), mode: m[2], links: JSON.parse(m[3].replace(/&#34;/g, '"')) }; };
+    assert.deepEqual(suggest(single), { hidden: true, mode: 'hint', links: { ru: '/ru/s/test-page' } });
+    assert.deepEqual(suggest(await (await get('/ru')).text()), { hidden: true, mode: 'hint', links: { ka: '/?lang=ka', ru: '/ru', en: '/en' } }, 'the general homepage has the hint too');
+    for (const url of ['/s/avejis-gadazidva?lang=ka', '/ru/s/avejis-gadazidva', '/en']) assert.equal(suggest(await (await get(url)).text()).hidden, true, url + ': the line waits for the script');
+
+    // Английская версия страницы задачи: реклама по грузинским запросам ведёт сюда, поэтому выбор
+    // языка стоит в странице сразу и виден всем — три кнопки, грузинская первая и главная.
+    const english = await (await get('/en/s/avejis-gadazidva')).text();
+    assert.deepEqual(suggest(english), { hidden: false, mode: 'choose', links: { ka: '/s/avejis-gadazidva?lang=ka', ru: '/ru/s/avejis-gadazidva', en: '/en/s/avejis-gadazidva' } });
+    const choices = [...english.matchAll(/<a class="(lang-choice[^"]*)" data-lang="([a-z]{2})" lang="[a-z]{2}" href="([^"]+)"( aria-current="true")?>([^<]+)<\/a>/g)].map(m => [m[2], m[5], m[3], m[1]]);
+    assert.deepEqual(choices, [
+      ['ka', 'ქართული', '/s/avejis-gadazidva?lang=ka', 'lang-choice lang-choice--main'],
+      ['en', 'English', '/en/s/avejis-gadazidva', 'lang-choice is-current'],
+      ['ru', 'Русский', '/ru/s/avejis-gadazidva', 'lang-choice'],
+    ], 'Georgian first and marked as the main one; the links work without scripts');
+    assert.match(english, /data-lang="en" lang="en" href="\/en\/s\/avejis-gadazidva" aria-current="true">/, 'the page language is marked as current');
+    assert.deepEqual(await Promise.all(LANGS.map(async lang => (await landingPages.view(moving, lang, tbilisi)).languageChooser)), [false, false, true], 'only the English version carries the choice');
+    assert.deepEqual(await Promise.all(LANGS.map(async lang => (await landingPages.view(moving, lang, tbilisi)).queryWords)), ['', '', 'Avejis gadazidva, mushebi'], 'and the query in Latin letters');
     // Выключенная страница ведёт на главную и не теряет метку; неизвестный адрес — 404.
     await landingPages.save(created.id, { ...draft(), is_active: false });
     assert.equal(await location('/ru/s/test-page?gclid=abc'), '/ru?gclid=abc');
@@ -307,6 +350,22 @@ function startSite() {
     server.closeAllConnections();
   }
 
+  // Какой язык предлагает подсказка (public/js/lang-suggest.js).
+  const sandbox = { window: {}, document: { getElementById: () => null } };
+  require('node:vm').runInNewContext(fs.readFileSync(path.join(root, 'public/js/lang-suggest.js'), 'utf8'), sandbox);
+  const suggest = sandbox.window.xtLangSuggestPick, all = ['ka', 'ru', 'en'];
+  assert.equal(suggest(['ka-GE', 'en-US'], 'en', all), 'ka', 'a Georgian browser on the English page');
+  assert.equal(suggest(['en-US', 'en', 'ka'], 'en', all), 'ka', 'English first, Georgian added: the reader is Georgian');
+  assert.equal(suggest(['en-US', 'en'], 'en', all), null, 'the page is already in the browser language');
+  assert.equal(suggest(['en-US', 'ka'], 'ka', all), null);
+  assert.equal(suggest(['ru-RU', 'ru', 'en'], 'ka', all), 'ru', 'a Russian browser on the Georgian page');
+  assert.equal(suggest(['ru', 'ka'], 'ru', all), null);
+  assert.equal(suggest(['en-GB'], 'ka', all), 'en');
+  assert.equal(suggest(['ru'], 'ka', ['ka', 'en']), null, 'no version in that language: nothing to offer');
+  assert.equal(suggest(['de-DE', 'fr'], 'ka', all), null, 'a language the site does not have');
+  assert.equal(suggest([], 'ka', all), null);
+  assert.equal(suggest(undefined, 'ka', all), null);
+
   // 7. Админка: список, форма, сохранение с ошибкой и без, удаление.
   const controller = require('../src/controllers/landing.controller');
   const render = (view, locals) => ejs.renderFile(path.join(root, 'src/views', view + '.ejs'), { csrfToken: 'csrf', ...locals });
@@ -325,6 +384,8 @@ function startSite() {
   const editing = await call(controller.form, { params: { id: String(moving.id) } });
   assert.ok(editing.html.includes('name="content[ka][title]" value="ავეჯის გადაზიდვა"') && editing.html.includes('name="content[ru][post_one]"'), 'the form carries the saved texts');
   assert.doesNotMatch(editing.html, /name="content\[ka\]\[post_one\]"/, 'the extra Russian number form is asked only in Russian');
+  assert.ok(editing.html.includes('name="content[en][query]" value="Avejis gadazidva, mushebi"'), 'the query words are edited here');
+  assert.doesNotMatch(editing.html, /name="content\[(ka|ru)\]\[query\]"/, 'and only for the English version, where they are shown');
   assert.match(editing.html, /name="content\[ru\]\[article_on\]" checked/);
   assert.doesNotMatch(editing.html, /name="content\[ka\]\[article_on\]" checked/);
   assert.match(editing.html, /name="categories" value="movers" checked/);

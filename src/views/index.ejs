@@ -89,7 +89,7 @@
     <script type="application/ld+json"><%- safeJson(breadcrumbJsonLd) %></script>
     <% } %>
 </head>
-<body class="home-page<%= topic ? ' home-topic' : '' %> font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+<body class="home-page<%= topic ? ' home-topic' : '' %><%= topic && topic.queryWords ? ' home-topic-query' : '' %> font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
 
     <% const homePrefix = lang === 'ka' ? '' : '/' + lang; %>
@@ -107,6 +107,7 @@
         </div>
       </div>
     </header>
+    <%- include('partials/lang-suggest', { alternates: seo.hreflang || seo.alternates, chooser: topic && topic.languageChooser }) %>
     <main class="flex-grow">
       <div class="home-shell">
         <div class="home-hero-layout">
@@ -115,7 +116,7 @@
               // The offer as a picture: the members of the group, then one sentence in two beats.
               const topicMore = topic.count - topic.initials.length;
             %>
-            <h1 class="home-hero-title"><%= topic.title %><% if (topic.accent) { %> <span><%= topic.accent %></span><% } %></h1>
+            <h1 class="home-hero-title"><%= topic.title %><% if (topic.accent) { %> <span><%= topic.accent %></span><% } %><% if (topic.queryWords) { %> <span class="home-hero-query"><%= topic.queryWords %></span><% } %></h1>
             <div class="home-usp">
               <%# Кружки идут вместе с числом: маленькая группа без числа с одним-двумя кружками выглядит пустой. %>
               <% if (topic.count && topic.initials.length) { %>

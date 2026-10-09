@@ -1,0 +1,37 @@
+<%#
+  Строка под шапкой про язык страницы (public/js/lang-suggest.js). Два вида.
+
+  Обычный: скрыта, пока скрипт не увидит, что язык браузера другой и версия на нём есть; тогда в ней
+  одна фраза и одна кнопка на языке человека.
+
+  Выбор языка (chooser): на английской версии страницы задачи строка стоит в странице сразу и видна
+  всем — три крупные кнопки, грузинская первая и самая большая. Реклама по грузинским запросам ведёт
+  на английскую версию (решение владельца 2026-10-09), и человек, которому по-английски неудобно,
+  должен сменить язык одним нажатием. Названия языков вместо флагов: флаги-эмодзи на Windows не
+  рисуются, а слово «ქართული» узнаётся быстрее любого флага. Строка одинакова для человека и
+  поисковика, ссылки работают без скриптов.
+
+  Ссылки — только на языки, на которых страница существует (у страницы задачи их может быть меньше
+  трёх); грузинской нужен ?lang=ka, иначе запомненный язык тут же вернул бы человека обратно.
+%>
+<%
+  const _chooser = typeof chooser !== 'undefined' && chooser;
+  const _suggestLinks = {};
+  Object.entries(alternates).forEach(function (pair) {
+    const url = new URL(pair[1]);
+    _suggestLinks[pair[0]] = url.pathname + (pair[0] === 'ka' ? '?lang=ka' : '');
+  });
+  const _names = { ka: 'ქართული', en: 'English', ru: 'Русский' };
+%>
+<div class="lang-suggest<%= _chooser ? ' lang-suggest--choose' : '' %>" id="langSuggest"<%= _chooser ? '' : ' hidden' %> data-page-lang="<%= lang %>" data-mode="<%= _chooser ? 'choose' : 'hint' %>" data-links="<%= JSON.stringify(_suggestLinks) %>">
+  <% if (_chooser) { %>
+  <% ['ka', 'en', 'ru'].filter(function (code) { return _suggestLinks[code]; }).forEach(function (code) { %>
+  <a class="lang-choice<%= code === 'ka' ? ' lang-choice--main' : '' %><%= code === lang ? ' is-current' : '' %>" data-lang="<%= code %>" lang="<%= code %>" href="<%= _suggestLinks[code] %>"<% if (code === lang) { %> aria-current="true"<% } %>><%= _names[code] %></a>
+  <% }); %>
+  <% } else { %>
+  <span class="lang-suggest-text" id="langSuggestText"></span>
+  <a class="lang-suggest-go" id="langSuggestGo" href="#"></a>
+  <% } %>
+  <button type="button" class="lang-suggest-close" id="langSuggestClose" aria-label="×">×</button>
+</div>
+<script src="/js/lang-suggest.js" defer></script>

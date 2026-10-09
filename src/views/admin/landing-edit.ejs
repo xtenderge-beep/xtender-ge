@@ -59,6 +59,12 @@
         <span class="<%= hint %> block">Обычно город. Можно оставить пустым.</span>
       </label>
     </div>
+    <% if (lang === 'en') { %>
+    <label class="block text-sm mt-3">Слова запроса под заголовком
+      <input maxlength="<%= limits.query %>" name="content[<%= lang %>][query]" value="<%= text(lang, 'query') %>" class="<%= input %>">
+      <span class="<%= hint %> block">Грузинские слова латиницей через запятую: <code>Avejis gadazidva, mushebi</code>. Реклама по грузинским запросам ведёт на английскую версию, и человек должен сразу увидеть то, что набрал. Если пусто — слова берутся из адреса страницы.</span>
+    </label>
+    <% } %>
     <label class="block text-sm mt-3">Фраза с числом
       <input maxlength="<%= limits.post %>" name="content[<%= lang %>][post]" value="<%= text(lang, 'post') %>" class="<%= input %>">
       <span class="<%= hint %> block">На месте <code>{count}</code> страница ставит число исполнителей. Слова в квадратных скобках выделяются зелёным: <code>…[{count} грузчиков]…</code></span>

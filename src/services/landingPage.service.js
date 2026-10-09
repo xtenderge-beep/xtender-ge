@@ -13,15 +13,16 @@ const LANG_NAMES = { ka: 'грузинском', ru: 'русском', en: 'ан
 // Меньше этого числа называть размер «группы» незачем: экран показывает фразу без числа.
 const MIN_GROUP = 5;
 const SEEDED_KEY = 'landing_pages_seeded';
+const QUERY_KEY = 'landing_query_words_added';
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 // Поля текста на одном языке и их предельная длина.
 const TEXT_LIMITS = {
-  title: 120, accent: 60, post: 160, post_one: 160, post_plain: 160, choose: 160, fact1: 80, fact2: 120,
+  title: 120, accent: 60, query: 80, post: 160, post_one: 160, post_plain: 160, choose: 160, fact1: 80, fact2: 120,
   placeholder: 240, seo_title: 120, seo_description: 320, article: 12000,
 };
 const FIELD_NAMES = {
-  title: 'Заголовок', accent: 'Вторая часть заголовка', post: 'Фраза с числом', post_one: 'Фраза для чисел на 1',
+  title: 'Заголовок', accent: 'Вторая часть заголовка', query: 'Слова запроса под заголовком', post: 'Фраза с числом', post_one: 'Фраза для чисел на 1',
   post_plain: 'Фраза без числа', choose: 'Вторая строка фразы', fact1: 'Первая строка под формой', fact2: 'Вторая строка под формой',
   placeholder: 'Пример в поле', seo_title: 'Заголовок вкладки', seo_description: 'Описание для поиска', article: 'Статья',
 };
@@ -39,16 +40,31 @@ function countForm(count, lang) {
 let seeding = null;
 // Начальные страницы пишутся один раз на базу. Отметка в app_settings, а не «таблица пуста»:
 // иначе удаление последней страницы возвращало бы все три при следующем старте.
+// Позже добавленное поле дописывается так же — один раз, под своей отметкой.
 function ensureSeeded() {
   if (!seeding) seeding = (async () => {
-    if (await settingsService.getSetting(SEEDED_KEY)) return;
-    for (const page of require('../config/landing-seed')) {
-      await pool.query(
-        `INSERT INTO landing_pages (slug, admin_name, categories, content, sort_order) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
-         ON CONFLICT (slug) DO NOTHING`,
-        [page.slug, page.admin_name, JSON.stringify(page.categories), JSON.stringify(page.content), page.sort_order]);
+    const seed = require('../config/landing-seed');
+    if (!(await settingsService.getSetting(SEEDED_KEY))) {
+      for (const page of seed) {
+        await pool.query(
+          `INSERT INTO landing_pages (slug, admin_name, categories, content, sort_order) VALUES ($1, $2, $3::jsonb, $4::jsonb, $5)
+           ON CONFLICT (slug) DO NOTHING`,
+          [page.slug, page.admin_name, JSON.stringify(page.categories), JSON.stringify(page.content), page.sort_order]);
+      }
+      await settingsService.setSetting(SEEDED_KEY, '1');
     }
-    await settingsService.setSetting(SEEDED_KEY, '1');
+    // Слова запроса под заголовком появились позже самих страниц (2026-10-09). В начальную страницу,
+    // созданную до них, они дописываются один раз и только в пустое поле: правка администратора остаётся.
+    if (!(await settingsService.getSetting(QUERY_KEY))) {
+      for (const page of seed) {
+        const row = (await pool.query('SELECT id, content FROM landing_pages WHERE slug=$1', [page.slug])).rows[0];
+        const missing = LANGS.filter(lang => page.content[lang]?.query && row?.content?.[lang] && !row.content[lang].query);
+        if (!missing.length) continue;
+        for (const lang of missing) row.content[lang].query = page.content[lang].query;
+        await pool.query('UPDATE landing_pages SET content=$1::jsonb WHERE id=$2', [JSON.stringify(row.content), row.id]);
+      }
+      await settingsService.setSetting(QUERY_KEY, '1');
+    }
   })().catch(error => { seeding = null; throw error; });
   return seeding;
 }
@@ -99,20 +115,33 @@ async function audience(categories, cityId) {
   return result;
 }
 
+// Фраза первого экрана на языке lang: с числом, а если группа мала — без него.
+const phraseFor = (text, count, lang) => (!count ? text.post_plain : (countForm(count, lang) === 'one' && text.post_one) || text.post).replace('{count}', count);
+
+// Адрес страницы — это запрос грузинскими словами в латинице: «avejis-gadazidva» → «Avejis gadazidva».
+const slugWords = slug => { const words = String(slug || '').split('-').join(' '); return words.charAt(0).toUpperCase() + words.slice(1); };
+
 // Всё, что нужно шаблону главной, чтобы показать страницу на языке lang.
 async function view(page, lang, cityId) {
   const text = page.content[lang];
   const group = await audience(page.categories, cityId);
   const count = group.count >= MIN_GROUP ? group.count : 0;
-  const phrase = !count ? text.post_plain : (countForm(count, lang) === 'one' && text.post_one) || text.post;
+  const phrase = phraseFor(text, count, lang);
+  // Английская версия — куда ведёт реклама по грузинским запросам (решение владельца 2026-10-09):
+  // под шапкой всем виден выбор языка из трёх крупных кнопок, грузинская первая и самая большая.
+  const languageChooser = lang === 'en' && available(page, 'ka');
   return {
+    languageChooser,
+    // Там же под заголовком стоит запрос латиницей: человек сразу видит слова, которые набрал.
+    // Слова задаются в админке; пустое поле — берутся из адреса страницы.
+    queryWords: languageChooser ? text.query || slugWords(page.slug) : '',
     slug: page.slug,
     count,
     initials: group.initials,
     title: text.title,
     accent: text.accent || '',
     // [до выделения, выделенное, после]; без скобок выделения нет.
-    post: phrase.replace('{count}', count).split(/[\[\]]/),
+    post: phrase.split(/[\[\]]/),
     choose: text.choose,
     facts: [text.fact1, text.fact2].filter(Boolean),
     placeholder: text.placeholder,

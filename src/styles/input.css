@@ -200,6 +200,8 @@ details > summary::-webkit-details-marker { display: none; }
 .home-page #seo-hero { grid-area:intro; }
 .home-hero-title { margin:0; font-size:clamp(30px,3.3vw,42px); font-weight:780; letter-spacing:-.035em; line-height:1.12; color:var(--home-ink); }
 .home-hero-title span { display:block; color:var(--home-green); }
+/* The search query in Latin letters on the English task page ("Avejis gadazidva"). */
+.home-hero-title .home-hero-query { margin-top:8px; font-size:.5em; font-weight:700; letter-spacing:0; line-height:1.3; color:#33463f; }
 .home-hero-lead { margin:18px 0 0; max-width:480px; font-size:17px; line-height:1.6; color:#33463f; }
 .home-catalog-strip { display:flex; align-items:center; gap:14px; max-width:480px; margin-top:30px; padding:14px 16px; background:#fff; border:1px solid var(--home-line); border-radius:14px; transition:border-color .2s; }
 .home-catalog-strip:hover { border-color:#a5c0af; }
@@ -232,6 +234,41 @@ details > summary::-webkit-details-marker { display: none; }
 .home-usp-facts li { display:flex; align-items:center; gap:8px; }
 .home-usp-facts i { font-size:11px; color:var(--home-green); }
 html[lang="ka"] .home-usp-post { font-size:21px; }
+/* «This page is available in your language» line under the header (partials/lang-suggest.ejs). */
+.lang-suggest { display:flex; align-items:center; justify-content:center; gap:14px; padding:10px 16px; background:#e4f1e9; border-bottom:1px solid #c9e0d2; color:var(--home-ink); font-size:14px; line-height:1.35; }
+.lang-suggest[hidden] { display:none; }
+.lang-suggest-go { flex-shrink:0; padding:8px 14px; border-radius:8px; background:var(--home-green); color:#fff; font-size:14px; font-weight:700; white-space:nowrap; }
+.lang-suggest-go:hover { background:#06664d; }
+.lang-suggest-close { flex-shrink:0; width:32px; height:32px; border-radius:50%; color:#4c6157; font-size:20px; line-height:1; }
+.lang-suggest-close:hover { background:#d3e6da; }
+body.compose-active .lang-suggest { display:none !important; }
+@media (max-width:639px) {
+  .lang-suggest { justify-content:space-between; gap:8px; padding:8px 12px; font-size:13px; }
+  .lang-suggest-text { flex:1; min-width:0; }
+  .lang-suggest-go { padding:8px 12px; font-size:13px; }
+}
+/* The narrowest phones: the sentence would wrap and push the request field under the bottom menu,
+   and the button says the same thing by itself. */
+@media (max-width:370px) {
+  .lang-suggest { justify-content:center; padding:6px 12px; }
+  .lang-suggest-text { display:none; }
+}
+/* English version of a task page: a language choice that is there for everyone. Three large buttons,
+   Georgian first and the largest; the page's own language is outlined. One row on phones, so the
+   request field stays above the bottom menu. */
+.lang-suggest--choose { gap:10px; padding:10px 16px; background:#dcefe4; }
+.lang-choice { display:inline-flex; align-items:center; justify-content:center; min-height:46px; padding:0 22px; border:1.5px solid #9cc4ae; border-radius:10px; background:#fff; color:var(--home-ink); font-size:15px; font-weight:700; white-space:nowrap; }
+.lang-choice:hover { border-color:var(--home-green); color:var(--home-green); }
+.lang-choice--main { min-height:52px; padding:0 38px; border-color:var(--home-green); background:var(--home-green); color:#fff; font-size:20px; }
+.lang-choice--main:hover { background:#06664d; border-color:#06664d; color:#fff; }
+.lang-choice.is-current { border-style:dashed; background:transparent; color:#4c6157; }
+@media (max-width:639px) {
+  .lang-suggest--choose { gap:6px; padding:6px 8px; }
+  .lang-choice { flex:1 1 0; min-width:0; min-height:44px; padding:0 4px; font-size:14px; }
+  .lang-choice--main { flex:1.6 1 0; min-height:44px; padding:0 6px; font-size:18px; }
+  .lang-suggest--choose .lang-suggest-close { width:26px; height:26px; }
+}
+
 /* Article of a task page (how the work goes for this task) and the links between task pages. */
 .home-article { max-width:760px; padding:44px 0 8px; border-top:1px solid var(--home-line); }
 .home-article h2 { margin:30px 0 10px; font-size:22px; font-weight:750; line-height:1.3; letter-spacing:-.02em; color:var(--home-ink); }
@@ -523,6 +560,7 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
   .home-eyebrow { font-size:11px; letter-spacing:.015em; }
   .home-hero-layout { padding:24px 0 34px; gap:20px; }
   .home-hero-title { font-size:25px; line-height:1.18; }
+  .home-hero-title .home-hero-query { margin-top:5px; font-size:15px; }
   html[lang="ka"] .home-hero-title { font-size:22px; }
   .home-hero-lead { font-size:14px; line-height:1.55; }
   /* The placeholder already shows what to write; the hint stays linked for screen readers. */
@@ -602,6 +640,12 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
   .home-topic:not(.compose-active) #detailsStep { padding:0; }
   .home-topic:not(.compose-active) .composer-inputbox { border:0; border-radius:0; background:transparent; }
   .home-topic:not(.compose-active) .composer-textarea { height:92px; }
+}
+/* The narrowest phones: the query line takes the room of the circles, otherwise the request field
+   ends up under the bottom menu. The number stays in the sentence. */
+@media (max-width:370px) {
+  .home-topic-query .home-usp-avatars { display:none; }
+  .home-topic-query .home-usp { margin-top:12px; }
 }
 @media (prefers-reduced-motion:reduce) {
   html:has(.home-page) { scroll-behavior:auto; }

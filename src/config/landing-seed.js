@@ -103,6 +103,8 @@ module.exports = [
     },
     en: {
       title: 'Furniture moving', accent: 'in Tbilisi',
+      // Запрос грузинскими словами в латинице: реклама по грузинским запросам ведёт на эту версию.
+      query: 'Avejis gadazidva, mushebi',
       post: 'Post to a group of [{count} movers and drivers]',
       post_plain: 'Post to a group of [movers and drivers]',
       placeholder: 'Example: a sofa and 10 boxes, Saburtalo → Vake, on Saturday. Up to 80 GEL.',
