@@ -16,6 +16,7 @@ const asyncHandler = require('./middleware/asyncHandler');
 const pool = require('./config/db');
 const adminAuth = require('./config/adminAuth');
 const googleTag = require('./config/googleTag');
+const metaPixel = require('./config/metaPixel');
 
 const app = express();
 
@@ -58,6 +59,8 @@ app.use((req, res, next) => {
   res.locals.isRememberedProvider = Boolean(req.cookies.master_session);
   // Google Analytics только на открытых страницах; на остальных идентификатор пуст.
   res.locals.googleTagId = googleTag.idFor(req.path);
+  // Пиксель Meta — на тех же страницах.
+  res.locals.metaPixel = metaPixel.tagFor(req.path);
   next();
 });
 

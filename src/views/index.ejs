@@ -695,6 +695,7 @@
 
         // Google Analytics (public/js/google-tag.js): шаги формы заявки и показа номера в каталоге.
         // Шаг считается один раз за открытие страницы; без Google на странице вызовы ничего не делают.
+        // Пиксель Meta (public/js/meta-pixel.js) берёт из тех же вызовов заявку и открытый номер.
         const trackedSteps = new Set();
         function trackStep(name, params) {
             if (trackedSteps.has(name)) return;

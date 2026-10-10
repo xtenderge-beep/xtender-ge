@@ -142,3 +142,6 @@
 адреса, `xtTrack`), `src/views/partials/google-tag.ejs` (подключение; в `partials/head.ejs`, `terms.ejs`,
 `privacy.ejs`), `src/app.js` (`res.locals.googleTagId`), события в `src/views/index.ejs` и
 `src/views/join.ejs` (`trackStep`, `trackSent`), тест `tests/google-tag.test.js`.
+
+С 2026-10-10 рядом стоит пиксель Meta ([meta-pixel.md](meta-pixel.md)): тот же список открытых страниц
+(`PUBLIC_PAGE`), а три цели он берёт из вызовов `xtTrack`, встав перед ним.

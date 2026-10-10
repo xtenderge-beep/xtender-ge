@@ -8,6 +8,7 @@
 [docs/manager-partners.md](docs/manager-partners.md). Аналитика и возврат
 заявок на исправление: [docs/admin-analytics.md](docs/admin-analytics.md).
 Google Analytics и цели для Google Ads: [docs/google-analytics.md](docs/google-analytics.md).
+Пиксель Meta для рекламы в Facebook и Instagram: [docs/meta-pixel.md](docs/meta-pixel.md).
 Заявка из нескольких категорий (закрытие по категориям, воронка по группам
 исполнителей): [docs/multi-category-orders.md](docs/multi-category-orders.md).
 Снимок состояния уточняет и заменяет исторические описания ниже там, где они расходятся.

@@ -23,4 +23,4 @@ function idFor(path, id = measurementId) {
   return id && PUBLIC_PAGE.test(String(path || '')) ? id : '';
 }
 
-module.exports = { resolveId, idFor, measurementId };
+module.exports = { resolveId, idFor, measurementId, PUBLIC_PAGE };

@@ -1,0 +1,2 @@
+<%# Пиксель Meta: только на открытых страницах, после google-tag (он задаёт xtTrack). См. src/config/metaPixel.js. %>
+<% if (typeof metaPixel !== 'undefined' && metaPixel) { %><script src="/js/meta-pixel.js" data-id="<%= metaPixel.id %>" data-pages="<%= metaPixel.pages %>" data-private="<%= metaPixel.privateParams %>" defer></script><% } %>

@@ -218,7 +218,7 @@ const terms = {
 
 const privacy = {
   version: PRIVACY_VERSION,
-  updated: { ka: '2026 წლის 8 ოქტომბერი', ru: '8 октября 2026 г.', en: 'October 8, 2026' },
+  updated: { ka: '2026 წლის 10 ოქტომბერი', ru: '10 октября 2026 г.', en: 'October 10, 2026' },
   body: {
     ka: [
       { h: '2.1. ზოგადი დებულებები' },
@@ -233,6 +233,7 @@ const privacy = {
         'ტექნიკური და აუდიტის მონაცემები: IP-მისამართი, მოწყობილობა, თარიღი/დრო (JSON-აუდიტ ლოგები), OTP ისტორია;',
         'ფაილები Cookie: სერვისი იყენებს აუცილებელ ტექნიკურ ფაილებს Cookie სესიების მართვისა და უსაფრთხო ავტორიზაციის უზრუნველსაყოფად.',
         'ვიზიტების სტატისტიკა: საიტის ღია გვერდებზე (მთავარი, შემსრულებლის რეგისტრაცია, დახმარება, ოფერტა, პოლიტიკა) მუშაობს სერვისი Google Analytics. ის იყენებს საკუთარ Cookie ფაილებს და იღებს ინფორმაციას ვიზიტის შესახებ: გვერდის მისამართი, გადმოსვლის წყარო, მოწყობილობისა და ბრაუზერის ტიპი, სავარაუდო მდებარეობა IP-მისამართის მიხედვით და მოქმედებები გვერდზე (მაგალითად, „განაცხადი გაგზავნილია“). ტელეფონის ნომერი, განაცხადის ტექსტი და განაცხადებისა და კაბინეტების გვერდების მისამართები Google-ს არ გადაეცემა. მონაცემები გამოიყენება ვიზიტების დასათვლელად და რეკლამის შესაფასებლად; რეკლამის პერსონალიზაციის ფუნქციები გამორთულია. უარის თქმა შეგიძლიათ ბრაუზერში Cookie ფაილების აკრძალვით.',
+        'რეკლამა Facebook-სა და Instagram-ში: იმავე ღია გვერდებზე მუშაობს კომპანია Meta-ს პიქსელი. ის იყენებს საკუთარ Cookie ფაილს და იღებს ინფორმაციას ვიზიტის შესახებ: გვერდის მისამართი, გადმოსვლის წყარო, მოწყობილობისა და ბრაუზერის ტიპი, IP-მისამართი და სამი მოქმედება საიტზე — „განაცხადი გაგზავნილია“, „შემსრულებლის ნომერი გახსნილია“, „შემსრულებელი დარეგისტრირდა“. ტელეფონის ნომერი, განაცხადის ტექსტი და განაცხადებისა და კაბინეტების გვერდების მისამართები Meta-ს არ გადაეცემა. Meta ამ ინფორმაციას იყენებს Xtender-ის რეკლამის შედეგების დასათვლელად და რეკლამის საჩვენებლად Facebook-სა და Instagram-ში, მათ შორის მათთვის, ვინც უკვე იყო საიტზე. უარის თქმა შეგიძლიათ ბრაუზერში Cookie ფაილების აკრძალვით ან თქვენი Facebook-ანგარიშის რეკლამის პარამეტრების შეცვლით.',
       ] },
 
       { h: '2.3. მონაცემთა დამუშავების მიზნები და საჯაროობა' },
@@ -265,6 +266,7 @@ const privacy = {
         'Технические данные и логи (IP, тип устройства, JSON-логи согласий);',
         'Файлы Cookie: используются необходимые технические куки для обеспечения работы сессий и безопасности.',
         'Статистика посещений: на открытых страницах сайта (главная, регистрация исполнителя, справка, оферта, политика) работает сервис Google Analytics. Он ставит свои файлы Cookie и получает сведения о посещении: адрес страницы, источник перехода, тип устройства и браузера, примерное местоположение по IP-адресу и действия на странице (например, «заявка отправлена»). Номер телефона, текст заявки и адреса страниц заявок и кабинетов в Google не передаются. Данные нужны для подсчёта посещений и оценки рекламы; функции персонализации рекламы отключены. Отказаться можно, запретив файлы Cookie в браузере.',
+        'Реклама в Facebook и Instagram: на тех же открытых страницах работает пиксель компании Meta. Он ставит свой файл Cookie и получает сведения о посещении: адрес страницы, источник перехода, тип устройства и браузера, IP-адрес и три действия на сайте — «заявка отправлена», «номер исполнителя открыт», «исполнитель зарегистрировался». Номер телефона, текст заявки и адреса страниц заявок и кабинетов в Meta не передаются. Meta использует эти сведения, чтобы считать результаты рекламы Xtender и показывать её в Facebook и Instagram, в том числе тем, кто уже заходил на сайт. Отказаться можно, запретив файлы Cookie в браузере или изменив настройки рекламы в своём аккаунте Facebook.',
       ] },
 
       { h: '2.3. Цели и публичность' },
@@ -295,6 +297,7 @@ const privacy = {
         'Technical data & JSON audit logs (IP, device type, timestamps);',
         'Cookies: Essential technical cookies are used for session management and authentication security.',
         'Visit statistics: Google Analytics runs on the public pages of the site (home, provider sign-up, help, terms, privacy policy). It sets its own cookies and receives information about the visit: page address, traffic source, device and browser type, approximate location derived from the IP address, and actions on the page (for example, "request submitted"). Phone numbers, request text and the addresses of request and account pages are not sent to Google. The data is used to count visits and measure advertising; ad personalisation features are switched off. You can opt out by blocking cookies in your browser.',
+        'Advertising on Facebook and Instagram: the Meta Pixel runs on the same public pages. It sets its own cookie and receives information about the visit: page address, traffic source, device and browser type, IP address, and three actions on the site: "request submitted", "provider number opened" and "provider signed up". Phone numbers, request text and the addresses of request and account pages are not sent to Meta. Meta uses this information to measure Xtender advertising and to show it on Facebook and Instagram, including to people who have already visited the site. You can opt out by blocking cookies in your browser or by changing the ad settings of your Facebook account.',
       ] },
 
       { h: '2.3. Purposes and Public Display' },
@@ -325,7 +328,7 @@ const consentDetails = {
     otp: '1.1.4. SMS-код подтверждает доступ к номеру телефона. Сервис сохраняет связь подтверждения с показанными условиями и действием пользователя. Пользователь должен защищать доступ к своему телефону и личным ссылкам.',
     heading: '1.8. Роль платформы и актуальность заявки',
     prices: 'Индивидуально согласованные с исполнителем цены и правила оплаты имеют приоритет перед общими тарифами. Принятие общих условий платформы само по себе не подтверждает согласование конкретной индивидуальной цены.',
-    sharing: 'Получатели данных: подходящие исполнители — номер клиента и сведения о его заявке для связи по этой заявке; поставщики хостинга, SMS и подключённых средств связи — в объёме, необходимом для работы сервиса; Google — сведения о посещении открытых страниц сайта (Google Analytics, п. 2.2); уполномоченные государственные органы — по закону.',
+    sharing: 'Получатели данных: подходящие исполнители — номер клиента и сведения о его заявке для связи по этой заявке; поставщики хостинга, SMS и подключённых средств связи — в объёме, необходимом для работы сервиса; Google — сведения о посещении открытых страниц сайта (Google Analytics, п. 2.2); Meta — сведения о посещении открытых страниц сайта (пиксель Meta, п. 2.2); уполномоченные государственные органы — по закону.',
     audit: 'Сохраняются текст и версия принятых условий, факт подтверждения номера, дата, технические сведения и действия с заявкой. Срок хранения определяется целью обработки, действующими обязательствами и необходимостью предъявления или защиты правовых требований. После отпадения этих оснований данные подлежат удалению или обезличиванию. Закрытие заявки прекращает новые передачи контактов по ней, но не отменяет законность предыдущей обработки и не означает немедленного удаления обязательных доказательств.',
   },
   en: {
@@ -333,7 +336,7 @@ const consentDetails = {
     otp: '1.1.4. An SMS code confirms access to a phone number. The service records the link between that confirmation, the displayed terms and the user action. Users must protect access to their phones and private links.',
     heading: '1.8. Platform role and keeping requests current',
     prices: 'Prices and payment rules individually agreed with a provider take precedence over general tariffs. Accepting the general platform terms does not itself establish acceptance of a specific individual price.',
-    sharing: 'Data recipients: suitable providers receive the customer phone number and request details to contact the customer about that request; hosting, SMS and connected communication providers receive data necessary to operate the service; Google receives information about visits to the public pages of the site (Google Analytics, section 2.2); authorised public authorities receive data as required by law.',
+    sharing: 'Data recipients: suitable providers receive the customer phone number and request details to contact the customer about that request; hosting, SMS and connected communication providers receive data necessary to operate the service; Google receives information about visits to the public pages of the site (Google Analytics, section 2.2); Meta receives information about visits to the public pages of the site (Meta Pixel, section 2.2); authorised public authorities receive data as required by law.',
     audit: 'The accepted terms and their version, phone verification, date, technical information and request actions are recorded. Retention depends on the processing purpose, applicable obligations and the need to establish or defend legal claims. Data must be deleted or anonymised when those grounds no longer apply. Closing a request stops new contact sharing for it, but does not invalidate earlier lawful processing or immediately delete evidence that must be retained.',
   },
   ka: {
@@ -341,7 +344,7 @@ const consentDetails = {
     otp: '1.1.4. SMS-კოდი ადასტურებს ტელეფონის ნომერზე წვდომას. სერვისი ინახავს ამ დადასტურების კავშირს ნაჩვენებ პირობებთან და მომხმარებლის მოქმედებასთან. მომხმარებელმა უნდა დაიცვას ტელეფონსა და პირად ბმულებზე წვდომა.',
     heading: '1.8. პლატფორმის როლი და განაცხადის აქტუალურობა',
     prices: 'შემსრულებელთან ინდივიდუალურად შეთანხმებულ ფასებსა და გადახდის წესებს უპირატესობა აქვთ ზოგად ტარიფებთან შედარებით. პლატფორმის ზოგადი პირობების მიღება თავისთავად არ ადასტურებს კონკრეტული ინდივიდუალური ფასის შეთანხმებას.',
-    sharing: 'მონაცემთა მიმღებები: შესაბამისი შემსრულებლები იღებენ დამკვეთის ნომერსა და განაცხადის მონაცემებს ამ განაცხადზე დასაკავშირებლად; ჰოსტინგის, SMS-ისა და დაკავშირებული საკომუნიკაციო სერვისების მომწოდებლები იღებენ სერვისის მუშაობისთვის საჭირო მონაცემებს; Google იღებს ინფორმაციას საიტის ღია გვერდებზე ვიზიტების შესახებ (Google Analytics, პ. 2.2); უფლებამოსილი სახელმწიფო ორგანოები — კანონით გათვალისწინებულ შემთხვევებში.',
+    sharing: 'მონაცემთა მიმღებები: შესაბამისი შემსრულებლები იღებენ დამკვეთის ნომერსა და განაცხადის მონაცემებს ამ განაცხადზე დასაკავშირებლად; ჰოსტინგის, SMS-ისა და დაკავშირებული საკომუნიკაციო სერვისების მომწოდებლები იღებენ სერვისის მუშაობისთვის საჭირო მონაცემებს; Google იღებს ინფორმაციას საიტის ღია გვერდებზე ვიზიტების შესახებ (Google Analytics, პ. 2.2); Meta იღებს ინფორმაციას საიტის ღია გვერდებზე ვიზიტების შესახებ (Meta-ს პიქსელი, პ. 2.2); უფლებამოსილი სახელმწიფო ორგანოები — კანონით გათვალისწინებულ შემთხვევებში.',
     audit: 'ინახება მიღებული პირობების ტექსტი და ვერსია, ნომრის დადასტურების ფაქტი, თარიღი, ტექნიკური ინფორმაცია და განაცხადთან დაკავშირებული მოქმედებები. შენახვის ვადა განისაზღვრება დამუშავების მიზნით, მოქმედი ვალდებულებებითა და სამართლებრივი მოთხოვნების წარდგენის ან დაცვის საჭიროებით. ამ საფუძვლების ამოწურვის შემდეგ მონაცემები უნდა წაიშალოს ან დეპერსონალიზდეს. განაცხადის დახურვა აჩერებს მის ფარგლებში კონტაქტების ახალ გადაცემას, მაგრამ არ აუქმებს წინა კანონიერი დამუშავების შედეგებს და არ ნიშნავს შესანახი მტკიცებულებების დაუყოვნებლივ წაშლას.',
   },
 };
