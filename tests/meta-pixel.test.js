@@ -38,7 +38,7 @@ for(const f of ['partials/head.ejs','terms.ejs','privacy.ejs']){
 // Скрипт страницы в подставном браузере. Атрибуты берутся из отрисованного шаблона.
 const attrs={};for(const [,name,value] of html.matchAll(/ (data-[a-z]+)="([^"]*)"/g)) attrs[name]=value.replace(/&#(\d+);/g,(m,code)=>String.fromCharCode(code)).replace(/&amp;/g,'&');
 const source=fs.readFileSync(path.join(__dirname,'../public/js/meta-pixel.js'),'utf8');
-function browser({href=ORIGIN+'/ru',referrer='',staff=false,webdriver=false,id=ID,readyState='complete',pages=attrs['data-pages'],google=true}={}){
+function browser({href=ORIGIN+'/ru',referrer='',staff=false,webdriver=false,id=ID,readyState='complete',pages=attrs['data-pages'],google=true,tab={}}={}){
   const url=new URL(href),scripts=[],listeners={},passed=[],window={addEventListener:(type,fn)=>{listeners[type]=fn;}};
   // google-tag.js на странице стоит раньше и уже задал xtTrack.
   if(google) window.xtTrack=(name,params,cb)=>{passed.push([name,params]);if(typeof cb==='function')cb();};
@@ -46,6 +46,7 @@ function browser({href=ORIGIN+'/ru',referrer='',staff=false,webdriver=false,id=I
   vm.runInContext(source,vm.createContext({window,URL,URLSearchParams,RegExp,
     location:{origin:url.origin,pathname:url.pathname,search:url.search},navigator:{webdriver},
     localStorage:{getItem:key=>(key==='xt_staff'&&staff?'1':null)},
+    sessionStorage:{getItem:key=>tab[key]??null,setItem:(key,value)=>{tab[key]=String(value);}},
     document:{referrer,readyState,currentScript:{getAttribute:name=>data[name]??null},createElement:()=>({}),head:{appendChild:s=>scripts.push(s)}}}));
   return {window,scripts,listeners,passed,sent:()=>Array.from(window.fbq?window.fbq.queue:[],args=>Array.from(args))};
 }
@@ -71,6 +72,15 @@ for(const state of off){
   // Страница при этом работает как раньше: событие идёт в google-tag, продолжение вызывается.
   b.window.xtTrack('generate_lead',{lead_type:'order'},()=>{calls++;});assert.equal(calls,1);assert.equal(b.passed.length,1);
 }
+
+// Проверка из Events Manager: адрес с ?pixeltest=1 включает пиксель и у сотрудника, и на следующих
+// страницах той же вкладки. Другое значение, другая вкладка и робот его не включают.
+const tab={};
+b=browser({href:ORIGIN+'/ru?pixeltest=1',staff:true,tab});assert.deepEqual(b.sent(),[['set','autoConfig',false,ID],['init',ID],['track','PageView']]);
+b=browser({href:ORIGIN+'/ru/join',referrer:ORIGIN+'/ru?pixeltest=1',staff:true,tab});assert.equal(b.scripts.length,1,'та же вкладка, следующая страница');
+b.window.xtTrack('sign_up',{method:'sms'});assert.deepEqual(b.sent().pop(),['track','CompleteRegistration']);
+for(const state of [{href:ORIGIN+'/ru?pixeltest=0',staff:true},{href:ORIGIN+'/ru',staff:true,tab:{}},{href:ORIGIN+'/ru?pixeltest=1',webdriver:true},{href:ORIGIN+'/ru/join?pixeltest=1&ref=MANAGERTOKEN',staff:true}])
+  assert.equal(browser(state).window.fbq,undefined,JSON.stringify(state));
 
 // Три цели уходят в Meta под её названиями и без параметров; шаги формы — нет. Всё идёт дальше в google-tag.
 b=browser();let done=0;

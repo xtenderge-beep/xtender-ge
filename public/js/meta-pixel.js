@@ -9,7 +9,14 @@
     var tag = document.currentScript;
     var id = tag && tag.getAttribute('data-id');
     if (!id || navigator.webdriver) return;
-    try { if (localStorage.getItem('xt_staff') === '1') return; } catch (e) {}
+    // Проверка из Events Manager («Тестирование событий»): он открывает сайт в том же браузере, а у
+    // сотрудника пиксель выключен. Адрес с ?pixeltest=1 включает пиксель и у сотрудника, до закрытия вкладки.
+    var testing = false;
+    try {
+      if (new URLSearchParams(location.search).get('pixeltest') === '1') sessionStorage.setItem('xt_pixel_test', '1');
+      testing = sessionStorage.getItem('xt_pixel_test') === '1';
+    } catch (e) {}
+    try { if (!testing && localStorage.getItem('xt_staff') === '1') return; } catch (e) {}
 
     // Без списка открытых страниц пиксель не включается: лучше потерять просмотр, чем отдать ссылку.
     var pages = new RegExp(tag.getAttribute('data-pages') || '^$');
