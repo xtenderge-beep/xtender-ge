@@ -3,6 +3,7 @@
 <%
     const catLabels = { movers: 'Грузчики', transport: 'Машины', junk: 'Мусор' };
     const open = threads.filter(function (t) { return t.is_open; });
+    const freshIds = new Set(typeof newIds !== 'undefined' ? newIds : []);
 %>
 
 <h1 class="text-2xl font-black text-stone-900 mb-1">Поддержка</h1>
@@ -22,6 +23,7 @@
                   <% if (t.telegram_id) { %><span class="text-[10px] font-bold text-[#229ED9] align-middle">TG</span><% } %>
               </span>
               <span class="flex items-center gap-2">
+                  <% if (freshIds.has(t.master_id)) { %><span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">Новое</span><% } %>
                   <% if (t.is_open) { %>
                       <span class="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">ждёт ответа</span>
                   <% } %>

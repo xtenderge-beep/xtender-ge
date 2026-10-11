@@ -1,5 +1,5 @@
 <%- include('./_header', { active: 'receipts' }) %>
-<% const query = typeof q === 'string' ? q : ''; const summary = typeof statementSummary !== 'undefined' ? statementSummary : null; const unmatched = typeof unmatchedCredits !== 'undefined' ? unmatchedCredits : []; %>
+<% const freshIds = new Set(typeof newIds !== 'undefined' ? newIds : []); const query = typeof q === 'string' ? q : ''; const summary = typeof statementSummary !== 'undefined' ? statementSummary : null; const unmatched = typeof unmatchedCredits !== 'undefined' ? unmatchedCredits : []; %>
 <h1 class="text-2xl font-black">Проверка пополнений</h1>
 <p class="text-sm text-stone-600 mt-3">Здесь показан каждый созданный исполнителем счёт на пополнение — включая те, к которым ещё не приложен чек. Проверьте перевод в банке и нажмите «Подтвердить оплату» — сумма сразу зачислится на баланс исполнителя.</p>
 <form method="GET" class="admin-filter"><input name="q" value="<%= query %>" placeholder="Номер счёта, имя, телефон"><button>Найти</button><% if (query) { %><a href="/admin/receipts">Сбросить</a><% } %></form>
@@ -36,7 +36,7 @@
 <% if (!receipts.length) { %><p class="p-6 mt-4 bg-white rounded-xl">Пока нет созданных счетов. Здесь будут появляться новые обращения.</p><% } %>
 <% const statusLabel = {awaiting:'Ожидает оплаты', received:'Чек получен', reviewing:'На проверке', credited:'Зачислено', rejected:'Нужно уточнение'};
 receipts.forEach(t=>{ %><article class="admin-receipt">
-<p><strong>Пополнение <%= t.reference %> · <%= (t.amount_tetri/100).toFixed(2) %> ₾</strong></p>
+<p><strong>Пополнение <%= t.reference %> · <%= (t.amount_tetri/100).toFixed(2) %> ₾</strong><% if (freshIds.has(t.id)) { %><span class="ml-2 text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">Новое</span><% } %></p>
 <p>Назначение: <%= t.purposeText %></p>
 <h2><a class="text-emerald-700 underline" href="/admin/masters/<%= t.master_id %>"><%= t.name %></a></h2>
 <p><%= t.phone %> · <%= new Date(t.created_at).toLocaleString('ru') %> · <strong><%= statusLabel[t.status] %></strong></p>

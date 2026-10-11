@@ -1,0 +1,12 @@
+<%# Что появилось на вкладке с прошлого захода (adminNav.service). Списком со ссылками: в самом
+    списке новое может оказаться далеко внизу или под фильтром. %>
+<% if (typeof newItems !== 'undefined' && newItems.length) { %>
+<section class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-4" aria-label="Новое с прошлого захода">
+    <p class="text-sm font-extrabold text-stone-900">Новое с прошлого захода: <%= newItems.length %></p>
+    <ul class="mt-2 space-y-1 text-sm">
+        <% newItems.forEach(function (item) { %>
+          <li><a href="<%= item.href %>" class="font-bold text-emerald-700 hover:text-emerald-800 break-words"><%= item.label %></a></li>
+        <% }); %>
+    </ul>
+</section>
+<% } %>

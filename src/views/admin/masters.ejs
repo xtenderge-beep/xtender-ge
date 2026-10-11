@@ -1,6 +1,8 @@
 <%- include('./_header', { active: 'masters' }) %>
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Специалисты (<%= masters.length %>)</h1>
+<% const freshIds = new Set(typeof newIds !== 'undefined' ? newIds : []); %>
+<%- include('./_new-items') %>
 
 <%# Сводка по языкам: то, на чём строится решение «кому какую рассылку». Каждая плашка — фильтр списка. %>
 <% const href = function (over) { const q = Object.assign({}, filter, over); const p = new URLSearchParams(); Object.keys(q).forEach(function (k) { if (q[k]) p.set(k, q[k]); }); const s = p.toString(); return '/admin/masters' + (s ? '?' + s : ''); }; %>
@@ -65,6 +67,7 @@
               <div class="flex items-center gap-2 flex-wrap">
                   <a href="/admin/masters/<%= m.id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= m.name %></a><% if(m.is_technical) { %><span class="text-amber-700 font-bold">🧪 Технический</span><% } %>
                   <span class="font-mono text-xs text-stone-500"><%= m.phone %></span>
+                  <% if (freshIds.has(m.id)) { %><span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">Новый</span><% } %>
                   <% if (m.followup_at) { %>
                     <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">На уточнении с <%= when(m.followup_at) %></span>
                   <% } %>

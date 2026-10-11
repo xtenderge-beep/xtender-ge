@@ -1,0 +1,1 @@
+<% const navBadgeCount = (typeof navCounts === 'object' && navCounts && Number(navCounts[key])) || 0; %><span class="admin-nav-badge" data-nav-count="<%= key %>" title="Ждёт обработки или пришло с прошлого захода"<%- navBadgeCount ? '' : ' hidden' %>><%= navBadgeCount > 99 ? '99+' : navBadgeCount %></span>

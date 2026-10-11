@@ -21,6 +21,12 @@ router.post('/verify-2fa', asyncHandler(adminController.verify2fa));
 router.post('/verify-2fa/resend', asyncHandler(adminController.resend2fa));
 
 router.use(requireAdmin);
+// Цифры на вкладках меню: сколько нового с прошлого захода (см. adminNav.service).
+router.use(require('../middleware/adminNavCounts'));
+router.get('/nav-counts', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await require('../services/adminNav.service').counts());
+}));
 const cityController = require('../controllers/city.controller');
 router.get('/cities', asyncHandler(cityController.index));
 router.post('/cities', verifyCsrf, asyncHandler(cityController.create));

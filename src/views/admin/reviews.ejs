@@ -1,6 +1,7 @@
 <%- include('./_header', { active: 'reviews' }) %>
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Отзывы на модерации (<%= pending.length %>)</h1>
+<% const freshIds = new Set(typeof newIds !== 'undefined' ? newIds : []); %>
 
 <% if (!pending.length) { %>
   <p class="text-sm text-stone-500">Очередь пуста.</p>
@@ -10,7 +11,7 @@
     <% pending.forEach(function (r) { %>
       <div class="bg-white rounded-2xl border border-stone-200 p-4">
           <div class="flex items-center justify-between flex-wrap gap-2">
-              <a href="/admin/masters/<%= r.master_id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= r.master_name %></a>
+              <span class="flex items-center gap-2 flex-wrap"><a href="/admin/masters/<%= r.master_id %>" class="font-extrabold text-stone-900 hover:text-emerald-700"><%= r.master_name %></a><% if (freshIds.has(r.id)) { %><span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">Новый</span><% } %></span>
               <span class="font-mono text-xs text-amber-600 font-bold"><%= '★'.repeat(r.rating) %><%= '☆'.repeat(5 - r.rating) %></span>
           </div>
           <p class="text-xs text-stone-500 mt-1">По заявке: <%= r.order_description %></p>

@@ -1,0 +1,30 @@
+<%# Цифры на вкладках меню (admin/_nav-badge): первое значение приходит со страницей, дальше
+    обновляется раз в минуту. Сумма идёт и в заголовок вкладки браузера — видно из соседней вкладки. %>
+<% const navInitial = typeof navCounts === 'object' && navCounts ? Object.fromEntries(Object.entries(navCounts).map(([section, count]) => [section, Number(count) || 0])) : null; %>
+<style>
+.admin-nav-badge{display:inline-block;min-width:17px;height:17px;margin-left:5px;padding:0 5px;border-radius:9px;background:#fbbf24;color:#1c1917;font-size:11px;font-weight:800;line-height:17px;text-align:center;vertical-align:1px}
+.admin-nav-badge[hidden]{display:none}
+</style>
+<script>
+(() => {
+  const title = document.title;
+  const show = counts => {
+    document.querySelectorAll('[data-nav-count]').forEach(badge => {
+      const count = Number(counts[badge.dataset.navCount]) || 0;
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.hidden = !count;
+    });
+    const total = Object.values(counts).reduce((sum, count) => sum + (Number(count) || 0), 0);
+    document.title = (total ? '(' + total + ') ' : '') + title;
+  };
+  const refresh = async () => {
+    try {
+      const response = await fetch('/admin/nav-counts', { credentials: 'same-origin', cache: 'no-store' });
+      if (response.ok && !response.redirected) show(await response.json());
+    } catch (error) {}
+  };
+  const initial = <%- JSON.stringify(navInitial) %>;
+  if (initial) show(initial); else refresh();
+  setInterval(refresh, 60000);
+})();
+</script>

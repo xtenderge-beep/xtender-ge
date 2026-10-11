@@ -1,6 +1,8 @@
 <%- include('./_header', { active: 'orders' }) %>
 
 <h1 class="text-2xl font-black text-stone-900 mb-5">Заявки (<%= total %>)</h1>
+<% const freshIds = new Set(typeof newIds !== 'undefined' ? newIds : []); %>
+<%- include('./_new-items') %>
 
 <% const selectedKind = typeof kind === 'string' ? kind : ''; %>
 <form method="GET" class="admin-filter"><select name="kind" aria-label="Тип заявки"><% [['','Все заявки'],['real','Обычные'],['technical','Тестовые']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===selectedKind?'selected':'' %>><%= label %></option><% }) %></select><input name="q" aria-label="Поиск заявки" value="<%= q %>" placeholder="Номер, описание, менеджер"><select name="status" aria-label="Статус заявки"><% [['','Все статусы'],['waiting','Ожидают рассылки'],['needs_revision','У клиента на доработке'],['unverified','Телефон не подтверждён'],['active','В работе'],['closed','Закрыты']].forEach(([v,label])=>{ %><option value="<%= v %>" <%= v===status?'selected':'' %>><%= label %></option><% }) %></select><button>Найти</button><a href="/admin/orders">Сбросить</a></form>
@@ -9,7 +11,7 @@
       <div class="relative">
         <a href="/admin/orders/<%= o.token %>" class="block bg-white rounded-2xl border border-stone-200 p-4 pr-12 hover:border-emerald-300 transition">
             <div class="flex items-center justify-between flex-wrap gap-2">
-                <span class="font-mono text-xs text-stone-500"><%= new Date(o.created_at).toLocaleString('ru') %></span>
+                <span class="flex items-center gap-2 flex-wrap"><span class="font-mono text-xs text-stone-500"><%= new Date(o.created_at).toLocaleString('ru') %></span><% if (freshIds.has(o.id)) { %><span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-amber-400 text-stone-900">Новая</span><% } %></span>
                 <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded
                     <%= o.status === 'closed' ? 'bg-stone-200 text-stone-600' : 'bg-emerald-100 text-emerald-800' %>">
                     <%= o.status === 'closed' ? 'Закрыта' : o.status === 'needs_revision' ? 'Нужны уточнения' : o.status === 'unverified' ? 'Телефон не подтверждён' : o.first_dispatched_at ? 'В работе' : 'Ожидает рассылки' %>

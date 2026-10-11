@@ -9,6 +9,7 @@ const { requestMeta } = require('../config/requestMeta');
 const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
+const adminNav = require('../services/adminNav.service');
 const audit = require('../services/masterAudit.service');
 const reviewService = require('../services/review.service');
 const orderService = require('../services/order.service');
@@ -195,7 +196,18 @@ async function overview(req, res) {
   res.render('admin/overview', { dashboard });
 }
 
+// Заход на вкладку меню: то, что было новым, страница помечает, а в цифре вкладки остаётся только
+// ждущее обработки (adminNav.service). Сбой отметки список не роняет — страница откроется без пометок.
+async function openNavSection(res, section) {
+  let found;
+  try { found = await adminNav.open(section); }
+  catch (error) { console.error('Admin nav mark failed:', error.message); return []; }
+  if (res.locals?.navCounts) res.locals.navCounts[section] = found.waiting.length;
+  return found.fresh;
+}
+
 async function mastersList(req, res) {
+  const newMasters = await openNavSection(res, 'masters');
   const masters = await adminService.listMastersAdmin();
   const labels = await require('../services/category.service').groups(true);
   masters.forEach(m=>m.category_label=labels[m.category] || m.category || 'Категория не назначена');
@@ -213,7 +225,8 @@ async function mastersList(req, res) {
   const managerSummary = adminService.managerSummary(scoped);
   filter.manager = known(req.query.manager, managerSummary.managers.map(m => String(m.id)));
   const shown = adminService.filterByManager(adminService.filterByLanguage(scoped, filter), filter.manager);
-  res.render('admin/masters', { masters: shown, languageSummary: adminService.languageSummary(masters), managerSummary, statusSummary, languageNames: ruNames, filter });
+  res.render('admin/masters', { masters: shown, languageSummary: adminService.languageSummary(masters), managerSummary, statusSummary, languageNames: ruNames, filter,
+    newIds: newMasters.map(m => m.id), newItems: newMasters.map(m => ({ href: '/admin/masters/' + m.id, label: m.name + ' · ' + m.phone })) });
 }
 
 async function masterDetail(req, res) {
@@ -417,13 +430,15 @@ async function correctBalance(req, res) {
 }
 
 async function ordersList(req, res) {
+  const newOrders = await openNavSection(res, 'orders');
   const orders = await adminService.listOrdersAdmin();
   const q = String(req.query.q || '').trim().slice(0,100);
   const status = ['waiting','active','closed','needs_revision','unverified'].includes(req.query.status) ? req.query.status : '';
   const kind = ['real','technical'].includes(req.query.kind) ? req.query.kind : '';
   const filtered = orders.filter(o=>(!kind || (kind === 'technical' ? o.is_technical : !o.is_technical)) && (!q || [o.id,o.token,o.description,o.manager_name].join(' ').toLowerCase().includes(q.toLowerCase())) && (!status || (['closed','needs_revision','unverified'].includes(status) ? o.status === status : status === 'waiting' ? o.status === 'pending_review' && !o.first_dispatched_at : o.status === 'new' && o.first_dispatched_at)));
   const page = Math.min(Math.max(1, Math.ceil(filtered.length/30)), Math.max(1, parseInt(req.query.page,10)||1));
-  res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, kind, page, total: filtered.length });
+  res.render('admin/orders', { orders: filtered.slice((page-1)*30,page*30), q, status, kind, page, total: filtered.length,
+    newIds: newOrders.map(o => o.id), newItems: newOrders.map(o => ({ href: '/admin/orders/' + o.token, label: '№ ' + o.id + ' · ' + String(o.description || '').slice(0, 90) })) });
 }
 
 // Страница заявки у администратора — тот же экран, что в кабинете менеджера (partials/order-screen):
@@ -518,13 +533,15 @@ async function deleteOrder(req, res) {
 }
 
 async function reviewsQueue(req, res) {
+  const newIds = (await openNavSection(res, 'reviews')).map(r => r.id);
   const pending = await reviewService.listPending();
-  res.render('admin/reviews', { pending });
+  res.render('admin/reviews', { pending, newIds });
 }
 
 async function supportList(req, res) {
+  const newIds = (await openNavSection(res, 'support')).map(t => t.id);
   const threads = await supportService.listThreads();
-  res.render('admin/support', { threads });
+  res.render('admin/support', { threads, newIds });
 }
 
 async function supportThread(req, res) {
@@ -724,12 +741,14 @@ async function receiptsWithPurpose(topups = null) {
 }
 async function receiptsList(req, res) {
   const q = String(req.query.q || '').trim().slice(0, 100);
+  // Поиск показывает часть списка — новое при нём просмотренным не считаем.
+  const newIds = q ? [] : (await openNavSection(res, 'receipts')).map(t => t.id);
   let receipts = await receiptsWithPurpose();
   if (q) {
     const needle = q.toLowerCase();
     receipts = receipts.filter(t => [t.reference, t.name, t.phone].some(v => String(v || '').toLowerCase().includes(needle)));
   }
-  res.render('admin/receipts', { receipts, error: null, q, statementSummary: null, unmatchedCredits: [] });
+  res.render('admin/receipts', { receipts, error: null, q, statementSummary: null, unmatchedCredits: [], newIds });
 }
 async function importStatement(req, res) {
   try {
