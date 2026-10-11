@@ -40,13 +40,14 @@ async function nudgeLowBalance(master, telegramService, reason) {
   }
 }
 
-async function createPendingOrder({ phone, description, districtName, managerId = null }) {
+// source — откуда заказчик пришёл на сайт (см. orders.source в schema.sql); null — не записано.
+async function createPendingOrder({ phone, description, districtName, managerId = null, source = null }) {
   const token = generateShortId();
   const ownerToken = generateShortId();
   const { rows } = await pool.query(
-    `INSERT INTO orders (phone, description, district_name, token, owner_token, target_categories, status, manager_id)
-     VALUES ($1, $2, $3, $4, $5, '{}', 'unverified', $6) RETURNING *`,
-    [phone, description, districtName, token, ownerToken, managerId]
+    `INSERT INTO orders (phone, description, district_name, token, owner_token, target_categories, status, manager_id, source)
+     VALUES ($1, $2, $3, $4, $5, '{}', 'unverified', $6, $7) RETURNING *`,
+    [phone, description, districtName, token, ownerToken, managerId, source]
   );
   return rows[0];
 }

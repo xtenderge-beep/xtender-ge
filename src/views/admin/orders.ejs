@@ -22,6 +22,7 @@
                 Категории: <%= (Array.isArray(o.target_categories) ? o.target_categories : []).join(', ') || '—' %>
                 · Просмотров: <%= o.view_count %> · Нажатий звонка: <%= o.call_count %> · WhatsApp: <%= o.whatsapp_count %>
                 <% if (o.manager_name) { %> · <span class="font-bold text-stone-600">менеджер: <%= o.manager_name %></span><% } %>
+                <% if (o.source_label) { %> · <span class="font-bold text-stone-600">источник: <%= o.source_label %></span><% } %>
             </p>
         </a>
         <form method="POST" action="/admin/orders/<%= o.token %>/delete" class="absolute top-3 right-3"

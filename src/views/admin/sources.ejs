@@ -1,0 +1,99 @@
+<%- include('./_header', { active: 'sources' }) %>
+<%
+  const num = n => Number(n || 0).toLocaleString('ru-RU');
+  const pageLabel = path => (pages.find(p => p.path === path) || {}).label || path;
+  const when = v => new Date(v).toLocaleDateString('ru-RU', { timeZone: 'Asia/Tbilisi' });
+  const chip = on => 'px-3 py-2 text-xs font-bold rounded-xl transition ' + (on ? 'bg-emerald-600 text-white' : 'bg-stone-100 hover:bg-stone-200 text-stone-700');
+  // Числа одной строки: визиты, заявки, из них разосланные и с контактом. Подписи повторяются в
+  // каждой строке, чтобы на телефоне числа стояли под названием, а не уезжали за край таблицы.
+  const numbers = function (row) { %>
+    <dl class="grid grid-cols-4 gap-2 text-center w-full lg:w-96 shrink-0">
+      <% [['Переходы', row.visits === null ? '—' : num(row.visits), null], ['Заявки', num(row.orders), row.tests], ['Разосланы', num(row.dispatched), null], ['С контактом', num(row.contacted), null]].forEach(function (cell) { %>
+        <div class="bg-stone-50 rounded-xl px-1 py-2">
+            <dt class="text-[11px] text-stone-500 leading-tight"><%= cell[0] %></dt>
+            <dd class="text-lg font-black text-stone-900"><%= cell[1] %><% if (cell[2]) { %><span class="block text-[11px] font-normal text-amber-700">+ <%= cell[2] %> тест.</span><% } %></dd>
+        </div>
+      <% }); %>
+    </dl>
+<% }; %>
+
+<h1 class="text-2xl font-black text-stone-900">Источники заявок</h1>
+<p class="mt-3 text-sm text-stone-600 max-w-3xl">Площадка — место, где вы оставляете ссылку: пост в группе, сайт, листовка. Создайте площадку, поставьте её ссылку в пост — и здесь будет видно, сколько человек по ней пришло и сколько оставило заявку.</p>
+
+<% if (error) { %><p role="alert" class="p-4 bg-red-50 text-red-800 rounded-xl mt-4"><%= error %></p><% } %>
+<% if (created) { %><p role="status" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-4">Ссылка создана. Скопируйте её ниже и поставьте в пост.</p><% } %>
+<% if (renamed) { %><p role="status" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-4">Название изменено. Ссылка осталась прежней.</p><% } %>
+<% if (removed) { %><p role="status" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-4">Площадка удалена. Её ссылка по-прежнему ведёт на сайт, а переходы и заявки видны в «Остальных источниках».</p><% } %>
+
+<form method="POST" action="/admin/sources" class="admin-filter mt-4" aria-label="Новая площадка">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="flex-1" style="min-width:260px">Название площадки
+        <input name="name" required minlength="2" maxlength="120" value="<%= value.name %>" placeholder="Например: группа «Переезды Тбилиси» в Facebook" class="block w-full mt-1"></label>
+    <label class="min-w-0">Куда ведёт ссылка
+        <select name="path" class="block w-full mt-1"><% pages.forEach(function (p) { %><option value="<%= p.path %>" <%= p.path === value.path ? 'selected' : '' %>><%= p.label %></option><% }); %></select></label>
+    <label class="min-w-0">Язык страницы
+        <select name="lang" class="block w-full mt-1"><% Object.keys(langNames).forEach(function (code) { %><option value="<%= code %>" <%= code === value.lang ? 'selected' : '' %>><%= langNames[code] %></option><% }); %></select></label>
+    <button type="submit" class="self-end">Создать ссылку</button>
+</form>
+
+<div class="flex flex-wrap items-center justify-between gap-3 mt-6 mb-3">
+    <h2 class="text-lg font-extrabold text-stone-900">Площадки</h2>
+    <nav class="flex flex-wrap gap-2" aria-label="Период"><% periods.forEach(function (p) { %><a href="/admin/sources?period=<%= p[0] %>" class="<%= chip(period === p[0]) %>" <%- period === p[0] ? 'aria-current="page"' : '' %>><%= p[1] %></a><% }); %></nav>
+</div>
+
+<% if (!placements.length) { %>
+  <p class="p-6 bg-white rounded-2xl border border-stone-200 text-sm text-stone-600">Площадок пока нет. Назовите первую в форме выше — получите ссылку для поста.</p>
+<% } %>
+<div class="space-y-3">
+<% placements.forEach(function (row) { const s = row.source; %>
+  <article id="source-<%= s.code %>" class="rounded-2xl border p-4 flex flex-col lg:flex-row lg:items-start gap-4 <%= created === s.code ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-stone-200' %>">
+      <div class="flex-1 min-w-0">
+          <h3 class="font-extrabold text-stone-900 break-words"><%= s.name %></h3>
+          <div class="flex flex-wrap gap-2 mt-2">
+              <input id="link-<%= s.id %>" readonly value="<%= baseUrl %>/go/<%= s.code %>" aria-label="Ссылка площадки «<%= s.name %>»" class="flex-1 min-w-0 font-mono text-xs border border-stone-300 rounded-lg px-2 py-2 bg-stone-50 text-stone-800" onfocus="this.select()">
+              <button type="button" data-copy="link-<%= s.id %>" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition">Скопировать</button>
+          </div>
+          <p class="text-xs text-stone-500 mt-2">Ведёт на: <a href="<%= landingUrl(s) %>" target="_blank" rel="noopener" class="underline"><%= pageLabel(s.path) %></a>, <%= langNames[s.lang] %> · создана <%= when(s.created_at) %></p>
+          <details class="mt-2 text-xs text-stone-600"><summary class="cursor-pointer font-bold text-emerald-700">Переименовать или удалить</summary>
+              <form method="POST" action="/admin/sources/<%= s.id %>/name" class="flex flex-wrap gap-2 mt-2">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <input name="name" required minlength="2" maxlength="120" value="<%= s.name %>" aria-label="Новое название площадки" class="flex-1 min-w-0 border border-stone-300 rounded-lg px-2 py-2">
+                  <button type="submit" class="px-3 py-2 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-lg transition">Сохранить название</button>
+              </form>
+              <form method="POST" action="/admin/sources/<%= s.id %>/delete" class="mt-2" onsubmit="return confirm('Удалить эту площадку? Ссылка останется рабочей, но в списке вместо названия будет её код.')">
+                  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+                  <button type="submit" class="text-red-700 underline">Удалить площадку</button>
+              </form>
+          </details>
+      </div>
+      <% numbers(row); %>
+  </article>
+<% }); %>
+</div>
+
+<h2 class="text-lg font-extrabold text-stone-900 mt-8 mb-3">Остальные источники</h2>
+<% if (!others.length) { %>
+  <p class="p-6 bg-white rounded-2xl border border-stone-200 text-sm text-stone-600">За этот период других переходов и заявок нет.</p>
+<% } %>
+<div class="space-y-2">
+<% others.forEach(function (row) { %>
+  <article class="bg-white rounded-2xl border border-stone-200 p-4 flex flex-col lg:flex-row lg:items-center gap-3">
+      <h3 class="flex-1 min-w-0 font-bold text-stone-900 break-words"><%= row.name %></h3>
+      <% numbers(row); %>
+  </article>
+<% }); %>
+</div>
+
+<p class="text-xs text-stone-500 mt-4 max-w-3xl" style="line-height:1.6">Как считаем. Переходы — визиты на сайт, начавшиеся с этого источника; роботы и сотрудники не считаются, поэтому ваши переходы из этого браузера сюда не попадут — проверяйте ссылку в окне инкогнито. Заявки — подтверждённые по SMS за выбранный период; «разосланы» и «с контактом» — сколько из них дошло до рассылки и до нажатия «позвонить» или WhatsApp (нажатие не подтверждает разговор). Тестовые заявки показаны отдельно. Источник заявки — метка ссылки, а без метки сайт, с которого человек пришёл; он записывается с 12.10.2026, у более ранних заявок его нет. Прочерк в «Переходах» — для таких заявок визиты не считаются.</p>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (button) {
+  button.addEventListener('click', async function () {
+    var input = document.getElementById(button.dataset.copy);
+    try { await navigator.clipboard.writeText(input.value); } catch (e) { input.select(); document.execCommand('copy'); }
+    button.textContent = 'Скопировано';
+    setTimeout(function () { button.textContent = 'Скопировать'; }, 2000);
+  });
+});
+</script>
+<%- include('./_footer') %>

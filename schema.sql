@@ -751,6 +751,10 @@ CREATE TABLE IF NOT EXISTS technical_client_phones (
  note VARCHAR(200) NOT NULL DEFAULT '',
  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Откуда заказчик пришёл на сайт, когда оставил заявку: метка utm_source или сайт-источник — те же
+-- значения, что в site_visits.source. Пустая строка — прямой заход; NULL — не записано (заявки до
+-- 2026-10-12 и оформленные менеджером). Раздел «Источники» в админке, trafficSource.service.js.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(80);
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_balance_transactions AS
@@ -924,6 +928,18 @@ CREATE TABLE IF NOT EXISTS landing_pages (
     sort_order INTEGER NOT NULL DEFAULT 100,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Источники заявок (trafficSource.service.js, /admin/sources): площадка, где размещена ссылка, —
+-- пост в группе, сайт, листовка. Ссылка /go/<code> ведёт на страницу path на языке lang с меткой
+-- utm_source=<code>; по коду сходятся визиты (site_visits.source) и заявки (orders.source).
+CREATE TABLE IF NOT EXISTS traffic_sources (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(60) NOT NULL UNIQUE,
+    name VARCHAR(120) NOT NULL,
+    path VARCHAR(120) NOT NULL DEFAULT '/',
+    lang VARCHAR(2) NOT NULL DEFAULT 'ka',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Multiple provider services and immutable dispatch context.

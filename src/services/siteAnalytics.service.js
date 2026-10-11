@@ -15,6 +15,8 @@ const VISIT_GAP_MS = 30 * 60 * 1000; // новый визит после 30 ми
 const ONLINE_MS = 5 * 60 * 1000;
 const KEEP_DAYS = 400;
 const tbilisiDate = ms => new Date(ms + 4 * HOUR).toISOString().slice(0, 10);
+// Как в отчётах назван визит без внешнего источника.
+const DIRECT = 'Прямой заход';
 
 // Тип страницы вместо адреса: токены из адресов никогда не попадают в базу.
 const PAGES = [
@@ -116,7 +118,7 @@ function summarize(rows) {
     const at = new Date(row.created_at).getTime();
     const prev = last.get(row.visitor);
     if (!prev || at - prev.at > VISIT_GAP_MS) {
-      const visit = { visitor: row.visitor, source: row.source || 'Прямой заход', page: row.page, device: row.device,
+      const visit = { visitor: row.visitor, source: row.source || DIRECT, page: row.page, device: row.device,
         browser: row.browser, country: row.country || '—', lang: row.lang || '—', views: 0, at };
       visits.push(visit);
       last.set(row.visitor, { at, visit });
@@ -174,6 +176,13 @@ async function report(window, now = Date.now()) {
   };
 }
 
+// Сколько визитов начал каждый источник за период — для раздела «Источники» (trafficSource.service).
+async function visitsBySource(start, end) {
+  const counts = new Map();
+  for (const visit of summarize(await rowsBetween(start, end)).visitList) counts.set(visit.source, (counts.get(visit.source) || 0) + 1);
+  return counts;
+}
+
 function start() {
   const cleanup = () => pool.query('DELETE FROM site_visits WHERE created_at < $1', [new Date(Date.now() - KEEP_DAYS * DAY)])
     .catch(err => console.error('[site-analytics] cleanup:', err.message));
@@ -181,4 +190,4 @@ function start() {
   setInterval(cleanup, DAY).unref();
 }
 
-module.exports = { classifyPage, parseSource, isBot, device, browser, record, summarize, report, start, PAGE_LABELS };
+module.exports = { classifyPage, parseSource, isBot, device, browser, record, summarize, report, visitsBySource, start, PAGE_LABELS, DIRECT };

@@ -10,6 +10,7 @@ const pool = require('../config/db');
 const masterService = require('../services/master.service');
 const adminService = require('../services/admin.service');
 const adminNav = require('../services/adminNav.service');
+const trafficSources = require('../services/trafficSource.service');
 const audit = require('../services/masterAudit.service');
 const reviewService = require('../services/review.service');
 const orderService = require('../services/order.service');
@@ -432,6 +433,9 @@ async function correctBalance(req, res) {
 async function ordersList(req, res) {
   const newOrders = await openNavSection(res, 'orders');
   const orders = await adminService.listOrdersAdmin();
+  // Источник заявки — названием площадки из раздела «Источники».
+  const sources = await trafficSources.list();
+  orders.forEach(o => { o.source_label = trafficSources.label(o.source, sources); });
   const q = String(req.query.q || '').trim().slice(0,100);
   const status = ['waiting','active','closed','needs_revision','unverified'].includes(req.query.status) ? req.query.status : '';
   const kind = ['real','technical'].includes(req.query.kind) ? req.query.kind : '';
@@ -450,6 +454,7 @@ async function orderDetail(req, res, result = null) {
   const detail = await adminService.getOrderDetailAdmin(req.params.token);
   res.render('admin/order-detail', { ...screen, result, error: req.query.error || req.query.dispatchError || null,
     notifiedMasters: detail.notifiedMasters,
+    sourceLabel: trafficSources.label(detail.source, await trafficSources.list()),
     revisionNotice: ['failed', 'sent'].includes(req.query.revisionNotice) ? req.query.revisionNotice : null,
     date: value => value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi' }) : '—' });
 }

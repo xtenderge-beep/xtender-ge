@@ -1004,7 +1004,8 @@
                 const description = descriptionInput.value.trim();
                 const res = await fetch('/api/otp/send', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phone, description, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest }),
+                    // entry — откуда человек пришёл на сайт (public/js/visit.js): источник заявки для админки.
+                    body: JSON.stringify({ phone, description, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null }),
                 });
                 const data = await res.json();
                 if (data.success) {

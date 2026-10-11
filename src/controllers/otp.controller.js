@@ -5,6 +5,7 @@ const orderService = require('../services/order.service');
 const managerService = require('../services/manager.service');
 const { requestMeta } = require('../config/requestMeta');
 const legalContentService = require('../services/legalContent.service');
+const { parseSource } = require('../services/siteAnalytics.service');
 
 const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 
@@ -34,11 +35,17 @@ async function send(req, res) {
     }
   }
 
+  // Откуда заказчик пришёл на сайт: метку ссылки или сайт-источник присылает форма
+  // (public/js/visit.js). Пустая строка — прямой заход; null — форма источник не прислала.
+  const entry = req.body.entry && typeof req.body.entry === 'object' ? req.body.entry : null;
+  const source = entry ? (parseSource(entry.r, entry.us, req.hostname) || '') : null;
+
   const order = await orderService.createPendingOrder({
     phone,
     description,
     districtName: districtName || '',
     managerId,
+    source,
   });
   if (inviteToken) {
     managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});

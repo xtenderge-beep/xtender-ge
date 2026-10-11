@@ -19,6 +19,7 @@
 <section class="card admin-only" id="admin-only">
 <h2>Только для администратора</h2>
 <p>Состояние: <strong><%= statusText %></strong> · создана <%= date(order.created_at) %><% if(order.closed_at){ %> · закрыта <%= date(order.closed_at) %><% } %></p>
+<% if(typeof sourceLabel !== 'undefined' && sourceLabel){ %><p>Источник: <strong><%= sourceLabel %></strong> <a href="/admin/sources">все источники →</a></p><% } %>
 <% if(order.status === 'pending_review' && !order.first_dispatched_at){ %>
 <details><summary>Вернуть заказчику на доработку</summary>
 <form method="post" action="/admin/orders/<%= order.token %>/request-revision"><input type="hidden" name="_csrf" value="<%= csrfToken %>">

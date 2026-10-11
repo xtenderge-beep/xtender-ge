@@ -191,6 +191,13 @@ router.get('/z/:token', asyncHandler(async (req, res) => {
   res.redirect(`${locale}/#post-section`);
 }));
 
+// Ссылка площадки из раздела «Источники» в админке: ведёт на выбранную страницу с меткой, по которой
+// считаются визиты и заявки (trafficSource.service.js).
+router.get('/go/:code', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.redirect(302, await require('../services/trafficSource.service').target(req.params.code));
+}));
+
 // Ссылка /join в нужном языковом варианте: ru/en получают префикс, ka — явную метку
 // ?lang=ka (без неё голый /join, если в куке остался ru/en с прошлого визита БРАУЗЕРА,
 // тут же уведёт обратно — см. redirectToCookieLocale/lang-switch.ejs). Без hint — как

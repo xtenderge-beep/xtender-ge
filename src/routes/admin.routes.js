@@ -47,6 +47,12 @@ router.get('/landings/:id(\\d+)', asyncHandler(landings.form));
 router.post('/landings', verifyCsrf, asyncHandler(landings.save));
 router.post('/landings/:id(\\d+)', verifyCsrf, asyncHandler(landings.save));
 router.post('/landings/:id(\\d+)/delete', verifyCsrf, asyncHandler(landings.remove));
+// Источники заявок: площадки со своей ссылкой (/go/<code>).
+const sources = require('../controllers/trafficSource.controller');
+router.get('/sources', asyncHandler(sources.index));
+router.post('/sources', verifyCsrf, asyncHandler(sources.create));
+router.post('/sources/:id(\\d+)/name', verifyCsrf, asyncHandler(sources.rename));
+router.post('/sources/:id(\\d+)/delete', verifyCsrf, asyncHandler(sources.remove));
 router.post('/orders/:token/refresh-categories', verifyCsrf, asyncHandler(categories.refreshOrder));
 const crm=require('../controllers/crm.controller');
 router.get('/processes',asyncHandler(crm.show));
