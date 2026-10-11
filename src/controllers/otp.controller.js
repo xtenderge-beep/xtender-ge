@@ -3,7 +3,6 @@ const consentService = require('../services/consent.service');
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
 const managerService = require('../services/manager.service');
-const { getBaseUrl } = require('../config/url');
 const { requestMeta } = require('../config/requestMeta');
 const legalContentService = require('../services/legalContent.service');
 
@@ -45,8 +44,9 @@ async function send(req, res) {
     managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});
   }
 
-  const link = `${getBaseUrl()}/o/${order.owner_token}`;
-  const result = await otpService.sendCode(phone, link, 'order', order.id, { meta: requestMeta(req), consent: acceptance.consent });
+  // В этой SMS только код. Ссылка на заявку уходит отдельной SMS после подтверждения
+  // (order.controller.create): раньше её открывали вместо ввода кода.
+  const result = await otpService.sendCode(phone, 'order', order.id, { meta: requestMeta(req), consent: acceptance.consent });
 
   if (!result.success) {
     if (result.reason === 'rate_limited') {

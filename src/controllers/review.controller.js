@@ -39,7 +39,7 @@ async function requestCode(req, res) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
 
-  const result = await otpService.sendCode(phone, null, REVIEW_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
+  const result = await otpService.sendCode(phone, REVIEW_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });

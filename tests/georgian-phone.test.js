@@ -26,8 +26,7 @@ const request=phone=>({body:{phone,code:'1234',token:'not-used',challengeId:'a'.
  assert.equal(sends,0);assert.equal((await pool.query('SELECT * FROM orders')).rows.length,0,'invalid phones do not create drafts');
  for(const purpose of ['order','master','master_login','review','catalog','admin_login']){
   for(const phone of ['+447911123456','+99550000100','500001001']){
-   assert.deepEqual(await otp.sendCode(phone,null,purpose),{success:false,reason:'invalid_phone'});
-   assert.deepEqual(await otp.sendCode(phone,'/o/test',purpose),{success:false,reason:'invalid_phone'});
+   assert.deepEqual(await otp.sendCode(phone, purpose),{success:false,reason:'invalid_phone'});
    await redis.set('otp:'+purpose+':'+phone,'1234');await redis.set('verified:'+purpose+':'+phone,'1');
    await redis.set('consent_grant:'+purpose+':'+phone+':'+'a'.repeat(48),JSON.stringify({consentLogId:1}));
    assert.equal(await otp.verifyCode(phone,'1234',purpose,{recordConsent:false}),false);
@@ -36,7 +35,7 @@ const request=phone=>({body:{phone,code:'1234',token:'not-used',challengeId:'a'.
   }
  }
  assert.equal(sends,0,'central service never contacts a gateway for foreign numbers');
- assert.equal((await otp.sendCode('+995500001002',null,'review')).success,true);
+ assert.equal((await otp.sendCode('+995500001002', 'review')).success,true);
  const code=await redis.get('otp:review:+995500001002');assert.ok(code);
  assert.equal(await otp.verifyCode('+995500001002',code,'review',{recordConsent:false}),true);
  assert.equal(await otp.isPhoneVerified('+995500001002','review'),true);

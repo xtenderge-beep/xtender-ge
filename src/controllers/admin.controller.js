@@ -108,7 +108,7 @@ async function login(req, res) {
   }
 
   const phone = toE164(process.env.ADMIN_PHONE);
-  const sent = await otpService.sendCode(phone, null, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  const sent = await otpService.sendCode(phone, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
   if (!sent.success) {
     return res.status(500).render('admin/login', { error: 'Не удалось отправить SMS-код. Попробуйте позже.' });
   }
@@ -164,7 +164,7 @@ async function resend2fa(req, res) {
   if (!pending) return res.redirect('/admin/login');
 
   const phone = toE164(process.env.ADMIN_PHONE);
-  const sent = await otpService.sendCode(phone, null, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  const sent = await otpService.sendCode(phone, ADMIN_OTP_PURPOSE, null, { meta: requestMeta(req) });
   if (!sent.success) {
     return res.render('admin/verify-2fa', { error: 'Не удалось отправить код повторно. Подождите немного.', resent: false });
   }

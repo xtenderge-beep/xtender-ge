@@ -45,7 +45,7 @@ function response() {
 const request = body => ({ body, cookies: {}, headers: {}, get:()=> 'localhost', lang: 'ru', protocol: 'http', ip:'127.0.0.1' });
 async function issue(phone, purpose, orderId=null) {
   const snapshot = await consent.bundle(purpose === 'order' ? 'client' : 'provider', 'ru');
-  const result = await otp.sendCode(phone, null, purpose, orderId, { consent: snapshot });
+  const result = await otp.sendCode(phone, purpose, orderId, { consent: snapshot });
   const code = await redis.get(`otp:${purpose}:${phone}`);
   return { snapshot, code, challengeId: result.challengeId };
 }

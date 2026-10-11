@@ -34,7 +34,7 @@ async function readSendMeta(phone, purpose) {
 }
 
 // context: { meta } — { ip, userAgent, xForwardedFor } из requestMeta(req), для журнала.
-async function sendCode(phone, orderLink, purpose = 'order', orderId = null, context = {}) {
+async function sendCode(phone, purpose = 'order', orderId = null, context = {}) {
   if (!isGeorgianPhone(phone)) return { success: false, reason: 'invalid_phone' };
   const allowed = await checkRateLimit(phone, purpose);
   if (!allowed) {
@@ -48,13 +48,10 @@ async function sendCode(phone, orderLink, purpose = 'order', orderId = null, con
 
   let result;
   try {
-    if (orderLink) {
-      const ref = orderId ? ` #${orderId}` : '';
-      result = await smsService.sendOrderNotification(
-        phone,
-        serviceMessage.sms('orderCode', { code, reference: ref, link: orderLink }),
-        { log: false }
-      );
+    if (purpose === 'order') {
+      // Заказчику — код и что с ним делать, без ссылки на заявку: ссылка уходит отдельной SMS
+      // после подтверждения (order.controller.create), см. service-message-copy.js.
+      result = await smsService.sendOrderNotification(phone, serviceMessage.sms('orderCode', { code }), { log: false });
     } else {
       result = await smsService.sendOtp(phone, code);
     }

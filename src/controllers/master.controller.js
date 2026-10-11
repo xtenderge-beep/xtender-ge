@@ -58,7 +58,7 @@ async function catalogOtpSend(req, res) {
   if (!rawPhone || !isGeorgianPhone(rawPhone)) {
     return res.status(400).json({ success: false, message: georgianPhoneError(req.lang) });
   }
-  const result = await otpService.sendCode(toE164(rawPhone), null, CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
+  const result = await otpService.sendCode(toE164(rawPhone), CATALOG_OTP_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
@@ -154,7 +154,7 @@ async function sendOtp(req, res) {
 
   const acceptance = await consentService.acceptedRequest(req, 'provider');
   if (acceptance.error) return res.status(acceptance.status).json({ success: false, message: acceptance.error });
-  const result = await otpService.sendCode(toE164(rawPhone), null, OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
+  const result = await otpService.sendCode(toE164(rawPhone), OTP_PURPOSE, null, { meta: requestMeta(req), consent: acceptance.consent });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });
@@ -415,7 +415,7 @@ async function loginRequestCode(req, res) {
     return res.status(404).json({ success: false, message: 'not_registered' });
   }
 
-  const result = await otpService.sendCode(phone, null, MASTER_LOGIN_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
+  const result = await otpService.sendCode(phone, MASTER_LOGIN_PURPOSE, null, { meta: requestMeta(req), language: req.lang });
   if (!result.success) {
     if (result.reason === 'rate_limited') {
       return res.status(429).json({ success: false, message: serviceMessage('rateLimit', req.lang) });

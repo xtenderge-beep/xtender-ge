@@ -14,9 +14,8 @@ router.post('/api/drafts/:token/send',wrap(async(req,res)=>{
  const item=await crm.publicInvite(req.params.token);if(item.kind==='provider'||item.status!=='unverified')throw crm.fail('Заявка уже отправлена / Request already submitted',409);
  if(!require('../config/phone').isGeorgianPhone(item.phone))return res.status(400).json({success:false,message:require('../config/phone').georgianPhoneError(req.lang)});
  const snapshot=crm.details(req.body),accepted=await consent.acceptedRequest(req,'client');if(accepted.error)return res.status(accepted.status).json({success:false,message:accepted.error});
- const order=await require('../services/order.service').getOrderByToken(item.order_token);
- const ownerLink=require('../config/url').getBaseUrl()+'/o/'+order.owner_token;
- const result=await otp.sendCode(item.phone,ownerLink,'order',item.order_id,{meta:require('../config/requestMeta').requestMeta(req),consent:accepted.consent,draftDetails:snapshot});
+ // В SMS только код; ссылка на заявку уходит отдельной SMS после подтверждения (order.controller.create).
+ const result=await otp.sendCode(item.phone,'order',item.order_id,{meta:require('../config/requestMeta').requestMeta(req),consent:accepted.consent,draftDetails:snapshot});
  if(!result.success)return res.status(result.reason==='rate_limited'?429:503).json({success:false,message:'Не удалось отправить код. Повторите позже / Try again later.'});
  res.json({success:true,token:item.order_token,challengeId:result.challengeId});
 }));

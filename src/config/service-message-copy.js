@@ -39,7 +39,11 @@ const messages = {
 // gateway arrives intact and its reply passes sms.service acceptedResponse.
 const smsMessages = {
   code: 'Code: {code}',
-  orderCode: 'Xtender: code {code}, order{reference}: {link} Close your request here when no longer needed.',
+  // The code SMS carries no link on purpose. With the request link in it people opened the request
+  // page, took the request for sent and never entered the code (2026-10-11). The link goes in its
+  // own SMS, orderLink, once the phone is confirmed.
+  orderCode: 'Xtender code: {code}. Enter it on the site to send your request.',
+  orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
   lead: 'Xtender: {test}new order #{id}: {link}',
   revision: 'Xtender: please update your request. Moderator feedback: {link}',
   reviewInvite: 'Xtender: order #{id} closed. Rate the provider: {link}',

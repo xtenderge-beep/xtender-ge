@@ -165,6 +165,15 @@ async function create(req, res) {
   // платного показа номера в каталоге: не гоняем клиента через SMS повторно.
   await catalogSession.issue(res, toE164(phone));
 
+  // Ссылка на заявку — отдельной SMS и только теперь, когда телефон подтверждён: по ней заказчик
+  // вернётся посмотреть статус и закрыть заявку. В SMS с кодом её нет намеренно (см.
+  // service-message-copy.js). Сбой отправки заявку не трогает: страница заявки уже открывается сама.
+  Promise.resolve()
+    .then(() => smsService.sendOrderNotification(order.phone,
+      serviceMessage.sms('orderLink', { id: order.id, link: `${getBaseUrl()}/o/${order.owner_token}` }),
+      { orderId: order.id, kind: 'transactional' }))
+    .catch((err) => console.error('Order link SMS failed:', err.message));
+
   // Перевод текста заявки + уведомление модератора — в фоне, ответ клиенту не ждёт.
   // Перевод с общим таймаутом 7с; сбой/таймаут → заявка и рассылка идут с оригиналом.
   // Модератору сообщение уходит уже с переводом (если успел).
