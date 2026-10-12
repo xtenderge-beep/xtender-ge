@@ -132,6 +132,10 @@ let server;
     assert.ok(hint && hint !== 'otp_hint', lang);
     assert.ok(html.includes('<p id="otp-hint" class="text-xs text-stone-600 mb-2">' + hint.replace(/'/g, '&#39;') + '</p>'), lang);
     assert.match(html, /id="code"[^>]*aria-describedby="otp-hint"/);
+    // После запроса кода шаг с кодом возвращается на экран. Шаг с телефоном высокий (согласия,
+    // галочки), при его замене страница сжимается, и на телефоне поле кода оставалось на сотни
+    // пикселей выше видимой части — проверено в браузере на трёх размерах экрана (2026-10-12).
+    assert.match(html, /otpStep\.classList\.remove\('hidden'\);[\s\S]{0,600}?otpStep\.scrollIntoView\(\{ block: 'center' \}\);\s*codeInput\.focus\(\{ preventScroll: true \}\);/, lang);
   }
 
   console.log('PASS: order code SMS — the first SMS carries only the code, the request link goes in a second SMS after confirmation on both the site form and the manager link; a failed link SMS does not break the request; the unconfirmed request page no longer says it is active; the code field explains what to do. No real SMS sent.');

@@ -1015,6 +1015,10 @@
                     showMsg(T.js_ok_code_sent, false);
                     phoneStep.classList.add('hidden');
                     otpStep.classList.remove('hidden');
+                    // Шаг с телефоном высокий (тексты согласий, галочки), шаг с кодом короткий: при
+                    // замене страница сжимается, а экран остаётся на месте — поле кода оказывалось на
+                    // сотни пикселей выше видимой части, и на телефоне его не находили. Возвращаем шаг на экран.
+                    otpStep.scrollIntoView({ block: 'center' });
                     codeInput.focus({ preventScroll: true });
                 } else { showMsg(data.message || T.js_err_send_code, true); }
             });
