@@ -40,15 +40,19 @@ async function send(req, res) {
   const entry = req.body.entry && typeof req.body.entry === 'object' ? req.body.entry : null;
   const source = entry ? (parseSource(entry.r, entry.us, req.hostname) || '') : null;
 
-  const order = await orderService.createPendingOrder({
-    phone,
-    description,
-    districtName: districtName || '',
-    managerId,
-    source,
-  });
-  if (inviteToken) {
-    managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});
+  // Форма просит код повторно по своей заявке (token) — черновик остаётся тот же.
+  let order = await orderService.reusePendingOrder(req.body.token, phone, description);
+  if (!order) {
+    order = await orderService.createPendingOrder({
+      phone,
+      description,
+      districtName: districtName || '',
+      managerId,
+      source,
+    });
+    if (inviteToken) {
+      managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});
+    }
   }
 
   // В этой SMS только код. Ссылка на заявку уходит отдельной SMS после подтверждения

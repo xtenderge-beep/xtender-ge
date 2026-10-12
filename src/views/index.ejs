@@ -213,13 +213,19 @@
                                 <label for="code" class="block text-[11px] font-bold text-stone-700 uppercase mb-1">
                                     <i class="fa-solid fa-key text-emerald-600 mr-1"></i><%= t('otp_label') %>
                                 </label>
+                                <%# Шаг с кодом — место, где заявки терялись чаще всего. На телефоне это отдельный экран
+                                    (body.otp-active, input.css): кроме кода на нём ничего нет. Код подставляется из SMS и
+                                    отправляется сам; кнопка остаётся запасным путём. %>
+                                <p id="otpSentTo" class="text-sm font-bold text-stone-900 mb-1"></p>
                                 <p id="otp-hint" class="text-xs text-stone-600 mb-2"><%= t('otp_hint') %></p>
-                                <input type="text" id="code" maxlength="4" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4}" aria-describedby="otp-hint"
+                                <input type="text" id="code" maxlength="4" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4}" aria-describedby="otpSentTo otp-hint"
                                     class="w-full px-4 py-3 rounded-xl border-2 border-stone-200 focus:border-emerald-500 outline-none font-mono text-lg font-black tracking-[0.3em] text-center text-stone-900 bg-white">
                                 <button id="verifyOtpButton" type="button" onclick="verifyOtp()" class="mt-4 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check"></i>
                                     <span><%= t('otp_verify') %></span>
                                 </button>
+                                <button id="otpResendButton" type="button" onclick="resendOtp()" class="mt-2 w-full py-3 text-sm font-bold text-stone-600 hover:text-stone-900 disabled:opacity-50 disabled:cursor-not-allowed transition"><%= t('otp_resend') %></button>
+                                <button id="otpChangePhoneButton" type="button" onclick="changeOtpPhone()" class="w-full py-2 text-xs font-bold text-stone-500 hover:text-stone-800 transition"><%= t('otp_change_phone') %></button>
                             </div>
 
                             <div id="formMsg" role="status" aria-live="polite" class="hidden text-xs font-bold mx-3.5 sm:mx-5 mb-3.5 sm:mb-5 p-3 rounded-xl"></div>
@@ -897,7 +903,7 @@
         function goToDetailsStep() {
             showMsg('');
             phoneStep.classList.add('hidden');
-            otpStep.classList.add('hidden');
+            leaveOtpStep();
             detailsStep.classList.remove('hidden');
             document.getElementById('freeformInput').focus({ preventScroll: true });
         }
@@ -996,16 +1002,100 @@
         let consentVerified = false;
         const consentLanguage = <%- JSON.stringify(consent.language) %>;
         const consentDigest = <%- JSON.stringify(consent.digest) %>;
-        async function sendOtp() {
-            if (!document.getElementById('clientTerms').checked || !document.getElementById('clientSharing').checked) return showMsg(T.consent_required, true);
+        // --- Шаг с кодом из SMS. Здесь заявки терялись чаще всего, поэтому:
+        //     на телефоне шаг занимает весь экран (body.otp-active, input.css) и его нельзя потерять прокруткой;
+        //     код подставляется из SMS сам (где браузер умеет) и отправляется сам после четвёртой цифры;
+        //     есть «Отправить код ещё раз» и «Изменить номер»;
+        //     шаг переживает перезагрузку вкладки, пока человек читает SMS. ---
+        const CODE_STEP_KEY = 'xt_code_step';
+        const CODE_STEP_KEEP_MS = 10 * 60 * 1000;
+        const RESEND_WAIT_MS = 30 * 1000;
+        const resendButton = document.getElementById('otpResendButton');
+        let resendReadyAt = 0, resendTimer = null, smsCodeAbort = null, autoSubmittedCode = '';
+
+        // Кнопка повторной отправки ждёт 30 секунд: SMS идёт не мгновенно, а кодов на номер три в час.
+        function renderResend() {
+            const left = Math.ceil((resendReadyAt - Date.now()) / 1000);
+            resendButton.disabled = left > 0;
+            resendButton.textContent = left > 0 ? T.otp_resend + ' (' + left + ')' : T.otp_resend;
+            if (left <= 0) { clearInterval(resendTimer); resendTimer = null; }
+        }
+        function startResendWait(sentAt) {
+            resendReadyAt = sentAt + RESEND_WAIT_MS;
+            clearInterval(resendTimer);
+            resendTimer = setInterval(renderResend, 1000);
+            renderResend();
+        }
+
+        // Браузер сам читает код из SMS, если в ней есть служебная строка «@сайт #код» (настройка в
+        // админке): человек нажимает «Разрешить», и уходить в сообщения не нужно. Без строки или в
+        // браузере без такой возможности вызов просто ничего не делает.
+        function stopListeningForSmsCode() {
+            if (smsCodeAbort) smsCodeAbort.abort();
+            smsCodeAbort = null;
+        }
+        function listenForSmsCode() {
+            stopListeningForSmsCode();
+            if (!('OTPCredential' in window) || !navigator.credentials) return;
+            smsCodeAbort = new AbortController();
+            navigator.credentials.get({ otp: { transport: ['sms'] }, signal: smsCodeAbort.signal }).then((otp) => {
+                if (!otp || !otp.code || otpStep.classList.contains('hidden')) return;
+                codeInput.value = otp.code;
+                codeInput.dispatchEvent(new Event('input'));
+            }).catch(() => {});
+        }
+
+        function rememberCodeStep(sentAt) {
+            try { sessionStorage.setItem(CODE_STEP_KEY, JSON.stringify({ token: pendingOrderToken, challenge: consentChallenge, phone: phoneInput.value.trim(), description: descriptionInput.value, at: sentAt })); } catch (e) {}
+        }
+        function forgetCodeStep() {
+            try { sessionStorage.removeItem(CODE_STEP_KEY); } catch (e) {}
+        }
+
+        function showOtpStep(sentAt) {
+            exitCompose();
+            detailsStep.classList.add('hidden');
+            phoneStep.classList.add('hidden');
+            otpStep.classList.remove('hidden');
+            document.getElementById('otpSentTo').textContent = T.otp_sent_to.replace('{phone}', phoneInput.value.trim());
+            document.body.classList.add('otp-active');
+            if (composeMobileNav) composeMobileNav.classList.add('translate-y-full');
+            // Шаг с телефоном высокий (тексты согласий, галочки), шаг с кодом короткий: при замене
+            // страница сжимается, а экран остаётся на месте — поле кода оказывалось на сотни пикселей
+            // выше видимой части. На телефоне шаг и так во весь экран, на широком экране возвращаем его в центр.
+            otpStep.scrollIntoView({ block: 'center' });
+            codeInput.focus({ preventScroll: true });
+            startResendWait(sentAt);
+            listenForSmsCode();
+        }
+        function leaveOtpStep() {
+            document.body.classList.remove('otp-active');
+            otpStep.classList.add('hidden');
+            clearInterval(resendTimer); resendTimer = null;
+            stopListeningForSmsCode();
+            forgetCodeStep();
+            codeInput.value = ''; autoSubmittedCode = '';
+            if (composeMobileNav) composeMobileNav.classList.remove('translate-y-full');
+        }
+        // «Изменить номер»: назад к телефону. Текст заявки и галочки остаются; с тем же номером
+        // новый код придёт по той же заявке, с другим — создастся новая.
+        function changeOtpPhone() {
+            leaveOtpStep();
+            showMsg('');
+            phoneStep.classList.remove('hidden');
+            if (window.innerWidth < 640) composePostSection.scrollIntoView({ block: 'start' });
+            phoneInput.focus({ preventScroll: true });
+        }
+
+        async function requestOrderCode(buttonId) {
             const phone = phoneInput.value.trim();
-            if (!window.GeorgianPhone.validate(phoneInput)) return;
-            await runRequestAction('sendOtpButton', async () => {
+            await runRequestAction(buttonId, async () => {
                 const description = descriptionInput.value.trim();
                 const res = await fetch('/api/otp/send', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    // token — повторный код по уже созданной заявке, второй черновик не создаётся.
                     // entry — откуда человек пришёл на сайт (public/js/visit.js): источник заявки для админки.
-                    body: JSON.stringify({ phone, description, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null }),
+                    body: JSON.stringify({ phone, description, token: pendingOrderToken, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -1013,16 +1103,30 @@
                     consentChallenge = data.challengeId; consentVerified = false;
                     trackStep('lead_form_code_sent');
                     showMsg(T.js_ok_code_sent, false);
-                    phoneStep.classList.add('hidden');
-                    otpStep.classList.remove('hidden');
-                    // Шаг с телефоном высокий (тексты согласий, галочки), шаг с кодом короткий: при
-                    // замене страница сжимается, а экран остаётся на месте — поле кода оказывалось на
-                    // сотни пикселей выше видимой части, и на телефоне его не находили. Возвращаем шаг на экран.
-                    otpStep.scrollIntoView({ block: 'center' });
-                    codeInput.focus({ preventScroll: true });
+                    codeInput.value = ''; autoSubmittedCode = '';
+                    const sentAt = Date.now();
+                    rememberCodeStep(sentAt);
+                    showOtpStep(sentAt);
                 } else { showMsg(data.message || T.js_err_send_code, true); }
             });
         }
+        async function sendOtp() {
+            if (!document.getElementById('clientTerms').checked || !document.getElementById('clientSharing').checked) return showMsg(T.consent_required, true);
+            if (!window.GeorgianPhone.validate(phoneInput)) return;
+            await requestOrderCode('sendOtpButton');
+        }
+        async function resendOtp() {
+            await requestOrderCode('otpResendButton');
+            // Запрос закончился и вернул кнопке активность — возвращаем ей ожидание.
+            renderResend();
+        }
+        // Четыре цифры — отправляем сами: набрать код и не нажать кнопку больше нельзя. Тот же
+        // неверный код второй раз сам не уходит, кнопка остаётся.
+        codeInput.addEventListener('input', () => {
+            const digits = codeInput.value.replace(/\D/g, '').slice(0, 4);
+            if (digits !== codeInput.value) codeInput.value = digits;
+            if (digits.length === 4 && digits !== autoSubmittedCode) { autoSubmittedCode = digits; verifyOtp(); }
+        });
         async function verifyOtp() {
             const phone = phoneInput.value.trim();
             const code = codeInput.value.trim();
@@ -1035,7 +1139,7 @@
                     body: JSON.stringify({ phone, code, challengeId: consentChallenge }),
                 });
                 data = await res.json();
-                if (!data.success) { showMsg(data.message || T.js_err_wrong_code, true); return; }
+                if (!data.success) { showMsg(data.message || T.js_err_wrong_code, true); codeInput.select(); return; }
                 consentVerified = true;
                 }
                 const formData = new FormData();
@@ -1046,6 +1150,8 @@
                 res = await fetch('/api/orders', { method: 'POST', body: formData });
                 data = await res.json();
                 if (data.success) {
+                    forgetCodeStep();
+                    stopListeningForSmsCode();
                     // Заявка создана — главная конверсия. На странице заявки Google Analytics нет
                     // (в её адресе секретная ссылка), поэтому событие уходит до перехода.
                     await trackSent('generate_lead', { lead_type: 'order' });
@@ -1054,6 +1160,23 @@
                 } else { showMsg(data.message || T.js_err_create_order, true); }
             });
         }
+
+        // Вкладку перезагрузили, пока человек читал SMS (или он вернулся на сайт в течение десяти
+        // минут) — показываем шаг с кодом, а не пустую форму. Фото при перезагрузке не сохраняются.
+        (function restoreCodeStep() {
+            let saved = null;
+            try { saved = JSON.parse(sessionStorage.getItem(CODE_STEP_KEY) || 'null'); } catch (e) {}
+            if (!saved) return;
+            if (!saved.token || !saved.challenge || !saved.phone || !(Date.now() - saved.at < CODE_STEP_KEEP_MS)) return forgetCodeStep();
+            descriptionInput.value = saved.description || '';
+            if (composeInput) composeInput.value = saved.description || '';
+            phoneInput.value = saved.phone;
+            document.getElementById('clientTerms').checked = true;
+            document.getElementById('clientSharing').checked = true;
+            pendingOrderToken = saved.token;
+            consentChallenge = saved.challenge; consentVerified = false;
+            showOtpStep(saved.at);
+        })();
 
         let activeOrderToken = null;
 
@@ -1065,7 +1188,7 @@
             liveSection.scrollIntoView({ behavior: 'smooth' });
             showToast(T.js_published_toast);
 
-            otpStep.classList.add('hidden');
+            leaveOtpStep();
             phoneStep.classList.add('hidden');
             detailsStep.classList.remove('hidden');
             phoneInput.value = '+995';

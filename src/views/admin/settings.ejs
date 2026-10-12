@@ -71,6 +71,26 @@
     </p>
 </div>
 
+<div id="order-code-autofill" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5 max-w-md" style="scroll-margin-top:110px">
+    <h2 class="text-sm font-extrabold text-stone-900 uppercase mb-1">Код из SMS подставляется сам</h2>
+    <p class="text-xs text-stone-500 mb-4">
+        Когда включено, в конце SMS с кодом заявки добавляется служебная строка
+        <span class="font-mono text-stone-700">@<%= siteHost %> #1234</span>. По ней телефон на Android
+        сам предлагает подставить код на сайте, и заказчику не нужно уходить в сообщения.
+        Сразу после включения оставьте заявку со своего телефона: если SMS не пришла или пришла
+        испорченной — выключите. Без этой строки всё работает как раньше.
+    </p>
+    <% if (saved === 'autofill') { %>
+      <p role="status" class="mb-3 text-sm text-emerald-700 font-semibold">Сохранено. Действует со следующей SMS с кодом.</p>
+    <% } %>
+    <form method="POST" action="/admin/settings/order-code-autofill" class="flex flex-wrap items-center gap-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="enabled" value="<%= orderCodeAutofill ? '0' : '1' %>">
+        <span class="text-sm text-stone-700">Сейчас: <b class="<%= orderCodeAutofill ? 'text-emerald-700' : 'text-stone-900' %>"><%= orderCodeAutofill ? 'включено' : 'выключено' %></b></span>
+        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= orderCodeAutofill ? 'Выключить' : 'Включить' %></button>
+    </form>
+</div>
+
 <section class="provider-welcome mt-4 max-w-md">
 <h2>Приветственный баланс</h2><p>Подарок каждому новому исполнителю после регистрации с подтверждённым номером. Начисляется автоматически, без ввода промокода.</p>
 <% if(error === 'invalid_welcome') { %><p role="alert">Введите сумму от 0 до 1000 ₾, максимум два знака после точки.</p><% } %>

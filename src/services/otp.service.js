@@ -4,6 +4,8 @@ const smsService = require('./sms.service');
 const consentLog = require('./consentLog.service');
 const crypto = require('crypto');
 const serviceMessage = require('../config/service-message-copy');
+const settingsService = require('./settings.service');
+const { getBaseUrl } = require('../config/url');
 
 const OTP_TTL_SECONDS = 300;
 const RATE_LIMIT_TTL_SECONDS = 3600;
@@ -51,7 +53,15 @@ async function sendCode(phone, purpose = 'order', orderId = null, context = {}) 
     if (purpose === 'order') {
       // Заказчику — код и что с ним делать, без ссылки на заявку: ссылка уходит отдельной SMS
       // после подтверждения (order.controller.create), см. service-message-copy.js.
-      result = await smsService.sendOrderNotification(phone, serviceMessage.sms('orderCode', { code }), { log: false });
+      const text = serviceMessage.sms('orderCode', { code });
+      // Со служебной строкой в конце браузер сам предлагает подставить код (настройка в админке).
+      // Если шлюз такую SMS не принял, тут же отправляем обычную: код важнее удобства.
+      if (await settingsService.getOrderCodeAutofill().catch(() => false)) {
+        const autofill = serviceMessage.sms('orderCodeAutofill', { host: new URL(getBaseUrl()).host, code });
+        try { result = await smsService.sendOrderNotification(phone, text + '\n\n' + autofill, { log: false }); }
+        catch (error) { console.error(`Order code SMS with the autofill line was not sent, sending without it: ${error.message}`); }
+      }
+      if (!result) result = await smsService.sendOrderNotification(phone, text, { log: false });
     } else {
       result = await smsService.sendOtp(phone, code);
     }

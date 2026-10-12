@@ -201,6 +201,7 @@ const dictionaries = {
 
     otp_label: 'SMS კოდი',
     otp_hint: 'კოდი SMS-ით მოგივიდათ. შეიყვანეთ აქ — კოდის გარეშე განაცხადი არ გაიგზავნება.',
+    otp_change_phone: 'ნომრის შეცვლა',
     otp_send: 'კოდის მიღება',
     otp_verify: 'დადასტურება და გაგზავნა',
     otp_back: 'უკან',
@@ -768,6 +769,7 @@ const dictionaries = {
 
     otp_label: 'Код из SMS',
     otp_hint: 'Код пришёл в SMS. Введите его здесь — без кода заявка не отправится.',
+    otp_change_phone: 'Изменить номер',
     otp_send: 'Получить код',
     otp_verify: 'Подтвердить и отправить',
     otp_back: 'Назад',
@@ -1335,6 +1337,7 @@ const dictionaries = {
 
     otp_label: 'SMS code',
     otp_hint: 'The code came by SMS. Enter it here — the request is not sent without it.',
+    otp_change_phone: 'Change number',
     otp_send: 'Send code',
     otp_verify: 'Confirm and send',
     otp_back: 'Back',

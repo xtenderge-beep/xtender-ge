@@ -718,8 +718,16 @@ async function settingsPage(req, res) {
   res.render('admin/settings', {
     paymentDetails,
     leadPriceTetri, catalogCallPriceTetri, welcomeBonusTetri,
+    orderCodeAutofill: await settingsService.getOrderCodeAutofill(),
+    siteHost: new URL(require('../config/url').getBaseUrl()).host,
     error: req.query.error || null, saved: req.query.saved || null,
   });
+}
+
+// Служебная строка «@сайт #код» в SMS с кодом заявки (settings.service.getOrderCodeAutofill).
+async function updateOrderCodeAutofill(req, res) {
+  await settingsService.setOrderCodeAutofill(req.body.enabled === '1');
+  res.redirect('/admin/settings?saved=autofill#order-code-autofill');
 }
 
 async function updateLeadPrice(req, res) {
@@ -900,6 +908,7 @@ module.exports = {
   updateMasterDisplayName,
   updatePaymentDetails,
   updateWelcomeBonus,
+  updateOrderCodeAutofill,
   saveOrderNeeds,
   retryDispatch,
   dispatchPreview, dispatchOrder,

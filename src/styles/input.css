@@ -80,6 +80,20 @@ details > summary::-webkit-details-marker { display: none; }
   body.compose-active #attachmentsPreview { padding: 0 16px 8px; }
 }
 
+/* ---- Шаг с кодом из SMS на телефоне — отдельный экран. Кроме кода на нём ничего нет, поэтому
+        поле нельзя потерять прокруткой; содержимое прижато к верху, и клавиатура его не закрывает. ---- */
+@media (max-width: 639px) {
+  body.otp-active { overflow: hidden; }
+  body.otp-active header,
+  body.otp-active #mobileNav { display: none !important; }
+  body.otp-active #post-section {
+    position: fixed; inset: 0; z-index: 50; margin: 0; background: #fff;
+    overflow-y: auto; animation: none; transform: none;
+  }
+  body.otp-active .composer-card { border: 0; border-radius: 0; box-shadow: none; }
+  body.otp-active #otpStep { padding-top: 28px; }
+}
+
 /* Provider signup: local steps inside the existing registration card. */
 .provider-join .provider-join-grid { margin-top:28px; }
 .provider-signup-header { padding:22px 24px 0; }

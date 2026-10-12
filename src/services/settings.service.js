@@ -101,7 +101,18 @@ async function setWelcomeBonusTetri(tetri) {
   if (!Number.isSafeInteger(tetri) || tetri < 0 || tetri > 100000) throw new Error('Invalid welcome bonus');
   await setSetting('welcome_bonus_tetri', tetri);
 }
+// Служебная строка «@сайт #код» в конце SMS с кодом заявки: по ней браузер на Android сам
+// предлагает подставить код, а iPhone привязывает подсказку кода к сайту. Выключено, пока владелец
+// не проверит настоящей SMS, что шлюз доставляет такую строку целой (кнопка в /admin/settings).
+const ORDER_CODE_AUTOFILL_KEY = 'order_code_sms_autofill';
+async function getOrderCodeAutofill() {
+  return (await getSetting(ORDER_CODE_AUTOFILL_KEY, '0')) === '1';
+}
+async function setOrderCodeAutofill(enabled) {
+  await setSetting(ORDER_CODE_AUTOFILL_KEY, enabled ? '1' : '0');
+}
 module.exports = {
+  getOrderCodeAutofill, setOrderCodeAutofill,
   getWelcomeBonusTetri, setWelcomeBonusTetri,
   getSetting,
   setSetting,

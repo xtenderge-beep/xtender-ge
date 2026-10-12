@@ -44,6 +44,9 @@ const smsMessages = {
   // own SMS, orderLink, once the phone is confirmed.
   orderCode: 'Xtender code: {code}. Enter it on the site to send your request.',
   orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
+  // Last line of the code SMS when the admin setting is on (otp.service adds it after a blank line):
+  // the format browsers read to offer the code on the site itself. host is the site's domain.
+  orderCodeAutofill: '@{host} #{code}',
   lead: 'Xtender: {test}new order #{id}: {link}',
   revision: 'Xtender: please update your request. Moderator feedback: {link}',
   reviewInvite: 'Xtender: order #{id} closed. Rate the provider: {link}',

@@ -19,7 +19,7 @@ stub('../src/services/sms.service', {
 });
 stub('../src/services/telegram.service', new Proxy({}, { get: () => async () => null }));
 stub('../src/services/translation.service', { translateOrder: async () => null, detectLang: () => 'ru' });
-process.env.DOMAIN = 'xtender.test';
+process.env.DOMAIN = 'xtender.test'; process.env.ADMIN_PASSWORD = 'test-only'; process.env.ADMIN_SESSION_SECRET = 'order-code-sms-only';
 const message = require('../src/config/service-message-copy');
 const consent = require('../src/services/consent.service');
 const tick = () => new Promise(resolve => setTimeout(resolve, 30));
@@ -44,6 +44,7 @@ let server;
   });
   app.use(require('../src/routes/crmPublic.routes'));
   app.use('/api', require('../src/routes/api.routes'));
+  app.use('/admin', require('../src/routes/admin.routes'));
   app.get('/o/:ownerToken', wrap(require('../src/controllers/order.controller').showByOwnerToken));
   const publicRoutes = require('../src/routes/public.routes');
   app.use('/', publicRoutes); app.use('/:locale(ru|en)', publicRoutes);
@@ -131,12 +132,75 @@ let server;
     const hint = i18n.translate(lang)('otp_hint');
     assert.ok(hint && hint !== 'otp_hint', lang);
     assert.ok(html.includes('<p id="otp-hint" class="text-xs text-stone-600 mb-2">' + hint.replace(/'/g, '&#39;') + '</p>'), lang);
-    assert.match(html, /id="code"[^>]*aria-describedby="otp-hint"/);
+    assert.match(html, /id="code"[^>]*aria-describedby="otpSentTo otp-hint"/);
     // После запроса кода шаг с кодом возвращается на экран. Шаг с телефоном высокий (согласия,
     // галочки), при его замене страница сжимается, и на телефоне поле кода оставалось на сотни
     // пикселей выше видимой части — проверено в браузере на трёх размерах экрана (2026-10-12).
-    assert.match(html, /otpStep\.classList\.remove\('hidden'\);[\s\S]{0,600}?otpStep\.scrollIntoView\(\{ block: 'center' \}\);\s*codeInput\.focus\(\{ preventScroll: true \}\);/, lang);
+    assert.match(html, /otpStep\.classList\.remove\('hidden'\);[\s\S]{0,1400}?otpStep\.scrollIntoView\(\{ block: 'center' \}\);\s*codeInput\.focus\(\{ preventScroll: true \}\);/, lang);
+    // Экран кода: на какой номер ушёл код, «ещё раз» и «изменить номер» — выход, если SMS не пришла
+    // или в номере ошибка. Сами сценарии (отправка после четвёртой цифры, перезагрузка вкладки,
+    // подстановка кода браузером) пройдены в браузере; здесь — что разметка и скрипт на месте.
+    assert.match(html, /<p id="otpSentTo"[^>]*><\/p>/);
+    assert.ok(html.includes('onclick="resendOtp()"') && html.includes('>' + i18n.translate(lang)('otp_resend') + '</button>'), lang);
+    assert.ok(html.includes('onclick="changeOtpPhone()"') && html.includes('>' + i18n.translate(lang)('otp_change_phone') + '</button>'), lang);
+    for (const piece of ["document.body.classList.add('otp-active')", "sessionStorage.setItem(CODE_STEP_KEY", "navigator.credentials.get({ otp: { transport: ['sms'] }", 'token: pendingOrderToken', "if (digits.length === 4 && digits !== autoSubmittedCode)"]) {
+      assert.ok(html.includes(piece), lang + ': ' + piece);
+    }
+    for (const inline of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new (require('vm').Script)(inline[1]);
   }
+  assert.match(fs.readFileSync(path.join(__dirname, '../src/styles/input.css'), 'utf8'), /body\.otp-active #post-section \{\s*position: fixed; inset: 0;/);
 
-  console.log('PASS: order code SMS — the first SMS carries only the code, the request link goes in a second SMS after confirmation on both the site form and the manager link; a failed link SMS does not break the request; the unconfirmed request page no longer says it is active; the code field explains what to do. No real SMS sent.');
+  // 4. «Отправить код ещё раз» и возврат к номеру: тот же номер — та же заявка, второй черновик не
+  //    создаётся; другой номер или чужой token — новая.
+  const third = '+995555000104';
+  const count = async () => (await pool.query('SELECT COUNT(*)::int AS n FROM orders')).rows[0].n;
+  sent = await (await post('/api/otp/send', { phone: third, description: 'Перевезти шкаф', ...agreed })).json();
+  const rows = await count(), firstCode = await redis.get('otp:order:' + third);
+  const again = await (await post('/api/otp/send', { phone: third, description: 'Перевезти шкаф и комод', token: sent.token, ...agreed })).json();
+  assert.equal(again.success, true, JSON.stringify(again));
+  assert.equal(again.token, sent.token); assert.notEqual(again.challengeId, sent.challengeId);
+  assert.equal(await count(), rows, 'повторный код не создаёт вторую заявку');
+  assert.equal((await pool.query('SELECT description FROM orders WHERE token=$1', [sent.token])).rows[0].description, 'Перевезти шкаф и комод');
+  const other = await (await post('/api/otp/send', { phone: '+995555000105', description: 'Перевезти шкаф', token: sent.token, ...agreed })).json();
+  assert.notEqual(other.token, sent.token); assert.equal(await count(), rows + 1, 'другой номер — новая заявка');
+  created = await confirm(third, again.token, again.challengeId);
+  assert.equal(created.success, true, JSON.stringify(created));
+  const reused = await (await post('/api/otp/send', { phone: third, description: 'Ещё заявка', token: sent.token, ...agreed })).json();
+  assert.notEqual(reused.token, sent.token, 'подтверждённую заявку повторный запрос не трогает');
+  assert.ok(firstCode);
+
+  // 5. Служебная строка «@сайт #код» для автоподстановки — только когда включена в настройках.
+  const settings = require('../src/services/settings.service'), otp = require('../src/services/otp.service');
+  const codeSms = async phone => { assert.equal((await otp.sendCode(phone, 'order', 1, {})).success, true); return sms.at(-1).text; };
+  assert.equal(await settings.getOrderCodeAutofill(), false, 'по умолчанию выключено');
+  assert.doesNotMatch(await codeSms('+995555000106'), /@/);
+  await settings.setOrderCodeAutofill(true);
+  let text = await codeSms('+995555000107');
+  assert.equal(text, message.sms('orderCode', { code: await redis.get('otp:order:+995555000107') }) + '\n\n@xtender.test #' + await redis.get('otp:order:+995555000107'));
+  assert.ok(text.length <= 160 && /^[ -~\n]+$/.test(text));
+  // Шлюз такую SMS не принял — тут же уходит обычная, код человек получает.
+  const real = require('../src/services/sms.service'), original = real.sendOrderNotification;
+  real.sendOrderNotification = async (phone, body, context) => { if (body.includes('@')) throw Object.assign(new Error('gateway rejected'), { code: 'SMS_NOT_ACCEPTED' }); return original(phone, body, context); };
+  const quiet = console.error; console.error = () => {};
+  try { text = await codeSms('+995555000108'); } finally { console.error = quiet; real.sendOrderNotification = original; }
+  assert.equal(text, message.sms('orderCode', { code: await redis.get('otp:order:+995555000108') }));
+  await settings.setOrderCodeAutofill(false);
+  assert.doesNotMatch(await codeSms('+995555000109'), /@/);
+  // Включает и выключает её администратор в настройках: кнопка с сессией и CSRF.
+  const auth = require('../src/config/adminAuth'), session = auth.createSessionValue();
+  const adminCookie = 'admin_session=' + session.cookieValue, csrfToken = auth.verifySessionValue(session.cookieValue).csrfToken;
+  const toggle = (body, withCookie = true) => fetch(base + '/admin/settings/order-code-autofill', { method: 'POST', redirect: 'manual', headers: withCookie ? { cookie: adminCookie } : {}, body: new URLSearchParams(body) });
+  html = await (await fetch(base + '/admin/settings', { headers: { cookie: adminCookie } })).text();
+  assert.match(html, /@xtender\.test #1234/); assert.match(html, /Сейчас: <b class="text-stone-900">выключено<\/b>/);
+  assert.match(html, /<input type="hidden" name="enabled" value="1">/);
+  assert.equal((await toggle({ enabled: '1' }, false)).headers.get('location'), '/admin/login');
+  assert.equal((await toggle({ enabled: '1' })).status, 403);
+  assert.equal((await toggle({ _csrf: csrfToken, enabled: '1' })).headers.get('location'), '/admin/settings?saved=autofill#order-code-autofill');
+  assert.equal(await settings.getOrderCodeAutofill(), true);
+  html = await (await fetch(base + '/admin/settings?saved=autofill', { headers: { cookie: adminCookie } })).text();
+  assert.match(html, /Сейчас: <b class="text-emerald-700">включено<\/b>/); assert.match(html, /<input type="hidden" name="enabled" value="0">/);
+  await toggle({ _csrf: csrfToken, enabled: '0' });
+  assert.equal(await settings.getOrderCodeAutofill(), false);
+
+  console.log('PASS: order code SMS — the first SMS carries only the code, the request link goes in a second SMS after confirmation on both the site form and the manager link; a failed link SMS does not break the request; the unconfirmed request page no longer says it is active; the code screen has resend and change-number, a repeated code keeps the same request; the autofill line is added only when switched on and falls back to the plain SMS. No real SMS sent.');
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => { server?.close(); redis.disconnect(); });

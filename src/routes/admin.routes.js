@@ -148,6 +148,7 @@ router.post('/managers/:id/client-link', verifyCsrf, asyncHandler(adminControlle
 router.post('/masters/:id/assign-manager', verifyCsrf, asyncHandler(adminController.assignManager));
 
 router.post('/settings/welcome-bonus', verifyCsrf, asyncHandler(adminController.updateWelcomeBonus));
+router.post('/settings/order-code-autofill', verifyCsrf, asyncHandler(adminController.updateOrderCodeAutofill));
 router.post('/settings/payment-details', verifyCsrf, asyncHandler(adminController.updatePaymentDetails));
 const technicalController = require('../controllers/technical.controller');
 router.get('/settings/technical', asyncHandler(technicalController.show));

@@ -52,6 +52,17 @@ async function createPendingOrder({ phone, description, districtName, managerId 
   return rows[0];
 }
 
+// Повторный код по той же заявке («Отправить код ещё раз», возврат к номеру и снова «Получить
+// код»): берём уже созданный неподтверждённый черновик с тем же телефоном, а не плодим второй.
+async function reusePendingOrder(token, phone, description) {
+  if (typeof token !== 'string' || !token || token.length > 40) return null;
+  const { rows } = await pool.query(
+    "UPDATE orders SET description = $3 WHERE token = $1 AND phone = $2 AND status = 'unverified' RETURNING *",
+    [token, phone, description]
+  );
+  return rows[0] || null;
+}
+
 async function getOrderByOwnerToken(ownerToken) {
   const { rows } = await pool.query('SELECT * FROM orders WHERE owner_token = $1', [ownerToken]);
   return rows[0] || null;
@@ -579,6 +590,7 @@ module.exports = {
   getCustomerLanguage,
   getDispatchRecipients,
   createPendingOrder,
+  reusePendingOrder,
   activateOrder,
   getOrderByToken,
   getOrderByOwnerToken,
