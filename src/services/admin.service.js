@@ -306,7 +306,7 @@ async function getMasterDetail(id) {
   const services = await pool.query('SELECT service_type, attributes, requires_own_transport FROM master_services WHERE master_id = $1', [id]);
   const category = await require('./category.service').get(master.category);
   const van = services.rows.find(s => s.service_type === 'van');
-  return { ...master, category_label: category?.name_ru || master.category || 'Категория не назначена', van_body: van ? vanBodyLabel(van.attributes) : null, services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count };
+  return { ...master, category_label: category?.name_ru || master.category || 'Категория не назначена', van_body: van ? vanBodyLabel(van.attributes) : null, services: services.rows, work_cities: workCities.rows, computed_rating: reviewRows[0].computed_rating, review_count: reviewRows[0].review_count, ...adminWhatsapp(master.phone, master.contact_channels) };
 }
 
 async function getMasterBalanceHistory(masterId) {
@@ -396,6 +396,7 @@ module.exports = {
   setMasterFollowup,
   isMasterFollowup,
   getMasterDetail,
+  adminWhatsapp,
   getMasterBalanceHistory,
   setMasterBanned,
   listOrdersAdmin,

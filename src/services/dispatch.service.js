@@ -6,6 +6,7 @@ const { vanSizeSpec, vanVehicles, vanVehicleLabel } = require('../config/service
 const matching = require('./serviceMatching.service');
 const orderNeeds = require('./orderNeeds.service');
 const toolsHint = require('../config/toolsHint');
+const recipientReport = require('./recipientReport.service');
 const vanOf =master => master.services.find(s => s.service_type === 'van');
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
@@ -138,7 +139,10 @@ async function planNeeds(token, input, languageRaw = '') {
     const available = master => master.funded && !received.has(master.id) && !pending.has(master.id);
     const fresh = master => available(master) && inLanguage(master);
     service.alreadyReceived = qualified.filter(master => received.has(master.id)).length;
-    service.unfunded = qualified.filter(master => !master.funded && !received.has(master.id) && inLanguage(master)).length;
+    // Подходят, но не получат: с балансом и причиной — кому предложить пополнить счёт или подтвердить тарифы.
+    service.missed = qualified.filter(master => !master.funded && !received.has(master.id) && inLanguage(master))
+      .map(master => ({ id: master.id, name: master.name, balance_tetri: master.balance_tetri, manager_id: master.manager_id, reason: master.billing_ok ? 'balance' : 'billing' }));
+    service.unfunded = service.missed.length;
     service.otherLanguage = qualified.filter(master => available(master) && !inLanguage(master)).length;
     service.groups = (transport && needs.sizes.length ? needs.sizes : ['']).map(size => {
       const members = qualified.filter(master => fresh(master) && (!size || classes(master).includes(size)));
@@ -245,6 +249,11 @@ async function screen(token, languageRaw = '') {
     requestLanguage: requestLang, languageNames: require('../config/spokenLanguages').ruNames,
     activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(),
     funnel: await orderService.getOrderFunnelStats(order.id), funnelByCategory: await orderService.getOrderFunnelByCategory(order.id), speakLabels,
+    // Кто получил заявку и что сделал потом; reportText — подписи и время для этой таблицы.
+    report: await recipientReport.build(order.id), reportText: recipientReport,
+    // Кому заявку можно дослать и кто подходит, но не получит (по всем услугам, без повторов).
+    newcomers: open && order.first_dispatched_at ? await newcomers(token) : { groups: [], recipients: [], total: 0, price: 0 },
+    missed: missedOf(plan),
   };
 }
 // Форма экрана заявки одна и та же в кабинете менеджера и в админке: расчёт и отправка по её полям.
@@ -275,7 +284,7 @@ async function orderList(limit = 100) {
   const unique = values => [...new Set(values)];
   const labels = rows => unique(rows.map(row => row.category)).map(key => groups[key] || key);
   const now = Date.now();
-  return orders.map(order => {
+  const rows = orders.map(order => {
     const received = new Set(of(charges, order.id).map(row => row.master_id));
     // Считается последняя попытка по исполнителю: повтор после сбоя заменяет прежний результат.
     const last = new Map(of(deliveries, order.id).map(row => [row.master_id, row.status]));
@@ -292,6 +301,16 @@ async function orderList(limit = 100) {
       minutes: Math.max(0, Math.floor((now - new Date(order.first_dispatched_at || order.created_at).getTime()) / 60000)),
     };
   });
+  return rows;
+}
+// Сколько новых подходящих у каждой разосланной открытой заявки списка: { token: число }, только ненулевые.
+// Пересчёт отбора идёт по каждой заявке (около 30 запросов на заявку), поэтому список заявок открывается
+// без него, а числа страница подгружает отдельным запросом.
+async function newcomerCounts(limit = 100) {
+  const orders = (await pool.query("SELECT token FROM orders WHERE status IN ('pending_review','new') AND first_dispatched_at IS NOT NULL ORDER BY created_at DESC LIMIT " + Number(limit))).rows;
+  const counts = {};
+  for (const order of orders) { const total = (await newcomers(order.token)).total; if (total) counts[order.token] = total; }
+  return counts;
 }
 // Почему получателей нет — для сообщения модератору (Telegram и админка).
 function emptyReason(plan) {
@@ -343,4 +362,50 @@ async function retry(token, runId, actor='admin') {
   await require('./telegram.service').updateMessage(order);
   return {count,price:plan.price,run:(await orderService.getOrderDispatches(order.id)).find(r=>r.id===context.runId)};
 }
-module.exports = { preview, dispatch, retry, validate, emptyReason, transportSizes, availability, planNeeds, planView, sendNeeds, screen, orderList, previewForm, sendForm };
+// Досылка: после рассылки появились исполнители, которым уже отправленная услуга подходит, а заявка
+// им не уходила — новый в городе, пополнил баланс, подтвердил тарифы, добавил услугу. Каждая прежняя
+// отправка (услуга, класс кузова, язык) пересчитывается тем же отбором, что и при рассылке; закрытые
+// услуги пропускаются. Исполнитель, подходящий нескольким отправкам, считается один раз. Кому заявка
+// уже уходила с ошибкой доставки, сюда не входит: для них кнопка «Повторить подтверждённые ошибки».
+async function newcomers(token) {
+  const order = await orderService.getOrderByToken(token);
+  if (!order || !['pending_review', 'new'].includes(order.status)) return { groups: [], recipients: [], total: 0, price: 0 };
+  const labels = await require('./category.service').groups();
+  const sent = (await pool.query('SELECT category, vehicle_size, language FROM order_dispatches WHERE order_id=$1 ORDER BY dispatched_at, id', [order.id])).rows;
+  const failed = (await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='failed'", [order.id])).rows.map(row => row.master_id);
+  const seen = new Set(failed), groups = [], recipients = [];
+  let price = await settingsService.getLeadPriceTetri();
+  for (const row of sent) {
+    let plan;
+    try { plan = await preview(token, row.category, row.vehicle_size || '', row.language || ''); } catch (_) { continue; }
+    price = plan.price;
+    const fresh = plan.recipients.filter(master => !seen.has(master.id));
+    if (!fresh.length) continue;
+    fresh.forEach(master => { seen.add(master.id); recipients.push({ id: master.id, name: master.name, service: labels[row.category] || row.category, balance_tetri: master.balance_tetri, manager_id: master.manager_id }); });
+    groups.push({ key: row.category, label: labels[row.category] || row.category, size: plan.size, language: row.language || '', ids: fresh.map(master => master.id) });
+  }
+  return { groups, recipients, total: recipients.length, price };
+}
+// Подходят уже отправленным услугам, но заявку не получат: не хватает баланса или не подтверждены тарифы.
+function missedOf(plan) {
+  const services = (plan?.services || []).filter(service => service.locked && !service.closed);
+  return [...new Map(services.flatMap(service => service.missed.map(master => [master.id, { ...master, service: service.label }]))).values()];
+}
+// Кнопка «Дослать новым»: expected — сколько получателей и по какой цене видел менеджер. Каждого
+// получателя рассылка перепроверяет под блокировкой и списывает один раз, как при обычной отправке.
+async function sendNewcomers(token, expected, actor) {
+  const plan = await newcomers(token);
+  if (!plan.total) throw new Error('Новых подходящих исполнителей нет.');
+  if (Number(expected?.total) !== plan.total || Number(expected?.price) !== plan.price) throw new Error('Состав новых исполнителей или тариф изменились. Проверьте числа и нажмите ещё раз.');
+  const order = await orderService.getOrderByToken(token);
+  const results = [];
+  for (const group of plan.groups) {
+    const result = { key: group.key, label: group.label, size: group.size, count: 0 };
+    results.push(result);
+    try { result.count = await orderService.notifyMasters(order, group.key, group.size || null, plan.price, group.language, { actor, recipientIds: group.ids }); }
+    catch (error) { result.error = error.message; }
+  }
+  require('./telegram.service').updateMessage(order).catch(err => console.error('Dispatch message update failed:', err.message));
+  return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price };
+}
+module.exports = { preview, dispatch, retry, newcomers, newcomerCounts, sendNewcomers, missedOf, validate, emptyReason, transportSizes, availability, planNeeds, planView, sendNeeds, screen, orderList, previewForm, sendForm };

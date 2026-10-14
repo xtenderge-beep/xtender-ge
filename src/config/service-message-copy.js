@@ -47,7 +47,9 @@ const smsMessages = {
   // Last line of the code SMS when the admin setting is on (otp.service adds it after a blank line):
   // the format browsers read to offer the code on the site itself. host is the site's domain.
   orderCodeAutofill: '@{host} #{code}',
-  lead: 'Xtender: {test}new order #{id}: {link}',
+  // «Zakazi» — так исполнители называют заказ (решение владельца 2026-10-15); «#», не «№»: «№» нет в
+  // латинском наборе SMS, с ним сообщение уходит как не-латинское и делится на части по 70 знаков.
+  lead: 'Xtender: {test}Zakazi (Order) #{id}: {link}',
   revision: 'Xtender: please update your request. Moderator feedback: {link}',
   reviewInvite: 'Xtender: order #{id} closed. Rate the provider: {link}',
   balanceLow: 'Xtender: balance low ({amount} GEL). Top up to keep getting orders: {link}',

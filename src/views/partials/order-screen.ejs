@@ -2,7 +2,8 @@
   // Экран заявки: слева заявка, справа услуги с расчётом «кто получит» и одна кнопка отправки.
   // Общий для кабинета менеджера и админки. Страница передаёт: base — адрес заявки для форм
   // (…/orders/<ссылка>), listHref — список заявок, csrf, canCloseNeed — можно ли закрывать потребность,
-  // masterHref — начало ссылки на карточку исполнителя ('' — без ссылки).
+  // masterHref — начало ссылки на карточку исполнителя ('' — без ссылки); ownManagerId — у менеджера:
+  // ссылка только на его исполнителей, чужие карточки ему не открываются.
 %>
 <style>
 .dispatch-layout{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}
@@ -53,6 +54,13 @@
 .send-total{flex:1;min-width:200px;font-weight:700;font-size:17px}
 .send-bar button{min-width:300px}
 .send-bar button:disabled{background:#b7c4c0;cursor:default}
+.report-summary{font-size:17px}
+.report-table td{vertical-align:top}.report-table tr.is-contacted td{background:#f4faf7}
+.report-table .yes{color:#075d4b;font-weight:600}.report-table .no{color:#62716e}.report-table .bad{color:#a53030}
+.report-table .balance{display:block;font-size:13px;color:#62716e;font-weight:400}.report-table .balance.bad{color:#a53030}
+.newcomers,.missed{margin:12px 0;padding:12px 14px;border-radius:12px}.newcomers{border:1px solid #08765f;background:#f4faf7}.missed{border:1px solid #f0d58a;background:#fff8e1}
+.newcomers ul,.missed ul{margin:8px 0;padding-left:20px}.missed p{margin:4px 0 0;font-size:14px}
+@media(max-width:600px){.report-table thead{display:none}.report-table tr{display:block;padding:8px 0;border-bottom:1px solid #e5e9e8}.report-table td{display:flex;gap:10px;padding:3px 4px;border:0}.report-table td::before{content:attr(data-label);flex:0 0 112px;color:#62716e;font-weight:400}.report-table td:first-child{display:block;font-weight:650}.report-table td:first-child::before{content:none}}
 @media(max-width:900px){.dispatch-layout{display:block}.order-brief{position:static;max-height:none;margin-bottom:14px}.order-brief-text{font-size:17px}.service-body{padding-left:14px}.send-bar{margin:12px -14px -14px;padding:10px 14px}.send-total{font-size:15px;min-width:0;flex-basis:100%}.send-bar button{width:100%;min-width:0}}
 </style>
 <%
@@ -61,6 +69,8 @@
   const cityName=allCities.find(city=>city.id===(order.city_id||activeCities.find(c=>c.slug==='tbilisi')?.id))?.name_ru||'Тбилиси';
   const sentAny=runs.length>0, transportSent=needs.locked.categories.includes('transport');
   const vehicleFlag=order.requirements?.movers_need_vehicle===true;
+  const ownerOf=Object.fromEntries(report.rows.map(r=>[r.master_id,r.manager_id]));
+  const cardHref=(id,managerId)=>!masterHref?'':typeof ownManagerId==='undefined'||ownManagerId==null||Number(managerId)===Number(ownManagerId)?masterHref+id:'';
 %>
 <a href="<%= listHref %>">← Все заявки</a>
 <% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
@@ -150,13 +160,33 @@
 </div>
 </form>
 
-<% if(sentAny){ %><section class="card"><h2>Отправки и отклики</h2>
-<p>Просмотров: <strong><%= funnel.view %></strong> · нажатий «Позвонить»: <strong><%= funnel.call %></strong> · WhatsApp: <strong><%= funnel.whatsapp %></strong> · нажали хотя бы один контакт: <strong><%= funnel.contacted||0 %></strong>.</p>
-<% if(funnelByCategory.length){ %><ul><% funnelByCategory.forEach(item=>{ %><li><%= groups[item.category]||(item.category==='legacy'?'Архив: услуга неизвестна':item.category) %>: уведомлены <%= item.received %> · просмотров <%= item.view %> · звонок <%= item.call %> · WhatsApp <%= item.whatsapp %></li><% }); %></ul><% } %>
-<p class="muted">Принятие Telegram/SMS не означает прочтение. Просмотр и нажатие контакта не подтверждают договорённость с клиентом. Один исполнитель может подходить нескольким услугам.</p>
+<% if(sentAny){ const S=report.summary, F=reportText;
+  // Ячейка действия: «✓ 14:05 · через 3 мин» от доставки; нажатие без выданного номера — отдельной строкой.
+  const done=(at,from)=>'✓ '+F.when(at,from)+(F.after(from,at)?' · '+F.after(from,at):'');
+  const contactCell=(r,key)=>r[key]?{cls:'yes',text:done(r[key],r.sent_at)}:r.denied[key]?{cls:'bad',text:'нажал '+F.when(r.denied[key].at,r.sent_at)+' — номер не выдан: '+F.deniedText(r.denied[key].reason)}:{cls:'no',text:'—'};
+  const gotCell=r=>r.outcome==='outside'?{cls:'bad',text:'не был в рассылке'}:r.status==='failed'?{cls:'bad',text:'не доставлено'+(r.reason?' · '+F.reasonText(r.reason):'')}:r.status==='skipped'?{cls:'no',text:'не отправлено'+(r.reason?' · '+F.reasonText(r.reason):'')}:{cls:r.status==='pending'?'bad':'',text:(r.status==='pending'?'результат неизвестен · ':'')+[F.channelName(r.channel),F.when(r.sent_at)].filter(Boolean).join(' · ')};
+%><section class="card"><h2>Отправки и отклики</h2>
+<p class="report-summary">Получили: <strong><%= S.received %></strong> · открыли ссылку: <strong><%= S.opened %></strong> · нажали контакт: <strong><%= S.contacted %></strong><%= S.contacted?' (позвонить '+S.call+', WhatsApp '+S.whatsapp+')':'' %> · не открыли: <strong><%= S.notOpened %></strong><% if(S.failed){ %> · не доставлено: <strong><%= S.failed %></strong><% } %><% if(S.pending){ %> · результат неизвестен: <strong><%= S.pending %></strong><% } %></p>
+<% if(newcomers.total){ const N=newcomers; %><form method="post" action="<%= base %>/newcomers" class="newcomers" onsubmit="this.querySelector('button').disabled=true"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="expectedTotal" value="<%= N.total %>"><input type="hidden" name="expectedPrice" value="<%= N.price %>">
+  <b>Новые подходящие: <%= N.total %></b> — заявка им ещё не уходила: новые в городе, пополнили баланс или подтвердили тарифы.
+  <ul><% N.recipients.forEach(m=>{ const href=cardHref(m.id,m.manager_id); %><li><% if(href){ %><a href="<%= href %>"><%= m.name %></a><% } else { %><%= m.name %><% } %> · <%= m.service %> · баланс <%= F.money(m.balance_tetri) %></li><% }); %></ul>
+  <button>Дослать <%= N.total %> <%= N.total%10===1&&N.total%100!==11?'исполнителю':'исполнителям' %> и списать <%= F.money(N.total*N.price) %></button></form><% } %>
+<% if(missed.length){ %><div class="missed"><b>Подходят, но не получили: <%= missed.length %></b>
+  <ul><% missed.forEach(m=>{ const href=cardHref(m.id,m.manager_id); %><li><% if(href){ %><a href="<%= href %>"><%= m.name %></a><% } else { %><%= m.name %><% } %> · <%= m.service %> · <%= m.reason==='billing'?'тарифы не подтверждены':'не хватает баланса' %>, баланс <%= F.money(m.balance_tetri) %></li><% }); %></ul>
+  <p class="muted">Пополнят баланс или подтвердят тарифы — появятся в «Новых подходящих», и заявку можно будет дослать.</p></div><% } %>
+<% if(report.rows.length){ %><div class="scroll"><table class="report-table"><thead><tr><th>Исполнитель</th><th>Получил</th><th>Открыл ссылку</th><th>Позвонить</th><th>WhatsApp</th></tr></thead><tbody>
+<% report.rows.forEach(r=>{ const name=r.name||'Исполнитель', got=gotCell(r), reached=r.status==='accepted'||r.status==='pending', call=contactCell(r,'call'), wa=contactCell(r,'whatsapp'); %><tr class="is-<%= r.outcome %>">
+<td data-label="Исполнитель"><% const href=cardHref(r.master_id,r.manager_id); if(href){ %><a href="<%= href %>"><%= name %></a><% } else { %><%= name %><% } %><% if(r.balance_tetri!=null){ %><span class="balance<%= r.low?' bad':'' %>">баланс <%= F.money(r.balance_tetri) %><%= r.low?' — не хватит на следующую заявку':'' %></span><% } %></td>
+<td data-label="Получил" class="<%= got.cls %>"><%= got.text %></td>
+<td data-label="Открыл ссылку" class="<%= r.view?'yes':'no' %>"><%= r.view?done(r.view,r.sent_at):reached?'не открыл':'—' %></td>
+<td data-label="Позвонить" class="<%= call.cls %>"><%= call.text %></td>
+<td data-label="WhatsApp" class="<%= wa.cls %>"><%= wa.text %></td></tr><% }); %>
+</tbody></table></div><% } %>
+<% if(funnelByCategory.length>1){ %><p class="muted">По услугам:</p><ul><% funnelByCategory.forEach(item=>{ %><li><%= groups[item.category]||(item.category==='legacy'?'Архив: услуга неизвестна':item.category) %>: получили <%= item.received %> · открыли ссылку <%= item.view %> · позвонить <%= item.call %> · WhatsApp <%= item.whatsapp %></li><% }); %></ul><% } %>
+<p class="muted">Время по Тбилиси. «Получил» — Telegram или SMS-шлюз принял сообщение; прочитал ли его исполнитель, неизвестно. «Открыл ссылку» — у исполнителя открылась страница заявки, превью ссылки в мессенджере не считается. «Позвонить» и WhatsApp — первое нажатие, после которого исполнитель получил номер клиента; договорились ли они, неизвестно. Один исполнитель может подходить нескольким услугам.</p>
 <% runs.forEach(run=>{ %><div class="card"><strong>Отправка #<%= run.id %> · <%= run.legacy?'архивная рассылка':groups[run.category]||run.category %><%= run.vehicle_size?' · класс '+run.vehicle_size:'' %><%= run.language?' · говорят '+(speakLabels[run.language]||run.language):'' %></strong> · <%= date(run.created_at) %>
 <p>Выбрано: <%= run.selected %> · принято каналом: <%= run.accepted %> (Telegram: <%= run.telegram %>, SMS: <%= run.sms %>) · ошибки: <%= run.failed %> · пропущено: <%= run.skipped %> · в обработке / неизвестно: <%= run.pending %></p>
-<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ %><li><% if(masterHref){ %><a href="<%= masterHref+d.master_id %>"><%= names[d.master_id]||'Исполнитель' %></a><% } else { %><%= names[d.master_id]||'Исполнитель' %><% } %> (#<%= d.master_id %>) · <%= statusLabels[d.status]||d.status %><%= d.channel?' · '+d.channel:'' %><%= d.reason?' · '+(reasonLabels[d.reason]||d.reason):'' %></li><% }); %></ul></details>
+<details><summary>Получатели и причины</summary><ul><% run.deliveries.forEach(d=>{ const href=cardHref(d.master_id,ownerOf[d.master_id]); %><li><% if(href){ %><a href="<%= href %>"><%= names[d.master_id]||'Исполнитель' %></a><% } else { %><%= names[d.master_id]||'Исполнитель' %><% } %> (#<%= d.master_id %>) · <%= statusLabels[d.status]||d.status %><%= d.channel?' · '+d.channel:'' %><%= d.reason?' · '+(reasonLabels[d.reason]||d.reason):'' %></li><% }); %></ul></details>
 <% if(open && !run.legacy && run.deliveries.some(d=>d.status==='failed'&&!d.retry_run_id)){ %><form method="post" action="<%= base %>/retry"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="runId" value="<%= run.id %>"><button>Повторить подтверждённые ошибки</button></form><% } %></div><% }); %>
 </section><% } %>
 <% if(open && sentAny && canCloseNeed && order.target_categories.length>1){ %><details class="card"><summary>Отметить закрытую потребность</summary><p>Используйте после подтверждения, что по этой услуге новые предложения уже не нужны.</p><% order.target_categories.filter(key=>!closedCategories.includes(key)).forEach(key=>{ %><form method="post" action="<%= base %>/close-category" class="form-actions"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="category" value="<%= key %>"><button type="submit" class="secondary-action">Закрыть «<%= key==='flatbed'?'🚛 Перевозки — бортовая машина':groups[key]||key %>»</button></form><% }); %></details><% } %>

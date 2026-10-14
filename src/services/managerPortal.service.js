@@ -285,6 +285,8 @@ async function detail(managerId, masterId) {
   const contacts = (await pool.query("SELECT * FROM (SELECT v.order_id,MIN(v.viewed_at) AS contacted_at,o.first_dispatched_at FROM order_views v JOIN masters m ON m.id=v.master_id JOIN orders o ON o.id=v.order_id WHERE m.id=$1 AND m.manager_id=$2 AND v.event_type IN ('call','whatsapp') GROUP BY v.order_id,o.first_dispatched_at) contacts WHERE contacted_at >= $3",[masterId,managerId,since])).rows;
   const delays = contacts.filter(c=>c.first_dispatched_at && new Date(c.contacted_at)>=new Date(c.first_dispatched_at)).map(c=>(new Date(c.contacted_at)-new Date(c.first_dispatched_at))/60000);
   const topups = (await pool.query("SELECT COUNT(*) AS count,COALESCE(SUM(b.amount_tetri),0) AS amount FROM balance_transactions b JOIN masters m ON m.id=b.master_id WHERE m.id=$1 AND m.manager_id=$2 AND b.reason='topup' AND b.amount_tetri>0 AND b.created_at >= $3",[masterId,managerId,since])).rows[0];
+  // Кнопка WhatsApp в карточке: тот же номер, что у кнопки в админке (из «Мессенджеров», иначе основной).
+  Object.assign(master, require('./admin.service').adminWhatsapp(master.phone, master.contact_channels));
   return { master, ledger, events, activity, metrics:{contacts:contacts.length,averageMinutes:delays.length?delays.reduce((a,b)=>a+b,0)/delays.length:null,topups} };
 }
 async function action(managerId, masterId, action, body) {

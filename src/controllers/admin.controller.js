@@ -471,6 +471,13 @@ async function orderSend(req, res) {
   catch (e) { return res.redirect(orderPage(req.params.token) + '?error=' + encodeURIComponent(e.message)); }
   return orderDetail(req, res, result);
 }
+// «Дослать новым»: исполнителям, которым уже отправленная услуга подходит, а заявка не уходила.
+async function orderNewcomers(req, res) {
+  let result;
+  try { result = await dispatchService.sendNewcomers(req.params.token, { total: req.body.expectedTotal, price: req.body.expectedPrice }, 'admin'); }
+  catch (e) { return res.redirect(orderPage(req.params.token) + '?error=' + encodeURIComponent(e.message)); }
+  return orderDetail(req, res, result);
+}
 const orderAction = action => async (req, res) => {
   try { await action(req); res.redirect(orderPage(req.params.token)); }
   catch (e) { if (e.status === 404) return res.status(404).send(e.message); res.redirect(orderPage(req.params.token) + '?error=' + encodeURIComponent(e.message)); }
@@ -934,6 +941,7 @@ module.exports = {
   orderDetail,
   orderPreview,
   orderSend,
+  orderNewcomers,
   orderText,
   orderNote,
   orderBrief,

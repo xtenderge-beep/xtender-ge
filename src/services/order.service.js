@@ -402,7 +402,8 @@ function dispatchFilter(category, vehicleSize, isTechnical = false) {
 }
 // language: '' — все исполнители группы, иначе только отметившие этот язык при регистрации.
 // options.withUnfunded — для расчёта на экране менеджера: вернуть и тех, кто подходит, но не может
-// получить заявку (не хватает баланса или не разрешено списание); у каждого поле funded.
+// получить заявку (не хватает баланса или не разрешено списание); у каждого поле funded и billing_ok —
+// разрешено ли ему списание (тарифы подтверждены или на балансе только подарок).
 // Рассылка этот режим не использует.
 async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '', order = null, options = {}) {
   const catalog = require('./category.service');
@@ -430,7 +431,7 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;
     if(!definition.is_builtin && catalog.validate(definition,services.find(s=>s.service_type === definition.slug)?.attributes).errors.length) continue;
-    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded} : {})});
+    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded,billing_ok:allowed.has(master.id)} : {})});
   }
   return result;
 }

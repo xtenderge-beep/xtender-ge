@@ -45,6 +45,8 @@ const message = require('../src/config/service-message-copy');
     assert.ok(!body.includes('{'), 'SMS "' + key + '" has an unfilled placeholder');
   }
   assert.equal(message.sms('code',{code:'1234'}),'Code: 1234','the login code is a bare code on purpose');
+  // Providers call an order «zakazi»; «#», not «№», which would turn the SMS into UCS-2.
+  assert.equal(message.sms('lead',sample),'Xtender: [TEST] Zakazi (Order) #7: https://example.test/x');
   // A gateway that does not confirm acceptance must not become an unhandled error, keep a dead code
   // alive, or use up the person's hourly attempts.
   const brokenPhone = '+995500000199';

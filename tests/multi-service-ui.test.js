@@ -113,7 +113,7 @@ let server;
  assert.match(managerHtml,/<input type="checkbox" name="transportSize" value="XL"  >/,'другой класс можно добавить');
  assert.match(managerHtml,/name="transportAny"/,'ограничение по классу можно снять');
  assert.match(managerHtml,/Отправки и отклики/);
- assert.match(managerHtml,/Демо исполнитель \(#\d+\) · Принято каналом/,'в отправках имена и статусы по-русски');
+ assert.match(managerHtml,/<a href="\/manager\/masters\/\d+">Демо исполнитель<\/a> \(#\d+\) · Принято каналом/,'в отправках имена и статусы по-русски, свой исполнитель — ссылкой на карточку');
  for(const script of managerHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(script[1]);
  assert.equal((await pool.query('SELECT vehicle_size FROM masters WHERE id=$1',[m.id])).rows[0].vehicle_size,'M');
  // Три размера кузова в карточке администратора: букву ставит система, выбранная вручную не действует.

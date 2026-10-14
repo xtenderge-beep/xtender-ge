@@ -11,7 +11,7 @@
 .badge-wait{background:#fff3d6;color:#7a5200}.badge-sent{background:#e2f4ee;color:#075d4b}.badge-bad{background:#fbe4e4;color:#8a2424}.badge-test{background:#eceff1;color:#3d4a52}
 .order-row-text{margin:10px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 .order-row-facts{display:flex;gap:4px 18px;flex-wrap:wrap;margin:10px 0 0;font-size:14px}
-.order-row-facts .bad{color:#a53030;font-weight:700}.order-row-facts .soft{color:#7a5200;font-weight:600}
+.order-row-facts .bad{color:#a53030;font-weight:700}.order-row-facts .soft{color:#7a5200;font-weight:600}.order-row-facts .new{color:#075d4b;font-weight:700}
 @media(max-width:600px){.order-row{padding:14px 14px}}
 </style>
 <%
@@ -23,7 +23,7 @@
 <h1>Заявки для рассылки</h1>
 <p class="muted">Открытые заявки и что с каждой происходит. Чтобы выбрать исполнителей и отправить, откройте заявку.</p>
 <% if(!orders.length){ %><p>Открытых заявок сейчас нет.</p><% } else { %>
-<p class="order-totals" id="order-totals"><span>Ждут рассылки: <%= waiting.length %></span><span>Разосланы: <%= sent.length %></span><% if(troubled){ %><span class="warn">С ошибками доставки: <%= troubled %></span><% } %></p>
+<p class="order-totals" id="order-totals"><span>Ждут рассылки: <%= waiting.length %></span><span>Разосланы: <%= sent.length %></span><% if(troubled){ %><span class="warn">С ошибками доставки: <%= troubled %></span><% } %><span data-extendable hidden></span></p>
 <% } %>
 <% [['Ждут рассылки', waiting], ['Разосланы — ждём откликов', sent]].forEach(([title, rows]) => { if(!rows.length) return; %>
 <h2><%= title %></h2>
@@ -45,6 +45,7 @@
       <% if(order.opened){ %><span>Открыли: <%= order.opened %></span><span>Связались с заказчиком: <%= order.contacted %></span>
       <% } else { %><span class="<%= order.minutes >= 60 ? 'soft' : 'muted' %>">Пока никто не открыл</span><% } %>
     <% } %>
+    <span class="new" data-newcomers="<%= order.token %>" hidden></span>
     <% if(order.failed){ %><span class="bad">Не доставлено: <%= order.failed %> — откройте и повторите отправку</span><% } %>
     <% if(order.pending){ %><span class="soft">Доставка не подтверждена: <%= order.pending %></span><% } %>
     <% if(order.closed.length){ %><span class="muted">Закрыто: <%= order.closed.join(', ') %></span><% } %>
@@ -52,4 +53,12 @@
   <% } %>
 </a>
 <% }); }); %>
+<script>
+// «Новые подходящие»: кому разосланную заявку можно дослать. Считается дольше списка, поэтому приходит отдельно.
+fetch('/manager/orders-newcomers').then(response=>response.ok?response.json():{}).then(counts=>{
+ let orders=0;
+ document.querySelectorAll('[data-newcomers]').forEach(item=>{ const count=counts[item.dataset.newcomers]; if(!count) return; item.textContent='Новые подходящие: '+count+' — можно дослать'; item.hidden=false; orders++; });
+ const total=document.querySelector('[data-extendable]'); if(total&&orders){ total.textContent='Можно дослать новым: '+orders; total.hidden=false; }
+}).catch(()=>{});
+</script>
 </main></body></html>

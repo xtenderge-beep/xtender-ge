@@ -97,6 +97,7 @@ router.get('/orders/:token', asyncHandler((req, res) => adminController.orderDet
 // Экран заявки — те же действия, что в кабинете менеджера (см. managerPortal.routes.js).
 router.post('/orders/:token/preview', verifyCsrf, asyncHandler(adminController.orderPreview));
 router.post('/orders/:token/send', verifyCsrf, asyncHandler(adminController.orderSend));
+router.post('/orders/:token/newcomers', verifyCsrf, asyncHandler(adminController.orderNewcomers));
 router.post('/orders/:token/text', verifyCsrf, asyncHandler(adminController.orderText));
 router.post('/orders/:token/note', verifyCsrf, asyncHandler(adminController.orderNote));
 router.post('/orders/:token/brief', verifyCsrf, asyncHandler(adminController.orderBrief));

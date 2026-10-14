@@ -54,6 +54,8 @@ const dispatchPage=async(req,res,result=null)=>{
 router.get('/orders',wrap(async(req,res)=>{
   res.render('manager/orders',{orders:await dispatchService.orderList()});
 }));
+// Числа «Новые подходящие» для списка заявок — отдельно, чтобы список открывался сразу.
+router.get('/orders-newcomers',wrap(async(req,res)=>res.json(await dispatchService.newcomerCounts())));
 router.get('/orders/:token',wrap(async(req,res)=>dispatchPage(req,res)));
 // Пересчёт при каждом изменении формы: ничего не сохраняет и не отправляет.
 router.post('/orders/:token/preview',wrap(async(req,res)=>{
@@ -64,6 +66,12 @@ router.post('/orders/:token/preview',wrap(async(req,res)=>{
 router.post('/orders/:token/send',wrap(async(req,res)=>{
   try {
     return dispatchPage(req,res,await dispatchService.sendForm(req.params.token,req.body,'manager:'+req.managerSession.id));
+  } catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
+}));
+// «Дослать новым»: исполнителям, которым уже отправленная услуга подходит, а заявка не уходила.
+router.post('/orders/:token/newcomers',wrap(async(req,res)=>{
+  try {
+    return dispatchPage(req,res,await dispatchService.sendNewcomers(req.params.token,{total:req.body.expectedTotal,price:req.body.expectedPrice},'manager:'+req.managerSession.id));
   } catch(e){res.redirect('/manager/orders/'+encodeURIComponent(req.params.token)+'?error='+encodeURIComponent(e.message));}
 }));
 router.post('/orders/:token/needs',wrap(async(req,res)=>{

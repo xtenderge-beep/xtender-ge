@@ -684,23 +684,15 @@ async function telegramWebhook(req, res) {
       const order = await orderService.getOrderByToken(callback.data.split(':')[1]);
       if (!order) { await telegramService.answerCallback(callback.id,'Заявка не найдена'); return res.sendStatus(200); }
       await telegramService.answerCallback(callback.id);
-      const runs=await orderService.getOrderDispatches(order.id);
-      const labels=await require('../services/category.service').groups(true);
-      const reasons={need_closed:'потребность закрыта',service_changed:'изменились услуги',eligibility_changed:'изменился допуск или баланс',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'предыдущая попытка не завершена',channel_rejected:'канал отклонил',result_unknown:'результат неизвестен',before_send_error:'ошибка до отправки'};
-      const lines=['Заявка #'+order.id+' · результаты последних рассылок'];
-      for(const run of runs.slice(-3)) {
-        lines.push('',(labels[run.category] || 'Архивная группа')+' · запуск #'+run.id,
-          'Выбрано '+run.selected+' · принято '+run.accepted+' · ошибки '+run.failed+' · пропущено '+run.skipped+' · в обработке / неизвестно '+run.pending);
-        for(const d of run.deliveries.slice(0,25)) lines.push('#'+d.master_id+' · '+({accepted:'принято',failed:'ошибка',pending:'в обработке / неизвестно',skipped:'пропущено'})[d.status]+(d.channel ? ' · '+d.channel : '')+(d.reason ? ' · '+(reasons[d.reason] || d.reason) : ''));
-        if(run.deliveries.length>25) lines.push('…остальные получатели — в карточке заявки');
-      }
-      if(!runs.length)lines.push('Рассылок ещё нет.');
-      const funnel = await orderService.getOrderFunnelStats(order.id);
-      lines.push('', 'Действия получателей: просмотров '+funnel.view+' · позвонить '+funnel.call+' · WhatsApp '+funnel.whatsapp+' · нажали хотя бы один контакт '+(funnel.contacted||0));
-      const byCategory = await orderService.getOrderFunnelByCategory(order.id);
-      for (const row of byCategory) lines.push((labels[row.category] || row.category)+': уведомлены '+row.received+' · просмотров '+row.view+' · звонок '+row.call+' · WhatsApp '+row.whatsapp);
-      lines.push('Принято каналом не означает прочтение; нажатие контакта не подтверждает договорённость.');
-      await telegramService.sendToChat(chat,lines.join('\n').slice(0,3800));
+      // Кто получил заявку, открыл ссылку и нажал «Позвонить» / WhatsApp — по каждому исполнителю;
+      // у открытой заявки — кому её можно дослать и кто подходит, но не получил.
+      const recipientReport=require('../services/recipientReport.service'), dispatchService=require('../services/dispatch.service');
+      const open=['pending_review','new'].includes(order.status) && order.first_dispatched_at;
+      const plan=open ? await dispatchService.planNeeds(order.token,require('../services/orderNeeds.service').storedInput(order)).catch(()=>null) : null;
+      const text=recipientReport.telegramText({ order, runs:await orderService.getOrderDispatches(order.id), report:await recipientReport.build(order.id),
+        byCategory:await orderService.getOrderFunnelByCategory(order.id), labels:await require('../services/category.service').groups(true),
+        newcomers:open ? await dispatchService.newcomers(order.token) : null, missed:dispatchService.missedOf(plan) });
+      await telegramService.sendToChat(chat,text);
       return res.sendStatus(200);
     }
     if (callback.data.startsWith('retry:')) {
