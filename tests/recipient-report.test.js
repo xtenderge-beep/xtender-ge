@@ -54,7 +54,7 @@ const at=clock=>'2026-10-14T'+clock+':00Z';
   const built=await report.build(order.id),row=id=>built.rows.find(r=>r.master_id===id);
   assert.deepEqual([row(called).balance_tetri,row(called).low,row(silent).balance_tetri,row(silent).low],[5000,false,0,true]);
   assert.equal(built.rows.length,8,'один исполнитель — одна строка');
-  assert.deepEqual(built.rows.map(r=>r.name),['Позвонил','Две отправки','Открыл','Опоздал','Старая рассылка','Молчит','Не дошло','Чужой'],'сначала нажавшие контакт, потом открывшие, не открывшие, не получившие; внутри — по времени доставки');
+  assert.deepEqual(built.rows.map(r=>r.name),['Позвонил','Открыл','Опоздал','Две отправки','Старая рассылка','Молчит','Не дошло','Чужой'],'сначала открывшие — кто раньше открыл, тот выше; потом не открывшие по времени доставки; в конце не получившие');
   assert.deepEqual(built.summary,{received:6,opened:4,contacted:2,call:1,whatsapp:2,notOpened:2,pending:0,failed:1,denied:1,outside:1});
   assert.deepEqual([row(both).status,row(both).channel,new Date(row(both).sent_at).toISOString()],['accepted','telegram',at('11:30').replace('Z','.000Z')]);
   assert.deepEqual([row(old).outcome,row(old).channel,row(lost).outcome,row(lost).reason,row(stranger).outcome],['not_opened',null,'not_delivered','channel_rejected','outside']);

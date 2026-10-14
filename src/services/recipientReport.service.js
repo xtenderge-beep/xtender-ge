@@ -13,7 +13,9 @@ const pool = require('../config/db');
 const RANK = { accepted: 0, pending: 1, failed: 2, skipped: 3 };
 // outside — исполнитель открыл заявку или нажал контакт, но в её рассылке не был (вошёл в кабинет
 // по пересланной ссылке): номер ему не выдаётся, строка нужна, чтобы такое было видно.
-const OUTCOMES = ['contacted', 'opened', 'not_opened', 'pending', 'not_delivered', 'skipped', 'outside'];
+// Порядок строк (решение владельца 2026-10-15): сначала все, кто открыл ссылку или нажал контакт, — кто
+// раньше среагировал, тот выше; потом не открывшие — по времени доставки; в конце не получившие.
+const ORDER = { contacted: 0, opened: 0, not_opened: 1, pending: 2, not_delivered: 3, skipped: 4, outside: 5 };
 
 async function build(orderId) {
   const [deliveries, charges, events, denied] = await Promise.all([
@@ -52,7 +54,9 @@ async function build(orderId) {
     rows.forEach(row => Object.assign(people.get(Number(row.id)), { name: row.name, balance_tetri: row.balance_tetri, low: row.balance_tetri < price, manager_id: row.manager_id }));
   }
   const rows = [...people.values()].map(p => ({ ...p, outcome: outcome(p) }));
-  rows.sort((a, b) => OUTCOMES.indexOf(a.outcome) - OUTCOMES.indexOf(b.outcome) || time(a.sent_at) - time(b.sent_at) || a.master_id - b.master_id);
+  // Первая реакция — открытие ссылки, а если оно не записалось — первое нажатие контакта.
+  const reacted = r => Math.min(time(r.view), time(r.call), time(r.whatsapp));
+  rows.sort((a, b) => ORDER[a.outcome] - ORDER[b.outcome] || (ORDER[a.outcome] === 0 ? reacted(a) - reacted(b) : 0) || time(a.sent_at) - time(b.sent_at) || a.master_id - b.master_id);
   const count = test => rows.filter(r => r.outcome !== 'outside' && test(r)).length;
   return {
     rows,
