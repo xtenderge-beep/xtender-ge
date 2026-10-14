@@ -238,6 +238,9 @@ async function screen(token, languageRaw = '') {
   const requestLang = require('../config/requestLanguage').ofOrder(order);
   const digits = String(order.phone || '').replace(/\D/g, '');
   const greeting = require('../config/service-message-copy')('clarifyGreeting', requestLang || 'ru', { id: order.id });
+  const report = await recipientReport.build(order.id);
+  const fresh = open && order.first_dispatched_at ? await newcomers(token) : { groups: [], recipients: [], total: 0, price: 0 };
+  const missed = missedOf(plan);
   return {
     brief, briefLines: briefService.lines(brief, 'ru'), briefEnabled: briefService.enabled(),
     briefServices: (brief?.services || []).filter(key => Object.hasOwn(groups, key)).map(key => ({ key, label: groups[key] })),
@@ -250,10 +253,11 @@ async function screen(token, languageRaw = '') {
     activeCities: await masterService.getActiveCities(), allCities: await masterService.getWorkCities(),
     funnel: await orderService.getOrderFunnelStats(order.id), funnelByCategory: await orderService.getOrderFunnelByCategory(order.id), speakLabels,
     // Кто получил заявку и что сделал потом; reportText — подписи и время для этой таблицы.
-    report: await recipientReport.build(order.id), reportText: recipientReport,
+    report, reportText: recipientReport,
     // Кому заявку можно дослать и кто подходит, но не получит (по всем услугам, без повторов).
-    newcomers: open && order.first_dispatched_at ? await newcomers(token) : { groups: [], recipients: [], total: 0, price: 0 },
-    missed: missedOf(plan),
+    newcomers: fresh, missed,
+    // История каждого показанного исполнителя за 30 дней: получил, открыл, связался.
+    history: await recipientReport.history([...report.rows.map(r => r.master_id), ...fresh.recipients.map(m => m.id), ...missed.map(m => m.id)]),
   };
 }
 // Форма экрана заявки одна и та же в кабинете менеджера и в админке: расчёт и отправка по её полям.

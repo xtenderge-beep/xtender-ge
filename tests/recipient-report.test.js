@@ -88,9 +88,10 @@ const at=clock=>'2026-10-14T'+clock+':00Z';
   const render=masterHref=>ejs.renderFile(view,{...screen,base:'/manager/orders/'+order.token,listHref:'/manager/orders',csrf:'x',canCloseNeed:false,masterHref,result:null,error:null,date:v=>v?new Date(v).toISOString():'—'});
   const page=await render('');
   assert.match(page,/Получили: <strong>6<\/strong> · открыли ссылку: <strong>4<\/strong> · нажали контакт: <strong>2<\/strong> \(позвонить 1, WhatsApp 2\) · не открыли: <strong>2<\/strong> · не доставлено: <strong>1<\/strong>/);
-  assert.match(page,/<tr class="is-contacted">\s*<td data-label="Исполнитель">Позвонил<span class="balance">баланс 50\.00 ₾<\/span><\/td>\s*<td data-label="Получил" class="">Telegram · 14\.10 14:02<\/td>\s*<td data-label="Открыл ссылку" class="yes">✓ 14:05 · через 3 мин<\/td>\s*<td data-label="Позвонить" class="yes">✓ 14:07 · через 5 мин<\/td>\s*<td data-label="WhatsApp" class="yes">✓ 16:10 · через 2 ч 8 мин<\/td><\/tr>/);
-  assert.match(page,/Молчит<span class="balance bad">баланс 0\.00 ₾ — не хватит на следующую заявку<\/span><\/td>\s*<td[^>]*>SMS · 14\.10 14:02<\/td>\s*<td data-label="Открыл ссылку" class="no">не открыл<\/td>/);
-  const name=who=>who+'<span[^>]*>[^<]*<\\/span><\\/td>';
+  assert.match(page,/<tr class="is-contacted">\s*<td data-label="Исполнитель">Позвонил<span class="balance">баланс 50\.00 ₾<\/span><span class="balance">за 30 дней заявок не получал<\/span><\/td>\s*<td data-label="Получил" class="">Telegram · 14\.10 14:02<\/td>\s*<td data-label="Открыл ссылку" class="yes">✓ 14:05 · через 3 мин<\/td>\s*<td data-label="Позвонить" class="yes">✓ 14:07 · через 5 мин<\/td>\s*<td data-label="WhatsApp" class="yes">✓ 16:10 · через 2 ч 8 мин<\/td><\/tr>/);
+  assert.match(page,/Молчит<span class="balance bad">баланс 0\.00 ₾ — не хватит на следующую заявку<\/span><span class="balance">за 30 дней заявок не получал<\/span><\/td>\s*<td[^>]*>SMS · 14\.10 14:02<\/td>\s*<td data-label="Открыл ссылку" class="no">не открыл<\/td>/);
+  // Под именем баланс и история за 30 дней (историю с датами от сегодняшнего дня проверяет dispatch-newcomers).
+  const name=who=>who+'(?:<span[^>]*>[^<]*<\\/span>)+<\\/td>';
   assert.match(page,new RegExp(name('Опоздал')+'[\\s\\S]*?<td data-label="Позвонить" class="bad">нажал 14:41 — номер не выдан: заявка или услуга уже закрыта<\\/td>'));
   assert.match(page,new RegExp(name('Не дошло')+'\\s*<td data-label="Получил" class="bad">не доставлено · канал отклонил отправку<\\/td>\\s*<td data-label="Открыл ссылку" class="no">—<\\/td>'));
   assert.match(page,new RegExp(name('Чужой')+'\\s*<td data-label="Получил" class="bad">не был в рассылке<\\/td>'));

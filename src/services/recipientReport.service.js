@@ -74,6 +74,32 @@ async function build(orderId) {
   };
 }
 
+// История исполнителя за последние days дней: сколько заявок получил (списание lead_charge), сколько из
+// них открыл и по скольким нажал контакт — когда бы ни открыл. { id: { received, opened, contacted } }.
+async function history(masterIds, days = 30) {
+  const ids = [...new Set(masterIds.map(Number))];
+  const result = Object.fromEntries(ids.map(id => [id, { received: 0, opened: 0, contacted: 0 }]));
+  if (!ids.length) return result;
+  const list = ids.map((_, i) => '$' + (i + 2)).join(','), since = new Date(Date.now() - days * 86400000);
+  const [charges, events] = await Promise.all([
+    pool.query("SELECT DISTINCT master_id, order_id FROM balance_transactions WHERE reason = 'lead_charge' AND order_id IS NOT NULL AND created_at >= $1 AND master_id IN (" + list + ')', [since, ...ids]),
+    pool.query('SELECT master_id, order_id, event_type FROM order_views WHERE viewed_at >= $1 AND master_id IN (' + list + ')', [since, ...ids]),
+  ]);
+  const received = new Set(charges.rows.map(row => row.master_id + ':' + row.order_id));
+  const opened = new Set(), contacted = new Set();
+  for (const row of events.rows) {
+    const key = row.master_id + ':' + row.order_id;
+    if (!received.has(key)) continue;
+    opened.add(key);
+    if (row.event_type === 'call' || row.event_type === 'whatsapp') contacted.add(key);
+  }
+  for (const key of received) result[Number(key.split(':')[0])].received++;
+  for (const key of opened) result[Number(key.split(':')[0])].opened++;
+  for (const key of contacted) result[Number(key.split(':')[0])].contacted++;
+  return result;
+}
+const historyText = h => !h ? '' : h.received ? 'за 30 дней: получил ' + h.received + ' · открыл ' + h.opened + ' · связался ' + h.contacted : 'за 30 дней заявок не получал';
+
 function outcome(p) {
   if (p.status == null) return 'outside';
   if (p.call || p.whatsapp) return 'contacted';
@@ -158,4 +184,4 @@ function telegramText({ order, runs, report, byCategory = [], labels = {}, newco
   return text;
 }
 
-module.exports = { build, when, after, channelName, reasonText, deniedText, money, missedText, recipientLine, telegramText };
+module.exports = { build, history, historyText, when, after, channelName, reasonText, deniedText, money, missedText, recipientLine, telegramText };

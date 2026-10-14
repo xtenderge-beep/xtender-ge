@@ -94,6 +94,15 @@ const names=list=>list.map(m=>m.name);
   assert.equal(report.summary.received,4);
   assert.deepEqual([report.rows.find(r=>r.master_id===first).balance_tetri,report.rows.find(r=>r.master_id===first).low],[5000-plan.price,false]);
 
+  // История за 30 дней: получил (списание), открыл, связался — по заявкам, полученным в эти 30 дней.
+  await orders.logView(order.id,first,'view');await orders.logView(order.id,first,'whatsapp');await orders.logView(order.id,newcomer,'view');
+  const old=(await pool.query("INSERT INTO orders(token,phone,description,status) VALUES('late-old','+995500008997','Старая','closed') RETURNING id")).rows[0].id;
+  await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason,order_id,created_at) VALUES($1,-50,'lead_charge',$2,NOW() - INTERVAL '40 days')",[first,old]);
+  const stats=await require('../src/services/recipientReport.service').history([first,newcomer,unconfirmed]);
+  assert.deepEqual([stats[first],stats[newcomer],stats[unconfirmed]],[{received:1,opened:1,contacted:1},{received:1,opened:1,contacted:0},{received:0,opened:0,contacted:0}],'заявка 40-дневной давности не считается');
+  const withHistory=await require('ejs').renderFile(path.join(__dirname,'../src/views/partials/order-screen.ejs'),{...await dispatch.screen(order.token),base:'/x',listHref:'/x',csrf:'x',canCloseNeed:false,masterHref:'',result:null,error:null,date:()=>''});
+  assert.match(withHistory,/Первый<span class="balance">[^<]*<\/span><span class="balance">за 30 дней: получил 1 · открыл 1 · связался 1<\/span>/);
+  assert.match(withHistory,/Без тарифов · 💪 Грузчики · тарифы не подтверждены, баланс 50\.00 ₾ · <span class="muted">за 30 дней заявок не получал<\/span>/);
   // Баланс меньше цены заявки: в отчёте помечен — следующую заявку не получит.
   await pool.query('UPDATE masters SET balance_tetri=10 WHERE id=$1',[first]);
   assert.equal((await require('../src/services/recipientReport.service').build(order.id)).rows.find(r=>r.master_id===first).low,true);
