@@ -14,9 +14,7 @@ const MODEL = process.env.OPENROUTER_MATCH_MODEL || process.env.OPENROUTER_TRANS
 const KEY = process.env.OPENROUTER_API_KEY;
 const CALL_TIMEOUT_MS = 8000;
 // Меняется вместе с текстом подсказок: ответы прежней версии из кеша не берутся.
-const PROMPT_VERSION = 2;
-// Временно (2026-10-16): модели, которые можно выбрать отладочным запросом для сравнения качества подбора.
-const TEST_MODELS = ['google/gemini-2.5-flash-lite', 'google/gemini-3.1-flash-lite', 'google/gemini-2.5-flash', 'google/gemini-3-flash-preview'];
+const PROMPT_VERSION = 3;
 const MIN_LENGTH = 8;
 const MAX_LENGTH = 1000;
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
@@ -84,9 +82,10 @@ Task:
 ${text}`;
 }
 
-async function callModel(prompt, modelId = MODEL) {
-  // Запас по длине: часть моделей тратит ответ на рассуждение, обрезанный JSON — потерянный подбор.
-  const body = { model: modelId, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 1500 };
+async function callModel(prompt) {
+  // Запас по длине обязателен: с max_tokens 400 модель на проде отвечала пустым разбором (2026-10-16), с 1500
+  // она же верно разобрала все 9 проверочных задач на трёх языках.
+  const body = { model: MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 1500 };
   const send = (extra) => axios.post('https://openrouter.ai/api/v1/chat/completions', { ...body, ...extra },
     { headers: { Authorization: `Bearer ${KEY}`, 'HTTP-Referer': 'https://xtender.ge', 'X-Title': 'xtender.ge' }, timeout: CALL_TIMEOUT_MS });
   let res;
@@ -137,15 +136,14 @@ function sanitize(raw, services, featureKeys) {
 const normalize = (text) => require('../config/phoneInText').maskPhones(String(text || '').replace(/\s+/g, ' ').trim()).slice(0, MAX_LENGTH);
 
 // text — что человек написал в поле задачи; ip — для лимита. Не бросает: подбор не должен ломать страницу.
-async function match({ text, ip, debug }) {
+async function match({ text, ip }) {
   const clean = normalize(text);
   if (!enabled() || clean.length < MIN_LENGTH) return null;
   const redis = require('../config/redis');
-  const modelId = (debug && debug.model) || MODEL;
-  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(modelId + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
+  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
   try {
     const cached = await redis.get(cacheKey);
-    if (cached) { if (debug) debug.cached = true; return JSON.parse(cached); }
+    if (cached) return JSON.parse(cached);
     const limitKey = 'task_match_ip:' + String(ip || 'unknown');
     const count = await redis.incr(limitKey);
     if (count === 1) await redis.expire(limitKey, RATE_LIMIT_WINDOW_SECONDS);
@@ -156,10 +154,7 @@ async function match({ text, ip, debug }) {
     const features = FEATURE_TAGS.map((f) => ({ key: f.key, label: f.tag.ru }));
     if (!await withinDailyLimit(redis)) return null;
     const prompt = buildPrompt({ text: clean, services, features, sizes });
-    const raw = await (model || callModel)(prompt, modelId);
-    const result = sanitize(raw, services, features.map((f) => f.key));
-    // Временно (2026-10-16): разбор ответа модели на проде. Ответ — только ключи, без текста задачи.
-    if (debug) debug.raw = String(raw).slice(0, 2000);
+    const result = sanitize(await (model || callModel)(prompt), services, features.map((f) => f.key));
     if (result) await redis.set(cacheKey, JSON.stringify(result), 'EX', CACHE_TTL_SECONDS);
     return result;
   } catch (error) {
@@ -236,8 +231,8 @@ function sanitizeOrder(raw, ids) {
 // text — задача; locale — язык страницы (подписи и описания кандидатов); citySlug — город каталога.
 // Возвращает { services, features, providers: [id по порядку] }; без providers — список собрать не удалось;
 // null — ИИ выключен, лимит, сбой разбора.
-async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
-  const understood = await match({ text, ip, debug });
+async function rank({ text, ip, locale = 'ru', citySlug }) {
+  const understood = await match({ text, ip });
   if (!understood) return null;
   if (!understood.services.length && !understood.features.length) return { ...understood, providers: [] };
   try {
@@ -272,8 +267,7 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
     if (candidates.length > 1) {
       const clean = normalize(text);
       const redis = require('../config/redis');
-      const modelId = (debug && debug.model) || MODEL;
-      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(modelId + '\n' + PROMPT_VERSION + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
+      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
       const cached = await redis.get(cacheKey);
       if (cached) providers = JSON.parse(cached);
       else if (await withinDailyLimit(redis)) {
@@ -285,7 +279,7 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
         });
         // Сбой модели на этом шаге не страшен: остаётся порядок по услугам и характеристикам.
         let order = null;
-        try { order = sanitizeOrder(await (model || callModel)(rerankPrompt(clean, lines), modelId), providers); }
+        try { order = sanitizeOrder(await (model || callModel)(rerankPrompt(clean, lines)), providers); }
         catch (error) { console.error('[task-match] rerank failed:', error.message); }
         if (order) {
           providers = order;
@@ -302,4 +296,4 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
   }
 }
 
-module.exports = { MODEL, PROMPT_VERSION, TEST_MODELS, enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };
+module.exports = { enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };
