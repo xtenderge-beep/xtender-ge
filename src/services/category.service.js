@@ -209,4 +209,16 @@ async function remove(slug) {
     await client.query('DELETE FROM service_categories WHERE slug=$1', [slug]);
   });
 }
-module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,save,remove,toType,toCategory,hasLockedField};
+// Отметки карточки каталога (другие услуги исполнителя, характеристики) и машины перевозки по отдельности.
+// Нужны главной и подбору по смыслу (taskMatch.service): исполнитель везде описан одинаково.
+function decorateForCatalog(masters, categories, locale) {
+  masters.forEach(m => { m.badges = [...(m.services || []).filter(s=>s.service_type !== m.service_type).map(s=>{const c=categories.find(c=>c.slug===s.service_type);return c?.['name_'+locale] || c?.name_ru || s.service_type;}), ...badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale)]; });
+  // Несколько машин у исполнителя перевозок: фильтры каталога проверяют каждую машину отдельно.
+  masters.forEach(m => {
+    const van = m.service_type === 'van' ? m.attributes : (m.services || []).find(s => s.service_type === 'van')?.attributes;
+    const vehicles = van ? base.vanVehicles(van) : [];
+    m.van_vehicles = vehicles.length > 1 ? vehicles : null;
+  });
+  return masters;
+}
+module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,decorateForCatalog,save,remove,toType,toCategory,hasLockedField};

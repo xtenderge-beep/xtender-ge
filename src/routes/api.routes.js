@@ -20,6 +20,20 @@ router.post('/v', (req, res) => {
   }).catch(err => console.error('[site-analytics]', err.message));
 });
 
+// Подбор исполнителей по смыслу задачи на главной (taskMatch.service.rank): разбор задачи, кандидаты из
+// каталога города, порядок по смыслу. 204 — ИИ выключен, текст короткий, лимит или сбой: страница остаётся на
+// подборе по словарю.
+router.post('/task-match', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const result = await require('../services/taskMatch.service').rank({
+    text: body.text, ip: req.headers['cf-connecting-ip'] || req.ip,
+    locale: require('../config/i18n').normalizeLang(body.lang), citySlug: typeof body.city === 'string' ? body.city : '',
+  });
+  if (!result) return res.status(204).end();
+  res.json(result);
+}));
+
 router.post('/otp/send', asyncHandler(otpController.send));
 router.post('/otp/verify', asyncHandler(otpController.verify));
 

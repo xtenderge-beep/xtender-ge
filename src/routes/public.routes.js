@@ -94,14 +94,7 @@ async function renderHome(req, res, locale, page, options = {}) {
   const t = translate(locale);
   const categoryService = require('../services/category.service');
   const categories = await categoryService.list();
-  masters.forEach(m => { m.badges = [...(m.services || []).filter(s=>s.service_type !== m.service_type).map(s=>{const c=categories.find(c=>c.slug===s.service_type);return c?.['name_'+locale] || c?.name_ru || s.service_type;}), ...categoryService.badges(categories.find(c=>c.slug===m.service_type),m.attributes,locale)]; });
-
-  // Несколько машин у исполнителя перевозок: фильтры каталога проверяют каждую машину отдельно.
-  masters.forEach(m => {
-    const van = m.service_type === 'van' ? m.attributes : (m.services || []).find(s => s.service_type === 'van')?.attributes;
-    const vehicles = van ? require('../config/serviceTypes').vanVehicles(van) : [];
-    m.van_vehicles = vehicles.length > 1 ? vehicles : null;
-  });
+  categoryService.decorateForCatalog(masters, categories, locale);
 
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
@@ -129,8 +122,10 @@ async function renderHome(req, res, locale, page, options = {}) {
     catalogGroups: await categoryService.catalogGroups(locale),
     catalogServiceConfig: await categoryService.configForView(locale),
     simpleHome: Boolean(options.simple),
-    simpleTabs: require('../config/simple-home-copy').SIMPLE_HOME_TABS,
-    simpleSearch: options.simple ? require('../config/service-search-words').forPage(categories, locale) : null,
+    // Хэштеги главной: у каждого исполнителя каталога этого города свои, в ряду — самые частые, с числом.
+    simpleSearch: options.simple ? require('../config/service-search-words').forPage(categories, locale, masters) : null,
+    // Подбор по смыслу (ИИ) пока включается только ссылкой с ?ai=1 — для проверки владельцем на проде.
+    aiMatch: Boolean(options.simple && req.query.ai === '1' && require('../services/taskMatch.service').enabled()),
   });
 }
 

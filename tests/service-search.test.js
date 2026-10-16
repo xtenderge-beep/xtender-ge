@@ -31,9 +31,40 @@ for (const [query, services] of Object.entries(expect)) {
 assert.equal(page.labels.movers, 'Грузчики');
 assert.equal(page.labels.hidden, undefined);
 
+// Хэштеги: группы из словаря, услуга из админки — по названию; без исполнителей хэштег не показывается.
+assert.deepEqual(page.tags.map((tag) => tag.label), ['грузчики', 'грузоперевозки', 'переезд', 'вывоз мусора', 'эвакуатор', 'автовышка', 'сантехники']);
+assert.deepEqual(words.forPage(categories, 'ka', [{ id: 1, service_type: 'movers' }, { id: 2, service_type: 'svc_plumbers' }]).tags.map((tag) => tag.label), ['მუშები', 'გადაბარგება', 'სანტექნიკოსი']);
+
+// Хэштеги исполнителя: услуга первой, потом особенности из отметок и описания; не больше трёх на карточке.
+const providers = [
+  { id: 1, service_type: 'movers', description: 'Чиню сантехнику. Собираю/разбираю мебель' },
+  { id: 2, service_type: 'van', description: 'Перевозка пианино', van_vehicles: [{ tail_lift: false }, { tail_lift: true }] },
+  { id: 3, service_type: 'junk', description: 'Демонтаж и вывоз. Работаю круглосуточно', attributes: { dump_body: true } },
+  { id: 4, service_type: 'movers', description: 'Подъём мебели без лифта. Моя работа — разобраться и так далее.' },
+  { id: 5, service_type: 'movers', description: 'Перевозка пианино', services: [{ service_type: 'movers' }, { service_type: 'svc_plumbers' }] },
+];
+const tagged = words.forPage(categories, 'ru', providers);
+const shown = (id) => tagged.byMaster.get(id).display.map((tag) => tag.label);
+assert.deepEqual(shown(1), ['грузчики', 'сборка мебели']);
+assert.deepEqual(shown(2), ['грузоперевозки', 'пианино', 'гидроборт'], 'tail lift on the second vehicle');
+assert.deepEqual(shown(3), ['вывоз мусора', 'демонтаж', 'самосвал'], 'three at most');
+assert.ok(tagged.byMaster.get(3).keys.includes('night'), 'the fourth one still filters');
+assert.deepEqual(shown(4), ['грузчики'], 'no lift, no assembly from «разобраться»');
+assert.deepEqual(shown(5), ['грузчики', 'пианино', 'сантехники']);
+assert.deepEqual(tagged.byMaster.get(5).keys.sort(), ['movers', 'moving', 'piano', 'svc_plumbers']);
+// Ряд каталога — самые частые хэштеги с настоящим числом; хэштегов без исполнителей нет.
+assert.deepEqual(tagged.rowTags.slice(0, 3).map((tag) => [tag.label, tag.count]), [['переезд', 4], ['грузчики', 3], ['пианино', 2]]);
+assert.ok(!tagged.tags.some((tag) => tag.key === 'tow' || tag.count === 0));
+assert.deepEqual(page.tags.find((tag) => tag.key === 'moving').services, ['movers', 'van']);
+// Подсказка хэштегов по тексту задачи и по запросу поиска (на любом языке страницы).
+const findTags = search.serviceMatcher(page.tags.map((tag) => ({ services: [tag.key], words: tag.words })));
+assert.deepEqual(findTags('Нужно перевезти пианино на 3 этаж').sort(), ['moving', 'van']);
+assert.deepEqual(findTags('ევაკუატორი მჭირდება'), ['tow']);
+assert.deepEqual(findTags('убрать строительный мусор после ремонта'), ['junk']);
+
 // Текст карточки: каждое слово запроса должно найтись, с окончаниями.
 assert.equal(search.textMatches('пианино', 'Перевозка мебели и пианино без лифта'), true);
 assert.equal(search.textMatches('мебель пианино', 'Перевозка мебели и пианино'), true);
 assert.equal(search.textMatches('мебель сейф', 'Перевозка мебели и пианино'), false);
 assert.equal(search.textMatches('гр', 'грузчики'), false);
-console.log('PASS: service words in ka/ru/en/Latin, admin-created service by name, no matches from ordinary task words, card text with endings.');
+console.log('PASS: service words in ka/ru/en/Latin, admin-created service by name, no matches from ordinary task words, hashtags only for services with providers and suggested from task text, provider hashtags from services, marks and description, row by real counts, card text with endings.');

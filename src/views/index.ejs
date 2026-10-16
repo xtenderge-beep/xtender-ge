@@ -193,6 +193,7 @@
                                         </label>
                                         <input type="file" id="attachments" multiple accept="image/*" class="hidden">
 
+                                        <% if (simple) { %><button type="button" class="task-match" hidden></button><% } %>
                                         <button type="button" onclick="submitFreeform()" class="composer-inline-publish inline-flex items-center gap-1.5 px-4 sm:px-5 py-2.5 sm:py-3 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-bold text-sm rounded-xl shadow-sm shadow-emerald-600/30 transition">
                                             <span><%= simple ? t('simple_publish') : t('home_submit') %></span>
                                             <i class="fa-solid fa-arrow-right text-[11px]"></i>
@@ -350,28 +351,28 @@
 
                     <section id="masters-section" class="home-catalog space-y-5 scroll-mt-24">
                         <% if (simple) { %>
-                        <%# Вкладка — группа задач заказчика (simple-home-copy.js); первая открыта сразу. Ряд — карусель:
-                            на телефоне листается пальцем, с мышью — стрелками, которые видны, только когда есть что листать. %>
-                        <div class="simple-tabs-wrap">
-                          <button type="button" class="simple-tabs-arrow is-prev" aria-label="<%= t('simple_tabs_prev') %>" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
-                          <div class="simple-tabs" role="group" aria-label="<%= t('simple_tabs_label') %>">
-                            <button type="button" class="simple-search-open" aria-expanded="false" aria-controls="simpleSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg><span><%= t('simple_search_open') %></span></button>
-                            <% simpleTabs.forEach(function (tab, index) { %>
-                            <button type="button" class="simple-tab" data-tab-services="<%= tab.services.join(' ') %>" aria-pressed="<%= index === 0 %>"><%= t('simple_tab_' + tab.key) %></button>
-                            <% }); %>
+                        <%# Выбор исполнителя сам — второстепенный путь. Поле задачи — оно же поиск: пока человек пишет,
+                            здесь остаются подходящие исполнители (словарь service-search-words.js), подходящие хэштеги
+                            подсвечиваются. Хэштег в ряду или на карточке показывает всех с ним. Ряд — карусель: пальцем на
+                            телефоне, стрелками с мышью. Под результатом — опубликовать задачу или показать всех. %>
+                        <div class="simple-find" id="simpleSearch">
+                          <div class="simple-tabs-wrap">
+                            <button type="button" class="simple-tabs-arrow is-prev" aria-label="<%= t('simple_tabs_prev') %>" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+                            <div class="simple-tabs" role="group" aria-label="<%= t('simple_tags_label') %>">
+                              <% simpleSearch.rowTags.forEach(function (tag) { %>
+                              <button type="button" class="simple-tag" data-tag="<%= tag.key %>" data-label="#<%= tag.label %>" aria-pressed="false">#<%= tag.label %> <span class="simple-tag-count"><%= tag.count %></span></button>
+                              <% }); %>
+                            </div>
+                            <button type="button" class="simple-tabs-arrow is-next" aria-label="<%= t('simple_tabs_next') %>" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
                           </div>
-                          <button type="button" class="simple-tabs-arrow is-next" aria-label="<%= t('simple_tabs_next') %>" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
-                        </div>
-                        <%# Поиск для тех, кто не хочет писать задачу: открывается вместо ряда вкладок, ищет по словам
-                            услуг (service-search-words.js) и по тексту карточек; внизу — путь обратно к задаче. %>
-                        <div class="simple-search" id="simpleSearch" role="search" hidden>
-                          <div class="simple-search-bar">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L20 20"/></svg>
-                            <input type="search" id="simpleSearchInput" aria-label="<%= t('simple_search_label') %>" placeholder="<%= t('simple_search_placeholder') %>" autocomplete="off" enterkeyhint="search">
-                            <button type="button" class="simple-search-close" aria-label="<%= t('simple_search_close') %>"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+                          <div class="simple-search-result" hidden>
+                            <p class="simple-search-status" id="simpleSearchStatus" aria-live="polite" data-thinking="<%= t('simple_match_thinking') %>"></p>
+                            <p class="simple-search-nudge" id="simpleSearchNote"></p>
+                            <div class="simple-search-actions">
+                              <button type="button" class="simple-search-publish"><%= t('simple_publish') %></button>
+                              <button type="button" class="simple-search-all"><%= t('simple_show_all') %></button>
+                            </div>
                           </div>
-                          <p class="simple-search-status" id="simpleSearchStatus" aria-live="polite"><%= t('simple_search_hint') %></p>
-                          <p class="simple-search-nudge"><span><%= t('simple_search_nudge') %></span> <button type="button" class="simple-search-task"><%= t('simple_search_nudge_btn') %></button></p>
                         </div>
                         <% } %>
 
@@ -454,7 +455,7 @@
                             </h3>
                             <div class="home-master-grid">
                                 <% groupMasters.forEach(function (master) { %>
-                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-reachable="<%= master.reachable ? 1 : 0 %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>" data-vehicles="<%= master.van_vehicles ? JSON.stringify(master.van_vehicles) : '' %>">
+                                  <div class="master-card bg-white rounded-2xl border border-stone-200/90 p-4 sm:p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3" data-languages="<%= (master.spoken_languages || []).join(' ') %>" data-reachable="<%= master.reachable ? 1 : 0 %>" data-original-group="<%= group.key %>" data-services="<%= [...new Set([master.service_type,...(master.services || []).map(s=>s.service_type)])].join(' ') %>" data-service-attributes="<%= JSON.stringify(Object.fromEntries([...(master.services || []).map(s=>[s.service_type,s.attributes || {}]),[master.service_type,master.attributes || {}]])) %>" data-category="<%= group.key %>" data-id="<%= master.id %>" data-tags="<%= simple ? simpleSearch.byMaster.get(master.id).keys.join(' ') : '' %>" data-size="<%= (master.attributes && master.attributes.size) || master.vehicle_size || '' %>" data-vehicles="<%= master.van_vehicles ? JSON.stringify(master.van_vehicles) : '' %>">
 
                                       <%
                                         const ratingStars = Math.round(Number(master.rating) || 0);
@@ -471,7 +472,11 @@
                                                     <span class="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap"><%= master.price_text %></span>
                                                   <% } %>
                                               </div>
+                                              <% if (simple) { %>
+                                              <p class="catalog-card-tags"><% simpleSearch.byMaster.get(master.id).display.forEach(function (tag) { %><button type="button" class="card-tag" data-tag="<%= tag.key %>">#<%= tag.label %></button><% }); %></p>
+                                              <% } else { %>
                                               <p class="catalog-card-category"><%= group.label %></p>
+                                              <% } %>
 
                                               <% if (master.reviews.length) { %>
                                                 <button type="button" class="review-toggle mt-1 flex items-center gap-1.5 text-xs">
@@ -802,9 +807,7 @@
 
         let activeCategory = 'all';
         let activeSize = 'all';
-        // Вкладка главной: список услуг, хотя бы одна из которых должна быть у исполнителя.
-        let activeTabServices = null;
-        // Поиск там же: (карточка, её услуги) → показывать ли. Пока поиск пуст, работает вкладка.
+        // Подбор по задаче или хэштег на главной: (карточка, её услуги) → показывать ли; null — все исполнители.
         let activeSearchMatch = null;
 
         const catFilterBtns = document.querySelectorAll('[data-filter-cat]');
@@ -831,7 +834,6 @@
                 const types=card.dataset.services.split(' ');
                 let show = activeCategory === 'all' || types.includes(activeCategory);
                 if (show && activeSearchMatch) show = activeSearchMatch(card, types);
-                else if (show && activeTabServices) show = activeTabServices.some((service) => types.includes(service));
                 const target=activeCategory === 'all' ? card.dataset.originalGroup : activeCategory;
                 const container=[...document.querySelectorAll('[data-group]')].find(g=>g.dataset.group === target)?.querySelector('.home-master-grid');
                 if(show && container) container.appendChild(card);
@@ -1677,18 +1679,8 @@
             }
         }
 
-        const simpleTabs = document.querySelectorAll('.simple-tab');
+        // Ряд хэштегов каталога — карусель. Края: затемнение и стрелка только с той стороны, куда ещё можно листать.
         const simpleTabsRow = document.querySelector('.simple-tabs');
-        // Выбранная вкладка встаёт в середину ряда, чтобы соседние было видно с обеих сторон.
-        function selectSimpleTab(tab) {
-            simpleTabs.forEach((other) => other.setAttribute('aria-pressed', String(other === tab)));
-            activeTabServices = tab.dataset.tabServices.split(' ');
-            applyFilters();
-            simpleTabsRow.scrollTo({ left: tab.offsetLeft - (simpleTabsRow.clientWidth - tab.offsetWidth) / 2, behavior: 'smooth' });
-        }
-        simpleTabs.forEach((tab) => tab.addEventListener('click', () => selectSimpleTab(tab)));
-        if (simpleTabs.length) activeTabServices = simpleTabs[0].dataset.tabServices.split(' ');
-        // Края ряда: затемнение и стрелка появляются только с той стороны, куда ещё можно листать.
         if (simpleTabsRow) {
             const simpleTabsWrap = simpleTabsRow.parentElement;
             const syncTabsEdges = () => {
@@ -1697,11 +1689,11 @@
                 simpleTabsWrap.classList.toggle('can-next', simpleTabsRow.scrollLeft < max - 2);
             };
             simpleTabsRow.addEventListener('scroll', syncTabsEdges, { passive: true });
-            // Ширина вкладок меняется и после загрузки шрифта (грузинский шире), не только при смене размера окна.
+            // Ширина хэштегов меняется и после загрузки шрифта (грузинский шире), не только при смене размера окна.
             if ('ResizeObserver' in window) {
                 const tabsObserver = new ResizeObserver(syncTabsEdges);
                 tabsObserver.observe(simpleTabsRow);
-                simpleTabs.forEach((tab) => tabsObserver.observe(tab));
+                simpleTabsRow.querySelectorAll('.simple-tag').forEach((tag) => tabsObserver.observe(tag));
             } else {
                 window.addEventListener('resize', syncTabsEdges);
             }
@@ -1712,62 +1704,166 @@
             syncTabsEdges();
         }
 
-        // Поиск исполнителя на главной: по словам услуг (грузинский, русский, латиница) и по тексту
-        // карточки — имя, описание, отметки. Не нашёл или не хочет выбирать — кнопка ведёт к задаче.
+        // Подбор исполнителей главной (service-search-words.js): слова групп и хэштеги со своими словами.
+        // Поле задачи — оно же поиск: пока человек пишет, в каталоге остаются подходящие исполнители. Дальше он
+        // либо публикует задачу, либо звонит кому-то из них сам. Хэштег в ряду или на карточке показывает всех с ним.
+        const SEARCH = <%- JSON.stringify(simple ? {
+          entries: simpleSearch.entries, tags: simpleSearch.tags.map((tag) => ({ key: tag.key, kind: tag.kind, words: tag.words })),
+          /* Подбор по смыслу (ИИ, /api/task-match): язык страницы и город каталога для кандидатов. */
+          ai: aiMatch,
+          lang, city: catalogCity ? catalogCity.slug : '',
+          short: t('simple_match_short'), count: t('simple_match_count'), choice: t('simple_match_choice'), unknown: t('simple_match_unknown'), none: t('simple_match_none'), thinking: t('simple_match_thinking'),
+        } : null).split('<').join('\\u003c') %>;
         const searchPanel = document.getElementById('simpleSearch');
-        if (searchPanel && window.ServiceSearch) {
-            const SEARCH = <%- JSON.stringify(simple ? { ...simpleSearch, hint: t('simple_search_hint'), found: t('simple_search_found'), none: t('simple_search_none') } : null).split('<').join('\\u003c') %>;
-            const searchInput = document.getElementById('simpleSearchInput');
-            const searchStatus = document.getElementById('simpleSearchStatus');
-            const searchOpen = document.querySelector('.simple-search-open');
+        if (searchPanel && SEARCH && window.ServiceSearch) {
             const findServices = ServiceSearch.serviceMatcher(SEARCH.entries);
-            const cardText = new Map();
-            document.querySelectorAll('.master-card').forEach((card) => {
-                cardText.set(card, Array.from(card.querySelectorAll('h3, .catalog-card-category, .catalog-card-description p, .flex-wrap span, p.text-emerald-700')).map((el) => el.textContent).join(' '));
-            });
-            const runSearch = () => {
-                const query = searchInput.value;
-                if (!ServiceSearch.tokens(query, 3).length) {
+            const findTags = ServiceSearch.serviceMatcher(SEARCH.tags.map((tag) => ({ services: [tag.key], words: tag.words })));
+            const featureKeys = SEARCH.tags.filter((tag) => tag.kind === 'feature').map((tag) => tag.key);
+            const searchStatus = document.getElementById('simpleSearchStatus');
+            const searchNote = document.getElementById('simpleSearchNote');
+            const searchResult = searchPanel.querySelector('.simple-search-result');
+            const showAllButton = searchPanel.querySelector('.simple-search-all');
+            const catalogTags = searchPanel.querySelectorAll('.simple-tag');
+            const taskMatch = document.querySelector('.task-match');
+            const cards = Array.from(document.querySelectorAll('.master-card'));
+            const cardTags = new Map(cards.map((card) => [card, card.dataset.tags.split(' ')]));
+            const cardServices = new Map(cards.map((card) => [card, card.dataset.services.split(' ')]));
+            const hasAny = (card, keys) => cardTags.get(card).some((key) => keys.includes(key));
+            const visibleCount = () => document.querySelectorAll('.master-card:not(.hidden)').length;
+            const pressTag = (chosen) => catalogTags.forEach((tag) => tag.setAttribute('aria-pressed', String(tag === chosen)));
+            // Порядок карточек по смыслу задачи задаётся через CSS order; без подбора — прежний порядок.
+            const resetOrder = () => cards.forEach((card) => { card.style.order = ''; });
+            const showResult = (status, note, canShowAll) => {
+                searchResult.hidden = !status;
+                searchStatus.textContent = status || '';
+                searchNote.textContent = note || '';
+                showAllButton.hidden = !canShowAll;
+            };
+            // Подходящие хэштеги подсвечиваются и встают в начало ряда, остальные — в прежнем порядке.
+            const suggestTags = (keys) => {
+                Array.from(catalogTags).sort((a, b) => Number(keys.includes(b.dataset.tag)) - Number(keys.includes(a.dataset.tag))).forEach((tag) => simpleTabsRow.append(tag));
+                catalogTags.forEach((tag) => tag.classList.toggle('is-suggested', keys.includes(tag.dataset.tag)));
+                simpleTabsRow.scrollLeft = 0;
+            };
+            const showAll = () => {
+                pressTag(null);
+                resetOrder();
+                activeSearchMatch = null;
+                applyFilters();
+                showResult('');
+            };
+            const showTag = (key, label) => {
+                const rowTag = Array.from(catalogTags).find((tag) => tag.dataset.tag === key) || null;
+                pressTag(rowTag);
+                resetOrder();
+                activeSearchMatch = (card) => hasAny(card, [key]);
+                applyFilters();
+                if (rowTag) simpleTabsRow.scrollTo({ left: rowTag.offsetLeft - (simpleTabsRow.clientWidth - rowTag.offsetWidth) / 2, behavior: 'smooth' });
+                showResult(label + ': ' + visibleCount(), '', true);
+            };
+
+            // Группы слов («переезд», «грузчики») дают круг исполнителей; особенности (#пианино) сужают его, если
+            // среди них такие есть. Ничего не понял или подходящих нет — показываем всех и предлагаем опубликовать.
+            const matchTask = () => {
+                const text = composeInput.value;
+                const keys = findTags(text);
+                suggestTags(keys);
+                pressTag(null);
+                resetOrder();
+                taskMatch.hidden = true;
+                if (!ServiceSearch.tokens(text, 3).length) return showAll();
+                const services = findServices(text);
+                const features = keys.filter((key) => featureKeys.includes(key));
+                let pool = services.length
+                    ? cards.filter((card) => cardServices.get(card).some((service) => services.includes(service)))
+                    : cards.filter((card) => hasAny(card, features));
+                const narrowed = pool.filter((card) => hasAny(card, features));
+                if (narrowed.length) pool = narrowed;
+                if (!pool.length) {
                     activeSearchMatch = null;
                     applyFilters();
-                    searchStatus.textContent = SEARCH.hint;
-                    return;
+                    return showResult(services.length || features.length ? SEARCH.none : SEARCH.unknown, '', false);
                 }
-                const services = findServices(query);
-                activeSearchMatch = (card, types) => services.some((service) => types.includes(service)) || ServiceSearch.textMatches(query, cardText.get(card));
+                const chosen = new Set(pool);
+                activeSearchMatch = (card) => chosen.has(card);
                 applyFilters();
-                const count = document.querySelectorAll('.master-card:not(.hidden)').length;
-                const labels = services.map((service) => SEARCH.labels[service]).filter(Boolean);
-                searchStatus.textContent = !count ? SEARCH.none : labels.length ? labels.join(' · ') + ': ' + count : SEARCH.found.replace('{n}', count);
+                const count = visibleCount();
+                taskMatch.textContent = SEARCH.short.replace('{n}', count) + ' ›';
+                taskMatch.hidden = false;
+                showResult(SEARCH.count.replace('{n}', count), SEARCH.choice, true);
             };
-            const openSearch = () => {
-                simpleTabsRow.parentElement.hidden = true;
-                searchPanel.hidden = false;
-                searchOpen.setAttribute('aria-expanded', 'true');
-                document.body.classList.add('simple-searching');
-                searchInput.focus({ preventScroll: true });
-                searchPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            };
-            const closeSearch = () => {
-                searchInput.value = '';
-                activeSearchMatch = null;
-                searchPanel.hidden = true;
-                simpleTabsRow.parentElement.hidden = false;
-                searchOpen.setAttribute('aria-expanded', 'false');
-                document.body.classList.remove('simple-searching');
+            // Подбор по смыслу: через секунду тишины текст уходит в /api/task-match. Сервер разбирает задачу ИИ,
+            // отбирает кандидатов каталога (услуга, город, характеристики, без учёта баланса) и выстраивает их по
+            // смыслу; страница показывает их в этом порядке, остальных скрывает. Ответ применяется, только если текст
+            // за это время не изменился; без ответа (ИИ выключен, лимит, сбой) остаётся подбор по словарю.
+            const cardsById = new Map(cards.map((card) => [card.dataset.id, card]));
+            const applyAI = (data) => {
+                if (!Array.isArray(data.providers)) return;
+                const chosen = data.providers.map((id) => cardsById.get(String(id))).filter(Boolean);
+                if (!chosen.length) {
+                    if (!data.services.length && !data.features.length) return;
+                    resetOrder();
+                    activeSearchMatch = null;
+                    applyFilters();
+                    taskMatch.hidden = true;
+                    return showResult(SEARCH.none, '', false);
+                }
+                resetOrder();
+                chosen.forEach((card, index) => { card.style.order = String(index - chosen.length); });
+                const picked = new Set(chosen);
+                activeSearchMatch = (card) => picked.has(card);
                 applyFilters();
-                searchStatus.textContent = SEARCH.hint;
-                searchOpen.focus({ preventScroll: true });
+                suggestTags([...data.services.map((service) => service.key), ...data.features]);
+                const count = visibleCount();
+                taskMatch.textContent = SEARCH.short.replace('{n}', count) + ' ›';
+                taskMatch.hidden = false;
+                showResult(SEARCH.count.replace('{n}', count), SEARCH.choice, true);
             };
-            searchOpen.addEventListener('click', openSearch);
-            searchPanel.querySelector('.simple-search-close').addEventListener('click', closeSearch);
-            searchInput.addEventListener('input', runSearch);
-            searchInput.addEventListener('keydown', (event) => {
-                if (event.key === 'Escape') closeSearch();
-                // «Найти» на клавиатуре телефона прячет клавиатуру, чтобы были видны карточки.
-                if (event.key === 'Enter') { event.preventDefault(); searchInput.blur(); }
+            let askedText = '';
+            const askAI = async () => {
+                const text = composeInput.value.trim();
+                if (!SEARCH.ai || text.length < 8 || ServiceSearch.tokens(text, 3).length < 2 || text === askedText) return;
+                askedText = text;
+                searchPanel.classList.add('is-thinking');
+                let data = null;
+                try {
+                    const response = await fetch('/api/task-match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, lang: SEARCH.lang, city: SEARCH.city }) });
+                    if (response.status === 200) data = await response.json();
+                } catch (error) { data = null; }
+                if (composeInput.value.trim() !== text) return;
+                searchPanel.classList.remove('is-thinking');
+                if (data && Array.isArray(data.services)) applyAI(data);
+            };
+            let matchTimer = null;
+            let aiTimer = null;
+            composeInput.addEventListener('input', () => {
+                clearTimeout(matchTimer);
+                clearTimeout(aiTimer);
+                searchPanel.classList.remove('is-thinking');
+                matchTimer = setTimeout(matchTask, 250);
+                if (SEARCH.ai) aiTimer = setTimeout(askAI, 1000);
             });
-            searchPanel.querySelector('.simple-search-task').addEventListener('click', openComposer);
+
+            catalogTags.forEach((tag) => tag.addEventListener('click', () => {
+                if (tag.getAttribute('aria-pressed') === 'true') return showAll();
+                showTag(tag.dataset.tag, tag.dataset.label);
+            }));
+            document.querySelectorAll('.card-tag').forEach((tag) => tag.addEventListener('click', () => {
+                showTag(tag.dataset.tag, tag.textContent.trim());
+                searchPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }));
+            showAllButton.addEventListener('click', showAll);
+            // «Опубликовать задачу» под списком: пустое поле — открыть его, иначе тот же шаг, что у кнопки в форме.
+            searchPanel.querySelector('.simple-search-publish').addEventListener('click', () => {
+                if (!composeInput.value.trim()) return openComposer();
+                submitFreeform();
+                scrollToId('post-section');
+            });
+            // «Подходят: N» в поле задачи: на телефоне закрывает полноэкранный редактор и показывает этих исполнителей.
+            taskMatch.addEventListener('click', () => {
+                exitCompose();
+                setTimeout(() => searchPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+            });
         }
 
         // Окно «Как это работает?» главной: анимация внутри запускается своей кнопкой (hxToggle),
