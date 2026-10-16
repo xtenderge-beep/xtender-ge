@@ -7,6 +7,7 @@ const matching = require('./serviceMatching.service');
 const orderNeeds = require('./orderNeeds.service');
 const toolsHint = require('../config/toolsHint');
 const recipientReport = require('./recipientReport.service');
+const billing = require('./providerBilling.service');
 const vanOf =master => master.services.find(s => s.service_type === 'van');
 async function validate(category, size) {
   const groups = await require('./category.service').groups();
@@ -69,6 +70,8 @@ async function preview(token, category, size, languageRaw = '') {
   const sentLanguages = previous.rows.map(row => row.language);
   return {
     order, category, size: size || '', language, price, recipients, count: recipients.length, criteria, attributeExcluded,
+    // Списание только у получателей в платном режиме; бесплатные получают заявку без списания.
+    charge: recipients.filter(billing.isPaid).length * price,
     alreadySent: sentLanguages.includes(language), sentLanguages,
     // Подходящие по группе и языку, но уже получившие эту заявку раньше.
     alreadyReceived: inScope.filter(m=>received.has(m.id)).length,
@@ -150,7 +153,7 @@ async function planNeeds(token, input, languageRaw = '') {
     });
     const ids = new Set(service.groups.filter(group => group.sendable).flatMap(group => group.ids));
     service.recipients = qualified.filter(master => ids.has(master.id)).map(master => ({
-      id: master.id, name: master.name,
+      id: master.id, name: master.name, paid: billing.isPaid(master),
       body: vehicles.get(master.id).filter(vehicle => !transport || !needs.sizes.length || needs.sizes.includes(vehicle.size)).map(vanVehicleLabel).join('; '),
     }));
     service.count = service.recipients.length;
@@ -162,7 +165,9 @@ async function planNeeds(token, input, languageRaw = '') {
     }
   }
   const total = new Set(services.flatMap(service => service.recipients.map(master => master.id))).size;
-  return { order, needs, language, price, services, total, charge: total * price, revision: order.revision_version || 0 };
+  // Списание только у получателей в платном режиме (бесплатный период — без списания).
+  const paid = new Set(services.flatMap(service => service.recipients.filter(master => master.paid).map(master => master.id))).size;
+  return { order, needs, language, price, services, total, charge: paid * price, revision: order.revision_version || 0 };
 }
 
 // Одна кнопка экрана менеджера: сохранить потребности и разослать заявку всем отмеченным услугам.
@@ -184,10 +189,10 @@ async function sendNeeds(token, input, expected = null, languageRaw = '', contex
     try {
       const fresh = await preview(token, service.key, group.size, plan.language);
       // Ноль — когда все подходящие уже получили заявку по другой услуге или классу этой же отправки.
-      if (fresh.count) result.count = (await dispatch(token, service.key, group.size, { price: fresh.price, count: fresh.count, revision: fresh.order.revision_version || 0 }, plan.language, { actor: context.actor })).count;
+      if (fresh.count) Object.assign(result, (({ count, charged }) => ({ count, charged }))(await dispatch(token, service.key, group.size, { price: fresh.price, count: fresh.count, revision: fresh.order.revision_version || 0 }, plan.language, { actor: context.actor })));
     } catch (error) { result.error = error.message; }
   }
-  return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price };
+  return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price, charged: results.reduce((sum, result) => sum + (result.charged || 0), 0) };
 }
 // Расчёт в виде, который уходит в браузер менеджера: без телефонов и прочих данных заявки.
 function planView(plan) {
@@ -341,7 +346,7 @@ async function dispatch(token, category, size, expected = null, languageRaw = ''
   const count = await orderService.notifyMasters(order, category, size || null, plan.price, plan.language, context);
   const telegramService = require('./telegram.service');
   telegramService.updateMessage(order).catch(err => console.error('Dispatch message update failed:', err.message));
-  return { count, price: plan.price, run: (await orderService.getOrderDispatches(order.id)).find(r=>r.id === context.runId) };
+  return { count, price: plan.price, charged: context.chargedTetri || 0, run: (await orderService.getOrderDispatches(order.id)).find(r=>r.id === context.runId) };
 }
 async function retry(token, runId, actor='admin') {
   const order=await orderService.getOrderByToken(token);
@@ -364,7 +369,7 @@ async function retry(token, runId, actor='admin') {
   });
   const count=await orderService.notifyMasters(order,run.category,run.vehicle_size,plan.price,run.language,context);
   await require('./telegram.service').updateMessage(order);
-  return {count,price:plan.price,run:(await orderService.getOrderDispatches(order.id)).find(r=>r.id===context.runId)};
+  return {count,price:plan.price,charged:context.chargedTetri || 0,run:(await orderService.getOrderDispatches(order.id)).find(r=>r.id===context.runId)};
 }
 // Досылка: после рассылки появились исполнители, которым уже отправленная услуга подходит, а заявка
 // им не уходила — новый в городе, пополнил баланс, подтвердил тарифы, добавил услугу. Каждая прежняя
@@ -385,10 +390,10 @@ async function newcomers(token) {
     price = plan.price;
     const fresh = plan.recipients.filter(master => !seen.has(master.id));
     if (!fresh.length) continue;
-    fresh.forEach(master => { seen.add(master.id); recipients.push({ id: master.id, name: master.name, service: labels[row.category] || row.category, balance_tetri: master.balance_tetri, manager_id: master.manager_id }); });
+    fresh.forEach(master => { seen.add(master.id); recipients.push({ id: master.id, name: master.name, service: labels[row.category] || row.category, balance_tetri: master.balance_tetri, manager_id: master.manager_id, paid: billing.isPaid(master) }); });
     groups.push({ key: row.category, label: labels[row.category] || row.category, size: plan.size, language: row.language || '', ids: fresh.map(master => master.id) });
   }
-  return { groups, recipients, total: recipients.length, price };
+  return { groups, recipients, total: recipients.length, price, charge: recipients.filter(master => master.paid).length * price };
 }
 // Подходят уже отправленным услугам, но заявку не получат: не хватает баланса или не подтверждены тарифы.
 function missedOf(plan) {
@@ -406,10 +411,11 @@ async function sendNewcomers(token, expected, actor) {
   for (const group of plan.groups) {
     const result = { key: group.key, label: group.label, size: group.size, count: 0 };
     results.push(result);
-    try { result.count = await orderService.notifyMasters(order, group.key, group.size || null, plan.price, group.language, { actor, recipientIds: group.ids }); }
+    const run = { actor, recipientIds: group.ids };
+    try { result.count = await orderService.notifyMasters(order, group.key, group.size || null, plan.price, group.language, run); result.charged = run.chargedTetri || 0; }
     catch (error) { result.error = error.message; }
   }
   require('./telegram.service').updateMessage(order).catch(err => console.error('Dispatch message update failed:', err.message));
-  return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price };
+  return { results, count: results.reduce((sum, result) => sum + result.count, 0), price: plan.price, charged: results.reduce((sum, result) => sum + (result.charged || 0), 0) };
 }
 module.exports = { preview, dispatch, retry, newcomers, newcomerCounts, sendNewcomers, missedOf, validate, emptyReason, transportSizes, availability, planNeeds, planView, sendNeeds, screen, orderList, previewForm, sendForm };

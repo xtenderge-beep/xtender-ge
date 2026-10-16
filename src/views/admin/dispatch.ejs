@@ -3,7 +3,7 @@
 <section class="admin-dispatch">
 <h1 class="text-2xl font-black">Рассылка исполнителям</h1>
 <% if(error) { %><p role="alert" class="text-red-800"><%= error %></p><% } %>
-<% if(result) { %><p role="status">Сообщений принято каналом: <strong><%= result.count %></strong>. Списано: <strong><%= (result.count*result.price/100).toFixed(2) %> ₾</strong>.</p><p>Это подтверждение отправки через канал уведомлений. Просмотры и нажатия контактов доступны в карточке заявки.</p><% } %>
+<% if(result) { %><p role="status">Сообщений принято каналом: <strong><%= result.count %></strong>. Списано: <strong><%= ((result.charged ?? result.count*result.price)/100).toFixed(2) %> ₾</strong>.</p><p>Это подтверждение отправки через канал уведомлений. Просмотры и нажатия контактов доступны в карточке заявки.</p><% } %>
 <% if(result && result.run) { %><p>Выбрано: <%= result.run.selected %> · Telegram: <%= result.run.telegram %> · SMS: <%= result.run.sms %> · Ошибки: <%= result.run.failed %> · Пропущено: <%= result.run.skipped %> · В обработке / неизвестно: <%= result.run.pending %></p><a href="/admin/orders/<%= token %>#dispatch-results">Получатели, причины и повтор ошибок</a><% } %>
 <% if(plan) { %>
 <p class="font-bold"><%= plan.order.is_technical ? '🧪 ТЕСТ — только технические исполнители' : 'Обычная заявка — только реальные исполнители' %></p>
@@ -16,11 +16,11 @@
 <% const choose = function (language) { return '/admin/orders/' + encodeURIComponent(token) + '/dispatch?category=' + encodeURIComponent(plan.category) + '&size=' + encodeURIComponent(plan.size) + (language ? '&language=' + language : ''); }; %>
 <p class="text-xs">Выбрать другого адресата: <a href="<%= choose('') %>" class="text-emerald-700 underline">все (<%= plan.languages.all %>)</a><% Object.keys(speakLabels).filter(function (code) { return ['ru', 'ka', 'en'].includes(code) || plan.languages.byLanguage[code]; }).forEach(function (code) { %> · <a href="<%= choose(code) %>" class="text-emerald-700 underline">говорят <%= speakLabels[code] %> (<%= plan.languages.byLanguage[code] || 0 %>)</a><% }); %><% if (plan.languages.none) { %> · язык не указан у <%= plan.languages.none %> (получат заявку только при выборе «все»)<% } %></p>
 <% if (plan.alreadyReceived) { %><p class="text-xs">Уже получили эту заявку раньше и повторно не платят: <strong><%= plan.alreadyReceived %></strong>.</p><% } %>
-<p>Получателей с достаточным балансом: <strong><%= plan.count %></strong><br>Тариф каждому: <strong><%= (plan.price/100).toFixed(2) %> ₾</strong><br>Расчётное списание по группе: <strong><%= (plan.count*plan.price/100).toFixed(2) %> ₾</strong></p>
+<p>Получателей: <strong><%= plan.count %></strong><br>Тариф каждому в платном режиме: <strong><%= (plan.price/100).toFixed(2) %> ₾</strong><br>Расчётное списание по группе: <strong><%= (plan.charge/100).toFixed(2) %> ₾</strong><% if (plan.charge < plan.count*plan.price) { %> (в бесплатном режиме — без списания)<% } %></p>
 <p>Рассылка по категории в Тбилиси. Районы профиля не ограничивают эту группу. Используется Telegram, при его отсутствии или ошибке — SMS. Списание за отправленную заявку, независимо от сделки.</p>
 <% if(plan.alreadySent) { %><p>Рассылка этой группе уже запускалась. Повторная отправка заблокирована.</p><% } else if(plan.count) { %>
 <form method="POST" action="/admin/orders/<%= token %>/dispatch" class="admin-filter" onsubmit="this.querySelector('button').disabled=true">
 <input type="hidden" name="_csrf" value="<%= csrfToken %>"><input type="hidden" name="category" value="<%= plan.category %>"><input type="hidden" name="size" value="<%= plan.size %>"><input type="hidden" name="language" value="<%= plan.language %>"><input type="hidden" name="price" value="<%= plan.price %>"><input type="hidden" name="revision" value="<%= plan.order.revision_version || 0 %>"><input type="hidden" name="count" value="<%= plan.count %>">
-<button type="submit">Отправить группе и списать баланс</button></form><% } else { %><p><%= emptyReason(plan) %>. Попробуйте другого адресата или другую группу.</p><% } %>
+<button type="submit"><%= plan.charge ? 'Отправить группе и списать баланс' : 'Отправить группе' %></button></form><% } else { %><p><%= emptyReason(plan) %>. Попробуйте другого адресата или другую группу.</p><% } %>
 <% } %></section>
 <%- include('./_footer') %>

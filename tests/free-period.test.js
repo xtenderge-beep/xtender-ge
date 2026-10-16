@@ -28,6 +28,9 @@ const {translate}=require('../src/config/i18n');
  // Заявка уходит, баланс не меняется; доставка записана нулевой строкой lead_charge и в журнал доказательств.
  assert.equal((await orders.getDispatchRecipients('movers',null,50)).length,1);
  const order=await newOrder('free-order-1');
+ // Экран рассылки: получатель есть, сумма списания 0 — бесплатный получатель в неё не входит.
+ const plan=await require('../src/services/dispatch.service').preview(order.token,'movers');
+ assert.equal(plan.count,1);assert.equal(plan.charge,0);
  assert.equal(await orders.notifyMasters(order,'movers',null,50),1);assert.equal(sent.length,1);
  assert.equal(await balance(),20);
  const rows=(await pool.query("SELECT amount_tetri FROM balance_transactions WHERE master_id=$1 AND order_id=$2 AND reason='lead_charge'",[master.id,order.id])).rows;
@@ -71,5 +74,14 @@ const {translate}=require('../src/config/i18n');
  assert.ok(await admin.setMasterPaidMode(master.id,false));
  assert.equal(await orders.notifyMasters(await newOrder('free-order-3'),'movers',null,50),1);assert.equal(await balance(),20);
  assert.equal(await admin.setMasterPaidMode(999999,true),null);
+
+ // Смешанная рассылка: бесплатный и платный (подарочный баланс) — итог «списано» считает только платного.
+ const paidOne=(await pool.query("INSERT INTO masters(name,phone,master_token,category,is_active,is_subscribed,balance_tetri,paid_mode) VALUES('Paid','+995500000905','paid-master','movers',true,true,500,true) RETURNING *")).rows[0];
+ await pool.query("INSERT INTO master_services(master_id,service_type,attributes,is_primary) VALUES($1,'movers','{}',true)",[paidOne.id]);
+ await pool.query("INSERT INTO balance_transactions(master_id,amount_tetri,reason,note) VALUES($1,500,'promo','WELCOME_AUTO')",[paidOne.id]);
+ const mixed=await newOrder('free-order-4'),dispatch=require('../src/services/dispatch.service');
+ const mixedPlan=await dispatch.preview(mixed.token,'movers');assert.equal(mixedPlan.count,2);assert.equal(mixedPlan.charge,50);
+ const done=await dispatch.dispatch(mixed.token,'movers','',{price:50,count:2,revision:0});
+ assert.equal(done.count,2);assert.equal(done.charged,50);assert.equal(await balance(),20);
  console.log('PASS: free period dispatch, contact, catalog, cabinet; paid mode switch on and off');
 })().catch(e=>{console.error(e);process.exit(1);});

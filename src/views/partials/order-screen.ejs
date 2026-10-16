@@ -74,7 +74,7 @@
 %>
 <a href="<%= listHref %>">← Все заявки</a>
 <% if(error){ %><div class="card" role="alert"><%= error %></div><% } %>
-<% if(result){ %><div class="card" role="status"><strong>Отправлено: <%= result.count %>. Списано: <%= (result.count*result.price/100).toFixed(2) %> ₾.</strong>
+<% if(result){ %><div class="card" role="status"><strong>Отправлено: <%= result.count %>. Списано: <%= ((result.charged ?? result.count*result.price)/100).toFixed(2) %> ₾.</strong>
 <ul><% result.results.forEach(item=>{ %><li><%= item.label %><%= item.size?' · класс '+item.size:'' %>: <%= item.error?'не отправлено — '+item.error:item.count?'принято каналом '+item.count:'новых получателей не осталось — они получили заявку по другой услуге' %></li><% }); %></ul>
 Принятие Telegram/SMS не означает прочтение. Отклики видны ниже.</div><% } %>
 <div class="dispatch-layout">
@@ -170,7 +170,7 @@
 <% if(newcomers.total){ const N=newcomers; %><form method="post" action="<%= base %>/newcomers" class="newcomers" onsubmit="this.querySelector('button').disabled=true"><input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="expectedTotal" value="<%= N.total %>"><input type="hidden" name="expectedPrice" value="<%= N.price %>">
   <b>Новые подходящие: <%= N.total %></b> — заявка им ещё не уходила: новые в городе, пополнили баланс или подтвердили тарифы.
   <ul><% N.recipients.forEach(m=>{ const href=cardHref(m.id,m.manager_id); %><li><% if(href){ %><a href="<%= href %>"><%= m.name %></a><% } else { %><%= m.name %><% } %> · <%= m.service %> · баланс <%= F.money(m.balance_tetri) %><% if(history[m.id]){ %> · <span class="muted"><%= F.historyText(history[m.id]) %></span><% } %></li><% }); %></ul>
-  <button>Дослать <%= N.total %> <%= N.total%10===1&&N.total%100!==11?'исполнителю':'исполнителям' %> и списать <%= F.money(N.total*N.price) %></button></form><% } %>
+  <button>Дослать <%= N.total %> <%= N.total%10===1&&N.total%100!==11?'исполнителю':'исполнителям' %> <%= N.charge ? 'и списать ' + F.money(N.charge) : '(без списания)' %></button></form><% } %>
 <% if(missed.length){ %><div class="missed"><b>Подходят, но не получили: <%= missed.length %></b>
   <ul><% missed.forEach(m=>{ const href=cardHref(m.id,m.manager_id); %><li><% if(href){ %><a href="<%= href %>"><%= m.name %></a><% } else { %><%= m.name %><% } %> · <%= m.service %> · <%= m.reason==='billing'?'тарифы не подтверждены':'не хватает баланса' %>, баланс <%= F.money(m.balance_tetri) %><% if(history[m.id]){ %> · <span class="muted"><%= F.historyText(history[m.id]) %></span><% } %></li><% }); %></ul>
   <p class="muted">Пополнят баланс или подтвердят тарифы — появятся в «Новых подходящих», и заявку можно будет дослать.</p></div><% } %>
@@ -239,8 +239,8 @@
   form.elements.expectedTotal.value=plan.total; form.elements.expectedPrice.value=plan.price; form.elements.revision.value=plan.revision;
   // Включённый отбор по языку виден рядом с итогом: без него нули выглядят как пустая база.
   const filter=plan.language?' · '+form.elements.language.selectedOptions[0].textContent.trim().toLowerCase():'';
-  total.textContent=(plan.total?'Получат: '+plan.total+' · спишется '+money(plan.charge):(plan.services.length?'Новых получателей нет':'Отметьте услуги из заявки'))+filter;
-  send.disabled=!plan.total; send.textContent=plan.total?'Отправить '+people(plan.total)+' и списать '+money(plan.charge):'Отправить';
+  total.textContent=(plan.total?'Получат: '+plan.total+(plan.charge?' · спишется '+money(plan.charge):' · без списания'):(plan.services.length?'Новых получателей нет':'Отметьте услуги из заявки'))+filter;
+  send.disabled=!plan.total; send.textContent=plan.total?'Отправить '+people(plan.total)+(plan.charge?' и списать '+money(plan.charge):''):'Отправить';
  };
  let timer, request=0;
  const refresh=()=>{

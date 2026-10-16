@@ -466,6 +466,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
    await Promise.all(masters.slice(offset, offset + 4).map(async candidate => {
     let outcome = 'skipped';
     let attempted = false;
+    let spentTetri = 0;
     let skipReason = 'eligibility_changed';
     try { await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
       const live = (await client.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE', [order.id])).rows[0];
@@ -510,6 +511,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
         // lead_charge пишется с нулевой суммой: по ней система знает, что заявка ушла этому исполнителю
         // (повторно не шлём, контакт заказчика открывается, отчёты и статистика ответов).
         const charges = await masterService.chargeMastersForLead([master.id], amount, order.id, client);
+        spentTetri = amount;
         await consentLog.recordAction({ eventType: 'LEAD_CHARGE_ACCEPTED', phone: master.phone,
           masterId: master.id, orderId: order.id, metadata: {
             balance_transaction_id: charges[0].id,
@@ -531,6 +533,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     }
     if (outcome === 'accepted') {
       notifiedIds.push(candidate.id);
+      // Сколько действительно списано этой рассылкой — для итога на экране (бесплатные не списываются).
+      context.chargedTetri = (context.chargedTetri || 0) + spentTetri;
       if (billing.isPaid(candidate) && candidate.balance_tetri >= lowBalanceNudgeTetri && candidate.balance_tetri - leadPrice < lowBalanceNudgeTetri)
         await nudgeLowBalance({ ...candidate, is_technical: isTechnical, balance_tetri: candidate.balance_tetri - leadPrice }, telegramService, 'low').catch(err => console.error('Low balance reminder failed:', err.message));
     }

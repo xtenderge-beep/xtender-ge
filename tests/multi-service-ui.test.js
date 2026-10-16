@@ -53,7 +53,7 @@ let server;
  const adminPlan=await (await post('/admin/orders/ui-multi/preview',[['needs','transport'],['needs','movers'],['transportSize','L']])).json();
  assert.deepEqual([adminPlan.total,adminPlan.services.map(s=>s.key),adminPlan.services[0].sizes.find(s=>s.code==='L').count],[1,['transport','movers'],1]);
  assert.equal((await fetch(base+'/admin/orders/ui-multi/preview',{method:'POST',headers:{cookie,'content-type':'application/x-www-form-urlencoded'},body:'needs=transport'})).status,403,'без защитного кода формы расчёт не отдаётся');
- assert.match(await get('/admin/orders/ui-multi/dispatch?category=transport&size=L'),/Получателей с достаточным балансом/);
+ assert.match(await get('/admin/orders/ui-multi/dispatch?category=transport&size=L'),/Получателей: <strong>/);
  const plan=await require('../src/services/dispatch.service').preview(o.token,'transport','L');
  const sent=await post('/admin/orders/ui-multi/dispatch',[['category','transport'],['size','L'],['price',String(plan.price)],['count',String(plan.count)],['revision',String(configured.revision_version)]]);
  assert.equal(sent.status,200);assert.match(await sent.text(),/Сообщений принято каналом/);
