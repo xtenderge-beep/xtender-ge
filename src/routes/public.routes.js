@@ -62,7 +62,7 @@ async function publishedLandings() {
 
 // Главная и страницы под рекламу и поиск (/s/<slug>) — один шаблон. У страницы свой первый экран,
 // заголовок вкладки, описание для поиска и статья; каталог, форма и остальное общие.
-// page — строка landing_pages или null для главной. options.simple — тестовая главная /demo.
+// page — строка landing_pages или null для главной. options.simple — вёрстка главной (эскиз 2026-10-16).
 async function renderHome(req, res, locale, page, options = {}) {
   const catalogCities = await masterService.getActiveCities();
   const catalogCity = catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
@@ -136,15 +136,15 @@ async function renderHome(req, res, locale, page, options = {}) {
 
 router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
-  await renderHome(req, res, resolveLocale(req, res, '/'), null);
+  // Главная по эскизу владельца 2026-10-16: поле задачи, вкладки услуг, поиск, каталог, SEO-текст;
+  // пояснения убраны за «Как это работает?». Страницы задач (/s/<slug>) пока в прежней вёрстке.
+  await renderHome(req, res, resolveLocale(req, res, '/'), null, { simple: true });
 }));
 
-// Тестовая главная по эскизу владельца 2026-10-16: те же форма и каталог, пояснения убраны за
-// «Как это работает?». Закрыта от поиска (noindex в index.ejs), ссылок на неё с сайта нет.
-router.get('/demo', asyncHandler(async (req, res) => {
-  if (redirectToCookieLocale(req, res, '/demo')) return;
-  await renderHome(req, res, resolveLocale(req, res, '/demo'), null, { simple: true });
-}));
+// Адрес, по которому эта главная проверялась до выкладки (2026-10-16): ведёт на главную того же языка.
+router.get('/demo', (req, res) => {
+  res.redirect(301, localizedPath(normalizeLang(req.params.locale || req.query.lang), '/'));
+});
 
 // Страница под рекламу и поиск. Параметры адреса (gclid, utm_*) при переадресациях сохраняются:
 // по ним Google связывает клик с заявкой.

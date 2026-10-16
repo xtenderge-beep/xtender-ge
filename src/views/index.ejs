@@ -6,9 +6,9 @@
       // вкладки, описание для поиска и статья; на телефоне от формы остаётся одно поле.
       // Без неё (landing не передан) — общая главная, как была.
       const topic = typeof landing !== 'undefined' && landing ? landing : null;
-      // Тестовая главная /demo (эскиз владельца 2026-10-16): шапка, поле задачи, вкладки услуг, плитка
+      // Главная (эскиз владельца 2026-10-16): шапка, поле задачи, вкладки услуг с поиском, плитка
       // исполнителей, SEO-текст. Остальные блоки не выводятся; фильтры каталога остаются в разметке
-      // скрытыми, потому что на них опирается скрипт страницы.
+      // скрытыми, потому что на них опирается скрипт страницы. Страницы задач — в прежней вёрстке.
       const simple = typeof simpleHome !== 'undefined' && simpleHome;
       const pageTitle = topic ? topic.seoTitle : t('site_title_index');
       const pageDescription = (topic && topic.seoDescription) || t('meta_description_index');
@@ -19,7 +19,6 @@
       viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
     }) %>
 
-    <% if (simple) { %><meta name="robots" content="noindex"><% } %>
     <link rel="canonical" href="<%= seo.canonical %>">
     <%# У страницы задачи языков может быть меньше трёх: поисковикам объявляются только существующие. %>
     <% Object.entries(seo.hreflang || seo.alternates).forEach(function (pair) { %>
@@ -557,9 +556,12 @@
                     </section>
 
                     <% if (simple) { %>
-                    <%# SEO-текст эскиза: пока это тексты частых вопросов главной, те же, что в разметке FAQPage выше. %>
+                    <%# SEO-текст эскиза. Заголовок страницы для поисковиков (h1) стоит здесь, а не над полем: первый
+                        экран по эскизу без заголовка. Дальше — частые вопросы, те же, что в разметке FAQPage выше. %>
                     <section class="simple-seo" aria-labelledby="simple-seo-title">
-                      <h2 id="simple-seo-title"><%= t('faq_title') %></h2>
+                      <h1 id="simple-seo-title"><%= t('home_hero_title') %> <%= t('home_hero_title_accent') %></h1>
+                      <p class="simple-seo-lead"><%= t('home_hero_lead_short') %></p>
+                      <h2><%= t('faq_title') %></h2>
                       <% faqItems.forEach(function (item) { %>
                       <h3><%= item.q %></h3>
                       <p><%= item.a %></p>
@@ -800,7 +802,7 @@
 
         let activeCategory = 'all';
         let activeSize = 'all';
-        // Вкладка тестовой главной /demo: список услуг, хотя бы одна из которых должна быть у исполнителя.
+        // Вкладка главной: список услуг, хотя бы одна из которых должна быть у исполнителя.
         let activeTabServices = null;
         // Поиск там же: (карточка, её услуги) → показывать ли. Пока поиск пуст, работает вкладка.
         let activeSearchMatch = null;
@@ -1710,7 +1712,7 @@
             syncTabsEdges();
         }
 
-        // Поиск исполнителя тестовой главной: по словам услуг (грузинский, русский, латиница) и по тексту
+        // Поиск исполнителя на главной: по словам услуг (грузинский, русский, латиница) и по тексту
         // карточки — имя, описание, отметки. Не нашёл или не хочет выбирать — кнопка ведёт к задаче.
         const searchPanel = document.getElementById('simpleSearch');
         if (searchPanel && window.ServiceSearch) {
@@ -1768,7 +1770,7 @@
             searchPanel.querySelector('.simple-search-task').addEventListener('click', openComposer);
         }
 
-        // Окно «Как это работает?» тестовой главной: анимация внутри запускается своей кнопкой (hxToggle),
+        // Окно «Как это работает?» главной: анимация внутри запускается своей кнопкой (hxToggle),
         // поэтому окно нажимает её при открытии и при закрытии, чтобы анимация шла с начала и вставала на паузу.
         const howDialog = document.getElementById('simpleHowDialog');
         function setHowAnimation(open) {

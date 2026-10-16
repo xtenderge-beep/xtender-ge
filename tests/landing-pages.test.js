@@ -255,15 +255,18 @@ function startSite() {
         assert.ok(html.includes(piece), `${where}: ${piece}`);
     }
 
-    // Общая главная: прежний первый экран, плюс ссылки на страницы задач.
+    // Общая главная (вёрстка по эскизу владельца 2026-10-16): поле задачи без заголовка над ним, h1 и
+    // короткий текст в SEO-блоке внизу, ссылки на страницы задач; страница открыта для поиска.
     for (const lang of LANGS) {
       const response = await get(lang === 'ka' ? '/?lang=ka' : '/' + lang);
       assert.equal(response.status, 200);
       const html = await response.text(), t = translate(lang);
-      assert.match(html, /<body class="home-page font-sans /, `${lang}: the general homepage has no task mark`);
+      assert.match(html, /<body class="home-page home-simple font-sans /, `${lang}: the general homepage has no task mark`);
       assert.ok(html.includes(`<title>${t('site_title_index')}</title>`), `${lang}: general tab title`);
-      assert.ok(html.includes(`<h1 class="home-hero-title">${t('home_hero_title')} <span>${t('home_hero_title_accent')}</span></h1>`) && html.includes(`<p class="home-hero-lead">${t('home_hero_lead_short')}</p>`), `${lang}: general headline and lead`);
-      assert.ok(html.includes(`placeholder="${t('freeform_placeholder')}"`), `${lang}: general example in the form`);
+      assert.ok(html.includes(`<h1 id="simple-seo-title">${t('home_hero_title')} ${t('home_hero_title_accent')}</h1>`) && html.includes(`<p class="simple-seo-lead">${t('home_hero_lead_short')}</p>`), `${lang}: general headline and lead`);
+      assert.equal((html.match(/<h1[ >]/g) || []).length, 1, `${lang}: one h1`);
+      assert.ok(html.includes(`placeholder="${t('simple_placeholder')}"`), `${lang}: general text in the form`);
+      assert.doesNotMatch(html, /noindex/, `${lang}: the homepage is open to search`);
       assert.doesNotMatch(html, /home-usp|home-article"|"serviceType"|"BreadcrumbList"/, `${lang}: nothing of a task page on the general homepage`);
       for (const page of [moving, cargo, junk]) assert.ok(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/s/${page.slug}">${page.content[lang].title} ${page.content[lang].accent}<i`), `${lang}: homepage links to ${page.slug}`);
       for (const other of LANGS) assert.ok(html.includes(`<link rel="alternate" hreflang="${other}" href="https://xtender.test${other === 'ka' ? '/' : '/' + other}">`), `${lang}: homepage hreflang ${other}`);
@@ -276,8 +279,15 @@ function startSite() {
     assert.ok(small.includes('<span class="home-usp-post">Разместите пост в группе <b>водителей</b></span>'), 'a small group gets the phrase without a number');
     assert.doesNotMatch(small, /home-usp-avatars|home-usp-more/, 'and no circles');
 
+    // Адрес, по которому новая главная проверялась до выкладки, ведёт на главную того же языка.
+    for (const [url, target] of [['/demo', '/'], ['/ru/demo', '/ru'], ['/en/demo', '/en']]) {
+      const response = await get(url);
+      assert.equal(response.status, 301, url);
+      assert.equal(response.headers.get('location'), target, url);
+    }
+
     // Прежний параметр ?for= ничего не включает: страницы живут по своим адресам.
-    assert.match(await (await get('/?lang=ka&for=moving')).text(), /<body class="home-page font-sans /);
+    assert.match(await (await get('/?lang=ka&for=moving')).text(), /<body class="home-page home-simple font-sans /);
 
     // Переадресации сохраняют метку клика рекламы.
     const location = async (url, cookie) => { const response = await get(url, cookie); assert.equal(response.status, 302, url); return response.headers.get('location'); };
@@ -424,5 +434,5 @@ function startSite() {
   assert.ok(schema.indexOf('CREATE TABLE IF NOT EXISTS landing_pages') < schema.indexOf('-- Multiple provider services and immutable dispatch context.'));
   assert.doesNotMatch(schema, /INSERT INTO landing_pages/, 'schema.sql runs on every start and must not bring deleted pages back');
 
-  console.log('PASS: task pages — seeded once, real dispatch counts, copy without promises, own addresses with search tags, redirects keep the ad click id, sitemap, admin section, same request form, general homepage unchanged.');
+  console.log('PASS: task pages — seeded once, real dispatch counts, copy without promises, own addresses with search tags, redirects keep the ad click id, sitemap, admin section, same request form, general homepage in the new layout, old /demo address redirects.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
