@@ -167,7 +167,7 @@ async function getDistrictsByCity(cityId) {
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
-            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id, is_subscribed, subscription_until
+            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id, is_subscribed, subscription_until, paid_mode
      FROM masters WHERE master_token = $1`,
     [token]
   );
@@ -267,11 +267,12 @@ async function getMasterActivity(masterId) {
 
 // История баланса для кабинета исполнителя. В примечании к показу номера из каталога записан
 // телефон заказчика — это учёт для админки, исполнителю его не показываем.
+// Только движения денег: заявка бесплатного периода пишется с нулевой суммой и видна в списке заявок.
 async function getMasterBalanceHistory(masterId, limit = 40) {
   const { rows } = await pool.query(
     `SELECT amount_tetri, reason, CASE WHEN reason = 'catalog_call' THEN NULL ELSE note END AS note, created_at
      FROM balance_transactions
-     WHERE master_id = $1
+     WHERE master_id = $1 AND amount_tetri <> 0
      ORDER BY created_at DESC
      LIMIT $2`,
     [masterId, limit]
@@ -575,7 +576,7 @@ async function deleteMaster(id, { meta = {} } = {}) {
 // (см. revealPhoneForCall). Сам номер (m.phone) сюда попадает для server-side рендера
 // каталога; JSON-ручка /api/masters (masterController.list) обязана его вычищать перед
 // отдачей клиенту — иначе платный gate на «показать номер» тривиально обходится.
-const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override';
+const LIST_FIELDS = 'm.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override, m.paid_mode';
 
 // Каталог группирует по service_type из master_services. Тип и attributes подтягиваем
 // вторым запросом и клеим в JS (а не join + GROUP BY по jsonb — pg-mem не тянет).
@@ -586,7 +587,7 @@ async function listMasters({ serviceType, language, cityId } = {}) {
      FROM masters m
      LEFT JOIN master_reviews r ON r.master_id = m.id AND r.is_approved = true
      WHERE m.is_technical = false AND m.is_active = true AND m.is_banned = false
-     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override
+     GROUP BY m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.price_text, m.description, m.avatar_url, m.balance_tetri, m.city_id, m.display_name_override, m.paid_mode
      ORDER BY m.id`
   );
   if (!rows.length) return [];
@@ -638,6 +639,8 @@ async function listMasters({ serviceType, language, cityId } = {}) {
 // Lock the provider before checking the durable access record. Access, debit and audit commit together.
 // free — тестовый телефон из /admin/technical: номер открывается при тех же условиях, что и у
 // настоящего заказчика (тариф подтверждён или на балансе только подарок, баланса хватает), но без списания.
+// Исполнитель в бесплатном периоде (платный режим не включён) открывает номер любому заказчику без
+// списания и без проверки тарифов и баланса.
 async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = false } = {}) {
   return pool.withTransaction(async (client) => {
     const found = (await client.query('SELECT * FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
@@ -645,6 +648,10 @@ async function revealPhoneForCall(masterId, priceTetri, callerPhone, { free = fa
     const prior = (await client.query('SELECT opened_at FROM catalog_contact_access WHERE master_id=$1 AND caller_phone=$2', [masterId, callerPhone])).rows[0];
     if (prior) return { ...found, alreadyOpened: true, charged: false, openedAt: prior.opened_at };
     const billing = require('./providerBilling.service');
+    if (!billing.isPaid(found)) {
+      await client.query('INSERT INTO catalog_contact_access (master_id, caller_phone) VALUES ($1,$2)', [masterId, callerPhone]);
+      return { ...found, alreadyOpened: false, charged: false };
+    }
     const rates = await billing.pricing(client, true);
     const acceptance = await billing.permission(masterId, rates, client);
     if (!acceptance || rates.catalogCallPriceTetri !== priceTetri) return null;

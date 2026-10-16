@@ -82,7 +82,7 @@
           <div class="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-900 font-medium"><%= t('order_next_sent').replace('{n}', recipientsCount) %></div>
         <% } %>
 
-        <% if (masterAccount && masterAccount.leadsLeft < 5) { %>
+        <% if (masterAccount && !masterAccount.free && masterAccount.leadsLeft < 5) { %>
           <div class="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-semibold flex items-start gap-2">
             <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
             <span><%= t('order_master_low_balance') %></span>

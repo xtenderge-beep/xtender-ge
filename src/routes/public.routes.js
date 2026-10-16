@@ -94,8 +94,9 @@ async function renderHome(req, res, locale, page, options = {}) {
     m.contact_opened = history.has(m.id);
     // Full number only for a caller who already opened this provider; everyone else sees the masked start.
     m.phone_display = m.contact_opened ? formattedPhone(m.phone) : m.phone_masked;
-    // Whether the card shows contact buttons or «temporarily unavailable».
-    m.reachable = m.contact_opened || (m.billing_accepted === true && m.balance_tetri >= catalogCallPriceTetri);
+    // Whether the card shows contact buttons or «temporarily unavailable». Providers in the free period
+    // (paid mode off) are always reachable: opening their number charges nothing.
+    m.reachable = m.contact_opened || m.paid_mode !== true || (m.billing_accepted === true && m.balance_tetri >= catalogCallPriceTetri);
   });
   // Reachable providers go first, so a row of cards rarely mixes a tall card with buttons and a short
   // «unavailable» one. The sort is stable: the language order from listMasters is kept inside each half.

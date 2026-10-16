@@ -403,7 +403,8 @@ function dispatchFilter(category, vehicleSize, isTechnical = false) {
 // language: '' — все исполнители группы, иначе только отметившие этот язык при регистрации.
 // options.withUnfunded — для расчёта на экране менеджера: вернуть и тех, кто подходит, но не может
 // получить заявку (не хватает баланса или не разрешено списание); у каждого поле funded и billing_ok —
-// разрешено ли ему списание (тарифы подтверждены или на балансе только подарок).
+// разрешено ли ему списание (тарифы подтверждены или на балансе только подарок). Исполнитель в
+// бесплатном периоде (не включён платный режим) получает заявку при любом балансе.
 // Рассылка этот режим не использует.
 async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical = false, language = '', order = null, options = {}) {
   const catalog = require('./category.service');
@@ -425,13 +426,13 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
   const needSizes=matching.needSizes(order?.requirements);
   const size=vehicleSize || (category === 'transport' ? needSizes : '');
   for(const master of rows) {
-    const funded=master.balance_tetri >= leadPrice && allowed.has(master.id);
+    const paid=billing.isPaid(master), funded=!paid || (master.balance_tetri >= leadPrice && allowed.has(master.id));
     if((!funded && !options.withUnfunded) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
     if(inCity && !inCity(master)) continue;
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;
     if(!definition.is_builtin && catalog.validate(definition,services.find(s=>s.service_type === definition.slug)?.attributes).errors.length) continue;
-    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded,billing_ok:allowed.has(master.id)} : {})});
+    result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded,billing_ok:!paid || allowed.has(master.id)} : {})});
   }
   return result;
 }
@@ -468,8 +469,9 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     let skipReason = 'eligibility_changed';
     try { await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
       const live = (await client.query('SELECT * FROM orders WHERE id=$1 FOR UPDATE', [order.id])).rows[0];
+      const paid = billing.isPaid(master);
       if (!live || !['pending_review','new'].includes(live.status) || !master.is_active || master.is_banned || !master.is_subscribed ||
-          (master.subscription_until && new Date(master.subscription_until) <= new Date()) || master.balance_tetri < leadPrice) return;
+          (master.subscription_until && new Date(master.subscription_until) <= new Date()) || (paid && master.balance_tetri < leadPrice)) return;
       const closed = await client.query('SELECT category FROM order_category_closures WHERE order_id=$1 AND category=$2', [order.id, category]);
       if (closed.rows.length) { skipReason='need_closed'; return; }
       const openMatches=await matching.openMatches(master,live,client);
@@ -484,8 +486,10 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const earlier=(await client.query("SELECT id FROM dispatch_deliveries WHERE order_id=$1 AND master_id=$2 AND status='pending' AND run_id < $3",[order.id,master.id,run.id])).rows;
       if(earlier.length) { skipReason='prior_attempt_pending'; return; }
       const rates = await billing.pricing(client, true);
-      const billingConsent = await billing.permission(master.id, rates, client);
+      // Бесплатный период: основание не нужно, ниже запишется доставка с нулевой суммой.
+      const billingConsent = paid ? await billing.permission(master.id, rates, client) : { basis: 'free_period', consent_log_id: null };
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
+      const amount = paid ? leadPrice : 0;
       // Личная ссылка: ключ открывает заявку и контакт без входа, но только в первом браузере (leadLink.service).
       const link = getBaseUrl() + '/order/' + order.token + '?k=' + await require('./leadLink.service').issue(order.id, master.id, client);
       let receipt = null;
@@ -502,14 +506,16 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const delivered = receipt?.ok === true;
       outcome = delivered ? 'accepted' : receipt?.uncertain ? 'pending' : 'failed';
       if (delivered) {
-        // Evidence and debit commit together. A failed audit means no charge.
-        const charges = await masterService.chargeMastersForLead([master.id], leadPrice, order.id, client);
+        // Evidence and debit commit together. A failed audit means no charge. В бесплатный период строка
+        // lead_charge пишется с нулевой суммой: по ней система знает, что заявка ушла этому исполнителю
+        // (повторно не шлём, контакт заказчика открывается, отчёты и статистика ответов).
+        const charges = await masterService.chargeMastersForLead([master.id], amount, order.id, client);
         await consentLog.recordAction({ eventType: 'LEAD_CHARGE_ACCEPTED', phone: master.phone,
           masterId: master.id, orderId: order.id, metadata: {
             balance_transaction_id: charges[0].id,
             billing_consent_log_id: billingConsent.consent_log_id, billing_basis: billingConsent.basis, pricing_key: rates.key,
-            run_id: run.id, category, matched_categories: openMatches, service_snapshot: liveServices, amount_tetri: leadPrice, balance_before_tetri: master.balance_tetri,
-            balance_after_tetri: master.balance_tetri - leadPrice, channel,
+            run_id: run.id, category, matched_categories: openMatches, service_snapshot: liveServices, amount_tetri: amount, balance_before_tetri: master.balance_tetri,
+            balance_after_tetri: master.balance_tetri - amount, channel,
             provider_message_id: receipt.providerMessageId || null,
             provider_response: receipt.providerResponse || null, message_body: receipt.messageBody || null,
             acceptance_status: 'accepted', delivery_status: 'unknown',
@@ -525,7 +531,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     }
     if (outcome === 'accepted') {
       notifiedIds.push(candidate.id);
-      if (candidate.balance_tetri >= lowBalanceNudgeTetri && candidate.balance_tetri - leadPrice < lowBalanceNudgeTetri)
+      if (billing.isPaid(candidate) && candidate.balance_tetri >= lowBalanceNudgeTetri && candidate.balance_tetri - leadPrice < lowBalanceNudgeTetri)
         await nudgeLowBalance({ ...candidate, is_technical: isTechnical, balance_tetri: candidate.balance_tetri - leadPrice }, telegramService, 'low').catch(err => console.error('Low balance reminder failed:', err.message));
     }
     if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',reason=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id,skipReason]);
@@ -534,7 +540,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
   // Прежние отправки этой же группы (другой язык): кого они уже учли, тому «упущенный лид» второй раз не засчитываем.
   const { rows: earlier } = await pool.query('SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3 AND language <> $4', [order.id, category, vehicleSize || '', language || '']);
-  const { rows: broke } = await pool.query('SELECT * FROM masters WHERE ' + activeWhere + ' AND balance_tetri < $1', [leadPrice]);
+  // «Упущенная заявка из-за баланса» бывает только в платном режиме.
+  const { rows: broke } = await pool.query('SELECT * FROM masters WHERE ' + activeWhere + ' AND paid_mode = true AND balance_tetri < $1', [leadPrice]);
   for (const candidate of broke) {
     if (notifiedIds.includes(candidate.id)) continue;
     if (!(await matching.openMatches(candidate,await getOrderByToken(order.token))).includes(category)) continue;
@@ -543,7 +550,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     if (language && !speaks(candidate, language)) continue;
     if (earlier.some((e) => !e.language || speaks(candidate, e.language))) continue;
     await technical.withMaster(candidate.id, isTechnical, async (master, client) => {
-      if (!master.is_active || master.is_banned || !master.is_subscribed || master.balance_tetri >= leadPrice) return;
+      if (!master.is_active || master.is_banned || !master.is_subscribed || !billing.isPaid(master) || master.balance_tetri >= leadPrice) return;
       if (!await billing.permission(master.id, await billing.pricing(client), client)) return;
       await client.query('UPDATE masters SET missed_dispatch_count = missed_dispatch_count + 1 WHERE id=$1', [master.id]);
       await nudgeLowBalance(master, telegramService, 'missed');

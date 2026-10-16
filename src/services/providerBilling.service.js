@@ -49,12 +49,18 @@ async function permission(masterId, rates, client = pool) {
   return await ownFunds(masterId, client) ? null : { basis: 'gift_balance', consent_log_id: null };
 }
 
-// required — на балансе есть свои деньги, а действующие тарифы не подтверждены: платные функции на паузе.
+// Платный режим включает администратор каждому исполнителю отдельно (masters.paid_mode). До этого —
+// бесплатный период: заявки и показ номера без списаний, без подтверждения тарифов и без проверки баланса.
+const isPaid = master => master?.paid_mode === true;
+
+// required — платный режим, на балансе есть свои деньги, а действующие тарифы не подтверждены: платные
+// функции на паузе. free — бесплатный период (тарифы подтверждать не нужно).
 async function state(masterId, language) {
   const rates = await pricing();
   const isAccepted = Boolean(await accepted(masterId, rates));
   const funded = await ownFunds(masterId);
-  return { ...bundle(rates, language, { gift: !funded }), accepted: isAccepted, required: funded && !isAccepted };
+  const free = !isPaid((await pool.query('SELECT paid_mode FROM masters WHERE id=$1', [masterId])).rows[0]);
+  return { ...bundle(rates, language, { gift: !funded }), accepted: isAccepted, required: !free && funded && !isAccepted, free };
 }
 
 async function accept(masterToken, body, meta = {}) {
@@ -85,4 +91,4 @@ async function eligibleIds(rates, client = pool) {
   return ids;
 }
 
-module.exports = { pricing, bundle, state, accept, accepted, permission, ownFunds, eligibleIds };
+module.exports = { pricing, bundle, state, accept, accepted, permission, ownFunds, eligibleIds, isPaid };

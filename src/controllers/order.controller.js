@@ -895,6 +895,8 @@ async function show(req, res) {
           token: m.master_token,
           balanceTetri: m.balance_tetri,
           leadsLeft: Math.floor(m.balance_tetri / leadPriceTetri),
+          // Бесплатный период: предупреждения о балансе нет.
+          free: m.paid_mode !== true,
         };
       }
     }

@@ -35,7 +35,7 @@ async function getOverviewStats() {
       ),
       pool.query(`SELECT COALESCE(SUM(balance_tetri), 0) AS total FROM business_masters WHERE is_banned = false`),
       pool.query(
-        `SELECT COUNT(*)::int AS count FROM business_masters WHERE is_banned = false AND is_active = true AND balance_tetri < $1`,
+        `SELECT COUNT(*)::int AS count FROM business_masters WHERE is_banned = false AND is_active = true AND paid_mode = true AND balance_tetri < $1`,
         [lowBalanceThreshold]
       ),
       // date_trunc() не поддерживается pg-mem (локальная разработка) — считаем полночь в JS.
@@ -138,7 +138,7 @@ async function listMastersAdmin() {
   // pg-mem (локальная разработка) коррелированные подзапросы не поддерживает.
   const { rows } = await pool.query(
     `SELECT m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
-            m.banned_reason, m.balance_tetri, m.created_at, lt.last_topup_at,
+            m.banned_reason, m.balance_tetri, m.paid_mode, m.created_at, lt.last_topup_at,
             COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating,
             COUNT(r.id)::int AS review_count
      FROM masters m
@@ -148,7 +148,7 @@ async function listMastersAdmin() {
        FROM balance_transactions WHERE reason = 'topup' GROUP BY master_id
      ) lt ON lt.master_id = m.id
      GROUP BY m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
-              m.banned_reason, m.balance_tetri, m.created_at, lt.last_topup_at
+              m.banned_reason, m.balance_tetri, m.paid_mode, m.created_at, lt.last_topup_at
      ORDER BY m.id`
   );
   // Языки — отдельным запросом и склейкой в JS, как master_services в каталоге: jsonb в GROUP BY pg-mem не тянет.
@@ -318,6 +318,12 @@ async function getMasterBalanceHistory(masterId) {
   return rows;
 }
 
+// Платный режим исполнителя (providerBilling.isPaid): включает и выключает только администратор.
+async function setMasterPaidMode(id, paid) {
+  const { rows } = await pool.query('UPDATE masters SET paid_mode = $1 WHERE id = $2 RETURNING id', [paid === true, id]);
+  return rows[0] || null;
+}
+
 async function setMasterBanned(id, banned, reason) {
   await pool.query(
     `UPDATE masters SET is_banned = $1, banned_reason = $2, banned_by_manager_id = NULL, banned_at = CASE WHEN $1 THEN NOW() ELSE NULL END
@@ -399,6 +405,7 @@ module.exports = {
   adminWhatsapp,
   getMasterBalanceHistory,
   setMasterBanned,
+  setMasterPaidMode,
   listOrdersAdmin,
   getOrderDetailAdmin,
 };

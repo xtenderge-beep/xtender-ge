@@ -84,6 +84,7 @@
                   <% if (m.van_body) { %>· кузов <b class="text-stone-800"><%= m.van_body %></b><% } %>
                   · рейтинг <%= m.rating %> (<%= m.review_count %>)
                   · баланс <b class="text-stone-800"><%= (m.balance_tetri / 100).toFixed(2) %> ₾</b>
+                  · <% if (m.paid_mode) { %><b class="text-sky-800">платный режим</b><% } else { %>бесплатно<% } %>
                   · <%= m.last_topup_at ? 'пополнял ' + new Date(m.last_topup_at).toLocaleDateString('ru') : 'ни разу не пополнял' %>
               </p>
               <p class="text-xs text-stone-500 mt-1">

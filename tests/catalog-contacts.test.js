@@ -1,5 +1,6 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ejs=require('ejs');
 const db=require('pg-mem').newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+db.public.none('ALTER TABLE masters ALTER COLUMN paid_mode SET DEFAULT true'); // тест проверяет платный режим (списания и баланс)
 const {Pool}=db.adapters.createPg(),pool=new Pool();
 // pg-mem has no row locks: serialize transactions here. Production uses FOR UPDATE.
 let queue=Promise.resolve();pool.withTransaction=fn=>{const run=queue.then(async()=>{const backup=db.backup();try{return await fn(pool);}catch(e){backup.restore();throw e;}});queue=run.catch(()=>{});return run;};

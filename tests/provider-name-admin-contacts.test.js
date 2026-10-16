@@ -23,6 +23,7 @@ assert.equal(validateOverride('x'.repeat(120)), 'x'.repeat(120));
 
 const db = require('pg-mem').newDb();
 db.public.none(fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8'));
+db.public.none('ALTER TABLE masters ALTER COLUMN paid_mode SET DEFAULT true'); // тест проверяет платный режим (списания и баланс)
 const { Pool } = db.adapters.createPg();
 const pool = new Pool();
 pool.withTransaction = async fn => {

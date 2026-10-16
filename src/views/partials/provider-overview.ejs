@@ -1,6 +1,8 @@
 <%
+// Бесплатный период (платный режим не включён): баланс и тарифы на получение заявок не влияют.
+const freePeriod = master.paid_mode !== true;
 const receivingState = master.is_banned || master.is_subscribed === false || (master.subscription_until && new Date(master.subscription_until) <= new Date())
-  ? 'disabled' : (typeof billingState !== 'undefined' && billingState.required) ? 'billing_pending' : !master.is_active ? 'pending' : master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
+  ? 'disabled' : (typeof billingState !== 'undefined' && billingState.required) ? 'billing_pending' : !master.is_active ? 'pending' : !freePeriod && master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
 %>
 <section class="provider-overview" data-account-state="<%= receivingState %>">
   <div class="provider-overview-top"><span class="provider-status <%= receivingState %>"><%= t('provider_' + receivingState) %></span><span class="provider-channel"><%= t('provider_channel') %>: <strong><%= master.telegram_id ? 'Telegram' : 'SMS' %></strong></span></div>
@@ -16,5 +18,6 @@ const receivingState = master.is_banned || master.is_subscribed === false || (ma
       <a href="#balance" data-tab-jump="balance" class="provider-primary"><%= t(receivingState === 'low' ? 'provider_balance_action' : 'provider_balance_view') %></a>
     <% } %>
   </div>
-  <div class="provider-overview-footer"><span><%= t('provider_lead_price') %>: <b><%= (leadPriceTetri / 100).toFixed(2) %> ₾</b></span><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
+  <% if (freePeriod && receivingState !== 'disabled') { %><p class="provider-state-hint"><b><%= t('provider_free_period') %></b></p><% } %>
+  <div class="provider-overview-footer"><span><%= t('provider_lead_price') %>: <b><%= freePeriod ? t('provider_price_free') : (leadPriceTetri / 100).toFixed(2) + ' ₾' %></b></span><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
 </section>

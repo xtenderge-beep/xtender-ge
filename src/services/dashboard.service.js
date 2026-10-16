@@ -55,7 +55,9 @@ function buildDashboard({ orders, masters, finances, queues, window, leadPrice, 
       median: percentile(delays, 0.5), p90: percentile(delays, 0.9) };
   };
   const eligibleBase = m => m.is_active && !m.is_banned && m.is_subscribed && (!m.subscription_until || time(m.subscription_until) > now);
-  const eligible = m => eligibleBase(m) && Number(m.balance_tetri) >= leadPrice;
+  // Нехватка баланса бывает только в платном режиме: в бесплатный период заявка уходит при любом балансе.
+  const short = m => m.paid_mode === true && Number(m.balance_tetri) < leadPrice;
+  const eligible = m => eligibleBase(m) && !short(m);
   const segments = Object.entries(GROUPS).map(([key, label]) => {
     const matches = m => key === 'flatbed' ? m.category === 'transport' && m.is_flatbed : m.category === key;
     const supply = masters.filter(matches);
@@ -63,7 +65,7 @@ function buildDashboard({ orders, masters, finances, queues, window, leadPrice, 
     const sent = demand.filter(o => o.first_dispatched_at);
     const ready = supply.filter(eligible).length;
     const contacts = sent.filter(o => Number(o.contact_count) > 0).length;
-    const lowBalance = supply.filter(m => eligibleBase(m) && Number(m.balance_tetri) < leadPrice).length;
+    const lowBalance = supply.filter(m => eligibleBase(m) && short(m)).length;
     const unanswered = sent.filter(o => o.status !== 'closed' && !Number(o.contact_count)).length;
     let signal = 'Наблюдать';
     if (demand.length && !ready) signal = 'Нет доступных получателей';
@@ -84,7 +86,7 @@ function buildDashboard({ orders, masters, finances, queues, window, leadPrice, 
     waiting: problems.filter(o => o.waiting && !o.revision).length, revisions: problems.filter(o => o.revision).length, noContact: problems.filter(o => !o.waiting).length,
     unclassified: confirmed(current).filter(o => !(o.target_categories || []).length).length,
     eligible: masters.filter(eligible).length, active: masters.filter(m => m.is_active && !m.is_banned).length,
-    lowBalance: masters.filter(m => eligibleBase(m) && Number(m.balance_tetri) < leadPrice).length,
+    lowBalance: masters.filter(m => eligibleBase(m) && short(m)).length,
     balance: masters.filter(m => !m.is_banned).reduce((sum, m) => sum + Number(m.balance_tetri), 0) / 100,
     pendingMasters: masters.filter(m => !m.is_active && !m.is_banned).length, queues };
 }
@@ -92,7 +94,7 @@ function buildDashboard({ orders, masters, finances, queues, window, leadPrice, 
 async function getPeople(window, now, leadPrice) {
   const [people, managers, activity, ledger] = await Promise.all([
     pool.query(`SELECT m.id, m.name, m.phone, m.category, m.vehicle_size, m.manager_id, m.referral_manager_id, m.promo_code_used,
-      m.is_active, m.is_banned, m.is_subscribed, m.subscription_until, m.balance_tetri, m.created_at,
+      m.is_active, m.is_banned, m.is_subscribed, m.subscription_until, m.balance_tetri, m.paid_mode, m.created_at,
       mgr.name AS manager_name, COALESCE(m.referral_manager_id, pc.manager_id) AS source_manager_id, source.name AS source_manager_name
       FROM business_masters m LEFT JOIN managers mgr ON mgr.id = m.manager_id
       LEFT JOIN promo_codes pc ON pc.code = m.promo_code_used LEFT JOIN managers source ON source.id = COALESCE(m.referral_manager_id, pc.manager_id) ORDER BY m.id DESC`),
@@ -127,7 +129,7 @@ async function getPeople(window, now, leadPrice) {
     const delays = events.filter(e => e.contacted_at).map(e => (time(e.contacted_at) - time(e.sent_at)) / 60000);
     const contacts = delays.length;
     return { ...m, balance: Number(m.balance_tetri) / 100,
-      eligible: Boolean(m.is_active && !m.is_banned && m.is_subscribed && (!m.subscription_until || time(m.subscription_until) > now) && Number(m.balance_tetri) >= leadPrice),
+      eligible: Boolean(m.is_active && !m.is_banned && m.is_subscribed && (!m.subscription_until || time(m.subscription_until) > now) && (m.paid_mode !== true || Number(m.balance_tetri) >= leadPrice)),
       leads: events.length, opened: events.filter(e => e.opened_at).length, contacts, delays,
       average: contacts ? delays.reduce((a, b) => a + b, 0) / contacts : null,
       contactRate: percent(contacts, events.length),
@@ -167,11 +169,12 @@ async function getDashboard(period) {
       WHERE (o.created_at >= $1 AND o.created_at < $2) OR (o.status NOT IN ('closed', 'unverified') AND o.created_at < $2)
       GROUP BY o.id, o.token, o.description, o.target_categories, o.status, o.created_at, o.first_dispatched_at`,
       [new Date(window.previousStart), new Date(now)]),
-    pool.query(`SELECT id, category, is_flatbed, is_active, is_banned, is_subscribed, subscription_until, balance_tetri FROM business_masters`),
-    pool.query(`SELECT 'current' AS period, reason, SUM(amount_tetri) AS amount, COUNT(*)::int AS count
+    pool.query(`SELECT id, category, is_flatbed, is_active, is_banned, is_subscribed, subscription_until, balance_tetri, paid_mode FROM business_masters`),
+    // count — только операции с деньгами: заявка бесплатного периода пишется в журнал с нулевой суммой.
+    pool.query(`SELECT 'current' AS period, reason, SUM(amount_tetri) AS amount, COUNT(CASE WHEN amount_tetri <> 0 THEN 1 END)::int AS count
       FROM business_balance_transactions WHERE created_at >= $1 AND created_at < $2 GROUP BY reason
       UNION ALL
-      SELECT 'previous' AS period, reason, SUM(amount_tetri) AS amount, COUNT(*)::int AS count
+      SELECT 'previous' AS period, reason, SUM(amount_tetri) AS amount, COUNT(CASE WHEN amount_tetri <> 0 THEN 1 END)::int AS count
       FROM business_balance_transactions WHERE created_at >= $3 AND created_at < $4 GROUP BY reason`,
       [new Date(window.start), new Date(window.end), new Date(window.previousStart), new Date(window.previousEnd)]),
     pool.query("SELECT COUNT(*)::int AS count FROM topup_receipts WHERE status IN ('received','reviewing')"),

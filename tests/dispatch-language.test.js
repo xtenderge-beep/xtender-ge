@@ -5,6 +5,7 @@ const path = require('node:path');
 const { newDb } = require('pg-mem');
 const db = newDb();
 db.public.none(fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8'));
+db.public.none('ALTER TABLE masters ALTER COLUMN paid_mode SET DEFAULT true'); // тест проверяет платный режим (списания и баланс)
 const { Pool } = db.adapters.createPg();
 const pool = new Pool();
 pool.withTransaction = async fn => { const backup = db.backup(); try { return await fn(pool); } catch (e) { backup.restore(); throw e; } };

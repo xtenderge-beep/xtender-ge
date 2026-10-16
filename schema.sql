@@ -755,6 +755,11 @@ CREATE TABLE IF NOT EXISTS technical_client_phones (
 -- значения, что в site_visits.source. Пустая строка — прямой заход; NULL — не записано (заявки до
 -- 2026-10-12 и оформленные менеджером). Раздел «Источники» в админке, trafficSource.service.js.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(80);
+-- Платный режим исполнителя (2026-10-16). По умолчанию false — бесплатный период: заявки и показ номера
+-- в каталоге не списывают баланс и не требуют подтверждённых тарифов и денег на балансе. Администратор
+-- включает платный режим каждому отдельно в карточке исполнителя (providerBilling.isPaid). Колонка
+-- объявлена до business_masters, чтобы представление получило её с первого запуска.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_mode BOOLEAN NOT NULL DEFAULT false;
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_balance_transactions AS

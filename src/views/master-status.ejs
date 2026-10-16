@@ -142,7 +142,7 @@
             </nav>
 
             <section data-tab="leads" class="space-y-3">
-                <% if (!master.is_banned && master.missed_dispatch_count > 0) { %>
+                <% if (!master.is_banned && master.paid_mode === true && master.missed_dispatch_count > 0) { %>
                     <a href="#" data-tab-jump="balance" class="block p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium">
                         <i class="fa-solid fa-triangle-exclamation mr-1"></i><span class="font-bold"><%= master.missed_dispatch_count %></span> <%= t('master_missed_note') %>
                     </a>
@@ -203,7 +203,7 @@
             <section data-tab="balance" class="hidden space-y-4">
                 <%- include('partials/provider-pricing') %>
                 <%- include('partials/provider-receipts', { reviewLocale }) %>
-                <p class="provider-help"><%= t('provider_limits_note') %></p>
+                <% if (master.paid_mode === true) { %><p class="provider-help"><%= t('provider_limits_note') %></p><% } %>
                 <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 <%= statusColor %> overflow-hidden">
                     <div class="p-5 sm:p-6 space-y-4">
                         <div class="bg-stone-900 text-white p-4 rounded-2xl space-y-1.5">
@@ -212,7 +212,7 @@
                                 <span class="font-mono text-xl font-bold text-emerald-400"><%= (master.balance_tetri / 100).toFixed(2) %> GEL</span>
                             </div>
                             <div class="text-[11px] text-stone-400 text-right">
-                                ≈ <span class="font-mono font-bold text-stone-200"><%= leadsLeft %></span> <%= t('master_status_leads_word') %>
+                                <% if (master.paid_mode === true) { %>≈ <span class="font-mono font-bold text-stone-200"><%= leadsLeft %></span> <%= t('master_status_leads_word') %><% } else { %><%= t('provider_free_period') %><% } %>
                             </div>
                         </div>
 

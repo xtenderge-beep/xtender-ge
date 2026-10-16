@@ -47,9 +47,9 @@ function isChecked(v) {
 async function list(req, res) {
   const serviceType = req.query.serviceType || req.query.category;
   const masters = await masterService.listMasters({ serviceType, language: req.lang });
-  // Номер и баланс — только для server-side рендера каталога (index.ejs). Эта JSON-ручка
+  // Номер, баланс и платный режим — только для server-side рендера каталога (index.ejs). Эта JSON-ручка
   // публичная и без неё платный gate «Показать номер» тривиально обходится curl'ом.
-  const safe = masters.map(({ phone, balance_tetri, ...rest }) => rest);
+  const safe = masters.map(({ phone, balance_tetri, paid_mode, ...rest }) => rest);
   return res.json({ success: true, masters: safe });
 }
 

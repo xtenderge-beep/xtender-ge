@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('fs'),path=require('path');
 const {newDb}=require('pg-mem');
 const db=newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
+db.public.none('ALTER TABLE masters ALTER COLUMN paid_mode SET DEFAULT true'); // тест проверяет платный режим (списания и баланс)
 const {Pool}=db.adapters.createPg(),pool=new Pool();
 pool.withTransaction=async fn=>{const b=db.backup();try{return await fn(pool);}catch(e){b.restore();throw e;}};
 require.cache[require.resolve('../src/config/db')]={exports:pool};

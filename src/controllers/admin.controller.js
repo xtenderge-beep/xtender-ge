@@ -400,6 +400,16 @@ async function setMasterFollowup(req, res) {
   res.redirect(back + (isMasterCard(back) ? '#master-notes' : ''));
 }
 
+// Платный режим: с этого момента заявки и показ номера в каталоге списываются с баланса (если тарифы
+// подтверждены или на балансе только подарок), без него — бесплатный период.
+async function setMasterPaidMode(req, res) {
+  const id = parseInt(req.params.id, 10);
+  const paid = req.body.paid === '1';
+  if (!await adminService.setMasterPaidMode(id, paid)) return res.status(404).send('Мастер не найден');
+  await audit.record(id, { action: paid ? 'paid_mode_on' : 'paid_mode_off', body: paid ? 'Включён платный режим' : 'Возвращён бесплатный режим' });
+  res.redirect(`/admin/masters/${id}`);
+}
+
 async function unbanMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   await adminService.setMasterBanned(id, false, null);
@@ -928,6 +938,7 @@ module.exports = {
   overview,
   mastersList,
   masterDetail,
+  setMasterPaidMode,
   updateMaster,
   approveMaster,
   unapproveMaster,

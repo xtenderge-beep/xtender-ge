@@ -47,11 +47,12 @@ async function build(orderId) {
     const p = person(d.master_id), channel = ['call', 'whatsapp'].includes(meta.channel) ? meta.channel : 'call';
     if (!p[channel] && !p.denied[channel]) p.denied[channel] = { at: d.timestamp_utc, reason: meta.reason || null };
   }
-  // Баланс — текущий, не на момент рассылки; low — денег меньше цены одной заявки, следующую не получит.
+  // Баланс — текущий, не на момент рассылки; low — платный режим и денег меньше цены одной заявки,
+  // следующую не получит (в бесплатный период баланс не важен).
   const ids = [...people.keys()], price = await require('./settings.service').getLeadPriceTetri();
   if (ids.length) {
-    const { rows } = await pool.query('SELECT id, name, balance_tetri, manager_id FROM masters WHERE id IN (' + ids.map((_, i) => '$' + (i + 1)).join(',') + ')', ids);
-    rows.forEach(row => Object.assign(people.get(Number(row.id)), { name: row.name, balance_tetri: row.balance_tetri, low: row.balance_tetri < price, manager_id: row.manager_id }));
+    const { rows } = await pool.query('SELECT id, name, balance_tetri, manager_id, paid_mode FROM masters WHERE id IN (' + ids.map((_, i) => '$' + (i + 1)).join(',') + ')', ids);
+    rows.forEach(row => Object.assign(people.get(Number(row.id)), { name: row.name, balance_tetri: row.balance_tetri, low: row.paid_mode === true && row.balance_tetri < price, manager_id: row.manager_id }));
   }
   const rows = [...people.values()].map(p => ({ ...p, outcome: outcome(p) }));
   // Первая реакция — открытие ссылки, а если оно не записалось — первое нажатие контакта.
