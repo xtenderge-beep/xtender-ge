@@ -53,11 +53,12 @@ const {translate}=require('../src/config/i18n');
  // В истории баланса кабинета нулевых строк нет; в списке заявок заявка есть.
  assert.deepEqual((await masters.getMasterBalanceHistory(master.id)).map(h=>h.reason),['topup']);
 
- // Кабинет: нет «Пополните баланс», вместо цены — «бесплатно», есть строка о бесплатном периоде.
+ // Кабинет: крупно «Бесплатный период», баланс одной строкой, без «Пополните баланс» и кнопки баланса.
  const view=path.join(__dirname,'../src/views/partials/provider-overview.ejs');
  for(const lang of ['ka','ru','en']) {
    const t=translate(lang),html=await ejs.renderFile(view,{master:{...master,paid_mode:false},billingState:state,leadPriceTetri:50,t});
-   assert.ok(html.includes('data-account-state="ready"'));assert.ok(html.includes(t('provider_free_period')));assert.ok(html.includes(t('provider_price_free')));
+   assert.ok(html.includes('data-account-state="ready"'));assert.ok(html.includes(t('provider_free_title')));assert.ok(html.includes(t('provider_free_body')));
+   assert.ok(html.includes(t('provider_free_balance').replace('{amount}','0.20')));assert.ok(!html.includes('provider-balance-row'));assert.ok(!html.includes(t('provider_balance_action')));
  }
 
  // Администратор включает платный режим: дальше — прежние правила (своих денег без подтверждения тарифов не списываем).
@@ -68,7 +69,7 @@ const {translate}=require('../src/config/i18n');
  assert.equal(await orders.notifyMasters(await newOrder('free-order-2'),'movers',null,50),0);assert.equal(sent.length,1);
  assert.equal(await masters.revealPhoneForCall(master.id,50,'+995500000904'),null);assert.equal(await balance(),20);
  const t=translate('ru'),html=await ejs.renderFile(view,{master:paid,billingState:await billing.state(master.id,'ru'),leadPriceTetri:50,t});
- assert.ok(html.includes('data-account-state="billing_pending"'));assert.ok(!html.includes(t('provider_free_period')));
+ assert.ok(html.includes('data-account-state="billing_pending"'));assert.ok(!html.includes(t('provider_free_title')));assert.ok(html.includes('provider-balance-row'));
 
  // Вернули бесплатный режим — заявки снова уходят.
  assert.ok(await admin.setMasterPaidMode(master.id,false));

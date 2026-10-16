@@ -899,3 +899,19 @@ body.signup-compose-active .provider-focus-promo{display:none}
   .home-simple .home-header-actions .lang-btn { min-width:24px; padding:3px; }
   .home-simple .home-provider-link { min-width:36px; }
 }
+/* Бесплатный период в кабинете исполнителя (2026-10-17): крупная плашка в главной карточке вместо баланса,
+   зелёная строка первой во вкладке «Баланс», пополнение — под ссылкой «Пополнить всё равно». */
+.provider-free { margin-top:18px; padding:18px 20px; border-radius:18px; background:#dbe9b5; color:#173b2c; }
+.provider-free-title { display:flex; align-items:center; gap:10px; font-size:24px; font-weight:800; letter-spacing:-.02em; line-height:1.2; }
+.provider-free-title i { font-size:20px; color:#2f6a3c; }
+.provider-overview .provider-free p { margin-top:6px; font-size:15px; font-weight:600; line-height:1.5; color:#24452f; }
+.provider-overview .provider-free-balance { margin:16px 0 18px; padding-top:16px; border-top:1px solid #ffffff26; font-size:14px; color:#dce8d9; }
+.provider-free-banner { display:flex; align-items:center; gap:12px; padding:16px 20px; border-radius:18px; background:#dbe9b5; color:#173b2c; font-size:15px; font-weight:700; line-height:1.45; }
+.provider-free-banner i { font-size:20px; color:#2f6a3c; flex:none; }
+.provider-topup-anyway > summary { cursor:pointer; display:inline-block; font-size:14px; font-weight:700; color:#2f6a3c; text-decoration:underline; text-underline-offset:4px; list-style:none; }
+.provider-topup-anyway > summary::-webkit-details-marker { display:none; }
+.provider-topup-anyway[open] > summary { margin-bottom:16px; }
+@media (max-width:420px) {
+  .provider-free { padding:16px; }
+  .provider-free-title { font-size:21px; }
+}

@@ -32,7 +32,10 @@
                     <%- include('partials/brand') %>
                 </a>
                 <div class="flex items-center gap-2">
-                    <% if (master) { %>
+                    <% if (master && master.paid_mode !== true) { %>
+                        <%# Бесплатный период: в шапке «Бесплатно» вместо суммы, баланс виден в карточке и во вкладке. %>
+                        <span class="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg whitespace-nowrap"><i class="fa-solid fa-gift" aria-hidden="true"></i> <%= t('provider_free_badge') %></span>
+                    <% } else if (master) { %>
                         <span class="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg whitespace-nowrap">
                             <%= (master.balance_tetri / 100).toFixed(2) %> ₾
                         </span>
@@ -128,7 +131,8 @@
 
             <%- include('partials/provider-overview') %>
             <%# With only gift balance the rates are confirmed before a top-up, in the balance tab (topup-panel). %>
-            <% if (typeof billingState !== 'undefined' && (billingState.accepted || billingState.required)) { %><%- include('partials/provider-billing-consent') %><% } %>
+            <%# В бесплатный период «Тарифы подтверждены» не показываем: тарифы сейчас ни на что не влияют. %>
+            <% if (typeof billingState !== 'undefined' && !billingState.free && (billingState.accepted || billingState.required)) { %><%- include('partials/provider-billing-consent') %><% } %>
             <%- include('partials/provider-guide') %>
             <nav class="sticky top-16 z-10 bg-stone-50/95 backdrop-blur-md border-b border-stone-200">
                 <div class="flex gap-1 overflow-x-auto no-scrollbar">
@@ -201,7 +205,13 @@
             </section>
 
             <section data-tab="balance" class="hidden space-y-4">
+                <% const freePeriod = master.paid_mode !== true; %>
+                <% if (freePeriod) { %>
+                <%# Бесплатный период: сначала — что пополнять не нужно; тарифы ниже, под заголовком «после бесплатного периода». %>
+                <div class="provider-free-banner"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span><%= t('provider_free_topup_banner') %></span></div>
+                <% } else { %>
                 <%- include('partials/provider-pricing') %>
+                <% } %>
                 <%- include('partials/provider-receipts', { reviewLocale }) %>
                 <% if (master.paid_mode === true) { %><p class="provider-help"><%= t('provider_limits_note') %></p><% } %>
                 <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 <%= statusColor %> overflow-hidden">
@@ -211,12 +221,20 @@
                                 <span class="text-xs font-bold text-stone-300"><%= t('master_status_balance_label') %></span>
                                 <span class="font-mono text-xl font-bold text-emerald-400"><%= (master.balance_tetri / 100).toFixed(2) %> GEL</span>
                             </div>
+                            <% if (!freePeriod) { %>
                             <div class="text-[11px] text-stone-400 text-right">
-                                <% if (master.paid_mode === true) { %>≈ <span class="font-mono font-bold text-stone-200"><%= leadsLeft %></span> <%= t('master_status_leads_word') %><% } else { %><%= t('provider_free_period') %><% } %>
+                                ≈ <span class="font-mono font-bold text-stone-200"><%= leadsLeft %></span> <%= t('master_status_leads_word') %>
                             </div>
+                            <% } %>
                         </div>
 
-                        <% if (!master.is_banned) { %>
+                        <% if (!master.is_banned && freePeriod) { %>
+                        <%# Пополнение не нужно, но не запрещено; открыто сразу, если уже есть пополнения (их статус). %>
+                        <details class="provider-topup-anyway"<%= topups.length ? ' open' : '' %>>
+                            <summary><%= t('provider_topup_anyway') %></summary>
+<%- include('partials/topup-panel') %>
+                        </details>
+                        <% } else if (!master.is_banned) { %>
 <%- include('partials/topup-panel') %>
                         <% } %>
                     </div>
@@ -237,11 +255,29 @@
 
                 <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('master_status_history_title') %></h2>
-                    <% if (!history.length) { %>
+                    <%
+                        // Отметка начала бесплатного периода среди операций: прежние списания были до него.
+                        const freeStart = typeof freePeriodStart !== 'undefined' ? freePeriodStart : null;
+                        const rows = history.slice();
+                        if (freePeriod && freeStart && new Date(master.created_at) < freeStart) {
+                            const at = rows.findIndex(function (h) { return new Date(h.created_at) < freeStart; });
+                            if (at >= 0) rows.splice(at, 0, { marker: true, created_at: freeStart });
+                            else if (rows.length < 40) rows.push({ marker: true, created_at: freeStart });
+                        }
+                    %>
+                    <% if (!rows.length) { %>
                         <p class="text-sm text-stone-400"><%= t('master_status_history_none') %></p>
                     <% } else { %>
                         <div class="divide-y divide-stone-100">
-                            <% history.forEach(function (h) { %>
+                            <% rows.forEach(function (h) { %>
+                                <% if (h.marker) { %>
+                                <div class="flex items-center justify-between gap-3 py-2 text-sm">
+                                    <div class="min-w-0">
+                                        <div class="font-bold text-emerald-800"><i class="fa-solid fa-gift" aria-hidden="true"></i> <%= t('provider_history_free_start') %></div>
+                                        <div class="text-[10px] text-stone-400 font-mono"><%= new Date(h.created_at).toLocaleDateString(reviewLocale, { day: 'numeric', month: 'short', year: 'numeric' }) %></div>
+                                    </div>
+                                </div>
+                                <% return; } %>
                                 <div class="flex items-center justify-between gap-3 py-2 text-sm">
                                     <div class="min-w-0">
                                         <div class="text-stone-700"><%= historyReason(h.reason, h.note) %><% if (h.note && h.note !== 'WELCOME_AUTO') { %> <span class="text-stone-400">— <%= h.note %></span><% } %></div>
@@ -255,6 +291,7 @@
                         </div>
                     <% } %>
                 </div>
+                <% if (freePeriod) { %><%- include('partials/provider-pricing', { pricingTitle: t('provider_prices_after') }) %><% } %>
             </section>
 
             <section data-tab="reviews" class="hidden space-y-4">

@@ -1,5 +1,7 @@
-<section class="provider-pricing" aria-label="<%= t('provider_prices') %>">
-  <h2><%= t('provider_prices') %></h2>
+<%# pricingTitle — другой заголовок: в бесплатный период кабинет показывает тарифы как «после бесплатного периода». %>
+<% const pricingHeading = typeof pricingTitle !== 'undefined' && pricingTitle ? pricingTitle : t('provider_prices'); %>
+<section class="provider-pricing" aria-label="<%= pricingHeading %>">
+  <h2><%= pricingHeading %></h2>
   <div class="provider-price-grid">
     <div><span><%= t('provider_lead_price') %></span><strong><%= (leadPriceTetri / 100).toFixed(2) %> ₾</strong></div>
     <div><span><%= t('provider_contact_price') %></span><strong><%= (catalogCallPriceTetri / 100).toFixed(2) %> ₾</strong></div>

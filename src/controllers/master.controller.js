@@ -338,6 +338,7 @@ async function statusPage(req, res) {
     master, badToken: false, reviews, activity, history, leads, supportMessages, receipts, topups,
     publicName: require('../config/providerName').resolve(master),
     leadPriceTetri, catalogCallPriceTetri, payment, billingState, botUsername: BOT_USERNAME, clientStrings: strings,
+    freePeriodStart: require('../config/freePeriod').STARTED_AT,
   });
 }
 

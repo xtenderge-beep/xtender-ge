@@ -1,5 +1,5 @@
 <section class="bg-white rounded-2xl border border-stone-200 p-5">
-<h2 class="font-bold mb-2"><%= t('contacts_title') %></h2><p class="text-sm text-stone-500 mb-4"><%= t('contacts_hint') %></p>
+<h2 class="font-bold mb-2"><%= t('contacts_title') %></h2><p class="text-sm text-stone-500 mb-4"><%= t(master.paid_mode === true ? 'contacts_hint' : 'contacts_hint_free') %></p>
 <form id="provider-contacts" class="space-y-4">
 <% const channels = master.contact_channels || {}; ['whatsapp','viber'].forEach(channel => { %>
 <label class="block text-sm font-bold"><%= channel==='whatsapp'?'WhatsApp':'Viber' %><input class="block w-full border rounded-lg p-3 mt-1" type="tel" name="<%= channel %>" value="<%= channels[channel] || '' %>" placeholder="+995…" maxlength="30"></label>
