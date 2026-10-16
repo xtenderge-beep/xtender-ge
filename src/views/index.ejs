@@ -42,6 +42,8 @@
         '@type': 'MovingCompany',
         name: 'xtender.ge',
         url: topic ? seo.canonical.split('/s/')[0] + (lang === 'ka' ? '/' : '') : seo.canonical,
+        // Тот же текст, что в блоке «Что такое xtender.ge» внизу главной: разметка совпадает с видимым текстом.
+        ...(simple ? { description: t('seo_what_body') } : {}),
         areaServed: {
           '@type': 'City',
           name: 'Tbilisi',
@@ -472,11 +474,7 @@
                                                     <span class="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md whitespace-nowrap"><%= master.price_text %></span>
                                                   <% } %>
                                               </div>
-                                              <% if (simple) { %>
-                                              <p class="catalog-card-tags"><% simpleSearch.byMaster.get(master.id).display.forEach(function (tag) { %><button type="button" class="card-tag" data-tag="<%= tag.key %>">#<%= tag.label %></button><% }); %></p>
-                                              <% } else { %>
                                               <p class="catalog-card-category"><%= group.label %></p>
-                                              <% } %>
 
                                               <% if (master.reviews.length) { %>
                                                 <button type="button" class="review-toggle mt-1 flex items-center gap-1.5 text-xs">
@@ -562,10 +560,44 @@
 
                     <% if (simple) { %>
                     <%# SEO-текст эскиза. Заголовок страницы для поисковиков (h1) стоит здесь, а не над полем: первый
-                        экран по эскизу без заголовка. Дальше — частые вопросы, те же, что в разметке FAQPage выше. %>
+                        экран по эскизу без заголовка. Дальше — что это за сервис, как он работает и чем удобнее обзвона
+                        (для людей, Google и ответов ИИ: Google берёт их из того же текста страницы), живые данные
+                        каталога и частые вопросы, те же, что в разметке FAQPage выше. %>
+                    <%
+                      // Живые данные считаются из того же списка, что карточки выше, поэтому текст не расходится с каталогом.
+                      const nowServices = groups
+                        .map((group) => ({ label: group.label, count: masters.filter((m) => m.service_type === group.key || (m.services || []).some((s) => s.service_type === group.key)).length }))
+                        .filter((item) => item.count).sort((a, b) => b.count - a.count);
+                      const nowLanguageNames = { ka: 'ქართული', ru: 'Русский', en: 'English', hy: 'Հայերեն', az: 'Azərbaycan dili', tr: 'Türkçe', uk: 'Українська' };
+                      const nowLanguages = Object.entries(nowLanguageNames)
+                        .map(([code, label]) => ({ label, count: masters.filter((m) => (m.spoken_languages || []).includes(code)).length }))
+                        .filter((item) => item.count).sort((a, b) => b.count - a.count);
+                      // По-грузински дата числом: месяц словом выходит в именительном падеже («16 ოქტომბერი»), а нужен родительный.
+                      const nowDate = lang === 'ka' ? new Date().toLocaleDateString('ru-RU') : new Date().toLocaleDateString(reviewLocale, { day: 'numeric', month: 'long', year: 'numeric' });
+                      const nowCount = t('seo_now_count')
+                        .replace('{n}', masters.length)
+                        .replace('{city}', catalogCity ? (catalogCity['name_' + lang] || catalogCity.name_ru) : '')
+                        .replace('{date}', nowDate);
+                    %>
                     <section class="simple-seo" aria-labelledby="simple-seo-title">
                       <h1 id="simple-seo-title"><%= t('home_hero_title') %> <%= t('home_hero_title_accent') %></h1>
                       <p class="simple-seo-lead"><%= t('home_hero_lead_short') %></p>
+                      <h2><%= t('seo_what_title') %></h2>
+                      <p><%= t('seo_what_body') %></p>
+                      <h2><%= t('seo_how_title') %></h2>
+                      <ol class="simple-seo-steps">
+                        <% t('seo_steps').forEach(function (step) { %><li><h3><%= step[0] %></h3><p><%= step[1] %></p></li><% }); %>
+                      </ol>
+                      <h2><%= t('seo_why_title') %></h2>
+                      <ul class="simple-seo-list">
+                        <% t('seo_why').forEach(function (item) { %><li><%= item %></li><% }); %>
+                      </ul>
+                      <% if (masters.length) { %>
+                      <h2><%= t('seo_now_title') %></h2>
+                      <p><%= nowCount %></p>
+                      <% if (nowServices.length) { %><p><strong><%= t('seo_now_services') %>:</strong> <%= nowServices.map((item) => item.label + ' — ' + item.count).join(', ') %>.</p><% } %>
+                      <% if (nowLanguages.length) { %><p><strong><%= t('catalog_languages') %>:</strong> <%= nowLanguages.map((item) => item.label + ' — ' + item.count).join(', ') %>.</p><% } %>
+                      <% } %>
                       <h2><%= t('faq_title') %></h2>
                       <% faqItems.forEach(function (item) { %>
                       <h3><%= item.q %></h3>
@@ -1847,10 +1879,6 @@
             catalogTags.forEach((tag) => tag.addEventListener('click', () => {
                 if (tag.getAttribute('aria-pressed') === 'true') return showAll();
                 showTag(tag.dataset.tag, tag.dataset.label);
-            }));
-            document.querySelectorAll('.card-tag').forEach((tag) => tag.addEventListener('click', () => {
-                showTag(tag.dataset.tag, tag.textContent.trim());
-                searchPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }));
             showAllButton.addEventListener('click', showAll);
             // «Опубликовать задачу» под списком: пустое поле — открыть его, иначе тот же шаг, что у кнопки в форме.

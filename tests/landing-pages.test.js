@@ -270,6 +270,16 @@ function startSite() {
       assert.doesNotMatch(html, /home-usp|home-article"|"serviceType"|"BreadcrumbList"/, `${lang}: nothing of a task page on the general homepage`);
       for (const page of [moving, cargo, junk]) assert.ok(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/s/${page.slug}">${page.content[lang].title} ${page.content[lang].accent}<i`), `${lang}: homepage links to ${page.slug}`);
       for (const other of LANGS) assert.ok(html.includes(`<link rel="alternate" hreflang="${other}" href="https://xtender.test${other === 'ka' ? '/' : '/' + other}">`), `${lang}: homepage hreflang ${other}`);
+      // Внизу — что это за сервис, как работает и чем удобнее обзвона; описание в разметке то же, что на странице.
+      assert.ok(html.includes(`<h2>${t('seo_what_title')}</h2>`) && html.includes(`<p>${t('seo_what_body')}</p>`), `${lang}: what the service is`);
+      assert.ok(html.includes(`"description":${JSON.stringify(t('seo_what_body'))}`), `${lang}: the same description in the markup`);
+      assert.equal((html.match(/<ol class="simple-seo-steps">[\s\S]*?<\/ol>/)[0].match(/<li><h3>/g) || []).length, 4, `${lang}: four steps`);
+      assert.equal((html.match(/<ul class="simple-seo-list">[\s\S]*?<\/ul>/)[0].match(/<li>/g) || []).length, t('seo_why').length, `${lang}: the reasons`);
+      // Живое число — столько же, сколько карточек в каталоге.
+      const cards = (html.match(/class="master-card /g) || []).length;
+      assert.ok(cards > 0 && html.includes('<p>' + t('seo_now_count').replace('{n}', cards).split('{city}')[0]), `${lang}: the live number equals the cards (${cards})`);
+      // Карточки в прежнем виде: строка категории, без хэштегов.
+      assert.ok(html.includes('<p class="catalog-card-category">') && !html.includes('class="card-tag"'), `${lang}: cards keep the category line`);
     }
     // Маленькая группа: фраза без числа и без кружков (на проде 2026-10-09 так вышла страница груза).
     const realGroup = orders.getDispatchRecipients;
