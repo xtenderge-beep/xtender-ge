@@ -26,12 +26,15 @@ router.post('/v', (req, res) => {
 router.post('/task-match', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   const body = req.body && typeof req.body === 'object' ? req.body : {};
-  const result = await require('../services/taskMatch.service').rank({
+  const taskMatch = require('../services/taskMatch.service');
+  // Временно (2026-10-16): body.debug — сырой ответ модели на разбор задачи, модель и версия подсказки.
+  const debug = body.debug === true ? { model: taskMatch.MODEL, version: taskMatch.PROMPT_VERSION } : null;
+  const result = await taskMatch.rank({
     text: body.text, ip: req.headers['cf-connecting-ip'] || req.ip,
-    locale: require('../config/i18n').normalizeLang(body.lang), citySlug: typeof body.city === 'string' ? body.city : '',
+    locale: require('../config/i18n').normalizeLang(body.lang), citySlug: typeof body.city === 'string' ? body.city : '', debug,
   });
-  if (!result) return res.status(204).end();
-  res.json(result);
+  if (!result) return debug ? res.json({ debug }) : res.status(204).end();
+  res.json(debug ? { ...result, debug } : result);
 }));
 
 router.post('/otp/send', asyncHandler(otpController.send));

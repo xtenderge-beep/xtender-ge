@@ -134,14 +134,14 @@ function sanitize(raw, services, featureKeys) {
 const normalize = (text) => require('../config/phoneInText').maskPhones(String(text || '').replace(/\s+/g, ' ').trim()).slice(0, MAX_LENGTH);
 
 // text — что человек написал в поле задачи; ip — для лимита. Не бросает: подбор не должен ломать страницу.
-async function match({ text, ip }) {
+async function match({ text, ip, debug }) {
   const clean = normalize(text);
   if (!enabled() || clean.length < MIN_LENGTH) return null;
   const redis = require('../config/redis');
   const cacheKey = 'task_match:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
   try {
     const cached = await redis.get(cacheKey);
-    if (cached) return JSON.parse(cached);
+    if (cached) { if (debug) debug.cached = true; return JSON.parse(cached); }
     const limitKey = 'task_match_ip:' + String(ip || 'unknown');
     const count = await redis.incr(limitKey);
     if (count === 1) await redis.expire(limitKey, RATE_LIMIT_WINDOW_SECONDS);
@@ -152,7 +152,10 @@ async function match({ text, ip }) {
     const features = FEATURE_TAGS.map((f) => ({ key: f.key, label: f.tag.ru }));
     if (!await withinDailyLimit(redis)) return null;
     const prompt = buildPrompt({ text: clean, services, features, sizes });
-    const result = sanitize(await (model || callModel)(prompt), services, features.map((f) => f.key));
+    const raw = await (model || callModel)(prompt);
+    const result = sanitize(raw, services, features.map((f) => f.key));
+    // Временно (2026-10-16): разбор ответа модели на проде. Ответ — только ключи, без текста задачи.
+    if (debug) debug.raw = String(raw).slice(0, 2000);
     if (result) await redis.set(cacheKey, JSON.stringify(result), 'EX', CACHE_TTL_SECONDS);
     return result;
   } catch (error) {
@@ -229,8 +232,8 @@ function sanitizeOrder(raw, ids) {
 // text — задача; locale — язык страницы (подписи и описания кандидатов); citySlug — город каталога.
 // Возвращает { services, features, providers: [id по порядку] }; без providers — список собрать не удалось;
 // null — ИИ выключен, лимит, сбой разбора.
-async function rank({ text, ip, locale = 'ru', citySlug }) {
-  const understood = await match({ text, ip });
+async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
+  const understood = await match({ text, ip, debug });
   if (!understood) return null;
   if (!understood.services.length && !understood.features.length) return { ...understood, providers: [] };
   try {
@@ -294,4 +297,4 @@ async function rank({ text, ip, locale = 'ru', citySlug }) {
   }
 }
 
-module.exports = { enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };
+module.exports = { MODEL, PROMPT_VERSION, enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };
