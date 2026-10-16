@@ -15,6 +15,8 @@ const KEY = process.env.OPENROUTER_API_KEY;
 const CALL_TIMEOUT_MS = 8000;
 // Меняется вместе с текстом подсказок: ответы прежней версии из кеша не берутся.
 const PROMPT_VERSION = 2;
+// Временно (2026-10-16): модели, которые можно выбрать отладочным запросом для сравнения качества подбора.
+const TEST_MODELS = ['google/gemini-2.5-flash-lite', 'google/gemini-3.1-flash-lite', 'google/gemini-2.5-flash', 'google/gemini-3-flash-preview'];
 const MIN_LENGTH = 8;
 const MAX_LENGTH = 1000;
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
@@ -82,8 +84,9 @@ Task:
 ${text}`;
 }
 
-async function callModel(prompt) {
-  const body = { model: MODEL, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 400 };
+async function callModel(prompt, modelId = MODEL) {
+  // Запас по длине: часть моделей тратит ответ на рассуждение, обрезанный JSON — потерянный подбор.
+  const body = { model: modelId, messages: [{ role: 'user', content: prompt }], temperature: 0, max_tokens: 1500 };
   const send = (extra) => axios.post('https://openrouter.ai/api/v1/chat/completions', { ...body, ...extra },
     { headers: { Authorization: `Bearer ${KEY}`, 'HTTP-Referer': 'https://xtender.ge', 'X-Title': 'xtender.ge' }, timeout: CALL_TIMEOUT_MS });
   let res;
@@ -138,7 +141,8 @@ async function match({ text, ip, debug }) {
   const clean = normalize(text);
   if (!enabled() || clean.length < MIN_LENGTH) return null;
   const redis = require('../config/redis');
-  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
+  const modelId = (debug && debug.model) || MODEL;
+  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(modelId + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
   try {
     const cached = await redis.get(cacheKey);
     if (cached) { if (debug) debug.cached = true; return JSON.parse(cached); }
@@ -152,7 +156,7 @@ async function match({ text, ip, debug }) {
     const features = FEATURE_TAGS.map((f) => ({ key: f.key, label: f.tag.ru }));
     if (!await withinDailyLimit(redis)) return null;
     const prompt = buildPrompt({ text: clean, services, features, sizes });
-    const raw = await (model || callModel)(prompt);
+    const raw = await (model || callModel)(prompt, modelId);
     const result = sanitize(raw, services, features.map((f) => f.key));
     // Временно (2026-10-16): разбор ответа модели на проде. Ответ — только ключи, без текста задачи.
     if (debug) debug.raw = String(raw).slice(0, 2000);
@@ -268,7 +272,8 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
     if (candidates.length > 1) {
       const clean = normalize(text);
       const redis = require('../config/redis');
-      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
+      const modelId = (debug && debug.model) || MODEL;
+      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(modelId + '\n' + PROMPT_VERSION + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
       const cached = await redis.get(cacheKey);
       if (cached) providers = JSON.parse(cached);
       else if (await withinDailyLimit(redis)) {
@@ -280,7 +285,7 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
         });
         // Сбой модели на этом шаге не страшен: остаётся порядок по услугам и характеристикам.
         let order = null;
-        try { order = sanitizeOrder(await (model || callModel)(rerankPrompt(clean, lines)), providers); }
+        try { order = sanitizeOrder(await (model || callModel)(rerankPrompt(clean, lines), modelId), providers); }
         catch (error) { console.error('[task-match] rerank failed:', error.message); }
         if (order) {
           providers = order;
@@ -297,4 +302,4 @@ async function rank({ text, ip, locale = 'ru', citySlug, debug }) {
   }
 }
 
-module.exports = { MODEL, PROMPT_VERSION, enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };
+module.exports = { MODEL, PROMPT_VERSION, TEST_MODELS, enabled, useModel, buildPrompt, sanitize, match, rank, fit, rerankPrompt, sanitizeOrder, RATE_LIMIT_MAX, MAX_CANDIDATES, DAILY_MODEL_CALLS };

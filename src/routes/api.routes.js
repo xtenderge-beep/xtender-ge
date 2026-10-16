@@ -28,7 +28,7 @@ router.post('/task-match', asyncHandler(async (req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const taskMatch = require('../services/taskMatch.service');
   // Временно (2026-10-16): body.debug — сырой ответ модели на разбор задачи, модель и версия подсказки.
-  const debug = body.debug === true ? { model: taskMatch.MODEL, version: taskMatch.PROMPT_VERSION } : null;
+  const debug = body.debug === true ? { model: taskMatch.TEST_MODELS.includes(body.model) ? body.model : taskMatch.MODEL, version: taskMatch.PROMPT_VERSION } : null;
   const result = await taskMatch.rank({
     text: body.text, ip: req.headers['cf-connecting-ip'] || req.ip,
     locale: require('../config/i18n').normalizeLang(body.lang), citySlug: typeof body.city === 'string' ? body.city : '', debug,
