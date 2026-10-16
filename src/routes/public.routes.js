@@ -62,8 +62,8 @@ async function publishedLandings() {
 
 // Главная и страницы под рекламу и поиск (/s/<slug>) — один шаблон. У страницы свой первый экран,
 // заголовок вкладки, описание для поиска и статья; каталог, форма и остальное общие.
-// page — строка landing_pages или null для главной.
-async function renderHome(req, res, locale, page) {
+// page — строка landing_pages или null для главной. options.simple — тестовая главная /demo.
+async function renderHome(req, res, locale, page, options = {}) {
   const catalogCities = await masterService.getActiveCities();
   const catalogCity = catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
   const [masters, catalogCallPriceTetri] = await Promise.all([
@@ -128,12 +128,22 @@ async function renderHome(req, res, locale, page) {
     clientStrings: clientStrings(locale),
     catalogGroups: await categoryService.catalogGroups(locale),
     catalogServiceConfig: await categoryService.configForView(locale),
+    simpleHome: Boolean(options.simple),
+    simpleTabs: require('../config/simple-home-copy').SIMPLE_HOME_TABS,
+    simpleSearch: options.simple ? require('../config/service-search-words').forPage(categories, locale) : null,
   });
 }
 
 router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
   await renderHome(req, res, resolveLocale(req, res, '/'), null);
+}));
+
+// Тестовая главная по эскизу владельца 2026-10-16: те же форма и каталог, пояснения убраны за
+// «Как это работает?». Закрыта от поиска (noindex в index.ejs), ссылок на неё с сайта нет.
+router.get('/demo', asyncHandler(async (req, res) => {
+  if (redirectToCookieLocale(req, res, '/demo')) return;
+  await renderHome(req, res, resolveLocale(req, res, '/demo'), null, { simple: true });
 }));
 
 // Страница под рекламу и поиск. Параметры адреса (gclid, utm_*) при переадресациях сохраняются:
