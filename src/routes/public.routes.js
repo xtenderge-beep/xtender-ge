@@ -4,6 +4,7 @@ const { normalizeLang, translate, clientStrings } = require('../config/i18n');
 const serviceTypes = require('../config/serviceTypes');
 const { buildSeo, localizedPath, sitemapXml } = require('../config/seo');
 const landingPages = require('../services/landingPage.service');
+const servicePages = require('../services/servicePages.service');
 const { SERVICE_REQUISITES } = require('../config/legal');
 const legalContent = require('../config/legal-content');
 const legalContentService = require('../services/legalContent.service');
@@ -60,12 +61,27 @@ async function publishedLandings() {
   }
 }
 
-// Главная и страницы под рекламу и поиск (/s/<slug>) — один шаблон. У страницы свой первый экран,
-// заголовок вкладки, описание для поиска и статья; каталог, форма и остальное общие.
-// page — строка landing_pages или null для главной. options.simple — вёрстка главной (эскиз 2026-10-16).
+// Адреса всех страниц задач, включённых и нет: автоматическая страница с таким же адресом не показывается,
+// потому что /s/<slug> сначала ищет страницу задачи.
+async function landingSlugs() {
+  try {
+    return new Set((await landingPages.list()).map(item => item.slug));
+  } catch (error) {
+    console.error('Landing pages unavailable:', error.message);
+    return new Set();
+  }
+}
+
+// Главная, страницы задач (/s/<slug> из админки) и страницы «услуга + город» — один шаблон и один стандарт
+// (владелец 2026-10-16): поле задачи, ряд хэштегов, каталог, внизу заголовок страницы и общий SEO-текст. У
+// страницы свои заголовок вкладки, описание для поиска, пример в поле, нажатый хэштег и текст внизу.
+// page — строка landing_pages или null. options.simple — эта вёрстка (без него — прежняя, сейчас её никто не
+// вызывает). options.auto — страница «услуга + город» ({ category, city } из servicePages.find); false —
+// у услуги в городе нет исполнителей, страницы нет.
 async function renderHome(req, res, locale, page, options = {}) {
   const catalogCities = await masterService.getActiveCities();
-  const catalogCity = catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
+  const catalogCity = (options.auto && catalogCities.find(city => city.id === options.auto.city.id))
+    || catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
   const [masters, catalogCallPriceTetri] = await Promise.all([
     masterService.listMasters({ language: locale, cityId: catalogCity?.id }),
     settingsService.getCatalogCallPriceTetri(),
@@ -96,6 +112,22 @@ async function renderHome(req, res, locale, page, options = {}) {
   const categories = await categoryService.list();
   categoryService.decorateForCatalog(masters, categories, locale);
 
+  // Страницы «услуга + город» этого города: ссылки с главной и сама страница, если открыта она.
+  const cityPages = options.simple && catalogCity ? servicePages.forCity(categories, catalogCity, masters, await landingSlugs()) : [];
+  let servicePage = null;
+  if (options.auto) {
+    const current = cityPages.find(item => item.category.slug === options.auto.category.slug);
+    if (!current) return false;
+    servicePage = servicePages.view(current, locale, masters, cityPages, t);
+  }
+  // Услуги, на которых стоит страница: у страницы услуги — её услуга, у страницы задачи — отмеченные группы
+  // («transport» в группах рассылки — это услуга van). Их исполнители первыми, внутри — прежний порядок.
+  const focusServices = servicePage ? [servicePage.key] : page ? [...new Set((page.categories || []).map(categoryService.toType))] : null;
+  if (focusServices) {
+    const serves = m => focusServices.some(key => m.service_type === key || (m.services || []).some(s => s.service_type === key));
+    masters.sort((a, b) => Number(serves(b)) - Number(serves(a)));
+  }
+
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
   const inviteToken = req.cookies.order_invite;
@@ -108,6 +140,18 @@ async function renderHome(req, res, locale, page, options = {}) {
   const landingLinks = (await publishedLandings())
     .filter(item => item.id !== page?.id && item.languages.includes(locale))
     .map(item => ({ href: localizedPath(locale, '/s/' + item.slug), title: [item.content[locale].title, item.content[locale].accent].filter(Boolean).join(' ') }));
+
+  // Хэштеги главной: у каждого исполнителя каталога этого города свои, в ряду — самые частые, с числом.
+  const simpleSearch = options.simple ? require('../config/service-search-words').forPage(categories, locale, masters) : null;
+  // Хэштег страницы первый в ряду и нажат сразу: каталог открывается её исполнителями. У страницы задачи из
+  // двух услуг — хэштег группы с теми же услугами (грузчики и перевозка — #переезд), иначе — первой услуги.
+  let pageFocus = null;
+  if (simpleSearch && focusServices) {
+    const same = tag => tag.kind !== 'feature' && tag.services.length === focusServices.length && focusServices.every(key => tag.services.includes(key));
+    const tag = simpleSearch.tags.find(same) || simpleSearch.tags.find(item => item.key === focusServices[0]);
+    pageFocus = { services: focusServices, preset: tag ? { key: tag.key, label: '#' + tag.label } : null };
+    if (tag) simpleSearch.rowTags = [tag, ...simpleSearch.rowTags.filter(item => item.key !== tag.key)].slice(0, 10);
+  }
 
   res.render('index', {
     consent: await consentService.bundle('client', locale),
@@ -122,8 +166,13 @@ async function renderHome(req, res, locale, page, options = {}) {
     catalogGroups: await categoryService.catalogGroups(locale),
     catalogServiceConfig: await categoryService.configForView(locale),
     simpleHome: Boolean(options.simple),
-    // Хэштеги главной: у каждого исполнителя каталога этого города свои, в ряду — самые частые, с числом.
-    simpleSearch: options.simple ? require('../config/service-search-words').forPage(categories, locale, masters) : null,
+    simpleSearch,
+    servicePage,
+    pageFocus,
+    // Ссылки внизу каждой страницы: открытые поиску страницы «услуга + город» (на странице услуги — остальные,
+    // соседние первыми), затем страницы задач.
+    serviceLinks: servicePage ? servicePage.others : cityPages.filter(item => item.indexable).map(item => ({ href: localizedPath(locale, '/s/' + item.slug), title: servicePages.title(item, locale) })),
+    linksTitle: catalogCity ? t('seo_links_title').replace('{city}', servicePages.inCity(catalogCity, locale)) : t('home_services_title'),
     // Подбор по смыслу (ИИ) пока включается только ссылкой с ?ai=1 — для проверки владельцем на проде.
     aiMatch: Boolean(options.simple && req.query.ai === '1' && require('../services/taskMatch.service').enabled()),
   });
@@ -132,7 +181,7 @@ async function renderHome(req, res, locale, page, options = {}) {
 router.get('/', asyncHandler(async (req, res) => {
   if (redirectToCookieLocale(req, res, '')) return;
   // Главная по эскизу владельца 2026-10-16: поле задачи, вкладки услуг, поиск, каталог, SEO-текст;
-  // пояснения убраны за «Как это работает?». Страницы задач (/s/<slug>) пока в прежней вёрстке.
+  // пояснения убраны за «Как это работает?». Страницы задач и услуг (/s/<slug>) — в той же вёрстке.
   await renderHome(req, res, resolveLocale(req, res, '/'), null, { simple: true });
 }));
 
@@ -145,7 +194,16 @@ router.get('/demo', (req, res) => {
 // по ним Google связывает клик с заявкой.
 router.get('/s/:slug', asyncHandler(async (req, res, next) => {
   const page = await landingPages.getBySlug(req.params.slug);
-  if (!page) return next();
+  if (!page) {
+    // Нет страницы задачи — может быть автоматическая «услуга + город» (/s/mushebi-tbilisi). Она есть на всех
+    // трёх языках; язык выбирается так же, как у остальных страниц.
+    const auto = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(req.params.slug) ? await servicePages.find(req.params.slug) : null;
+    if (!auto) return next();
+    const path = '/s/' + req.params.slug;
+    if (redirectToCookieLocale(req, res, path)) return;
+    if (await renderHome(req, res, resolveLocale(req, res, path), null, { simple: true, auto }) === false) return next();
+    return;
+  }
   const path = '/s/' + page.slug;
   const wanted = normalizeLang(req.params.locale);
   const query = new URLSearchParams(req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?') + 1) : '');
@@ -172,13 +230,20 @@ router.get('/s/:slug', asyncHandler(async (req, res, next) => {
   seo.hreflang = Object.fromEntries(langs.map(lang => [lang, seo.alternates[lang]]));
   seo.xDefault = seo.hreflang.ka || seo.hreflang[langs[0]];
   for (const lang of Object.keys(seo.alternates)) if (!langs.includes(lang)) seo.alternates[lang] = homeLinks[lang];
-  await renderHome(req, res, locale, page);
+  await renderHome(req, res, locale, page, { simple: true });
 }));
 
-// Карта сайта собирается на лету: в ней постоянные страницы и включённые страницы задач.
+// Карта сайта собирается на лету: постоянные страницы, включённые страницы задач и открытые поиску страницы
+// «услуга + город» (они есть на всех трёх языках). Сбой подсчёта страниц услуг карту не роняет.
 router.get('/sitemap.xml', asyncHandler(async (req, res, next) => {
   if (req.params.locale) return next();
-  res.type('application/xml').send(sitemapXml(await publishedLandings()));
+  let services = [];
+  try {
+    services = (await servicePages.published(await landingSlugs())).map(item => ({ slug: item.slug, languages: ['ka', 'ru', 'en'] }));
+  } catch (error) {
+    console.error('Service pages unavailable:', error.message);
+  }
+  res.type('application/xml').send(sitemapXml([...(await publishedLandings()), ...services]));
 }));
 
 // Персональная ссылка менеджера для заказчика. Ставим куку с токеном приглашения,

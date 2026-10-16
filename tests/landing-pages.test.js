@@ -232,26 +232,32 @@ function startSite() {
       assert.deepEqual(crumbs.itemListElement.map(item => item.item), ['https://xtender.test' + (lang === 'ka' ? '/' : '/' + lang), self], `${where}: breadcrumbs`);
       assert.match(head, /googletagmanager|google-tag\.js|G-TEST123456/, `${where}: the Google tag is on the page ads lead to`);
 
-      assert.match(html, /<body class="home-page home-topic /, `${where}: marked as a task page`);
-      assert.equal(html.includes('<body class="home-page home-topic home-topic-query '), lang === 'en', `${where}: the mark for the query line`);
+      // Один стандарт с главной (владелец 2026-10-16): та же вёрстка, свои заголовок, фраза, статья внизу.
+      assert.match(html, /<body class="home-page home-simple font-sans /, `${where}: the same layout as the homepage`);
       assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, `${where}: exactly one h1`);
       // Английская версия — куда ведёт реклама по грузинским запросам: в заголовке стоит и сам запрос латиницей.
       // Слова заданы в админке, а где поле пустое — берутся из адреса страницы.
-      const queryWords = lang === 'en' ? ` <span class="home-hero-query">${{ 'avejis-gadazidva': 'Avejis gadazidva, mushebi', 'tvirtis-gadazidva': 'Tvirtis gadazidva', 'samsheneblo-nagvis-gatana': 'Samsheneblo nagvis gatana' }[page.slug]}</span>` : '';
-      assert.ok(html.includes(`<h1 class="home-hero-title">${text.title} <span>${text.accent}</span>${queryWords}</h1>`), `${where}: the headline`);
+      const queryWords = lang === 'en' ? ` <span class="simple-seo-query">${{ 'avejis-gadazidva': 'Avejis gadazidva, mushebi', 'tvirtis-gadazidva': 'Tvirtis gadazidva', 'samsheneblo-nagvis-gatana': 'Samsheneblo nagvis gatana' }[page.slug]}</span>` : '';
+      assert.ok(html.includes(`<h1 id="simple-seo-title">${text.title} ${text.accent}${queryWords}</h1>`), `${where}: the headline`);
       const count = (await landingPages.view(page, lang, tbilisi)).count;
       const [before, bold, after] = text.post.replace('{count}', count).split(/[\[\]]/);
-      assert.ok(html.includes(`<span class="home-usp-post">${before}<b>${bold}</b>${after}</span> <span class="home-usp-choose">${text.choose}</span>`), `${where}: the sentence with the real number`);
-      assert.ok(html.includes(`</i>${text.fact1}</li>`) && html.includes(`</i>${text.fact2}</li>`), `${where}: two facts under the form`);
+      assert.ok(html.includes(`<p class="simple-seo-lead">${before}<b>${bold}</b>${after} ${text.choose}</p>`), `${where}: the sentence with the real number`);
       assert.ok(html.includes(`placeholder="${text.placeholder}"`), `${where}: the example fits the task`);
-      assert.doesNotMatch(html, /class="home-hero-lead"|class="home-catalog-strip"/, `${where}: the general lead and counter are replaced`);
-      assert.equal(html.includes('<article class="home-article">'), lang !== 'ka', `${where}: article shown only where it is switched on`);
-      if (lang !== 'ka') assert.ok(html.includes(`<h2>${text.article.match(/^## (.+)$/m)[1]}</h2>`), `${where}: article headings are h2`);
+      assert.doesNotMatch(html, /class="home-hero-title"|class="home-usp|class="home-catalog-strip"|class="home-article"/, `${where}: nothing of the old layout`);
+      // Статья страницы стоит на месте общих «Как это работает» и «Чем удобнее»: раздел «как работает» один.
+      const headings = [...text.article.matchAll(/^## (.+)$/gm)].map(match => match[1]);
+      assert.equal(html.includes(`<h2>${headings[headings.length - 1]}</h2>`), lang !== 'ka', `${where}: article shown only where it is switched on`);
+      assert.equal(html.split(`<h2>${translate(lang)('seo_how_title')}</h2>`).length - 1, 1, `${where}: one "how it works" section`);
+      assert.equal(html.includes(`<h2>${translate(lang)('seo_why_title')}</h2>`), lang === 'ka', `${where}: the shared reasons only without the article`);
+      assert.ok(html.includes(`<h2>${translate(lang)('seo_what_title')}</h2>`), `${where}: what the service is`);
+      // Хэштег страницы нажат при открытии: у переезда (грузчики и перевозка) — группа #переезд.
+      const preset = { 'avejis-gadazidva': 'moving', 'tvirtis-gadazidva': 'van', 'samsheneblo-nagvis-gatana': 'junk' }[page.slug];
+      assert.ok(html.includes(`"preset":{"key":"${preset}"`), `${where}: the ${preset} hashtag is pressed on open`);
       // Ссылки на остальные страницы задач и переключатель языка.
       for (const other of [moving, cargo, junk]) assert.equal(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/s/${other.slug}">`), other.id !== page.id, `${where}: link to ${other.slug}`);
       assert.equal((html.match(new RegExp(`<a href="https://xtender\\.test[^"]*/s/${page.slug}[^"]*" aria-label="(?:GE|RU|EN)"`, 'g')) || []).length, 3, `${where}: language switch stays on the page`);
       // The request form is the same one: same field, same handlers, same steps.
-      for (const piece of ['id="freeformInput"', 'onclick="submitFreeform()"', 'onclick="exitCompose()"', 'id="phoneStep"', 'id="otpStep"', 'class="composer-toprow"', 'for="freeformInput"', 'id="hxToggle"'])
+      for (const piece of ['id="freeformInput"', 'onclick="submitFreeform()"', 'onclick="exitCompose()"', 'id="phoneStep"', 'id="otpStep"', 'id="simpleSearch"', 'id="hxToggle"'])
         assert.ok(html.includes(piece), `${where}: ${piece}`);
     }
 
@@ -286,7 +292,7 @@ function startSite() {
     orders.getDispatchRecipients = async () => [{ id: 1, name: 'Avto' }, { id: 2, name: 'Beka' }];
     const small = await (await get('/ru/s/tvirtis-gadazidva')).text();
     orders.getDispatchRecipients = realGroup;
-    assert.ok(small.includes('<span class="home-usp-post">Разместите пост в группе <b>водителей</b></span>'), 'a small group gets the phrase without a number');
+    assert.ok(small.includes('<p class="simple-seo-lead">Разместите пост в группе <b>водителей</b> '), 'a small group gets the phrase without a number');
     assert.doesNotMatch(small, /home-usp-avatars|home-usp-more/, 'and no circles');
 
     // Адрес, по которому новая главная проверялась до выкладки, ведёт на главную того же языка.
@@ -339,13 +345,14 @@ function startSite() {
     assert.equal((await get('/s/no-such-page')).status, 404);
     assert.equal((await get('/s/Bad_Slug')).status, 404);
 
-    // 6. Карта сайта: постоянные страницы на трёх языках и включённые страницы задач.
+    // 6. Карта сайта: постоянные страницы на трёх языках, включённые страницы задач и страницы «услуга + город»,
+    // где в Тбилиси не меньше трёх исполнителей услуги (tests/service-pages.test.js).
     const sitemap = await get('/sitemap.xml');
     assert.match(sitemap.headers.get('content-type'), /xml/);
     const xml = await sitemap.text();
     const locs = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1].replace('https://xtender.test', ''));
     const three = suffix => [suffix, '/ru' + (suffix === '/' ? '' : suffix), '/en' + (suffix === '/' ? '' : suffix)];
-    assert.deepEqual(locs, [...['/', '/join', '/terms', '/privacy', '/guides/request'].flatMap(three), ...[moving, cargo, junk].flatMap(page => three('/s/' + page.slug))]);
+    assert.deepEqual(locs, [...['/', '/join', '/terms', '/privacy', '/guides/request'].flatMap(three), ...[moving, cargo, junk].flatMap(page => three('/s/' + page.slug)), ...['gadazidva', 'mushebi', 'nagvis-gatana'].flatMap(service => three('/s/' + service + '-tbilisi'))]);
     assert.doesNotMatch(xml, /test-page/, 'a switched-off page is not in the sitemap');
     assert.equal((xml.match(/hreflang="x-default"/g) || []).length, locs.length, 'every address names its default version');
     assert.equal((await get('/ru/sitemap.xml')).status, 404, 'the sitemap has one address');
@@ -359,9 +366,9 @@ function startSite() {
     console.error = () => {};
     const homeDuringFailure = await get('/?lang=ka');
     assert.equal(homeDuringFailure.status, 200, 'the homepage survives a landing-page failure');
-    assert.doesNotMatch(await homeDuringFailure.text(), /class="home-task-links"/);
+    assert.doesNotMatch(await homeDuringFailure.text(), /\/s\/avejis-gadazidva/, 'without the task pages');
     const sitemapDuringFailure = await (await get('/sitemap.xml')).text();
-    assert.ok(sitemapDuringFailure.includes('<loc>https://xtender.test/join</loc>') && !sitemapDuringFailure.includes('/s/'), 'the sitemap keeps the permanent pages');
+    assert.ok(sitemapDuringFailure.includes('<loc>https://xtender.test/join</loc>') && !sitemapDuringFailure.includes('/s/avejis-gadazidva'), 'the sitemap keeps the permanent pages');
     require(servicePath).published = realPublished; console.error = quiet;
   } finally {
     // Ответы, у которых проверялся только статус, держат соединение открытым: закрываем явно,

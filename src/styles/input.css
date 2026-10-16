@@ -830,6 +830,9 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .simple-seo h3 { margin:22px 0 6px; font-size:16px; font-weight:650; }
 .simple-seo p { max-width:820px; font-size:15px; line-height:1.7; color:var(--home-muted); }
 .simple-seo p strong { font-weight:650; color:var(--home-ink); }
+/* Страница задачи: запрос латиницей под заголовком (английская версия) и выделенные слова фразы о группе. */
+.simple-seo-query { display:block; margin-top:4px; font-size:15px; font-weight:600; letter-spacing:0; color:var(--home-muted); }
+.simple-seo-lead b { font-weight:650; color:var(--home-green); }
 /* «Как это работает»: шаги с номером в кружке; «Чем удобнее» — короткий список с точками. */
 .simple-seo-steps { max-width:820px; margin:10px 0 0; padding:0; list-style:none; counter-reset:seo-step; }
 .simple-seo-steps li { position:relative; margin-top:20px; padding:0 0 4px 44px; counter-increment:seo-step; }

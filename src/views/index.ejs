@@ -8,14 +8,23 @@
       const topic = typeof landing !== 'undefined' && landing ? landing : null;
       // Главная (эскиз владельца 2026-10-16): шапка, поле задачи, вкладки услуг с поиском, плитка
       // исполнителей, SEO-текст. Остальные блоки не выводятся; фильтры каталога остаются в разметке
-      // скрытыми, потому что на них опирается скрипт страницы. Страницы задач — в прежней вёрстке.
+      // скрытыми, потому что на них опирается скрипт страницы. Страницы задач и услуг — в этой же вёрстке
+      // (единый стандарт, docs/seo.md); ветка без simple — прежняя вёрстка, её больше никто не вызывает.
       const simple = typeof simpleHome !== 'undefined' && simpleHome;
-      const pageTitle = topic ? topic.seoTitle : t('site_title_index');
-      const pageDescription = (topic && topic.seoDescription) || t('meta_description_index');
+      // Автоматическая страница «услуга + город» (/s/mushebi-tbilisi, servicePages.service.js) — та же главная:
+      // свой заголовок, пример в поле, нажатый хэштег услуги и свой SEO-текст внизу. С малым числом исполнителей
+      // она закрыта от поиска.
+      const autoPage = typeof servicePage !== 'undefined' && servicePage ? servicePage : null;
+      // Услуги, на которых стоит страница задачи или услуги, и её хэштег (public.routes.js, pageFocus): группа
+      // этих услуг в каталоге первая, хэштег нажат при открытии, живые числа внизу — только по ним.
+      const focus = typeof pageFocus !== 'undefined' && pageFocus ? pageFocus : null;
+      const pageTitle = topic ? topic.seoTitle : autoPage ? autoPage.seoTitle : t('site_title_index');
+      const pageDescription = (topic && topic.seoDescription) || (autoPage && autoPage.seoDescription) || t('meta_description_index');
     %>
     <%- include('partials/head', {
       title: pageTitle,
       metaDescription: pageDescription,
+      noindex: Boolean(autoPage && !autoPage.indexable),
       viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
     }) %>
 
@@ -41,7 +50,7 @@
         '@context': 'https://schema.org',
         '@type': 'MovingCompany',
         name: 'xtender.ge',
-        url: topic ? seo.canonical.split('/s/')[0] + (lang === 'ka' ? '/' : '') : seo.canonical,
+        url: topic || autoPage ? seo.canonical.split('/s/')[0] + (lang === 'ka' ? '/' : '') : seo.canonical,
         // Тот же текст, что в блоке «Что такое xtender.ge» внизу главной: разметка совпадает с видимым текстом.
         ...(simple ? { description: t('seo_what_body') } : {}),
         areaServed: {
@@ -93,9 +102,34 @@
     %>
     <script type="application/ld+json"><%- safeJson(serviceJsonLd) %></script>
     <script type="application/ld+json"><%- safeJson(breadcrumbJsonLd) %></script>
+    <% } else if (autoPage) {
+      // Страница «услуга + город»: услуга, её город и место на сайте. Описание — то же, что для поиска.
+      // Названия услуг приходят из админки, поэтому знак «меньше» заменяется кодом, как у страниц задач.
+      const autoJson = (value) => JSON.stringify(value).split('<').join(String.fromCharCode(92) + 'u003c');
+      const autoServiceJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'Service',
+        name: autoPage.h1,
+        serviceType: autoPage.h1,
+        description: pageDescription,
+        url: seo.canonical,
+        areaServed: { '@type': 'City', name: catalogCity.name_en || catalogCity.name_ru },
+        provider: { '@type': 'Organization', name: 'xtender.ge', url: orgJsonLd.url },
+      };
+      const autoBreadcrumbJsonLd = {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'xtender.ge', item: orgJsonLd.url },
+          { '@type': 'ListItem', position: 2, name: autoPage.h1, item: seo.canonical },
+        ],
+      };
+    %>
+    <script type="application/ld+json"><%- autoJson(autoServiceJsonLd) %></script>
+    <script type="application/ld+json"><%- autoJson(autoBreadcrumbJsonLd) %></script>
     <% } %>
 </head>
-<body class="home-page<%= simple ? ' home-simple' : '' %><%= topic ? ' home-topic' : '' %><%= topic && topic.queryWords ? ' home-topic-query' : '' %> font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+<body class="home-page<%= simple ? ' home-simple' : '' %><%= topic && !simple ? ' home-topic' : '' %><%= topic && !simple && topic.queryWords ? ' home-topic-query' : '' %> font-sans text-stone-800 flex flex-col min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
 
 
     <% const homePrefix = lang === 'ka' ? '' : '/' + lang; %>
@@ -183,7 +217,7 @@
                                 <% } %>
 
                                 <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
-                                    <textarea id="freeformInput" rows="5" <% if (simple) { %>aria-label="<%= t('simple_placeholder') %>"<% } else { %>aria-describedby="home-description-hint"<% } %> placeholder="<%= simple ? t('simple_placeholder') : topic ? topic.placeholder : t('freeform_placeholder') %>"
+                                    <textarea id="freeformInput" rows="5" <% if (simple) { %>aria-label="<%= autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder') %>"<% } else { %>aria-describedby="home-description-hint"<% } %> placeholder="<%= simple ? (autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder')) : topic ? topic.placeholder : t('freeform_placeholder') %>"
                                         class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"></textarea>
 
                                     <div id="attachmentsPreview" class="hidden flex-wrap gap-1.5 pt-2"></div>
@@ -341,8 +375,9 @@
         </section>
         <% } %>
 
-        <% if (topic && topic.article.length) { %>
-        <%# Статья страницы задачи: как устроена работа для этой задачи. Формат как у оферты: заголовки, абзацы, списки. %>
+        <% if (topic && topic.article.length && !simple) { %>
+        <%# Статья страницы задачи: как устроена работа для этой задачи. Формат как у оферты: заголовки, абзацы, списки.
+            В вёрстке главной она стоит внизу, в SEO-блоке. %>
         <article class="home-article">
           <% topic.article.forEach(function (block) { %>
           <% if (block.h) { %><h2><%= block.h %></h2><% } else if (block.ul) { %><ul><% block.ul.forEach(function (item) { %><li><%= item %></li><% }); %></ul><% } else if (block.p) { %><p><%= block.p %></p><% } %>
@@ -388,7 +423,8 @@
                         </div>
 
                         <%
-                          const groups = catalogGroups;
+                          // На странице задачи или услуги её группы первые: карточки выводятся по группам.
+                          const groups = focus ? catalogGroups.slice().sort((a, b) => Number(focus.services.includes(b.key)) - Number(focus.services.includes(a.key))) : catalogGroups;
                           const reviewLocale = lang === 'ka' ? 'ka-GE' : (lang === 'en' ? 'en-US' : 'ru-RU');
                           function reviewsWord(n) {
                             const m10 = n % 10, m100 = n % 100;
@@ -559,31 +595,53 @@
                     </section>
 
                     <% if (simple) { %>
-                    <%# SEO-текст эскиза. Заголовок страницы для поисковиков (h1) стоит здесь, а не над полем: первый
-                        экран по эскизу без заголовка. Дальше — что это за сервис, как он работает и чем удобнее обзвона
-                        (для людей, Google и ответов ИИ: Google берёт их из того же текста страницы), живые данные
-                        каталога и частые вопросы, те же, что в разметке FAQPage выше. %>
+                    <%# SEO-текст — один стандарт для главной, страниц задач и страниц услуг (владелец 2026-10-16).
+                        Заголовок страницы для поисковиков (h1) стоит здесь, а не над полем: первый экран по эскизу без
+                        заголовка. Под ним — своё у страницы (у страницы задачи — фраза о группе и статья), дальше общее:
+                        что это за сервис, как он работает и чем удобнее обзвона (для людей, Google и ответов ИИ: Google
+                        берёт их из того же текста страницы), живые данные каталога, частые вопросы (те же, что в разметке
+                        FAQPage выше) и ссылки на страницы услуг и задач города. %>
                     <%
                       // Живые данные считаются из того же списка, что карточки выше, поэтому текст не расходится с каталогом.
-                      const nowServices = groups
-                        .map((group) => ({ label: group.label, count: masters.filter((m) => m.service_type === group.key || (m.services || []).some((s) => s.service_type === group.key)).length }))
+                      // На странице задачи или услуги — только исполнители её услуг.
+                      const servesAny = (m, keys) => keys.some((key) => m.service_type === key || (m.services || []).some((s) => s.service_type === key));
+                      const nowMasters = focus ? masters.filter((m) => servesAny(m, focus.services)) : masters;
+                      const nowServices = groups.filter((group) => !focus || focus.services.includes(group.key))
+                        .map((group) => ({ label: group.label, count: masters.filter((m) => servesAny(m, [group.key])).length }))
                         .filter((item) => item.count).sort((a, b) => b.count - a.count);
                       const nowLanguageNames = { ka: 'ქართული', ru: 'Русский', en: 'English', hy: 'Հայերեն', az: 'Azərbaycan dili', tr: 'Türkçe', uk: 'Українська' };
                       const nowLanguages = Object.entries(nowLanguageNames)
-                        .map(([code, label]) => ({ label, count: masters.filter((m) => (m.spoken_languages || []).includes(code)).length }))
+                        .map(([code, label]) => ({ label, count: nowMasters.filter((m) => (m.spoken_languages || []).includes(code)).length }))
                         .filter((item) => item.count).sort((a, b) => b.count - a.count);
                       // По-грузински дата числом: месяц словом выходит в именительном падеже («16 ოქტომბერი»), а нужен родительный.
                       const nowDate = lang === 'ka' ? new Date().toLocaleDateString('ru-RU') : new Date().toLocaleDateString(reviewLocale, { day: 'numeric', month: 'long', year: 'numeric' });
                       const nowCount = t('seo_now_count')
-                        .replace('{n}', masters.length)
+                        .replace('{n}', nowMasters.length)
                         .replace('{city}', catalogCity ? (catalogCity['name_' + lang] || catalogCity.name_ru) : '')
                         .replace('{date}', nowDate);
                     %>
                     <section class="simple-seo" aria-labelledby="simple-seo-title">
+                      <% if (autoPage) { %>
+                      <h1 id="simple-seo-title"><%= autoPage.h1 %></h1>
+                      <p class="simple-seo-lead"><%= t('seo_auto_lead') %></p>
+                      <% } else if (topic) { %>
+                      <%# Страница задачи: заголовок, фраза о группе с настоящим числом и статья — из админки. На английской
+                          версии в заголовке ещё и сам запрос латиницей (куда ведёт реклама по грузинским запросам). %>
+                      <h1 id="simple-seo-title"><%= topic.title %><% if (topic.accent) { %> <%= topic.accent %><% } %><% if (topic.queryWords) { %> <span class="simple-seo-query"><%= topic.queryWords %></span><% } %></h1>
+                      <p class="simple-seo-lead"><%= topic.post[0] %><% if (topic.post.length > 1) { %><b><%= topic.post[1] %></b><%= topic.post[2] %><% } %> <%= topic.choose %></p>
+                      <% } else { %>
                       <h1 id="simple-seo-title"><%= t('home_hero_title') %> <%= t('home_hero_title_accent') %></h1>
                       <p class="simple-seo-lead"><%= t('home_hero_lead_short') %></p>
+                      <% } %>
                       <h2><%= t('seo_what_title') %></h2>
                       <p><%= t('seo_what_body') %></p>
+                      <% if (topic && topic.article.length) { %>
+                      <%# Своя статья страницы задачи («Как это работает» и «Чем отличается от звонка» для этой задачи)
+                          стоит на месте общих «Как это работает» и «Чем удобнее»: два одинаковых раздела подряд не нужны. %>
+                      <% topic.article.forEach(function (block) { %>
+                      <% if (block.h) { %><h2><%= block.h %></h2><% } else if (block.ul) { %><ul class="simple-seo-list"><% block.ul.forEach(function (item) { %><li><%= item %></li><% }); %></ul><% } else if (block.p) { %><p><%= block.p %></p><% } %>
+                      <% }); %>
+                      <% } else { %>
                       <h2><%= t('seo_how_title') %></h2>
                       <ol class="simple-seo-steps">
                         <% t('seo_steps').forEach(function (step) { %><li><h3><%= step[0] %></h3><p><%= step[1] %></p></li><% }); %>
@@ -592,10 +650,12 @@
                       <ul class="simple-seo-list">
                         <% t('seo_why').forEach(function (item) { %><li><%= item %></li><% }); %>
                       </ul>
-                      <% if (masters.length) { %>
+                      <% } %>
+                      <% if (nowMasters.length) { %>
                       <h2><%= t('seo_now_title') %></h2>
                       <p><%= nowCount %></p>
-                      <% if (nowServices.length) { %><p><strong><%= t('seo_now_services') %>:</strong> <%= nowServices.map((item) => item.label + ' — ' + item.count).join(', ') %>.</p><% } %>
+                      <% if (nowServices.length > 1) { %><p><strong><%= t('seo_now_services') %>:</strong> <%= nowServices.map((item) => item.label + ' — ' + item.count).join(', ') %>.</p><% } %>
+                      <% if (autoPage && autoPage.features.length) { %><p><strong><%= t('seo_auto_features') %>:</strong> <%= autoPage.features.map((item) => item.name + ' — ' + item.count).join(', ') %>.</p><% } %>
                       <% if (nowLanguages.length) { %><p><strong><%= t('catalog_languages') %>:</strong> <%= nowLanguages.map((item) => item.label + ' — ' + item.count).join(', ') %>.</p><% } %>
                       <% } %>
                       <h2><%= t('faq_title') %></h2>
@@ -603,9 +663,11 @@
                       <h3><%= item.q %></h3>
                       <p><%= item.a %></p>
                       <% }); %>
-                      <% if (typeof landingLinks !== 'undefined' && landingLinks.length) { %>
-                      <nav class="home-task-links" aria-label="<%= t('home_services_title') %>">
-                        <% landingLinks.forEach(function (link) { %><a href="<%= link.href %>"><%= link.title %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><% }); %>
+                      <% const bottomLinks = [...(typeof serviceLinks !== 'undefined' ? serviceLinks : []), ...(typeof landingLinks !== 'undefined' ? landingLinks : [])]; %>
+                      <% if (bottomLinks.length) { %>
+                      <h2><%= linksTitle %></h2>
+                      <nav class="home-task-links" aria-label="<%= linksTitle %>">
+                        <% bottomLinks.forEach(function (link) { %><a href="<%= link.href %>"><%= link.title %><i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><% }); %>
                       </nav>
                       <% } %>
                     </section>
@@ -1744,6 +1806,8 @@
           /* Подбор по смыслу (ИИ, /api/task-match): язык страницы и город каталога для кандидатов. */
           ai: aiMatch,
           lang, city: catalogCity ? catalogCity.slug : '',
+          /* Страница задачи или услуги: её хэштег нажат при открытии. */
+          preset: focus && focus.preset ? focus.preset : null,
           short: t('simple_match_short'), count: t('simple_match_count'), choice: t('simple_match_choice'), unknown: t('simple_match_unknown'), none: t('simple_match_none'), thinking: t('simple_match_thinking'),
         } : null).split('<').join('\\u003c') %>;
         const searchPanel = document.getElementById('simpleSearch');
@@ -1803,7 +1867,7 @@
                 pressTag(null);
                 resetOrder();
                 taskMatch.hidden = true;
-                if (!ServiceSearch.tokens(text, 3).length) return showAll();
+                if (!ServiceSearch.tokens(text, 3).length) return SEARCH.preset ? showTag(SEARCH.preset.key, SEARCH.preset.label) : showAll();
                 const services = findServices(text);
                 const features = keys.filter((key) => featureKeys.includes(key));
                 let pool = services.length
@@ -1881,6 +1945,7 @@
                 showTag(tag.dataset.tag, tag.dataset.label);
             }));
             showAllButton.addEventListener('click', showAll);
+            if (SEARCH.preset) showTag(SEARCH.preset.key, SEARCH.preset.label);
             // «Опубликовать задачу» под списком: пустое поле — открыть его, иначе тот же шаг, что у кнопки в форме.
             searchPanel.querySelector('.simple-search-publish').addEventListener('click', () => {
                 if (!composeInput.value.trim()) return openComposer();
