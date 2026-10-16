@@ -13,6 +13,8 @@ const crypto = require('crypto');
 const MODEL = process.env.OPENROUTER_MATCH_MODEL || process.env.OPENROUTER_TRANSLATION_MODEL || 'google/gemini-2.5-flash-lite';
 const KEY = process.env.OPENROUTER_API_KEY;
 const CALL_TIMEOUT_MS = 8000;
+// Меняется вместе с текстом подсказок: ответы прежней версии из кеша не берутся.
+const PROMPT_VERSION = 2;
 const MIN_LENGTH = 8;
 const MAX_LENGTH = 1000;
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
@@ -58,8 +60,16 @@ function buildPrompt({ text, services, features, sizes }) {
 Return ONE JSON object and nothing else:
 {"services": [{"key": "<service key>", "main": true, "attributes": {"<field>": <value>}}], "features": ["<feature key>"]}
 
-services - keys from the list below that the task needs, the most important first, at most 3. "main": true for what the customer asks for directly, false for what such a task usually also needs (for example a van for a home move when only movers are named). [] if the task does not say what is needed.
-attributes - only requirements the task states or clearly implies (for example "2 movers" -> crew_size 2, "25 ton crane" -> the tonnage field), using the fields listed for that service and their allowed values. Numbers as numbers. Leave out anything not stated.
+services - keys from the list below, the most important first, at most 4:
+  "main": true - what the customer asks for directly;
+  "main": false - what such a task usually also needs even if it is not named (a home or office move usually needs movers AND a van; removing construction waste usually needs loaders).
+  [] if the task does not say what is needed.
+attributes - put them INSIDE each service object. Only requirements the task states, using the field keys listed for that service and their allowed values: a number of people -> the crew field ("2 movers", "нужны 2 грузчика", "ორი მუშა" -> 2), tonnage, volume, height, body type. Numbers as numbers. Leave out anything not stated.
+
+Example. Task: "на завтра нужен переезд, нужны 2 грузчика, 3 этаж"
+{"services": [{"key": "movers", "main": true, "attributes": {"crew_size": 2}}, {"key": "van", "main": false, "attributes": {}}], "features": []}
+Example. Task: "evakuatori mchirdeba vakeshi"
+{"services": [{"key": "tow", "main": true, "attributes": {}}], "features": []}
 features - keys from the feature list that the task mentions, [] if none.
 Use only what the text says; never guess. The text may be in Georgian, Russian or English, Georgian also in Latin letters, with typos.
 
@@ -118,7 +128,7 @@ function sanitize(raw, services, featureKeys) {
     result.push({ key, main: !(item && item.main === false), attributes });
   }
   const features = [...new Set((Array.isArray(data.features) ? data.features : []).filter((f) => featureKeys.includes(f)))];
-  return { services: result.slice(0, 3), features: features.slice(0, 4) };
+  return { services: result.slice(0, 4), features: features.slice(0, 4) };
 }
 
 const normalize = (text) => require('../config/phoneInText').maskPhones(String(text || '').replace(/\s+/g, ' ').trim()).slice(0, MAX_LENGTH);
@@ -128,7 +138,7 @@ async function match({ text, ip }) {
   const clean = normalize(text);
   if (!enabled() || clean.length < MIN_LENGTH) return null;
   const redis = require('../config/redis');
-  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(MODEL + '\n' + clean.toLowerCase()).digest('hex');
+  const cacheKey = 'task_match:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + clean.toLowerCase()).digest('hex');
   try {
     const cached = await redis.get(cacheKey);
     if (cached) return JSON.parse(cached);
@@ -255,7 +265,7 @@ async function rank({ text, ip, locale = 'ru', citySlug }) {
     if (candidates.length > 1) {
       const clean = normalize(text);
       const redis = require('../config/redis');
-      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(MODEL + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
+      const cacheKey = 'task_rank:' + crypto.createHash('sha1').update(MODEL + '\n' + PROMPT_VERSION + '\n' + locale + '\n' + clean.toLowerCase() + '\n' + providers.join(',')).digest('hex');
       const cached = await redis.get(cacheKey);
       if (cached) providers = JSON.parse(cached);
       else if (await withinDailyLimit(redis)) {
