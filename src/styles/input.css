@@ -874,3 +874,28 @@ body.signup-compose-active .provider-focus-promo{display:none}
   .home-simple .home-header-actions .lang-btn { min-width:27px; padding:4px; }
   .simple-seo { margin-top:40px; padding:20px; }
 }
+/* Вход исполнителя в шапке новой главной (нижнее меню здесь скрыто): на телефоне и узком планшете иконка
+   и короткое «Войти» под ней; логотип чуть меньше, чтобы шапка не выходила за ширину экрана до 320 px. */
+.home-provider-short { display:none; }
+@media (max-width:760px) {
+  .home-simple .home-provider-link { flex-direction:column; gap:4px; padding:2px 0; min-width:40px; border:0; }
+  .home-simple .home-provider-link span:not(.home-provider-short) { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+  .home-simple .home-provider-link i { font-size:17px; }
+  .home-simple .home-provider-link .home-provider-short { display:block; position:static; width:auto; height:auto; overflow:visible; clip:auto; font-size:10px; font-weight:700; line-height:1; color:#728279; }
+}
+@media (max-width:420px) {
+  .home-simple .home-header-inner { gap:8px; }
+  .home-simple .simple-how-link { min-width:64px; }
+  .home-simple .home-brand .brand-logo { gap:5px; }
+  .home-simple .home-brand .brand-logo img { width:24px; height:24px; }
+  .home-simple .home-brand .brand-logo .brand-word { font-size:17px; letter-spacing:-.7px; }
+  .home-simple .home-header-actions .lang-btn { min-width:26px; padding:4px; }
+}
+@media (max-width:340px) {
+  .home-simple .home-header-inner { padding-left:8px; padding-right:8px; gap:5px; }
+  .home-simple .home-brand .brand-logo { gap:4px; }
+  .home-simple .home-brand .brand-logo img { width:22px; height:22px; }
+  .home-simple .home-brand .brand-logo .brand-word { font-size:14px; letter-spacing:-.6px; }
+  .home-simple .home-header-actions .lang-btn { min-width:24px; padding:3px; }
+  .home-simple .home-provider-link { min-width:36px; }
+}

@@ -147,7 +147,8 @@
         <% } %>
         <div class="home-header-actions">
           <%- include('partials/lang-switch', { alternates: seo.alternates }) %>
-          <% if (!simple) { %><a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_label') %></span></a><% } %>
+          <%# Вход исполнителя: на главной в шапке, нижнее меню на этой вёрстке скрыто (просьба владельца 2026-10-17). %>
+          <a class="home-provider-link" href="/master"><i class="fa-solid fa-briefcase" aria-hidden="true"></i><span><%= isRememberedProvider ? t('nav_my_cabinet') : t('home_providers_label') %></span><span class="home-provider-short" aria-hidden="true"><%= isRememberedProvider ? t('nav_my_cabinet') : t('master_login_nav') %></span></a>
         </div>
       </div>
     </header>
