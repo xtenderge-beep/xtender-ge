@@ -2,7 +2,7 @@
 // с этим префиксом обнуляют уже данные подтверждения. Тексты про подарочный баланс поэтому названы rates_*.
 module.exports = {
   ru: {
-    signup_summary: ['Xtender связывает заказчиков и независимых исполнителей.', 'Одну заявку могут получить несколько исполнителей. Заказ и заработок не гарантируются.', 'Цену и объём работ вы согласовываете с заказчиком самостоятельно.', 'Бонусный баланс тратится на уведомления о заявках и показ вашего номера по тарифам из кабинета. Перед пополнением вы подтверждаете тарифы.'],
+    signup_summary: ['Xtender связывает заказчиков и независимых исполнителей.', 'Одну заявку могут получить несколько исполнителей. Заказ и заработок не гарантируются.', 'Цену и объём работ вы согласовываете с заказчиком самостоятельно.', 'Сейчас бесплатный период: уведомления о заявках и показ вашего номера ничего не стоят. Платный режим включается каждому исполнителю отдельно; после этого бонусный баланс тратится по тарифам из кабинета, а перед пополнением вы подтверждаете тарифы.'],
     signup_terms: 'Мне есть 18 лет. Принимаю оферту.',
     signup_terms_link: 'Полный текст оферты',
     signup_privacy: 'Ознакомлен с политикой конфиденциальности. Согласен на публичное размещение моего имени и номера телефона в каталоге.',
@@ -29,7 +29,7 @@ module.exports = {
     provider_billing_pending_hint: "Подтвердите тарифы ниже, чтобы начать получать заявки.",
   },
   en: {
-    signup_summary: ['Xtender connects customers with independent providers.', 'Several providers may receive the same request. Jobs and earnings are not guaranteed.', 'You agree on the price and scope of work directly with the customer.', 'Bonus credit pays for request notifications and for showing your number, at the rates listed in your account. You confirm the rates before topping up.'],
+    signup_summary: ['Xtender connects customers with independent providers.', 'Several providers may receive the same request. Jobs and earnings are not guaranteed.', 'You agree on the price and scope of work directly with the customer.', 'It is a free period now: request notifications and showing your number cost nothing. Paid mode is switched on for each provider separately; after that, bonus credit pays for them at the rates in your account, and you confirm the rates before topping up.'],
     signup_terms: 'I am 18 or older. I accept the Terms of Service.',
     signup_terms_link: 'Full Terms of Service',
     signup_privacy: 'I have read the Privacy Policy. I consent to my name and phone number being displayed publicly in the directory.',
@@ -56,7 +56,7 @@ module.exports = {
     provider_billing_pending_hint: "Confirm the rates below to start receiving requests.",
   },
   ka: {
-    signup_summary: ['Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან.', 'ერთი განაცხადი შეიძლება რამდენიმე შემსრულებელმა მიიღოს. შეკვეთა და შემოსავალი გარანტირებული არ არის.', 'სამუშაოს ფასსა და მოცულობას უშუალოდ დამკვეთთან ათანხმებთ.', 'ბონუსის თანხა იხარჯება განაცხადის შეტყობინებებსა და თქვენი ნომრის ჩვენებაზე, კაბინეტში მითითებული ტარიფებით. ბალანსის შევსებამდე ტარიფებს დაადასტურებთ.'],
+    signup_summary: ['Xtender აკავშირებს დამკვეთებს დამოუკიდებელ შემსრულებლებთან.', 'ერთი განაცხადი შეიძლება რამდენიმე შემსრულებელმა მიიღოს. შეკვეთა და შემოსავალი გარანტირებული არ არის.', 'სამუშაოს ფასსა და მოცულობას უშუალოდ დამკვეთთან ათანხმებთ.', 'ახლა უფასო პერიოდია: განაცხადების შეტყობინებები და თქვენი ნომრის ჩვენება არაფერი ღირს. ფასიანი რეჟიმი თითოეულ შემსრულებელს ცალ-ცალკე ერთვება; ამის შემდეგ ბონუსის თანხა იხარჯება კაბინეტში მითითებული ტარიფებით, ბალანსის შევსებამდე კი ტარიფებს დაადასტურებთ.'],
     signup_terms: 'ვარ 18 წლის ან მეტის. ვეთანხმები ოფერტას.',
     signup_terms_link: 'ოფერტის სრული ტექსტი',
     signup_privacy: 'გავეცანი კონფიდენციალურობის პოლიტიკას. ვეთანხმები ჩემი სახელისა და ტელეფონის ნომრის კატალოგში საჯაროდ განთავსებას.',
