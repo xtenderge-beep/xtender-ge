@@ -916,7 +916,7 @@ body.signup-compose-active .provider-focus-promo{display:none}
   .provider-free-title { font-size:21px; }
 }
 /* Регистрация исполнителя в бесплатный период (2026-10-17): строка о бесплатном периоде под заголовком,
-   вход одной строкой, карточки «Кто вы?» на первом шаге, справа только пример заявки, под формой — как это работает. */
+   вход одной строкой, карточки «Кто вы?» на первом шаге, под формой — как это работает. */
 .join-free-lead { display:flex; align-items:flex-start; gap:10px; margin-top:10px; padding:12px 16px; border-radius:14px; background:#dbe9b5; color:#173b2c; font-size:15px; font-weight:650; line-height:1.45; }
 .join-free-lead i { margin-top:3px; color:#2f6a3c; flex:none; }
 .join-kinds { border:0; padding:0; margin:0; }
@@ -942,3 +942,8 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .join-login { margin:10px 0 22px; font-size:14px; color:#536258; }
 .join-login a { font-weight:750; color:#047857; text-decoration:underline; text-underline-offset:4px; }
 .join-how { margin:20px 0 0; font-size:14px; line-height:1.6; color:#536258; text-align:center; }
+/* Платформа общего профиля: без примера заявки форма регистрации одна по центру — и с обычного захода, и по ссылке менеджера. */
+.provider-join main { max-width:40rem; }
+.provider-join .provider-join-grid { display:block; }
+/* Скрытая панель полноэкранного ввода (класс hidden) даёт карточкам «Кто вы?» лишний отступ сверху. */
+[data-signup-panel="0"] > .join-kinds { margin-top:0 !important; }
