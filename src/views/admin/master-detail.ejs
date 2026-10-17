@@ -42,6 +42,7 @@
     <p class="text-sm text-stone-600 mt-2">
         <%= master.phone %> · <%= master.category_label || master.category %><% if (master.vehicle_type) { %> — <%= master.vehicle_type %><% } %>
     </p>
+    <% if (typeof signupKinds !== 'undefined' && signupKinds.length) { %><p class="text-sm text-stone-600 mt-1">При регистрации выбрал: <b class="text-stone-900"><%= signupKinds.join(', ') %></b></p><% } %>
     <%# Связаться с исполнителем: звонок на основной номер, WhatsApp — на номер из «Мессенджеров», иначе на основной. %>
     <p class="flex flex-wrap gap-2 mt-2">
       <a href="tel:<%= master.phone %>" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold">📞 Позвонить</a>

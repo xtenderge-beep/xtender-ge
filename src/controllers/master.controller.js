@@ -204,6 +204,9 @@ async function register(req, res) {
   const description = (req.body.description || '').trim();
   const spokenLanguages = require('../config/spokenLanguages').parse(req.body.spokenLanguages);
   if (!spokenLanguages) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_languages_required });
+  // «Кто вы?»: подсказка модератору. Без поля (страница, открытая до выкладки) — пустой список.
+  const signupKinds = require('../config/providerKinds').parse(req.body.kinds);
+  if (!signupKinds) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_kind_required });
   const serviceType = null;
   if (!description || description.length > 2000) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_services_required });
   if (require('../config/phoneInText').hasPhone(description)) return res.status(400).json({ success: false, message: clientStrings(req.lang).join_description_phone });
@@ -254,6 +257,7 @@ async function register(req, res) {
       consentGrant: verified, requestMeta: requestMeta(req),
       referralToken: req.cookies.partner_ref || null, referralPromoCode: req.body.promoCode || null,
       language: req.lang,
+      signupKinds,
     });
   } catch (err) {
     if (err.code === 'MASTER_ALREADY_REGISTERED') return existingProfileResponse(req, res);

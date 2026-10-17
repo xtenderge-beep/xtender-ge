@@ -239,6 +239,8 @@ async function notifyModeratorNewMaster(master) {
     `🗣 Языки: ${(master.spoken_languages || []).map(code=>ruNames[code] || code).join(', ') || 'не указаны'}`,
     `${MASTER_CATEGORY_LABELS[master.category] || master.category || 'Категорию назначит модератор'}`,
   ];
+  const kinds = require('../config/providerKinds').labelsRu(master);
+  if (kinds.length) lines.push(`🏷 При регистрации выбрал: ${kinds.join(', ')}`);
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
   lines.push(master.referral_manager_name ? `🔗 По ссылке: ${master.referral_manager_name}` : '🔗 Без реферальной ссылки (органика)');

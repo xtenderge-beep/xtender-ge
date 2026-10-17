@@ -760,6 +760,9 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(80);
 -- включает платный режим каждому отдельно в карточке исполнителя (providerBilling.isPaid). Колонка
 -- объявлена до business_masters, чтобы представление получило её с первого запуска.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_mode BOOLEAN NOT NULL DEFAULT false;
+-- «Кто вы?» при регистрации на /join (2026-10-17): worker / vehicle / store, подсказка модератору
+-- (src/config/providerKinds.js). Пустой массив — зарегистрировался раньше или не отметил.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_kinds JSONB NOT NULL DEFAULT '[]'::jsonb;
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_balance_transactions AS

@@ -249,6 +249,7 @@ async function masterDetail(req, res) {
     vanSizes: vanSizeThresholds.map(t => ({ ...t, spec: vanSizeSpec(t.code, vanSizeThresholds) })),
     maxVanVehicles: MAX_VAN_VEHICLES,
     languageNames: require('../config/spokenLanguages').ruNames,
+    signupKinds: require('../config/providerKinds').labelsRu(master),
     autoDisplayName: require('../config/providerName').displayName(master.name),
     publicName: require('../config/providerName').resolve(master),
     messengersSaved: req.query.saved === 'messengers',

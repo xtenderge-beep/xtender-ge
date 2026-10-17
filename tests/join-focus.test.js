@@ -48,9 +48,10 @@ const settings = require('../src/services/settings.service');
   const count = (html, text) => html.split(text).length - 1;
   // The page embeds the whole dictionary for its script, so visible text is checked on the heading element.
   const heading = html => ((html.match(/<h1[^>]*>([^<]*)<\/h1>/) || [])[1] || '').trim();
-  const noise = ['provider-illustration', 'provider-pricing', 'provider-guide', 'provider-welcome'];
+  // Бесплатный период (2026-10-17): вместо цен и бонуса — «Сейчас бесплатно» и три шага.
+  const noise = ['provider-illustration', 'join-free-card', 'join-steps', 'provider-guide'];
   // What must stay, in every mode: the form, the four short facts and both consent checkboxes.
-  const form = ['id="signupCard"', 'id="descriptionInput"', 'signupBeforeTitle', 'id="termsCheckbox"', 'id="privacyCheckbox"', 'id="sendOtpButton"'];
+  const form = ['id="signupCard"', 'name="kinds"', 'join-free-lead', 'id="descriptionInput"', 'signupBeforeTitle', 'id="termsCheckbox"', 'id="privacyCheckbox"', 'id="sendOtpButton"'];
 
   try {
     // Organic visitor: the full page, the pitch and the bonus.
@@ -58,7 +59,8 @@ const settings = require('../src/services/settings.service');
     assert.equal(organic.status, 200);
     assert.ok(!organic.html.includes('provider-join-focused'));
     for (const marker of [...noise, ...form]) assert.ok(organic.html.includes(marker), 'organic page must contain ' + marker);
-    assert.equal(heading(organic.html), 'Находите новых клиентов');
+    assert.equal(heading(organic.html), 'Получайте заказы бесплатно');
+    for (const gone of ['provider-pricing', 'provider-welcome']) assert.ok(!organic.html.includes(gone), 'no prices or bonus block in the free period: ' + gone);
 
     // Manager's referral link: the registration form only.
     const referred = await page('/ru/join?ref=' + token);

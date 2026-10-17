@@ -32,6 +32,7 @@ async function registerMaster({
   name, phone, description, serviceType, attributes = {}, spokenLanguages = null,
   vehicleTypeText = null, cityId = null, districtIds = [], cityIds = null, photoUrl = null,
   createOnly = false, consentGrant = null, requestMeta = {}, referralToken = null, referralPromoCode = null, language = null,
+  signupKinds = null,
 }) {
   rejectPhoneInText(description);
   const masterToken = generateShortId();
@@ -95,6 +96,11 @@ async function registerMaster({
       if (!languages) throw new Error('Invalid spoken languages');
       await client.query('UPDATE masters SET spoken_languages = $1::jsonb WHERE id = $2', [JSON.stringify(languages), master.id]);
       master.spoken_languages = languages;
+    }
+    // «Кто вы?» с /join: подсказка модератору (providerKinds). null — форма поле не прислала, не трогаем.
+    if (signupKinds !== null) {
+      await client.query('UPDATE masters SET signup_kinds = $1::jsonb WHERE id = $2', [JSON.stringify(signupKinds), master.id]);
+      master.signup_kinds = signupKinds;
     }
     if (cityIds !== null) {
       const available = await client.query('SELECT id FROM cities');
