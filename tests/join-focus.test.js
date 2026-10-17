@@ -48,10 +48,10 @@ const settings = require('../src/services/settings.service');
   const count = (html, text) => html.split(text).length - 1;
   // The page embeds the whole dictionary for its script, so visible text is checked on the heading element.
   const heading = html => ((html.match(/<h1[^>]*>([^<]*)<\/h1>/) || [])[1] || '').trim();
-  // Бесплатный период (2026-10-17): вместо цен и бонуса — «Сейчас бесплатно» и три шага.
-  const noise = ['provider-illustration', 'join-free-card', 'join-steps', 'provider-guide'];
+  // Бесплатный период (2026-10-17): без цен, бонуса и подсказок — справа только пример заявки.
+  const noise = ['provider-illustration'];
   // What must stay, in every mode: the form, the four short facts and both consent checkboxes.
-  const form = ['id="signupCard"', 'name="kinds"', 'join-free-lead', 'id="descriptionInput"', 'signupBeforeTitle', 'id="termsCheckbox"', 'id="privacyCheckbox"', 'id="sendOtpButton"'];
+  const form = ['id="signupCard"', 'name="kinds"', 'join-free-lead', 'join-how', 'id="descriptionInput"', 'signupBeforeTitle', 'id="termsCheckbox"', 'id="privacyCheckbox"', 'id="sendOtpButton"'];
 
   try {
     // Organic visitor: the full page, the pitch and the bonus.
@@ -60,7 +60,7 @@ const settings = require('../src/services/settings.service');
     assert.ok(!organic.html.includes('provider-join-focused'));
     for (const marker of [...noise, ...form]) assert.ok(organic.html.includes(marker), 'organic page must contain ' + marker);
     assert.equal(heading(organic.html), 'Получайте заказы бесплатно');
-    for (const gone of ['provider-pricing', 'provider-welcome']) assert.ok(!organic.html.includes(gone), 'no prices or bonus block in the free period: ' + gone);
+    for (const gone of ['provider-pricing', 'provider-welcome', 'provider-guide', 'providerExampleNext']) assert.ok(!organic.html.includes(gone), 'no prices or bonus block in the free period: ' + gone);
 
     // Manager's referral link: the registration form only.
     const referred = await page('/ru/join?ref=' + token);
@@ -69,7 +69,7 @@ const settings = require('../src/services/settings.service');
     for (const marker of noise) assert.ok(!referred.html.includes(marker), 'focused page must not contain ' + marker);
     for (const marker of form) assert.ok(referred.html.includes(marker), 'focused page must keep ' + marker);
     assert.equal(heading(referred.html), 'Регистрация исполнителя');
-    assert.ok(referred.html.includes('<span>Уже есть профиль?</span>'));
+    assert.ok(referred.html.includes('<p class="join-login">Уже есть профиль? <a href="/master">'), 'login stays as one line');
     assert.ok(referred.setCookie.includes('partner_ref=' + token), 'attribution cookie is still set');
     // The language switcher points at clean URLs, so it must carry the parameters.
     assert.ok(referred.html.includes('/en/join?ref=' + token + '"'));

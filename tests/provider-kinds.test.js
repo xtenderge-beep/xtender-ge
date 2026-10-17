@@ -27,7 +27,7 @@ const args=(phone,signupKinds)=>({phone,name:'Kinds test',description:'Test',ser
  for(const kind of kinds.KINDS) assert.ok(html.includes("kind: '"+kind+"'"),kind);
  for(const lang of ['ka','ru','en']) {
    const t=translate(lang);
-   for(const key of ['join_free_title','join_free_lead','join_kind_title','join_kind_required','join_name_store_label','join_free_card_title'])
+   for(const key of ['join_free_title','join_free_lead','join_kind_title','join_kind_required','join_name_store_label','join_how_line'])
      assert.ok(typeof t(key)==='string'&&t(key)!==key,lang+':'+key);
    for(const kind of kinds.KINDS) assert.ok(t('join_kind_examples')[kind].body,lang+':example '+kind);
  }

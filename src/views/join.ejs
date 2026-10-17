@@ -49,10 +49,7 @@
         <% } %>
         <%# Бесплатный период для новых исполнителей (masters.paid_mode по умолчанию false). %>
         <p class="join-free-lead"><i class="fa-solid fa-gift" aria-hidden="true"></i><span><%= t('join_free_lead') %></span></p>
-        <div class="signup-login">
-            <span><%= t('join_have_profile') %></span>
-            <a href="/master"><i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i> <%= t('master_login_nav') %></a>
-        </div>
+        <p class="join-login"><%= t('join_have_profile') %> <a href="/master"><%= t('master_login_nav') %> →</a></p>
 
         <div class="provider-join-grid">
         <div id="signupCard" class="bg-white rounded-2xl shadow-xl border border-stone-200/80 border-l-4 border-l-emerald-600 overflow-hidden">
@@ -73,7 +70,7 @@
                 <a href="/" class="flex items-center gap-2"><%- include('partials/brand') %></a>
             </div>
             <div id="signupProgress" class="provider-signup-header">
-                <p id="signupStepCount" class="provider-signup-count" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
+                <p id="signupStepCount" class="sr-only" aria-live="polite"><%= t('provider_signup_count').replace('{step}', '1') %></p>
                 <ol class="provider-signup-progress" aria-label="<%= t('provider_signup_progress') %>">
                     <% ['provider_signup_services','provider_signup_city','provider_signup_profile'].forEach((key, i) => { %>
                     <li data-signup-indicator="<%= i %>" <%- i === 0 ? 'aria-current="step"' : '' %>><span class="provider-signup-progress-num"><%= i + 1 %></span><span class="provider-signup-progress-label"><%= t(key) %></span></li>
@@ -94,7 +91,6 @@
                 <%# «Кто вы?»: можно несколько (грузчик со своим фургоном). Подсказка модератору — masters.signup_kinds. %>
                 <fieldset class="join-kinds">
                     <legend class="sr-only"><%= t('join_kind_title') %></legend>
-                    <p class="provider-help"><%= t('join_kind_hint') %></p>
                     <div class="join-kind-grid">
                     <% [
                         { kind: 'worker', emoji: '👷', title: t('join_kind_worker'), desc: t('join_kind_worker_desc') },
@@ -222,19 +218,16 @@
                 </div>
               </div>
             </div>
-            <button type="button" id="providerExampleNext" class="example-next"><%= t('example_next') %></button>
-            <p class="provider-illustration-note"><%= t('provider_illustration_note') %></p>
           </div>
-          <section class="join-free-card"><h2><i class="fa-solid fa-gift" aria-hidden="true"></i><%= t('join_free_card_title') %></h2><p><%= t('join_free_card_body') %></p></section>
-          <section class="join-steps"><h2><%= t('join_steps_title') %></h2><ol><li><%= t('join_step_1') %></li><li><%= t('join_step_2') %></li><li><%= t('join_step_3') %></li></ol></section>
-          <%- include('partials/provider-guide') %></aside>
+          </aside>
         <% } %>
-    </div></main>
+    </div>
+    <p class="join-how"><%= t('join_how_line') %></p>
+    </main>
 
     <script>
         const T = <%- JSON.stringify(clientStrings) %>;
-<% if (typeof focused === 'undefined' || focused !== true) { %>        const PROVIDER_NOTIFICATIONS = <%- JSON.stringify(t('provider_notifications_data')) %>;
-        const KIND_EXAMPLES = <%- JSON.stringify(t('join_kind_examples')) %>;
+<% if (typeof focused === 'undefined' || focused !== true) { %>        const KIND_EXAMPLES = <%- JSON.stringify(t('join_kind_examples')) %>;
 <% } %>
 
         // --- Режим фокуса на шаге 1 (описание услуг): тот же полноэкранный
@@ -541,19 +534,13 @@
 
 <% if (typeof focused === 'undefined' || focused !== true) { %>        (function () {
             const track = document.getElementById('providerIllustrationTrack');
-            const next = document.getElementById('providerExampleNext');
-            if (!track || !next || !Array.isArray(PROVIDER_NOTIFICATIONS) || PROVIDER_NOTIFICATIONS.length < 2) return;
-            let index = 0;
+            if (!track) return;
             function show(example) {
                 const category = track.querySelector('.provider-illustration-category');
                 category.children[0].textContent = example.emoji;
                 category.children[1].textContent = example.notification;
                 track.querySelector('.provider-illustration-body').textContent = example.body;
             }
-            next.addEventListener('click', function () {
-                index = (index + 1) % PROVIDER_NOTIFICATIONS.length;
-                show(PROVIDER_NOTIFICATIONS[index]);
-            });
             // Отметили карточку «Кто вы?» — пример заявки под этот тип (магазину — заявка на материалы).
             window.showKindExample = function (kind) { if (KIND_EXAMPLES && KIND_EXAMPLES[kind]) show(KIND_EXAMPLES[kind]); };
         })();
