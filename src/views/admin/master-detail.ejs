@@ -85,6 +85,21 @@
           <button type="submit" class="px-3 py-2 bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold rounded-xl transition">Включить платный режим</button>
         <% } %>
     </form>
+    <%# Получение заявок (masters.is_subscribed). Исполнитель отписывается и возвращается сам — со страницы заявки
+        или из кабинета; здесь — если он попросил об этом по телефону. %>
+    <form method="POST" action="/admin/masters/<%= master.id %>/lead-subscription" class="mt-2 flex flex-wrap items-center gap-3"
+          onsubmit="return confirm(<%= JSON.stringify(master.is_subscribed === false ? 'Вернуть исполнителя в рассылку? Он сам отписался от заявок — возвращайте, только если он попросил.' : 'Снять исполнителя с рассылки? Новые заявки перестанут приходить; вернуться он сможет сам в кабинете.') %>)">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="subscribed" value="<%= master.is_subscribed === false ? '1' : '0' %>">
+        <% if (master.is_subscribed === false) { %>
+          <span class="text-sm font-bold text-stone-700 bg-stone-100 border border-stone-300 rounded-lg px-2 py-1">Отписался от заявок</span>
+          <span class="text-xs text-stone-500">Рассылка его пропускает, в каталоге он остаётся.</span>
+          <button type="submit" class="px-3 py-2 bg-white hover:bg-stone-50 text-stone-700 border border-stone-300 text-xs font-bold rounded-xl transition">Вернуть в рассылку</button>
+        <% } else { %>
+          <span class="text-xs text-stone-500">Получает заявки.</span>
+          <button type="submit" class="text-xs font-bold text-stone-500 hover:text-red-700 underline">Снять с рассылки</button>
+        <% } %>
+    </form>
 
     <% if (error === 'invalid_amount') { %>
       <p class="mt-2 text-sm text-red-600 font-semibold">Некорректная сумма коррекции.</p>

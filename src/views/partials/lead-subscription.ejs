@@ -1,0 +1,69 @@
+<%# «Больше не присылать мне заявки» / «Снова получать заявки» (leadSubscription.service).
+    endpoint — /api/orders/<заявка>/lead-subscription на странице заявки (ключ личной ссылки ?k= берётся из
+    адреса страницы) или /api/master/<ссылка кабинета>/lead-subscription в кабинете; subscribed — текущее
+    состояние; reload — после нажатия перезагрузить страницу (в кабинете меняется и статус сверху);
+    hint — строка над кнопкой отписки. Кнопка вне блока (статус в кабинете) работает тем же скриптом:
+    ей достаточно атрибутов data-lead-sub-set и data-endpoint. %>
+<div class="lead-sub" data-lead-sub-box data-endpoint="<%= endpoint %>"<%= typeof reload !== 'undefined' && reload ? ' data-reload' : '' %>>
+  <div data-lead-sub-view="on"<%= subscribed ? '' : ' hidden' %>>
+    <% if (typeof hint !== 'undefined' && hint) { %><p class="lead-sub-hint"><%= hint %></p><% } %>
+    <button type="button" data-lead-sub-ask class="lead-sub-link"><%= t('lead_sub_off_btn') %></button>
+    <div data-lead-sub-confirm class="lead-sub-confirm" hidden>
+      <p><%= t('lead_sub_confirm') %></p>
+      <div class="lead-sub-actions">
+        <button type="button" data-lead-sub-set="off" class="lead-sub-danger"><%= t('lead_sub_yes') %></button>
+        <button type="button" data-lead-sub-cancel class="lead-sub-plain"><%= t('lead_sub_cancel') %></button>
+      </div>
+    </div>
+  </div>
+  <div data-lead-sub-view="off"<%= subscribed ? ' hidden' : '' %>>
+    <p class="lead-sub-done"><%= t('lead_sub_done') %></p>
+    <button type="button" data-lead-sub-set="on" class="lead-sub-primary"><%= t('lead_sub_on_btn') %></button>
+  </div>
+  <p data-lead-sub-msg class="lead-sub-msg" role="status" hidden></p>
+</div>
+<script>
+  (function () {
+    if (window.__leadSubBound) return;
+    window.__leadSubBound = true;
+    var leadKey = new URLSearchParams(location.search).get('k') || '';
+    var ERR = <%- JSON.stringify(t('lead_sub_error')) %>;
+    var ON_DONE = <%- JSON.stringify(t('lead_sub_on_done')) %>;
+    function showConfirm(box, open) {
+      box.querySelector('[data-lead-sub-confirm]').hidden = !open;
+      box.querySelector('[data-lead-sub-ask]').hidden = open;
+    }
+    document.addEventListener('click', function (event) {
+      var ask = event.target.closest('[data-lead-sub-ask]');
+      var cancel = event.target.closest('[data-lead-sub-cancel]');
+      if (ask || cancel) { showConfirm((ask || cancel).closest('[data-lead-sub-box]'), Boolean(ask)); return; }
+      var button = event.target.closest('[data-lead-sub-set]');
+      if (!button || button.disabled) return;
+      var holder = button.closest('[data-endpoint]');
+      var box = button.closest('[data-lead-sub-box]');
+      var msg = box ? box.querySelector('[data-lead-sub-msg]') : null;
+      var on = button.getAttribute('data-lead-sub-set') === 'on';
+      button.disabled = true;
+      if (msg) msg.hidden = true;
+      fetch(holder.getAttribute('data-endpoint'), {
+        method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscribed: on, key: leadKey }),
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) { return { status: response.status, data: data }; });
+      }).then(function (result) {
+        if (!result.data.success) throw result;
+        if (holder.hasAttribute('data-reload')) { location.reload(); return; }
+        box.querySelector('[data-lead-sub-view="on"]').hidden = !result.data.subscribed;
+        box.querySelector('[data-lead-sub-view="off"]').hidden = result.data.subscribed;
+        showConfirm(box, false);
+        if (result.data.subscribed) { msg.textContent = ON_DONE; msg.classList.add('ok'); msg.hidden = false; }
+      }).catch(function (result) {
+        var text = (result && result.data && result.data.message) || ERR;
+        if (msg) { msg.textContent = text; msg.classList.remove('ok'); msg.hidden = false; } else { alert(text); }
+        // Ссылкой уже воспользовались в другом браузере — тот же вход по коду, что и для «Позвонить».
+        var login = document.getElementById('contactLogin');
+        if (result && result.status === 401 && login) login.classList.remove('hidden');
+      }).then(function () { button.disabled = false; });
+    });
+  })();
+</script>

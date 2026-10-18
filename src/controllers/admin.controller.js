@@ -411,6 +411,13 @@ async function setMasterPaidMode(req, res) {
   res.redirect(`/admin/masters/${id}`);
 }
 
+// Вернуть исполнителя в рассылку заявок или снять с неё по его просьбе (leadSubscription.service).
+async function setMasterLeadSubscription(req, res) {
+  const id = parseInt(req.params.id, 10);
+  if (await require('../services/leadSubscription.service').setByAdmin(id, req.body.subscribed === '1') === null) return res.status(404).send('Мастер не найден');
+  res.redirect(`/admin/masters/${id}`);
+}
+
 async function unbanMaster(req, res) {
   const id = parseInt(req.params.id, 10);
   await adminService.setMasterBanned(id, false, null);
@@ -940,6 +947,7 @@ module.exports = {
   mastersList,
   masterDetail,
   setMasterPaidMode,
+  setMasterLeadSubscription,
   updateMaster,
   approveMaster,
   unapproveMaster,

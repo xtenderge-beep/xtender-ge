@@ -947,3 +947,19 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .provider-join .provider-join-grid { display:block; }
 /* Скрытая панель полноэкранного ввода (класс hidden) даёт карточкам «Кто вы?» лишний отступ сверху. */
 [data-signup-panel="0"] > .join-kinds { margin-top:0 !important; }
+/* «Больше не присылать мне заявки» — страница заявки исполнителя и профиль в кабинете (partials/lead-subscription.ejs).
+   Обёртки прячутся атрибутом hidden, поэтому display у них не задаём. */
+.lead-sub { font-size:13px; line-height:1.55; color:#57534e; }
+.lead-sub-hint { margin-bottom:10px; color:#647269; }
+.lead-sub-link { font-size:13px; font-weight:700; color:#78716c; text-decoration:underline; text-underline-offset:3px; }
+.lead-sub-link:hover { color:#b91c1c; }
+.lead-sub-confirm { margin-top:10px; padding:12px 14px; border-radius:14px; background:#fef2f2; border:1px solid #fecaca; color:#7f1d1d; }
+.lead-sub-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+.lead-sub-danger, .lead-sub-plain, .lead-sub-primary { padding:10px 16px; border-radius:12px; font-size:13px; font-weight:700; }
+.lead-sub-danger { background:#b91c1c; color:#fff; }
+.lead-sub-plain { background:#fff; border:1px solid #e7e5e4; color:#44403c; }
+.lead-sub-done { font-weight:650; color:#44403c; }
+.lead-sub-primary { margin-top:10px; background:#183e30; color:#fff; }
+.lead-sub-msg { margin-top:8px; font-weight:700; color:#b91c1c; }
+.lead-sub-msg.ok { color:#047857; }
+.lead-sub button:disabled { opacity:.5; }

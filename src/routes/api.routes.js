@@ -43,6 +43,7 @@ router.post('/orders/:token/close', asyncHandler(orderController.close));
 router.post('/orders/:token/close-category', asyncHandler(orderController.closeCategory));
 router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
 router.post('/orders/:token/contact', asyncHandler(orderController.revealContact));
+router.post('/orders/:token/lead-subscription', asyncHandler(orderController.setLeadSubscription));
 
 router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));
@@ -61,6 +62,7 @@ router.use('/master/:token', asyncHandler(require('../services/masterSession.ser
 router.post('/master/:token/contacts', asyncHandler(masterController.saveContacts));
 router.post('/master/:token/billing/accept', asyncHandler(masterController.acceptBilling));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));
+router.post('/master/:token/lead-subscription', asyncHandler(masterController.setLeadSubscription));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
 router.post('/master/:token/topups', asyncHandler(require('../controllers/topup.controller').create));

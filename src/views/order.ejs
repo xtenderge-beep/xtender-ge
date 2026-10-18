@@ -269,6 +269,12 @@
         <% if (linkIsTaken) { %><div id="linkTaken" class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-800 font-medium"><%= t('contact_link_taken') %></div><% } %>
         <div id="msg" class="hidden p-3 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-bold"></div>
         <a id="contactLogin" href="/master?next=<%= encodeURIComponent('/order/' + order.token) %>" class="<%= linkIsTaken ? '' : 'hidden ' %>text-sm font-bold underline"><%= t('contact_signin') %></a>
+        <%# Исполнитель может отказаться от новых заявок прямо отсюда — в том числе с закрытой заявки. %>
+        <% if (!isOwner && typeof leadSubscription !== 'undefined' && leadSubscription) { %>
+          <div class="pt-4 border-t border-stone-100">
+            <%- include('partials/lead-subscription', { endpoint: '/api/orders/' + order.token + '/lead-subscription', subscribed: leadSubscription.subscribed }) %>
+          </div>
+        <% } %>
       </div>
 
       <script>

@@ -920,6 +920,8 @@ async function show(req, res) {
     noMatchingNeeds: !!m && !matched.length,
     vehicleHint: await vehicleHintFor(order, closedCategories, matched, m, pageLang),
     toolsHint: await toolsHintFor(order, matched),
+    // «Больше не присылать мне заявки» внизу страницы — исполнителю, которого страница узнала.
+    leadSubscription: m && !m.is_banned ? { subscribed: m.is_subscribed !== false } : null,
     funnel,
     masterAccount,
     requestLang,
@@ -1146,8 +1148,22 @@ async function revealContact(req, res) {
   return res.json({ success: true, url });
 }
 
+// «Больше не присылать мне заявки» / «Снова получать заявки» со страницы заявки (leadSubscription.service).
+// Действует тот же исполнитель, что и для «Позвонить»: вошедший в кабинет или владелец личной ссылки.
+async function setLeadSubscription(req, res) {
+  masterSession.noStore(res);
+  const order = await orderService.getOrderByToken(req.params.token);
+  if (!order) return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
+  const actor = await leadActor(req, res, order);
+  if (!actor || actor.master.is_banned) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
+  const subscribed = await require('../services/leadSubscription.service').set(actor.master.id, req.body.subscribed === true, { source: 'order', orderToken: order.token });
+  if (subscribed === null) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
+  return res.json({ success: true, subscribed });
+}
+
 module.exports = {
   revealContact,
+  setLeadSubscription,
   create,
   show,
   showByOwnerToken,

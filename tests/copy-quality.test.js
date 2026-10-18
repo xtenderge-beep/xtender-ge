@@ -37,7 +37,7 @@ const dynamic = [
   ...['van', 'movers', 'tow', 'bucket_lift', 'junk'].map(group => `service_desc_${group}_body`),
   ...[1, 2, 3, 4, 5].flatMap(n => [`faq_q${n}`, `faq_a${n}`]),
   ...[1, 2, 3].flatMap(n => [`home_step${n}_title`, `home_step${n}_body`]),
-  ...['ready', 'pending', 'billing_pending', 'low', 'disabled'].flatMap(state => [`provider_${state}`, `provider_${state}_hint`]),
+  ...['ready', 'pending', 'billing_pending', 'low', 'disabled', 'unsubscribed'].flatMap(state => [`provider_${state}`, `provider_${state}_hint`]),
   'provider_billing_review_hint', 'order_lang_ka', 'order_lang_ru', 'order_lang_en',
   // Подсказки на странице заявки собирают ключи из начала (partials/order-hint.ejs).
   ...['vehicle_hint', 'tools_hint'].flatMap(prefix => ['title', 'lead', 'how', 'step1', 'step2', 'step3', 'step4', 'limits', 'link'].map(part => prefix + '_' + part)),

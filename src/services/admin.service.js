@@ -138,7 +138,7 @@ async function listMastersAdmin() {
   // pg-mem (локальная разработка) коррелированные подзапросы не поддерживает.
   const { rows } = await pool.query(
     `SELECT m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
-            m.banned_reason, m.balance_tetri, m.paid_mode, m.created_at, lt.last_topup_at,
+            m.banned_reason, m.balance_tetri, m.paid_mode, m.is_subscribed, m.created_at, lt.last_topup_at,
             COALESCE(AVG(r.rating)::numeric(3,2), 0) AS rating,
             COUNT(r.id)::int AS review_count
      FROM masters m
@@ -148,7 +148,7 @@ async function listMastersAdmin() {
        FROM balance_transactions WHERE reason = 'topup' GROUP BY master_id
      ) lt ON lt.master_id = m.id
      GROUP BY m.is_technical, m.id, m.name, m.phone, m.category, m.vehicle_type, m.vehicle_size, m.is_active, m.is_banned,
-              m.banned_reason, m.balance_tetri, m.paid_mode, m.created_at, lt.last_topup_at
+              m.banned_reason, m.balance_tetri, m.paid_mode, m.is_subscribed, m.created_at, lt.last_topup_at
      ORDER BY m.id`
   );
   // Языки — отдельным запросом и склейкой в JS, как master_services в каталоге: jsonb в GROUP BY pg-mem не тянет.
