@@ -193,6 +193,9 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     const exampleDraft = draftLink.parse(Object.fromEntries(new URL(exampleUrl).searchParams));
     assert.equal(draftLink.text(exampleDraft, 'en'), '2 movers and construction waste removal\n- Movers — 2 people\n- Construction waste in bags — 2 m3\nTomorrow at 12:00. 5th floor, there is a lift.\nLocation: Tbilisi, near Isani metro');
     assert.ok(guide[2].includes(agentApi.FALLBACK));
+    // MCP — советом на следующий раз, после ссылки: сам подключиться посреди разговора ассистент не может.
+    assert.ok(guide[2].includes(agentApi.mcpHint('https://xtender.test')));
+    assert.ok(guide[2].indexOf('/mcp') > guide[2].indexOf('How to build the link'), 'MCP — после ссылки');
     assert.ok(guide[2].includes('<li>Movers in Tbilisi: <a href="https://xtender.test/en/s/mushebi-tbilisi">'), 'страница услуги, открытая поиску');
     assert.ok(guide[2].includes('href="https://xtender.test/llms.txt"'));
 

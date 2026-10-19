@@ -25,6 +25,13 @@ const AFTER = 'A moderator checks the request and sends it to matching providers
 // Исполнители есть не во всех городах: ассистент должен знать, где их нет (замечание чужой модели, 2026-10-19).
 const CITIES_NOTE = 'Providers are only in the cities listed; for any other place, tell the user that xtender.ge may have no providers there yet.';
 
+// MCP — второй строкой, не первой: сам подключиться к MCP посреди разговора ассистент не может, подключает человек в
+// настройках. Ссылка работает сразу; MCP — совет на следующий раз (владелец 2026-10-19: чтобы человек возвращался).
+function mcpHint(base) {
+  return `If your app supports MCP connectors, xtender.ge is also an MCP server: ${base}/mcp (Streamable HTTP, no sign-in; tools `
+    + 'list_services and create_request_link). The user can add it in the app settings, and next time you can prepare requests without opening this page.';
+}
+
 // Пошаговая сборка ссылки (владелец 2026-10-19: «дай подробную инструкцию, как собирается ссылка»). Общая для
 // /llms.txt и блока на главной.
 function buildSteps(base) {
@@ -87,6 +94,7 @@ function homeGuide(base, catalog) {
     cities: catalog.map((city) => city.name).join(', '),
     citiesNote: CITIES_NOTE,
     after: AFTER,
+    mcp: mcpHint(base),
     guide: `${base}/llms.txt`,
   };
 }
@@ -277,6 +285,8 @@ function llmsText(base, catalog) {
     '- Do not promise a price, a response time or a number of responses.',
     '- If no service below fits the task, tell the user that xtender.ge may have no providers for it yet.',
     '',
+    mcpHint(base),
+    '',
     '## What happens after the link',
     '',
     'On the page the user checks the text and can edit it, agrees to the Terms of Service and the Privacy Policy and confirms the phone number '
@@ -343,4 +353,4 @@ function llmsText(base, catalog) {
 }
 
 module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, CITIES_NOTE, FALLBACK, agentHint, homeGuide, buildSteps, workedExample,
-  statusOf, openapi, llmsText, draftExample };
+  mcpHint, statusOf, openapi, llmsText, draftExample };
