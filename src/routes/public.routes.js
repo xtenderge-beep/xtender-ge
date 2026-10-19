@@ -15,6 +15,7 @@ const promoService = require('../services/promo.service');
 const settingsService = require('../services/settings.service');
 const asyncHandler = require('../middleware/asyncHandler');
 const draftLink = require('../config/draftLink');
+const agentApi = require('../config/agentApi');
 const { getBaseUrl } = require('../config/url');
 
 const LEGAL_LOCALS = {
@@ -91,6 +92,9 @@ async function renderHome(req, res, locale, page, options = {}) {
     settingsService.getCatalogCallPriceTetri(),
   ]);
   res.set('Cache-Control', 'private, no-store');
+  // ИИ-агентам: где описание для моделей, без разбора страницы (config/agentApi.js, тот же адрес — в <head>).
+  res.set('Link', `<${getBaseUrl()}/llms.txt>; rel="help"; type="text/plain"`);
+  res.set('X-Agentic-Protocol', agentApi.AGENT_PROTOCOL);
   const callerPhone = await require('../services/catalogSession.service').getPhone(req);
   const history = new Map((await masterService.contactHistory(callerPhone)).map(h => [h.master_id, h.opened_at]));
   const { formattedPhone } = require('../config/catalogContacts');
@@ -189,6 +193,8 @@ async function renderHome(req, res, locale, page, options = {}) {
     servicePage,
     pageFocus,
     draft,
+    llmsUrl: getBaseUrl() + '/llms.txt',
+    agentHint: agentApi.agentHint(getBaseUrl()),
     // Параметры ссылки-черновика, которые переключатель языка уносит с собой (partials/lang-switch).
     switchQuery: options.switchQuery || '',
     // Ссылки внизу каждой страницы: открытые поиску страницы «услуга + город» (на странице услуги — остальные,

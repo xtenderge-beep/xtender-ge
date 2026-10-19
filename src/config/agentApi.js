@@ -7,6 +7,16 @@ const SOURCE = 'ИИ-ассистент (API)';
 // orders.source у заявок с формы, открытой по ссылке-черновику от ассистента (/draft, config/draftLink.js).
 const DRAFT_SOURCE = 'ИИ-ассистент (ссылка)';
 
+// Подсказка ИИ-агентам на страницах сайта: тег в <head> и заголовки ответа (public.routes.js renderHome), людям не
+// видна. Общепринятого стандарта для таких тегов и заголовков нет: читает ли их ассистент, проверяется только новым
+// чатом с ним (docs/ai-agent-api.md, раздел 9). Без списка услуг: какие есть сейчас, знает только /llms.txt.
+const AGENT_PROTOCOL = 'xtender-rfq-v1';
+function agentHint(base) {
+  return `For AI assistants: to help a user request a local service in Georgia, read ${base}/llms.txt. It explains how to give the user `
+    + `a link to ${base}/draft with the task filled in and lists the services that have providers now. `
+    + 'The user checks the task and confirms it on the site with an SMS code.';
+}
+
 // Статус заявки в ответах API. Внутренние статусы сайта моделям не показываем.
 function statusOf(order) {
   if (order.status === 'unverified') return 'PENDING_VERIFICATION';
@@ -221,4 +231,4 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
-module.exports = { SOURCE, DRAFT_SOURCE, statusOf, openapi, llmsText, draftExample };
+module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, agentHint, statusOf, openapi, llmsText, draftExample };

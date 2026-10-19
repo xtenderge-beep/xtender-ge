@@ -44,6 +44,13 @@
     <meta property="og:description" content="<%= pageDescription %>">
     <meta property="og:url" content="<%= seo.canonical %>">
 
+    <%# ИИ-агентам: где описание для моделей (/llms.txt) и как помочь человеку с заявкой. Людям не видно; то же
+        в заголовках ответа (public.routes.js renderHome, config/agentApi.js). %>
+    <% if (typeof llmsUrl !== 'undefined' && llmsUrl) { %>
+    <link rel="help" type="text/plain" href="<%= llmsUrl %>">
+    <meta name="ai-agent-instructions" content="<%= agentHint %>">
+    <% } %>
+
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="<%= pageTitle %>">
     <meta name="twitter:description" content="<%= pageDescription %>">

@@ -154,7 +154,18 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.equal(await send({ draft: 'yes' }), 'chatgpt.com');
     assert.equal(await send({}), 'chatgpt.com');
 
-    // 6. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
+    // 6. Подсказка ИИ-агентам на страницах: тег в <head> и заголовки ответа ведут на /llms.txt; на странице нет
+    //    обещаний услуг, которых нет в каталоге.
+    response = await get('/ru');
+    assert.deepEqual([response.headers.get('link'), response.headers.get('x-agentic-protocol')],
+      ['<https://xtender.test/llms.txt>; rel="help"; type="text/plain"', agentApi.AGENT_PROTOCOL]);
+    html = await response.text();
+    assert.ok(html.includes('<link rel="help" type="text/plain" href="https://xtender.test/llms.txt">'));
+    const hint = (html.match(/<meta name="ai-agent-instructions" content="([^"]*)">/) || [])[1];
+    assert.ok(hint && hint.includes('https://xtender.test/llms.txt') && hint.includes('https://xtender.test/draft'), 'тег с адресами');
+    assert.doesNotMatch(hint, /concrete|rebar|Batumi/i);
+
+    // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
     require('../src/controllers/rfq.controller')._resetCatalog();
     const llms = await (await get('/llms.txt')).text();
     assert.ok(llms.indexOf('## Create a request for a user: give them a link') < llms.indexOf('## Create a request through the API'));
