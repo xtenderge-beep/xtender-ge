@@ -270,6 +270,7 @@
                                     <% review.items.forEach(function (item) { %><li><span><%= item.name %></span><% if (item.amount) { %><b><%= item.amount %></b><% } %></li><% }); %>
                                   </ul>
                                   <% } %>
+                                  <% if (review.body) { %><p class="draft-review-body"><%= review.body %></p><% } %>
                                   <% if (review.note) { %><p class="draft-review-note"><%= review.note %></p><% } %>
                                   <% if (review.place) { %><p class="draft-review-place"><%= t('draft_place') %>: <b><%= review.place %></b></p><% } %>
                                   <% if (draftPage.services.length) { %>

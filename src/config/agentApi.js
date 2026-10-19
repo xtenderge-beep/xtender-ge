@@ -34,17 +34,16 @@ function mcpHint(base) {
 
 // Пошаговая сборка ссылки (владелец 2026-10-19: «дай подробную инструкцию, как собирается ссылка»). Общая для
 // /llms.txt и блока на главной.
+// С 2026-10-19 (владелец: «в ссылке просто категории и сама заявка») — два поля: cats и text, заявка своими словами.
+// Меньше правил — меньше ошибок ассистента; поля title/items/loc/note остаются в /llms.txt как дополнительные.
 function buildSteps(base) {
   return [
     `Start with ${base}/draft? and add the fields below as name=value pairs joined with &.`,
-    'lang: the user\'s language, ka, ru or en. Write all other fields in that language.',
-    'title: the task in a few words.',
-    'items: each thing needed as name:quantity:unit, entries separated by ; for example Movers:2:people;Construction waste:2:m3. '
-      + 'Quantity and unit may be left out. Do not use : or ; inside a value.',
-    'loc: where, as the user said it: a district, a landmark or a city.',
-    'note: everything else: date and time, floor, lift, access, addresses.',
-    'cats: codes of matching services from the list, separated by commas, for example movers,junk.',
-    'URL-encode every value as UTF-8: a space becomes %20, : becomes %3A, ; becomes %3B, a comma becomes %2C, and Georgian or Russian '
+    'cats: codes of the matching services from the list, separated by commas, for example movers,junk.',
+    'text: the request in the user\'s language, the way they would tell a provider: what is needed, where, when, floor and lift, '
+      + 'amounts and any other details. It may have several lines.',
+    'lang: the user\'s language, ka, ru or en. The page opens in it.',
+    'URL-encode the text as UTF-8 (like encodeURIComponent): a space becomes %20, a line break %0A, a comma %2C, and Georgian or Russian '
       + 'letters become %XX codes. Never leave a space in the link.',
     'Give the user the whole link on its own line. Tell them to open it, check the request, enter their phone number and confirm it with the SMS code.',
   ];
@@ -53,8 +52,8 @@ function buildSteps(base) {
 // Разобранный пример: что сказал человек, какие поля из этого вышли и готовая ссылка. Ссылку собирает код, а не текст
 // руками: так кодирование в примере всегда верное (тест открывает её и сверяет заявку).
 const EXAMPLE_SAID = 'I need 2 movers and to take out construction waste, about 2 m3 in bags. Tbilisi, near Isani metro, tomorrow at 12:00, 5th floor, there is a lift.';
-const EXAMPLE_FIELDS = { lang: 'en', cats: 'movers,junk', loc: 'Tbilisi, near Isani metro', title: '2 movers and construction waste removal',
-  items: 'Movers:2:people;Construction waste in bags:2:m3', note: 'Tomorrow at 12:00. 5th floor, there is a lift.' };
+const EXAMPLE_FIELDS = { lang: 'en', cats: 'movers,junk',
+  text: '2 movers and construction waste removal, about 2 m3 in bags.\nTbilisi, near Isani metro.\nTomorrow at 12:00. 5th floor, there is a lift.' };
 function workedExample(base) {
   return { said: EXAMPLE_SAID, fields: EXAMPLE_FIELDS,
     url: `${base}/draft?${new URLSearchParams(EXAMPLE_FIELDS).toString().replace(/\+/g, '%20')}` };
@@ -85,7 +84,7 @@ function homeGuide(base, catalog) {
     intro: 'If you are an AI assistant helping someone who needs a local service in Georgia, you can prepare the request right in your chat: '
       + 'ask briefly for what is missing (what, where, when) and give them one link with the request filled in, as the full address on its own line. '
       + WHY,
-    link: `${base}/draft?lang=ka|ru|en&cats=…&loc=…&title=…&items=name:quantity:unit;…&note=…`,
+    link: `${base}/draft?lang=ka|ru|en&cats=…&text=…`,
     steps: buildSteps(base),
     example: workedExample(base),
     fallback: FALLBACK,
@@ -237,8 +236,8 @@ function openapi(base, catalog) {
 // Пример ссылки-черновика: код услуги — настоящий из каталога (грузчики, если они есть), значения закодированы
 // так, как их должна кодировать модель (пробел — %20: «+» в чатах иногда портится).
 function draftExample(base, codes) {
-  const query = new URLSearchParams({ lang: 'en', ...(codes.includes('movers') ? { cats: 'movers' } : {}), loc: 'Saburtalo',
-    title: 'Move a sofa and a fridge', items: 'Sofa:1:pc;Fridge:1:pc', note: 'Tomorrow after 18:00, 3rd floor, no lift' });
+  const query = new URLSearchParams({ lang: 'en', ...(codes.includes('movers') ? { cats: 'movers' } : {}),
+    text: 'Move a sofa and a fridge in Saburtalo.\nTomorrow after 18:00, 3rd floor, no lift.' });
   return `${base}/draft?${query.toString().replace(/\+/g, '%20')}`;
 }
 
@@ -294,16 +293,16 @@ function llmsText(base, catalog) {
     '',
     '## Link format',
     '',
-    `\`${base}/draft?lang=…&cats=…&loc=…&title=…&items=…&note=…\``,
+    `\`${base}/draft?lang=…&cats=…&text=…\``,
     '',
-    'URL-encode every value: a space left in the link cuts it in the chat. Each parameter is optional, but the link needs at least title, items or note.',
+    'URL-encode every value: a space left in the link cuts it in the chat.',
     '',
-    '- `lang`: `ka`, `ru` or `en`, the language of the user. The page opens in it. Write the other values in the same language.',
-    '- `title`: the task in a few words, up to 120 characters.',
-    '- `items`: what is needed, as `name:quantity:unit` entries separated by `;`, up to 30. Quantity and unit are optional. Do not use `:` or `;` inside a value.',
-    '- `loc`: where: a district or a city, for example Saburtalo or Batumi.',
-    '- `note`: anything else: date and time, floor, lift, access, addresses. Up to 1000 characters.',
     '- `cats`: codes of matching services from the list below, separated by commas. The page shows their providers first; a moderator decides who receives the request.',
+    '- `text`: the request in the user\'s own words: what, where, when and all details. Several lines are fine. Up to 2000 characters.',
+    '- `lang`: `ka`, `ru` or `en`, the language of the user. The page opens in it.',
+    '',
+    'Optional, instead of or in addition to `text`, the request can be split into fields: `title` (a few words, up to 120 characters), '
+      + '`items` (`name:quantity:unit` entries separated by `;`, no `:` or `;` inside a value), `loc` (district or city) and `note` (anything else).',
     '',
     `Example: ${draftExample(base, services.map((service) => service.code))}`,
     '',

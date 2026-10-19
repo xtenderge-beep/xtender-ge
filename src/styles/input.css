@@ -720,6 +720,7 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
 .draft-review-items li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e7e5e4;font-size:15px;line-height:1.4}
 .draft-review-items b{white-space:nowrap;font-weight:700}
 .draft-review-note{margin-top:10px;font-size:15px;line-height:1.5;white-space:pre-line}
+.draft-review-body{margin-top:10px;font-size:16px;line-height:1.55;white-space:pre-line;color:#1c1917}
 .draft-review-place{margin-top:8px;font-size:15px}
 .draft-review-services{margin-top:10px;font-size:13px;font-weight:600;color:#315a43}
 .draft-review-hint{margin-top:10px;font-size:13px;line-height:1.5;color:#57534e}

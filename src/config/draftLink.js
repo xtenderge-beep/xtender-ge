@@ -7,7 +7,9 @@ const { detectLang } = require('../services/translation.service');
 const copy = require('./draft-link-copy');
 
 const LANGS = ['ka', 'ru', 'en'];
-const LIMITS = { title: 120, items: 30, name: 200, amount: 40, loc: 80, note: 1000, cats: 10 };
+// text — заявка своими словами одним полем (владелец 2026-10-19: «в ссылке просто категории и сама заявка»): главный
+// формат для ассистентов; title/items/loc/note остаются для старых ссылок и MCP-сервера.
+const LIMITS = { title: 120, items: 30, name: 200, amount: 40, loc: 80, note: 1000, text: 2000, cats: 10 };
 
 // Параметр, повторённый в адресе дважды, Express отдаёт массивом: берём первый.
 const first = (value) => (Array.isArray(value) ? value[0] : value);
@@ -25,9 +27,9 @@ function parseItems(raw) {
   }).filter((item) => item.name).slice(0, LIMITS.items);
 }
 
-// Примечание может быть в несколько строк; пустые строки и лишние пробелы убираем.
-function parseNote(raw) {
-  return str(raw).replace(/\r\n?/g, '\n').split('\n').map(oneLine).filter(Boolean).join('\n').slice(0, LIMITS.note);
+// Примечание и текст заявки могут быть в несколько строк; пустые строки и лишние пробелы убираем.
+function parseNote(raw, max = LIMITS.note) {
+  return str(raw).replace(/\r\n?/g, '\n').split('\n').map(oneLine).filter(Boolean).join('\n').slice(0, max);
 }
 
 // Коды услуг из /llms.txt (service_categories.slug). Есть ли такая услуга, проверяет страница.
@@ -38,11 +40,12 @@ function parseCats(raw) {
 // null — в ссылке нет ни названия, ни позиций, ни примечания: показывать нечего.
 function parse(query) {
   const title = oneLine(str(query.title)).slice(0, LIMITS.title), items = parseItems(query.items), note = parseNote(query.note);
-  if (!title && !items.length && !note) return null;
+  const body = parseNote(query.text, LIMITS.text);
+  if (!title && !items.length && !note && !body) return null;
   const loc = oneLine(str(query.loc)).slice(0, LIMITS.loc);
   const wanted = str(query.lang).trim().toLowerCase();
-  const lang = LANGS.includes(wanted) ? wanted : detectLang([title, ...items.map((item) => item.name), note].join(' '));
-  return { title, items, note, loc, cats: parseCats(query.cats), lang };
+  const lang = LANGS.includes(wanted) ? wanted : detectLang([title, ...items.map((item) => item.name), body, note].join(' '));
+  return { title, items, body, note, loc, cats: parseCats(query.cats), lang };
 }
 
 // «saburtalo» или «old-tbilisi» → «Saburtalo», «Old Tbilisi»; написанное словами — как есть.
@@ -62,6 +65,7 @@ function text(draft, lang) {
   return [
     draft.title,
     ...draft.items.map((item) => `- ${item.name}${item.amount ? ' — ' + item.amount : ''}`),
+    draft.body,
     draft.note,
     draft.loc ? `${copy[lang].draft_place}: ${place(draft.loc)}` : '',
   ].filter(Boolean).join('\n');
@@ -70,16 +74,19 @@ function text(draft, lang) {
 // Готовая заявка на странице (просьба владельца 2026-10-19): по ссылке человек видит не поле с текстом, а карточку
 // с кнопкой «Подтвердить заявку»; поле с тем же текстом — по кнопке «Изменить».
 function review(draft) {
-  return { title: draft.title, items: draft.items, note: draft.note, place: draft.loc ? place(draft.loc) : '' };
+  return { title: draft.title, items: draft.items, body: draft.body, note: draft.note, place: draft.loc ? place(draft.loc) : '' };
 }
 
-// Заголовок и описание карточки предпросмотра, когда ссылку пересылают в мессенджере.
+// Заголовок и описание карточки предпросмотра, когда ссылку пересылают в мессенджере. У заявки одним текстом
+// заголовок — её первая строка (до 120 знаков), описание — остальное.
 function card(draft, lang) {
-  const name = draft.title || (draft.items[0] && draft.items[0].name) || draft.note.split('\n')[0];
+  const lines = (draft.body || '').split('\n');
+  const name = draft.title || (draft.items[0] && draft.items[0].name) || lines[0].slice(0, LIMITS.title) || draft.note.split('\n')[0];
   const items = draft.items.map((item) => item.name + (item.amount ? ' — ' + item.amount : '')).join('; ');
+  const rest = draft.title || draft.items.length ? '' : lines.slice(1).join(' ');
   return {
     title: copy[lang].draft_card_title.replace('{title}', name),
-    description: [items, draft.loc ? place(draft.loc) : ''].filter(Boolean).join(' · ').slice(0, 200) || copy[lang].draft_card_fallback,
+    description: [items || rest, draft.loc ? place(draft.loc) : ''].filter(Boolean).join(' · ').slice(0, 200) || copy[lang].draft_card_fallback,
   };
 }
 

@@ -78,8 +78,14 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
   assert.equal(draftLink.parse({ cats: 'movers', loc: 'vake' }), null, 'без названия, позиций и примечания показывать нечего');
   const ru = draftLink.parse({ title: '  Переезд   из Ваке ', items: 'Диван:1:шт;Холодильник:1:шт', loc: 'saburtalo', note: 'Завтра после 18:00\r\n\r\n 3 этаж, без лифта ', cats: 'Movers, van,../x,van' });
   assert.deepEqual(ru, { title: 'Переезд из Ваке', items: [{ name: 'Диван', amount: '1 шт' }, { name: 'Холодильник', amount: '1 шт' }],
-    note: 'Завтра после 18:00\n3 этаж, без лифта', loc: 'saburtalo', cats: ['movers', 'van'], lang: 'ru' });
+    body: '', note: 'Завтра после 18:00\n3 этаж, без лифта', loc: 'saburtalo', cats: ['movers', 'van'], lang: 'ru' });
   assert.equal(draftLink.text(ru, 'ru'), 'Переезд из Ваке\n- Диван — 1 шт\n- Холодильник — 1 шт\nЗавтра после 18:00\n3 этаж, без лифта\nМесто: Saburtalo');
+  // Главный формат с 2026-10-19: категории и заявка одним текстом (text), в несколько строк.
+  const plain = draftLink.parse({ cats: 'movers,junk', text: ' Вывоз мусора, 2 куба в мешках.\r\n\r\nИсани, у метро.\nЗавтра к 12:00, 4 этаж, лифт есть ' });
+  assert.deepEqual([plain.body, plain.cats, plain.lang], ['Вывоз мусора, 2 куба в мешках.\nИсани, у метро.\nЗавтра к 12:00, 4 этаж, лифт есть', ['movers', 'junk'], 'ru']);
+  assert.equal(draftLink.text(plain, 'ru'), plain.body);
+  assert.deepEqual(draftLink.card(plain, 'ru'), { title: 'Заявка: Вывоз мусора, 2 куба в мешках.', description: 'Исани, у метро. Завтра к 12:00, 4 этаж, лифт есть' });
+  assert.equal(draftLink.parse({ text: 'x'.repeat(3000) }).body.length, draftLink.LIMITS.text);
   assert.equal(draftLink.parse({ title: 'Move a sofa', lang: 'KA' }).lang, 'ka', 'lang из ссылки важнее письменности');
   assert.equal(draftLink.parse({ title: 'ავეჯის გადატანა' }).lang, 'ka');
   assert.equal(draftLink.parse({ title: 'Move a sofa', lang: 'de' }).lang, 'en');
@@ -187,11 +193,11 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     // Подробная сборка по шагам, разобранный пример (его ссылка открывает ту же заявку) и запасное правило со страницами
     // услуг для ассистентов, которые не могут дать собранную ими ссылку.
     assert.equal((guide[2].match(/<li>/g) || []).length >= agentApi.buildSteps('x').length, true);
-    assert.ok(guide[2].includes('URL-encode every value as UTF-8'));
+    assert.ok(guide[2].includes('URL-encode the text as UTF-8'));
     const exampleUrl = agentApi.workedExample('https://xtender.test').url;
     assert.ok(guide[2].includes(exampleUrl.replace(/&/g, '&amp;')), 'пример со ссылкой');
     const exampleDraft = draftLink.parse(Object.fromEntries(new URL(exampleUrl).searchParams));
-    assert.equal(draftLink.text(exampleDraft, 'en'), '2 movers and construction waste removal\n- Movers — 2 people\n- Construction waste in bags — 2 m3\nTomorrow at 12:00. 5th floor, there is a lift.\nLocation: Tbilisi, near Isani metro');
+    assert.equal(draftLink.text(exampleDraft, 'en'), '2 movers and construction waste removal, about 2 m3 in bags.\nTbilisi, near Isani metro.\nTomorrow at 12:00. 5th floor, there is a lift.');
     assert.ok(guide[2].includes(agentApi.FALLBACK));
     // MCP — советом на следующий раз, после ссылки: сам подключиться посреди разговора ассистент не может.
     assert.ok(guide[2].includes(agentApi.mcpHint('https://xtender.test')));
@@ -205,16 +211,17 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     // Первым после описания — правило для ассистента: готовая ссылка, а не «заполните форму на сайте».
     assert.match(llms, /^# xtender\.ge\n\n> .+\n\n## For AI assistants: give the user a ready link\n\nWhen a user wants to hire a local service in Georgia, do not tell them to go to the website and fill in the form by hand\./);
     assert.ok(llms.indexOf('## For AI assistants') < llms.indexOf('## Link format') && llms.indexOf('## Link format') < llms.indexOf('## Create a request through the API'));
-    assert.ok(llms.includes('`https://xtender.test/draft?lang=…&cats=…&loc=…&title=…&items=…&note=…`'));
+    assert.ok(llms.includes('`https://xtender.test/draft?lang=…&cats=…&text=…`'));
     assert.doesNotMatch(llms, /instantly|concrete|rebar/i, 'без обещаний, которых сайт не держит');
     const example = llms.match(/^Example: (\S+)$/m)[1];
-    assert.ok(example.startsWith('https://xtender.test/draft?lang=en&cats=movers&loc=Saburtalo&title=Move%20a%20sofa'));
+    assert.ok(example.startsWith('https://xtender.test/draft?lang=en&cats=movers&text=Move%20a%20sofa'));
     assert.match(llms, /^- `movers` Movers \/ Грузчики \/ მუშები: \[Tbilisi\]\(https:\/\/xtender\.test\/en\/s\/mushebi-tbilisi\) 3, Batumi 1$/m, 'у открытой поиску страницы — ссылка');
     assert.match(llms, /^- `van` Transport \/ Перевозки \/ გადაზიდვა: Tbilisi 1$/m);
     assert.doesNotMatch(llms, /`tow`/, 'услуги без исполнителей не перечислены');
     // Пример из llms.txt открывается и даёт заполненную форму.
     html = await (await get(example.replace('https://xtender.test', ''))).text();
-    assert.equal(unescape(textarea(html)), 'Move a sofa and a fridge\n- Sofa — 1 pc\n- Fridge — 1 pc\nTomorrow after 18:00, 3rd floor, no lift\nLocation: Saburtalo');
+    assert.equal(unescape(textarea(html)), 'Move a sofa and a fridge in Saburtalo.\nTomorrow after 18:00, 3rd floor, no lift.');
+    assert.ok(html.includes('<p class="draft-review-body">Move a sofa and a fridge in Saburtalo.\nTomorrow after 18:00, 3rd floor, no lift.</p>'), 'карточка показывает текст заявки');
   } finally {
     server.close();
   }
