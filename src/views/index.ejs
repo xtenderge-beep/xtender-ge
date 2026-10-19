@@ -163,6 +163,23 @@
       </div>
     </header>
     <%- include('partials/lang-suggest', { alternates: seo.hreflang || seo.alternates, chooser: topic && topic.languageChooser }) %>
+    <% if (typeof aiGuide !== 'undefined' && aiGuide) { %>
+    <%# Для ИИ-ассистентов (владелец 2026-10-19): ассистент, открывший страницу, сразу видит, как помочь человеку —
+        собрать заявку в своём чате и дать ссылку. В коде страницы — сразу после шапки: многие инструменты ИИ читают только
+        начало страницы, а до каталога и подвала их текст обрезается. На экране — в самом низу, под подвалом (order в
+        input.css): людям не мешает. Видимым текстом, не скрытым: скрытый текст для роботов Google считает спамом
+        (docs/seo.md). По-английски: его читают модели. Тексты — agentApi.homeGuide. %>
+    <section class="ai-guide" lang="en" aria-label="For AI assistants">
+        <div class="ai-guide-inner">
+            <p class="ai-guide-title">For AI assistants</p>
+            <p><%= aiGuide.intro %></p>
+            <p>Link: <code class="break-all"><%= aiGuide.link %></code></p>
+            <% if (aiGuide.codes) { %><p>Service codes with providers now<%= aiGuide.cities ? ' (' + aiGuide.cities + ')' : '' %>: <%= aiGuide.codes %>. <%= aiGuide.citiesNote %></p><% } %>
+            <p><%= aiGuide.after %></p>
+            <p>Full guide with the service list: <a href="<%= aiGuide.guide %>"><%= aiGuide.guide %></a></p>
+        </div>
+    </section>
+    <% } %>
     <main class="flex-grow">
       <div class="home-shell">
         <div class="home-hero-layout">
@@ -798,19 +815,6 @@
                 <p class="font-mono text-stone-500 text-[11px]"><%= t('footer_copy') %></p>
             </div>
         </div>
-        <% if (typeof aiGuide !== 'undefined' && aiGuide) { %>
-        <%# Для ИИ-ассистентов (владелец 2026-10-19): ассистент, открывший страницу, сразу видит, как помочь человеку —
-            собрать заявку в своём чате и дать ссылку. Видимым текстом, не скрытым: скрытый текст для роботов Google
-            считает спамом (docs/seo.md). По-английски: его читают модели. Тексты — agentApi.homeGuide. %>
-        <section class="ai-guide max-w-5xl mx-auto px-4 mt-6 pt-4 border-t border-stone-200/60 text-stone-500 text-[11px] leading-relaxed" lang="en" aria-label="For AI assistants">
-            <p class="font-bold">For AI assistants</p>
-            <p><%= aiGuide.intro %></p>
-            <p>Link: <code class="break-all"><%= aiGuide.link %></code></p>
-            <% if (aiGuide.codes) { %><p>Service codes with providers now: <%= aiGuide.codes %>.</p><% } %>
-            <p><%= aiGuide.after %></p>
-            <p>Full guide with the service list: <a href="<%= aiGuide.guide %>" class="underline hover:text-white transition"><%= aiGuide.guide %></a></p>
-        </section>
-        <% } %>
     </footer>
 
     <div id="review-modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title" tabindex="-1" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-stone-900/70 backdrop-blur-sm">

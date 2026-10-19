@@ -17,9 +17,13 @@ const AGENT_PROTOCOL = 'xtender-rfq-v1';
 const WHY = 'This saves the user from filling in a form: you already know the details from your conversation, so the request '
   + 'arrives complete and with the right services, and the user only checks it, taps Confirm and enters an SMS code.';
 // Что будет после подтверждения и как человеку решать: ассистент может объяснить заранее.
-const AFTER = 'A moderator checks the request and sends it to matching providers, who call or message the user. The user compares '
-  + 'them, agrees the price and terms directly with one of them and closes the request with the link from the SMS once the job is '
-  + 'arranged. Free for customers: xtender.ge takes no payment, does not perform the work and does not guarantee its quality.';
+// После подтверждения заказчику приходит SMS со ссылкой на его страницу заявки (order.controller announceConfirmed).
+const AFTER = 'A moderator checks the request and sends it to matching providers, who call or message the user. After confirming, the user '
+  + 'also gets an SMS with a link to their request page, where they see its status. The user compares the providers, agrees the price and '
+  + 'terms directly with one of them and closes the request on that page once the job is arranged. Free for customers: xtender.ge takes '
+  + 'no payment, does not perform the work and does not guarantee its quality.';
+// Исполнители есть не во всех городах: ассистент должен знать, где их нет (замечание чужой модели, 2026-10-19).
+const CITIES_NOTE = 'Providers are only in the cities listed; for any other place, tell the user that xtender.ge may have no providers there yet.';
 
 // Блок «For AI assistants» внизу главной и страниц услуг: правило, формат ссылки и коды услуг видимым текстом, чтобы
 // ассистенту, открывшему страницу, не нужно было идти в /llms.txt. Видимый, не скрытый: скрытый текст для роботов
@@ -32,6 +36,8 @@ function homeGuide(base, catalog) {
       + WHY,
     link: `${base}/draft?lang=ka|ru|en&cats=…&loc=…&title=…&items=name:quantity:unit;…&note=…`,
     codes: codes.map(([code, label]) => `${code} (${label})`).join(', '),
+    cities: catalog.map((city) => city.name).join(', '),
+    citiesNote: CITIES_NOTE,
     after: AFTER,
     guide: `${base}/llms.txt`,
   };
@@ -219,7 +225,7 @@ function llmsText(base, catalog) {
     '',
     WHY,
     '',
-    '- Do not ask for the user\'s phone number in the chat: they enter it on the page.',
+    '- With the link, do not ask for the user\'s phone number in the chat: they enter it on the page. Only the API below takes the number.',
     '- Do not promise a price, a response time or a number of responses.',
     '- If no service below fits the task, tell the user that xtender.ge may have no providers for it yet.',
     '',
@@ -245,7 +251,7 @@ function llmsText(base, catalog) {
     '',
   ];
   if (services.length) {
-    lines.push('## Services with providers now', '', 'Code, service, then the number of providers in each city.', '');
+    lines.push('## Services with providers now', '', `Code, service, then the number of providers in each city. ${CITIES_NOTE}`, '');
     for (const service of services) lines.push(`- \`${service.code}\` ${service.label}: ${service.cities.join(', ')}`);
     lines.push('');
   }
@@ -271,4 +277,4 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
-module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, agentHint, homeGuide, statusOf, openapi, llmsText, draftExample };
+module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, CITIES_NOTE, agentHint, homeGuide, statusOf, openapi, llmsText, draftExample };

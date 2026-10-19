@@ -181,7 +181,9 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.doesNotMatch(guide[0], /hidden|display:\s*none/);
     assert.ok(guide[2].includes(agentApi.WHY.replace(/'/g, '&#39;')) && guide[2].includes(agentApi.AFTER));
     assert.ok(guide[2].includes('https://xtender.test/draft?lang=ka|ru|en&amp;cats=…'));
-    assert.ok(guide[2].includes('Service codes with providers now: van (Transport), movers (Movers).'), 'коды в порядке каталога');
+    assert.ok(guide[2].includes('Service codes with providers now (Tbilisi, Batumi): van (Transport), movers (Movers). ' + agentApi.CITIES_NOTE), 'коды в порядке каталога, города');
+    // В коде страницы — до основной части: инструменты ИИ, читающие только начало страницы, его не обрежут.
+    assert.ok(html.indexOf('<section class="ai-guide"') < html.indexOf('<main'), 'блок раньше основной части');
     assert.ok(guide[2].includes('href="https://xtender.test/llms.txt"'));
 
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
