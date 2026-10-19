@@ -168,8 +168,11 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
     require('../src/controllers/rfq.controller')._resetCatalog();
     const llms = await (await get('/llms.txt')).text();
-    assert.ok(llms.indexOf('## Create a request for a user: give them a link') < llms.indexOf('## Create a request through the API'));
-    assert.ok(llms.includes('Link format: `https://xtender.test/draft?lang=…&cats=…&loc=…&title=…&items=…&note=…`'));
+    // Первым после описания — правило для ассистента: готовая ссылка, а не «заполните форму на сайте».
+    assert.match(llms, /^# xtender\.ge\n\n> .+\n\n## For AI assistants: give the user a ready link\n\nWhen a user wants to hire a local service in Georgia, do not tell them to go to the website and fill in the form by hand\./);
+    assert.ok(llms.indexOf('## For AI assistants') < llms.indexOf('## Link format') && llms.indexOf('## Link format') < llms.indexOf('## Create a request through the API'));
+    assert.ok(llms.includes('`https://xtender.test/draft?lang=…&cats=…&loc=…&title=…&items=…&note=…`'));
+    assert.doesNotMatch(llms, /instantly|concrete|rebar/i, 'без обещаний, которых сайт не держит');
     const example = llms.match(/^Example: (\S+)$/m)[1];
     assert.ok(example.startsWith('https://xtender.test/draft?lang=en&cats=movers&loc=Saburtalo&title=Move%20a%20sofa'));
     assert.match(llms, /^- `movers` Movers: \[Tbilisi\]\(https:\/\/xtender\.test\/en\/s\/mushebi-tbilisi\) 3, Batumi 1$/m, 'у открытой поиску страницы — ссылка');
