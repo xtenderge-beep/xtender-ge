@@ -173,8 +173,16 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     const hint = (html.match(/<meta name="ai-agent-instructions" content="([^"]*)">/) || [])[1];
     assert.ok(hint && hint.includes('https://xtender.test/llms.txt') && hint.includes('https://xtender.test/draft'), 'тег с адресами');
     assert.doesNotMatch(hint, /concrete|rebar|Batumi/i);
-    // Видимая ссылка внизу страницы, с адресом текстом.
-    assert.ok(html.includes('<a href="/llms.txt" class="text-stone-500 hover:text-white transition">Для ИИ-ассистентов: xtender.ge/llms.txt</a>'));
+    // Блок «For AI assistants» внизу страницы видимым текстом: зачем собирать заявку в чате, формат ссылки, живые коды
+    // услуг, что дальше, ссылка на полный файл. Не скрыт (скрытый текст для роботов Google считает спамом).
+    const guide = (html.match(/<section class="ai-guide[^"]*"([^>]*)>([\s\S]*?)<\/section>/) || []);
+    assert.ok(guide[2], 'блок есть');
+    assert.match(guide[1], /lang="en"/);
+    assert.doesNotMatch(guide[0], /hidden|display:\s*none/);
+    assert.ok(guide[2].includes(agentApi.WHY.replace(/'/g, '&#39;')) && guide[2].includes(agentApi.AFTER));
+    assert.ok(guide[2].includes('https://xtender.test/draft?lang=ka|ru|en&amp;cats=…'));
+    assert.ok(guide[2].includes('Service codes with providers now: van (Transport), movers (Movers).'), 'коды в порядке каталога');
+    assert.ok(guide[2].includes('href="https://xtender.test/llms.txt"'));
 
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
     require('../src/controllers/rfq.controller')._resetCatalog();

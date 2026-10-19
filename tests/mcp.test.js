@@ -74,7 +74,9 @@ function startSite() {
     const instructions = client.getInstructions();
     assert.match(instructions, /create_request_link/);
     assert.match(instructions, /full address on its own line/);
-    assert.match(instructions, /Do not ask for the phone number in the chat/);
+    assert.match(instructions, /do not ask for it in the chat/);
+    const agentApi = require('../src/config/agentApi');
+    assert.ok(instructions.includes(agentApi.WHY) && instructions.includes(agentApi.AFTER), 'зачем так и что дальше — как в llms.txt');
 
     // 2. Два инструмента, оба только читают (так их видят каталоги ChatGPT и Claude).
     const { tools } = await client.listTools();

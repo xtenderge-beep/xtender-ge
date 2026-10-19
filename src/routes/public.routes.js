@@ -196,6 +196,8 @@ async function renderHome(req, res, locale, page, options = {}) {
     draft,
     llmsUrl: getBaseUrl() + '/llms.txt',
     agentHint: agentApi.agentHint(getBaseUrl()),
+    // Блок «For AI assistants» внизу страницы: правило, формат ссылки, коды услуг с исполнителями.
+    aiGuide: agentApi.homeGuide(getBaseUrl(), await require('../services/assistantCatalog.service').getOrEmpty()),
     // Параметры ссылки-черновика, которые переключатель языка уносит с собой (partials/lang-switch).
     switchQuery: options.switchQuery || '',
     // Ссылки внизу каждой страницы: открытые поиску страницы «услуга + город» (на странице услуги — остальные,

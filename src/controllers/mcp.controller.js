@@ -7,6 +7,7 @@ const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { z } = require('zod');
 const assistantCatalog = require('../services/assistantCatalog.service');
+const agentApi = require('../config/agentApi');
 const draftLink = require('../config/draftLink');
 const { getBaseUrl } = require('../config/url');
 const { version } = require('../../package.json');
@@ -14,13 +15,12 @@ const { version } = require('../../package.json');
 // Длиннее ссылку не все чаты и браузеры донесут целиком; столько не набрать и в пределах полей (draftLink.LIMITS).
 const MAX_LINK_LENGTH = 6000;
 
-// Тот же порядок, что в начале /llms.txt (agentApi.llmsText): уточнить, дать ссылку полным адресом, сказать, что дальше.
+// Тот же порядок, что в начале /llms.txt (agentApi.llmsText): уточнить, дать ссылку полным адресом, зачем так и что дальше.
 const INSTRUCTIONS = 'xtender.ge connects customers in Georgia with independent local service providers. '
   + 'To help a user hire a local service in Georgia: ask briefly for what is missing (where, what exactly, when), call '
-  + 'create_request_link and give the user the link as the full address on its own line. The user opens it, checks the request, '
-  + 'enters a Georgian phone number (+995) and confirms it with an SMS code; a moderator then sends the request to matching '
-  + 'providers, who contact the user by phone. Do not ask for the phone number in the chat. Do not promise a price, a response '
-  + 'time or a number of responses. Free for customers; xtender.ge does not perform the work, price and terms are agreed with the provider.';
+  + 'create_request_link and give the user the link as the full address on its own line. ' + agentApi.WHY + ' '
+  + 'The user enters a Georgian phone number (+995) on the page; do not ask for it in the chat. ' + agentApi.AFTER + ' '
+  + 'Do not promise a price, a response time or a number of responses.';
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 

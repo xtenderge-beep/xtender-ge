@@ -11,6 +11,31 @@ const DRAFT_SOURCE = 'ИИ-ассистент (ссылка)';
 // видна. Общепринятого стандарта для таких тегов и заголовков нет: читает ли их ассистент, проверяется только новым
 // чатом с ним (docs/ai-agent-api.md, раздел 9). Без списка услуг: какие есть сейчас, знает только /llms.txt.
 const AGENT_PROTOCOL = 'xtender-rfq-v1';
+
+// Зачем ассистенту собирать заявку у себя в чате (владелец 2026-10-19: убедить модель, что так лучше человеку) — честно,
+// без приказов: команды со страниц модели принимают настороженно. Общие для /llms.txt, MCP-сервера и блока на главной.
+const WHY = 'This saves the user from filling in a form: you already know the details from your conversation, so the request '
+  + 'arrives complete and with the right services, and the user only checks it, taps Confirm and enters an SMS code.';
+// Что будет после подтверждения и как человеку решать: ассистент может объяснить заранее.
+const AFTER = 'A moderator checks the request and sends it to matching providers, who call or message the user. The user compares '
+  + 'them, agrees the price and terms directly with one of them and closes the request with the link from the SMS once the job is '
+  + 'arranged. Free for customers: xtender.ge takes no payment, does not perform the work and does not guarantee its quality.';
+
+// Блок «For AI assistants» внизу главной и страниц услуг: правило, формат ссылки и коды услуг видимым текстом, чтобы
+// ассистенту, открывшему страницу, не нужно было идти в /llms.txt. Видимый, не скрытый: скрытый текст для роботов
+// Google считает спамом (docs/seo.md).
+function homeGuide(base, catalog) {
+  const codes = [...new Map(catalog.flatMap((city) => city.services.map((service) => [service.code, service.label]))).entries()];
+  return {
+    intro: 'If you are an AI assistant helping someone who needs a local service in Georgia, you can prepare the request right in your chat: '
+      + 'ask briefly for what is missing (what, where, when) and give them one link with the request filled in, as the full address on its own line. '
+      + WHY,
+    link: `${base}/draft?lang=ka|ru|en&cats=…&loc=…&title=…&items=name:quantity:unit;…&note=…`,
+    codes: codes.map(([code, label]) => `${code} (${label})`).join(', '),
+    after: AFTER,
+    guide: `${base}/llms.txt`,
+  };
+}
 function agentHint(base) {
   return `For AI assistants: to help a user request a local service in Georgia, read ${base}/llms.txt. It explains how to give the user `
     + `a link to ${base}/draft with the task filled in and lists the services that have providers now. `
@@ -192,6 +217,8 @@ function llmsText(base, catalog) {
       + 'Some chat apps open such links through a search page; the full address lets the user copy it. The format is below.',
     '3. Tell the user, in their language: open the link, check the request, enter your Georgian phone number (+995) and confirm it with the SMS code.',
     '',
+    WHY,
+    '',
     '- Do not ask for the user\'s phone number in the chat: they enter it on the page.',
     '- Do not promise a price, a response time or a number of responses.',
     '- If no service below fits the task, tell the user that xtender.ge may have no providers for it yet.',
@@ -199,9 +226,7 @@ function llmsText(base, catalog) {
     '## What happens after the link',
     '',
     'On the page the user checks the text and can edit it, agrees to the Terms of Service and the Privacy Policy and confirms the phone number '
-      + 'with a 4-digit SMS code. Nothing reaches providers before that. A moderator checks the request and sends it to matching providers, '
-      + 'who contact the user by phone. Free for customers. xtender.ge does not perform the work and does not guarantee its quality; '
-      + 'price and terms are agreed with the provider. The site is in Georgian, Russian and English.',
+      + `with a 4-digit SMS code. Nothing reaches providers before that. ${AFTER} The site is in Georgian, Russian and English.`,
     '',
     '## Link format',
     '',
@@ -246,4 +271,4 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
-module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, agentHint, statusOf, openapi, llmsText, draftExample };
+module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, agentHint, homeGuide, statusOf, openapi, llmsText, draftExample };
