@@ -229,6 +229,7 @@ function llmsText(base, catalog) {
     '',
     'Only for assistants that can call HTTP actions, for example a custom GPT with an action. Otherwise give the user the link above.',
     '',
+    `- MCP server: ${base}/mcp (Streamable HTTP, no sign-in) with two read-only tools: list_services and create_request_link.`,
     `- [OpenAPI schema](${base}/openapi.json): two calls, createRequest and verifyRequest.`,
     '- Before creating a request, show the user the Terms of Service and the Privacy Policy and ask if they agree that their phone number and the request are shared with matching providers.',
     '- createRequest sends a 4-digit code by SMS to the user\'s phone. Ask the user for the code and call verifyRequest. Without the code the request is not sent to anyone.',

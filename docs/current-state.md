@@ -650,6 +650,11 @@ xtender.ge», «Как это работает» (четыре шага), «Че
 ссылку (коды услуг — `service_categories.slug`). Раздел 8 в [ai-agent-api.md](ai-agent-api.md). Проверка:
 `node tests/draft-link.test.js`.
 
+MCP-сервер `POST /mcp` (раздел 10 того же документа): основа для плагина ChatGPT и коннектора Claude. Инструменты
+только на чтение: `list_services` (услуги с исполнителями) и `create_request_link` (ссылка `/draft`); номер телефона
+не принимает, в базу не пишет. Каталог услуг общий с `/llms.txt` — `assistantCatalog.service.js`. Проверка:
+`node tests/mcp.test.js`.
+
 ## Заявка: возврат на исправление
 
 Основная последовательность:

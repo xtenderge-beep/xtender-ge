@@ -12,6 +12,7 @@
     "seed:masters": "node scripts/seed-masters.js"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
     "axios": "^1.7.7",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -23,7 +24,8 @@
     "multer": "^2.2.0",
     "pdfkit": "^0.20.2",
     "pg": "^8.13.1",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@fortawesome/fontawesome-free": "^6.5.1",

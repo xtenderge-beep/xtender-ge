@@ -8,15 +8,12 @@ const consentLog = require('../services/consentLog.service');
 const otpService = require('../services/otp.service');
 const orderService = require('../services/order.service');
 const legalContentService = require('../services/legalContent.service');
-const categoryService = require('../services/category.service');
-const masterService = require('../services/master.service');
-const servicePages = require('../services/servicePages.service');
+const assistantCatalog = require('../services/assistantCatalog.service');
 const { announceConfirmed } = require('./order.controller');
 const redis = require('../config/redis');
 const { requestMeta } = require('../config/requestMeta');
 const { toE164, isGeorgianPhone } = require('../config/phone');
 const { getBaseUrl } = require('../config/url');
-const { localizedPath } = require('../config/seo');
 
 const LANGS = ['ka', 'ru', 'en'];
 const CODE_TTL_SECONDS = 300; // как у кода в otp.service
@@ -24,7 +21,6 @@ const CODE_TTL_SECONDS = 300; // как у кода в otp.service
 // Запросы GPT приходят с серверов OpenAI, у многих людей один IP: упрёмся — поднять.
 const IP_LIMIT_PER_HOUR = 30;
 const NAME_LABEL = { ka: 'სახელი', ru: 'Имя', en: 'Name' };
-const CATALOG_TTL_MS = 10 * 60 * 1000;
 
 const fail = (res, status, error, message, field) => res.status(status).json({ success: false, error, message, ...(field ? { field } : {}) });
 const text = (value) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '');
@@ -136,35 +132,13 @@ async function verify(req, res) {
   });
 }
 
-// Услуги, у которых сейчас есть исполнители, по городам — из того же каталога, что страницы «услуга + город».
-// Запоминаем на 10 минут: эти адреса читают роботы.
-let catalogCache = null;
-async function liveCatalog() {
-  if (catalogCache && catalogCache.until > Date.now()) return catalogCache.value;
-  const [categories, cities] = await Promise.all([categoryService.list(), masterService.getActiveCities()]);
-  const value = [];
-  for (const city of cities) {
-    const pages = servicePages.forCity(categories, city, await masterService.listMasters({ cityId: city.id }));
-    if (!pages.length) continue;
-    value.push({ name: city.name_en || city.name_ru, services: pages.map((page) => ({
-      code: page.category.slug, label: page.category.name_en || page.category.name_ru, count: page.count,
-      url: page.indexable ? getBaseUrl() + localizedPath('en', '/s/' + page.slug) : null })) });
-  }
-  catalogCache = { value, until: Date.now() + CATALOG_TTL_MS };
-  return value;
-}
-
-// Сбой подсчёта каталога описание не роняет: без списка услуг оно всё равно верное.
-async function catalogOrEmpty() {
-  try { return await liveCatalog(); } catch (err) { console.error('Agent API catalog unavailable:', err.message); return []; }
-}
-
+// Услуги с исполнителями по городам — services/assistantCatalog.service (общий с MCP-сервером).
 async function openapi(req, res) {
-  res.json(agentApi.openapi(getBaseUrl(), await catalogOrEmpty()));
+  res.json(agentApi.openapi(getBaseUrl(), await assistantCatalog.getOrEmpty()));
 }
 
 async function llmsTxt(req, res) {
-  res.type('text/plain; charset=utf-8').send(agentApi.llmsText(getBaseUrl(), await catalogOrEmpty()));
+  res.type('text/plain; charset=utf-8').send(agentApi.llmsText(getBaseUrl(), await assistantCatalog.getOrEmpty()));
 }
 
-module.exports = { create, verify, openapi, llmsTxt, parseCreate, _resetCatalog: () => { catalogCache = null; } };
+module.exports = { create, verify, openapi, llmsTxt, parseCreate, _resetCatalog: assistantCatalog.reset };

@@ -97,6 +97,11 @@ app.post('/v1/rfq/create', asyncHandler(rfqController.create));
 app.post('/v1/rfq/:rfq_id/verify', asyncHandler(rfqController.verify));
 app.get('/openapi.json', asyncHandler(rfqController.openapi));
 app.get('/llms.txt', asyncHandler(rfqController.llmsTxt));
+// MCP-сервер для ИИ-ассистентов: плагин ChatGPT, коннектор Claude (docs/ai-agent-api.md, раздел 10).
+const mcpController = require('./controllers/mcp.controller');
+app.post('/mcp', asyncHandler(mcpController.handle));
+app.get('/mcp', mcpController.notAllowed);
+app.delete('/mcp', mcpController.notAllowed);
 
 // Fail closed: без обеих переменных окружения /admin/* должен быть недоступен,
 // а не молча пускать всех без пароля — прецедент именно такой дыры уже был
@@ -112,10 +117,16 @@ app.use((err, req, res, next) => {
   if (err && (err.name === 'MulterError' || err.message === 'Unsupported file type')) {
     return res.status(400).json({ success: false, message: err.message });
   }
+  if (err && err.type === 'entity.parse.failed' && req.path === '/mcp') {
+    return res.status(400).json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error: the request body is not valid JSON.' }, id: null });
+  }
   if (err && err.type === 'entity.parse.failed' && req.path.startsWith('/v1/')) {
     return res.status(400).json({ success: false, error: 'invalid_request', message: 'The request body is not valid JSON.' });
   }
   console.error('Unhandled request error:', err);
+  if (req.path === '/mcp') {
+    return res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
+  }
   if (req.path.startsWith('/api') || req.path.startsWith('/v1/')) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
