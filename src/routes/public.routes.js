@@ -176,6 +176,15 @@ async function renderHome(req, res, locale, page, options = {}) {
     pageFocus = { services: focusServices, preset: tag ? { key: tag.key, label: '#' + tag.label } : null };
     if (tag) simpleSearch.rowTags = [tag, ...simpleSearch.rowTags.filter(item => item.key !== tag.key)].slice(0, 10);
   }
+  // На странице услуги к отметкам её исполнителей добавляются особенности-хэштеги (#сборка мебели, #демонтаж) с
+  // числом: те же, что на их карточках, — у грузчиков отметок нет, а это единственные живые данные о работах.
+  if (servicePage && simpleSearch) {
+    const keysOf = m => simpleSearch.byMaster.get(m.id)?.keys || [];
+    simpleSearch.tags.filter(tag => tag.kind === 'feature').forEach(tag => {
+      const count = servicePage.providers.filter(m => keysOf(m).includes(tag.key)).length;
+      if (count) servicePage.features.push({ name: tag.label, count });
+    });
+  }
 
   res.render('index', {
     consent: await consentService.bundle('client', locale),

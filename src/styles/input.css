@@ -869,6 +869,7 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .simple-seo-list { max-width:820px; margin:10px 0 0; padding-left:20px; list-style:disc; }
 .simple-seo-list li { margin:6px 0; font-size:15px; line-height:1.7; color:var(--home-muted); }
 .simple-seo-list li::marker { color:var(--home-green); }
+.simple-seo-join a { font-weight:650; color:var(--home-green); text-decoration:underline; text-underline-offset:3px; }
 .simple-how-dialog { width:min(560px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); padding:0; border:0; border-radius:20px; background:#fff; color:var(--home-ink); box-shadow:0 24px 64px -24px rgba(21,46,41,.45); overflow:auto; }
 .simple-how-dialog::backdrop { background:rgba(21,46,41,.55); }
 .simple-how-dialog .hx { max-width:none; padding:24px 20px 20px; }

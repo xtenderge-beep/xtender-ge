@@ -73,7 +73,9 @@
           itemOffered: { '@type': 'Service', name: g.label, areaServed: 'Tbilisi' },
         })),
       };
-      const faqItems = [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t(n === 2 ? 'home_faq_response' : 'faq_a' + n) }));
+      // У страницы услуги со своим текстом (config/service-pages-article.js) — свои вопросы, и в разметке, и внизу.
+      const faqItems = autoPage && autoPage.faq.length ? autoPage.faq
+        : [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t(n === 2 ? 'home_faq_response' : 'faq_a' + n) }));
       const faqJsonLd = {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
@@ -707,12 +709,15 @@
                       <% } %>
                       <h2><%= t('seo_what_title') %></h2>
                       <p><%= t('seo_what_body') %></p>
-                      <% if (topic && topic.article.length) { %>
-                      <%# Своя статья страницы задачи («Как это работает» и «Чем отличается от звонка» для этой задачи)
+                      <% const pageArticle = topic && topic.article.length ? topic.article : autoPage && autoPage.article.length ? autoPage.article : null; %>
+                      <% if (pageArticle) { %>
+                      <%# Своя статья страницы задачи или услуги («Как это работает» и «Чем удобнее» для этой задачи)
                           стоит на месте общих «Как это работает» и «Чем удобнее»: два одинаковых раздела подряд не нужны. %>
-                      <% topic.article.forEach(function (block) { %>
+                      <% pageArticle.forEach(function (block) { %>
                       <% if (block.h) { %><h2><%= block.h %></h2><% } else if (block.ul) { %><ul class="simple-seo-list"><% block.ul.forEach(function (item) { %><li><%= item %></li><% }); %></ul><% } else if (block.p) { %><p><%= block.p %></p><% } %>
                       <% }); %>
+                      <%# Тем, кто ищет такую работу (по запросу «მუშა» ищут и работу): ссылка на регистрацию исполнителя. %>
+                      <% if (autoPage && autoPage.join) { %><p class="simple-seo-join"><%= autoPage.join.text %> <a href="<%= lang === 'ka' ? '' : '/' + lang %>/join"><%= autoPage.join.cta %></a></p><% } %>
                       <% } else { %>
                       <h2><%= t('seo_how_title') %></h2>
                       <ol class="simple-seo-steps">

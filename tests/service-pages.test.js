@@ -25,6 +25,8 @@ const landingPages = require('../src/services/landingPage.service');
 const { translate, normalizeLang } = require('../src/config/i18n');
 const googleTag = require('../src/config/googleTag');
 const PLACEHOLDERS = require('../src/config/service-pages-copy');
+const ARTICLES = require('../src/config/service-pages-article');
+const { FEATURE_TAGS } = require('../src/config/service-search-words');
 const root = path.join(__dirname, '..');
 
 let phones = 0;
@@ -75,6 +77,8 @@ function startSite() {
   await pool.query(`INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_builtin,sort_order)
     VALUES('svc_plumb','სანტექნიკი','Сантехники','Plumbing','','[]',false,50)`);
   for (let i = 0; i < 3; i++) await insertMaster(['movers']);
+  // Один грузчик пишет о сборке мебели — на странице особенность «сборка мебели — 1».
+  await pool.query("UPDATE masters SET description='Погрузка, собираю и разбираю мебель' WHERE id=(SELECT MIN(id) FROM masters)");
   await insertMaster(['movers', 'junk']);
   await insertMaster(['van']);
   for (let i = 0; i < 3; i++) await insertMaster(['svc_plumb']);
@@ -112,12 +116,24 @@ function startSite() {
       // Карточки услуги — первыми.
       const services = [...html.matchAll(/class="master-card [^"]*"[^>]*data-services="([^"]*)"/g)].map(match => match[1]);
       assert.deepEqual(services.slice(0, 4).map(list => list.includes('movers')), [true, true, true, true], `${lang}: movers first`);
+      // Свой текст грузчиков: статья вместо общих «Как это работает» и «Чем удобнее», свои вопросы и в разметке, и
+      // внизу, ссылка для ищущих работу, особенность из описания с настоящим числом.
+      const copy = ARTICLES.movers[lang];
+      assert.ok(html.includes(`<h2>${copy.article[0].h}</h2>`) && !html.includes(`<h2>${t('seo_how_title')}</h2>`), `${lang}: own article instead of the general one`);
+      assert.ok(html.includes(`"@type":"Question","name":"${copy.faq[0].q}"`) && html.includes(`<h3>${copy.faq[0].q}</h3>`), `${lang}: own questions in markup and on the page`);
+      assert.ok(!html.includes(`"name":"${t('faq_q5')}"`), `${lang}: general questions are not in the markup`);
+      assert.ok(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/join">${copy.join.cta}</a>`), `${lang}: link for job seekers`);
+      const assembly = FEATURE_TAGS.find(tag => tag.key === 'assembly').tag[lang];
+      assert.ok(html.includes(`<strong>${t('seo_auto_features')}:</strong> ${assembly} — 1.`), `${lang}: furniture assembly counted from the description`);
     }
 
     // Один исполнитель — страница открывается, но закрыта от поиска; ни одного — 404; выключенный город — 404.
     const junk = await get('/en/s/nagvis-gatana-tbilisi');
     assert.equal(junk.status, 200);
-    assert.match(await junk.text(), /<meta name="robots" content="noindex, nofollow">/);
+    const junkHtml = await junk.text();
+    assert.match(junkHtml, /<meta name="robots" content="noindex, nofollow">/);
+    // У услуги без своего текста — общий текст и общие вопросы, как раньше.
+    assert.ok(junkHtml.includes(`<h2>${translate('en')('seo_how_title')}</h2>`) && junkHtml.includes(`"name":"${translate('en')('faq_q5')}"`), 'a service without its own copy keeps the general text');
     for (const url of ['/ru/s/evakuatori-tbilisi', '/ru/s/mushebi-batumi', '/ru/s/nothing-tbilisi', '/s/mushebi-tbilisi-extra'])
       assert.equal((await get(url)).status, 404, url);
 
@@ -146,5 +162,5 @@ function startSite() {
     server.close();
     server.closeAllConnections();
   }
-  console.log('PASS: service pages — addresses for built-in and admin services, city forms, threshold of three, noindex below it, 404 without providers, three languages with canonical and hreflang, live number of the service, homepage links, sitemap, a task page with the same address wins');
+  console.log('PASS: service pages — addresses for built-in and admin services, city forms, threshold of three, noindex below it, 404 without providers, three languages with canonical and hreflang, live number of the service, own article and questions for movers, homepage links, sitemap, a task page with the same address wins');
 })().catch(error => { console.error(error); process.exit(1); });
