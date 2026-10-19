@@ -12,6 +12,8 @@
 %>
 <meta charset="UTF-8">
 <meta name="viewport" content="<%= _viewport %>">
+<%# Подтверждение сайта в Bing Webmaster Tools (2026-10-20). Не удалять: без тега Bing снимает подтверждение. %>
+<meta name="msvalidate.01" content="CF907AE1DE21DCE339F3AF7898EF5593" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <title><%= title %></title>
 <% if (typeof metaDescription !== 'undefined' && metaDescription) { %>

@@ -22,6 +22,8 @@ const partial=path.join(views,'partials/google-tag.ejs'),render=locals=>ejs.rend
 assert.match(render({googleTagId:ID}),/<script src="\/js\/google-tag\.js" data-id="G-TEST123456" defer><\/script>/);
 assert.ok(!render({googleTagId:''}).includes('<script'));assert.ok(!render({}).includes('<script'),'шаблон без идентификатора рендерится без метки');
 for(const f of ['partials/head.ejs','terms.ejs','privacy.ejs']) assert.match(view(f),/include\('(partials\/)?google-tag'\)/,f);
+// Тег подтверждения Bing Webmaster Tools в общем <head>: без него Bing снимает подтверждение сайта.
+assert.ok(view('partials/head.ejs').includes('<meta name="msvalidate.01" content="CF907AE1DE21DCE339F3AF7898EF5593" />'));
 
 // Скрипт страницы в подставном браузере.
 const source=fs.readFileSync(path.join(__dirname,'../public/js/google-tag.js'),'utf8');

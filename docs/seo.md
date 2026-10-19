@@ -142,6 +142,9 @@ AI Overviews), что для этого уже работает и что дел
 - `public/robots.txt` закрывает только личные страницы и указывает карту сайта.
 - Файл подтверждения Search Console — `public/googlea8f7694c5b065f42.html` (с 2026-10-03). **Не удалять**: без
   него Google снимает подтверждение.
+- Тег подтверждения Bing Webmaster Tools — `<meta name="msvalidate.01">` в общем `<head>`
+  (`src/views/partials/head.ejs`, с 2026-10-20; тест в `tests/google-tag.test.js`). **Не удалять**: без него Bing
+  снимает подтверждение. Без Bing сайт не находит поиск ChatGPT ([ai-agent-api.md](ai-agent-api.md), раздел 9).
 
 ### Что уже автоматизировано
 
