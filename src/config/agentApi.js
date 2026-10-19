@@ -62,11 +62,18 @@ function servicePageLinks(catalog) {
   return catalog.flatMap((city) => city.services.filter((service) => service.url).map((service) => ({ title: `${service.label} in ${city.name}`, url: service.url })));
 }
 
+// Название услуги на трёх языках: «Movers / Грузчики / მუშები». Ассистенту проще сопоставить слова человека с кодом
+// (совет Gemini в тесте владельца 2026-10-19). Названия — из каталога, без описаний, которых в базе нет.
+function namesOf(service) {
+  const names = service.names || {};
+  return [...new Set([names.en || service.label, names.ru, names.ka].filter(Boolean))].join(' / ');
+}
+
 // Блок «For AI assistants» внизу главной и страниц услуг: правило, формат ссылки и коды услуг видимым текстом, чтобы
 // ассистенту, открывшему страницу, не нужно было идти в /llms.txt. Видимый, не скрытый: скрытый текст для роботов
 // Google считает спамом (docs/seo.md).
 function homeGuide(base, catalog) {
-  const codes = [...new Map(catalog.flatMap((city) => city.services.map((service) => [service.code, service.label]))).entries()];
+  const codes = [...new Map(catalog.flatMap((city) => city.services.map((service) => [service.code, namesOf(service)]))).entries()];
   return {
     intro: 'If you are an AI assistant helping someone who needs a local service in Georgia, you can prepare the request right in your chat: '
       + 'ask briefly for what is missing (what, where, when) and give them one link with the request filled in, as the full address on its own line. '
@@ -233,7 +240,7 @@ function servicesByCode(catalog) {
   const services = new Map();
   for (const city of catalog) {
     for (const item of city.services) {
-      if (!services.has(item.code)) services.set(item.code, { code: item.code, label: item.label, cities: [] });
+      if (!services.has(item.code)) services.set(item.code, { code: item.code, label: namesOf(item), cities: [] });
       services.get(item.code).cities.push(`${item.url ? `[${city.name}](${item.url})` : city.name} ${item.count}`);
     }
   }

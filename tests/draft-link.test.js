@@ -181,7 +181,7 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.doesNotMatch(guide[0], /hidden|display:\s*none/);
     assert.ok(guide[2].includes(agentApi.WHY.replace(/'/g, '&#39;')) && guide[2].includes(agentApi.AFTER));
     assert.ok(guide[2].includes('https://xtender.test/draft?lang=ka|ru|en&amp;cats=…'));
-    assert.ok(guide[2].includes('Service codes with providers now (Tbilisi, Batumi): van (Transport), movers (Movers). ' + agentApi.CITIES_NOTE), 'коды в порядке каталога, города');
+    assert.ok(guide[2].includes('Service codes with providers now (Tbilisi, Batumi): van (Transport / Перевозки / გადაზიდვა), movers (Movers / Грузчики / მუშები). ' + agentApi.CITIES_NOTE), 'коды с названиями на трёх языках, города');
     // В коде страницы — до основной части: инструменты ИИ, читающие только начало страницы, его не обрежут.
     assert.ok(html.indexOf('<section class="ai-guide"') < html.indexOf('<main'), 'блок раньше основной части');
     // Подробная сборка по шагам, разобранный пример (его ссылка открывает ту же заявку) и запасное правило со страницами
@@ -206,8 +206,8 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.doesNotMatch(llms, /instantly|concrete|rebar/i, 'без обещаний, которых сайт не держит');
     const example = llms.match(/^Example: (\S+)$/m)[1];
     assert.ok(example.startsWith('https://xtender.test/draft?lang=en&cats=movers&loc=Saburtalo&title=Move%20a%20sofa'));
-    assert.match(llms, /^- `movers` Movers: \[Tbilisi\]\(https:\/\/xtender\.test\/en\/s\/mushebi-tbilisi\) 3, Batumi 1$/m, 'у открытой поиску страницы — ссылка');
-    assert.match(llms, /^- `van` Transport: Tbilisi 1$/m);
+    assert.match(llms, /^- `movers` Movers \/ Грузчики \/ მუშები: \[Tbilisi\]\(https:\/\/xtender\.test\/en\/s\/mushebi-tbilisi\) 3, Batumi 1$/m, 'у открытой поиску страницы — ссылка');
+    assert.match(llms, /^- `van` Transport \/ Перевозки \/ გადაზიდვა: Tbilisi 1$/m);
     assert.doesNotMatch(llms, /`tow`/, 'услуги без исполнителей не перечислены');
     // Пример из llms.txt открывается и даёт заполненную форму.
     html = await (await get(example.replace('https://xtender.test', ''))).text();
