@@ -227,17 +227,34 @@
                                 </div>
                                 <% } %>
 
-                                <% if (draftPage) { %>
-                                <div class="draft-note" role="note">
-                                  <p class="draft-note-title"><%= t('draft_note_title') %></p>
-                                  <p><%= t('draft_note_body') %></p>
-                                  <% if (draftPage.services.length) { %>
-                                  <p class="draft-note-services"><%= t('draft_note_services').replace('{city}', draftPage.city) %> <%= draftPage.services.map(function (item) { return item.label + ' — ' + item.count; }).join(', ') %></p>
+                                <% if (draftPage) { const review = draftPage.review; %>
+                                <%# Ссылка от ИИ-ассистента: готовая заявка, а не поле с текстом (владелец 2026-10-19). «Подтвердить» —
+                                    тот же переход к номеру, что у кнопки под полем; «Изменить» показывает поле с этим текстом. %>
+                                <div class="draft-review" id="draftReview">
+                                  <p class="draft-review-label"><%= t('draft_note_title') %></p>
+                                  <% if (review.title) { %><h2 class="draft-review-title"><%= review.title %></h2><% } %>
+                                  <% if (review.items.length) { %>
+                                  <ul class="draft-review-items">
+                                    <% review.items.forEach(function (item) { %><li><span><%= item.name %></span><% if (item.amount) { %><b><%= item.amount %></b><% } %></li><% }); %>
+                                  </ul>
                                   <% } %>
+                                  <% if (review.note) { %><p class="draft-review-note"><%= review.note %></p><% } %>
+                                  <% if (review.place) { %><p class="draft-review-place"><%= t('draft_place') %>: <b><%= review.place %></b></p><% } %>
+                                  <% if (draftPage.services.length) { %>
+                                  <p class="draft-review-services"><%= t('draft_note_services').replace('{city}', draftPage.city) %> <%= draftPage.services.map(function (item) { return item.label + ' — ' + item.count; }).join(', ') %></p>
+                                  <% } %>
+                                  <p class="draft-review-hint"><%= t('draft_note_body') %></p>
+                                  <button type="button" onclick="submitFreeform()" class="mt-3 w-full py-4 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.97] duration-150 text-white font-black text-sm shadow-lg shadow-emerald-600/25 transition flex items-center justify-center gap-2">
+                                      <span><%= t('draft_confirm') %></span><i class="fa-solid fa-arrow-right text-[11px]"></i>
+                                  </button>
+                                  <button type="button" onclick="editDraft()" class="mt-2 w-full py-3 px-4 rounded-2xl border-2 border-stone-200 bg-white hover:border-stone-300 text-stone-700 font-bold text-sm transition flex items-center justify-center gap-2">
+                                      <i class="fa-solid fa-pen text-[11px]"></i><span><%= t('draft_edit') %></span>
+                                  </button>
+                                  <p class="draft-review-chat"><%= t('draft_edit_chat') %></p>
                                 </div>
                                 <% } %>
 
-                                <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
+                                <div class="composer-inputbox mt-2.5 <%= draftPage ? 'hidden' : 'flex' %> flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
                                     <textarea id="freeformInput" rows="<%= draftPage ? Math.min(12, Math.max(5, draftPage.text.split('\n').length + 1)) : 5 %>" <% if (simple) { %>aria-label="<%= autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder') %>"<% } else { %>aria-describedby="home-description-hint"<% } %> placeholder="<%= simple ? (autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder')) : topic ? topic.placeholder : t('freeform_placeholder') %>"
                                         class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"><%= draftPage ? draftPage.text : '' %></textarea>
 
@@ -2012,6 +2029,17 @@
         // Ссылка-черновик (/draft): текст задачи стоит в разметке поля, сброс выше его стёр — возвращаем.
         (function () { const field = document.getElementById('freeformInput'); field.value = field.defaultValue; })();
         <% } %>
+        // «Изменить» на готовой заявке по ссылке ассистента: вместо карточки — поле с тем же текстом.
+        function editDraft() {
+            const review = document.getElementById('draftReview');
+            if (review) review.classList.add('hidden');
+            const box = document.querySelector('.composer-inputbox');
+            box.classList.remove('hidden');
+            box.classList.add('flex');
+            const field = document.getElementById('freeformInput');
+            field.focus();
+            field.setSelectionRange(field.value.length, field.value.length);
+        }
 
         (function () {
             const track = document.getElementById('homeExamplesTrack');

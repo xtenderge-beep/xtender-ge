@@ -697,12 +697,19 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
 .provider-welcome-intro{margin:0;border:0;border-bottom:1px solid #ccdcb2;border-radius:0;padding:18px 22px}
 .provider-welcome-intro h2{font-size:15px}.provider-welcome-intro strong{font-size:30px;margin:5px 0}.provider-welcome-intro p{margin-top:5px}
 .home-free-note{font-size:12px;line-height:1.5;color:#315a43;margin-top:8px}
-/* Ссылка-черновик от ИИ-ассистента (/draft): пояснение над полем задачи. В полноэкранном поле на телефоне
-   его уже прочитали — там оно не занимает место. */
-.draft-note{background:#f1f7f3;border:1px solid #d3e6da;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.5;color:#315a43}
-.draft-note-title{font-weight:800;color:#1d3e2c}
-.draft-note-services{margin-top:4px;font-weight:600}
-body.compose-active .draft-note{display:none}
+/* Ссылка-черновик от ИИ-ассистента (/draft): готовая заявка с кнопками «Подтвердить» и «Изменить». */
+.draft-review{color:#1c1917;padding:16px 18px 12px}
+@media (max-width:639px){.draft-review{padding:14px 14px 10px}}
+.draft-review-label{display:inline-block;background:#f1f7f3;border:1px solid #d3e6da;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;color:#315a43}
+.draft-review-title{margin-top:10px;font-size:20px;line-height:1.3;font-weight:800;color:#1c1917}
+.draft-review-items{margin-top:10px;border-top:1px solid #e7e5e4}
+.draft-review-items li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #e7e5e4;font-size:15px;line-height:1.4}
+.draft-review-items b{white-space:nowrap;font-weight:700}
+.draft-review-note{margin-top:10px;font-size:15px;line-height:1.5;white-space:pre-line}
+.draft-review-place{margin-top:8px;font-size:15px}
+.draft-review-services{margin-top:10px;font-size:13px;font-weight:600;color:#315a43}
+.draft-review-hint{margin-top:10px;font-size:13px;line-height:1.5;color:#57534e}
+.draft-review-chat{margin-top:8px;font-size:12px;line-height:1.5;color:#78716c;text-align:center}
 @media(max-width:700px){body.signup-started .provider-welcome-intro{display:none}}
 
 /* Transfer instructions are numbered steps, not a paragraph. */

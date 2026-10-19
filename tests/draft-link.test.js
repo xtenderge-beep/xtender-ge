@@ -85,7 +85,10 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
   assert.equal(draftLink.parse({ title: 'Move a sofa', lang: 'de' }).lang, 'en');
   assert.equal(draftLink.place('old-tbilisi'), 'Old Tbilisi');
   assert.equal(draftLink.place('Сабуртало'), 'Сабуртало');
-  assert.deepEqual(draftLink.card(ru, 'ru'), { title: 'Задача: Переезд из Ваке', description: 'Диван — 1 шт; Холодильник — 1 шт · Saburtalo' });
+  // Разметка жирного шрифта, которую модель перенесла в ссылку («1 шт**», Gemini), убирается.
+  assert.deepEqual(draftLink.parseItems('**Диван**:1:шт**'), [{ name: 'Диван', amount: '1 шт' }]);
+  assert.equal(draftLink.parse({ title: '**Переезд**' }).title, 'Переезд');
+  assert.deepEqual(draftLink.card(ru, 'ru'), { title: 'Заявка: Переезд из Ваке', description: 'Диван — 1 шт; Холодильник — 1 шт · Saburtalo' });
 
   // Каталог: три грузчика и перевозка в Тбилиси, грузчик в Батуми (город включён).
   await pool.query("UPDATE cities SET is_active=true WHERE slug='batumi'");
@@ -109,9 +112,15 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.match(html, /<html lang="ru"/, 'язык адреса важнее параметра lang');
     assert.equal(unescape(textarea(html)), 'Переезд из Ваке\n- Диван — 1 шт\n- Холодильник — 1 шт\n3 этаж, без лифта\nМесто: Saburtalo');
     assert.ok(html.includes(t('draft_note_title')) && html.includes(t('draft_note_body')));
+    // Готовая заявка: заголовок, позиции, место и две кнопки; поле с тем же текстом спрятано до «Изменить».
+    assert.ok(html.includes('<h2 class="draft-review-title">Переезд из Ваке</h2>'));
+    assert.ok(html.includes('<li><span>Диван</span><b>1 шт</b></li>') && html.includes('<li><span>Холодильник</span><b>1 шт</b></li>'));
+    assert.ok(html.includes('<p class="draft-review-note">3 этаж, без лифта</p>') && html.includes('Место: <b>Saburtalo</b>'));
+    assert.ok(html.includes('onclick="submitFreeform()"') && html.includes(t('draft_confirm')) && html.includes('onclick="editDraft()"') && html.includes(t('draft_edit')));
+    assert.match(html, /class="composer-inputbox mt-2.5 hidden flex-col/, 'поле спрятано');
     assert.ok(html.includes('Исполнители в Тбилиси: Грузчики — 3, Перевозки — 1</p>'), 'числа — из каталога; эвакуаторов нет, неизвестный код отброшен');
     assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
-    assert.ok(html.includes('<meta property="og:title" content="Задача: Переезд из Ваке">'));
+    assert.ok(html.includes('<meta property="og:title" content="Заявка: Переезд из Ваке">'));
     assert.ok(html.includes('<meta property="og:description" content="Диван — 1 шт; Холодильник — 1 шт · Saburtalo">'));
     assert.ok(html.includes(`<link rel="canonical" href="https://xtender.test/ru/draft?${query.replace(/&/g, '&amp;')}&amp;lang=en">`));
     assert.doesNotMatch(html, /hreflang="(ka|ru|en)"/, 'страница закрыта от поиска — без языковых версий');
@@ -130,7 +139,7 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.ok(html.includes('შემსრულებლები ბათუმში: მუშები — 1</p>'), 'каталог Батуми');
     html = await (await get('/draft?title=' + encodeURIComponent('Вывезти мусор'))).text();
     assert.match(html, /<html lang="ru"/);
-    assert.doesNotMatch(html, /draft-note-services/, 'без кодов услуг — без строки с числами');
+    assert.doesNotMatch(html, /draft-review-services/, 'без кодов услуг — без строки с числами');
 
     // 4. Пустая ссылка ведёт на главную; разметка из ссылки экранируется в поле и в карточке.
     response = await get('/en/draft?cats=movers');

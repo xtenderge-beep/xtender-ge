@@ -12,7 +12,8 @@ const LIMITS = { title: 120, items: 30, name: 200, amount: 40, loc: 80, note: 10
 // Параметр, повторённый в адресе дважды, Express отдаёт массивом: берём первый.
 const first = (value) => (Array.isArray(value) ? value[0] : value);
 const str = (value) => (typeof first(value) === 'string' ? first(value) : '');
-const oneLine = (value) => value.replace(/\s+/g, ' ').trim();
+// Модель иногда переносит в ссылку разметку жирного шрифта: «1 шт**» (Gemini, тест владельца 2026-10-19).
+const oneLine = (value) => value.replace(/\*{2,}/g, '').replace(/\s+/g, ' ').trim();
 
 // «Бетон М300:15:м3;Арматура d12:2:т» → [{ name: 'Бетон М300', amount: '15 м3' }, …]. Количество и единица
 // необязательны; двоеточие внутри названия остаётся в названии.
@@ -66,6 +67,12 @@ function text(draft, lang) {
   ].filter(Boolean).join('\n');
 }
 
+// Готовая заявка на странице (просьба владельца 2026-10-19): по ссылке человек видит не поле с текстом, а карточку
+// с кнопкой «Подтвердить заявку»; поле с тем же текстом — по кнопке «Изменить».
+function review(draft) {
+  return { title: draft.title, items: draft.items, note: draft.note, place: draft.loc ? place(draft.loc) : '' };
+}
+
 // Заголовок и описание карточки предпросмотра, когда ссылку пересылают в мессенджере.
 function card(draft, lang) {
   const name = draft.title || (draft.items[0] && draft.items[0].name) || draft.note.split('\n')[0];
@@ -76,4 +83,4 @@ function card(draft, lang) {
   };
 }
 
-module.exports = { parse, parseItems, place, city, text, card, LIMITS };
+module.exports = { parse, parseItems, place, city, text, review, card, LIMITS };

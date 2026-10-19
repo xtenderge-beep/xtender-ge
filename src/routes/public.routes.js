@@ -145,6 +145,7 @@ async function renderHome(req, res, locale, page, options = {}) {
   // числа; кому отправить заявку, решает модератор, как всегда).
   const draft = options.draft ? {
     text: draftLink.text(options.draft, locale),
+    review: draftLink.review(options.draft),
     card: draftLink.card(options.draft, locale),
     city: catalogCity ? servicePages.inCity(catalogCity, locale) : '',
     services: draftServices.map(key => ({ category: categories.find(c => c.slug === key), count: masters.filter(m => servesKey(m, key)).length }))
