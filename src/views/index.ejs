@@ -795,6 +795,9 @@
                     <a href="<%= legalPrefix %>/terms" class="text-stone-500 hover:text-white transition"><%= t('join_terms_link') %></a>
                     <a href="<%= legalPrefix %>/privacy" class="text-stone-500 hover:text-white transition"><%= t('join_privacy_link') %></a>
                 </div>
+                <%# Видимая ссылка на описание для моделей (/llms.txt): ассистент, читающий текст страницы, теряет ссылки и
+                    скрытые теги, а адрес в тексте видит (владелец 2026-10-19). %>
+                <a href="/llms.txt" class="text-stone-500 hover:text-white transition"><%= t('footer_ai_link') %> xtender.ge/llms.txt</a>
                 <p class="font-mono text-stone-500 text-[11px]"><%= t('footer_copy') %></p>
             </div>
         </div>

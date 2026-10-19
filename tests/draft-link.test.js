@@ -173,6 +173,8 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     const hint = (html.match(/<meta name="ai-agent-instructions" content="([^"]*)">/) || [])[1];
     assert.ok(hint && hint.includes('https://xtender.test/llms.txt') && hint.includes('https://xtender.test/draft'), 'тег с адресами');
     assert.doesNotMatch(hint, /concrete|rebar|Batumi/i);
+    // Видимая ссылка внизу страницы, с адресом текстом.
+    assert.ok(html.includes('<a href="/llms.txt" class="text-stone-500 hover:text-white transition">Для ИИ-ассистентов: xtender.ge/llms.txt</a>'));
 
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
     require('../src/controllers/rfq.controller')._resetCatalog();

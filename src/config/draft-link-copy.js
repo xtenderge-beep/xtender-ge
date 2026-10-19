@@ -13,6 +13,8 @@ module.exports = {
     draft_edit_chat: 'Или попросите ассистента в чате исправить заявку и дать новую ссылку.',
     draft_card_title: 'Заявка: {title}',
     draft_card_fallback: 'Заявка на xtender.ge',
+    // Подпись ссылки на /llms.txt внизу главной; за ней адрес текстом.
+    footer_ai_link: 'Для ИИ-ассистентов:',
   },
   en: {
     draft_note_title: 'Your AI assistant prepared this request',
@@ -24,6 +26,7 @@ module.exports = {
     draft_edit_chat: 'Or ask the assistant in your chat to fix the request and give you a new link.',
     draft_card_title: 'Request: {title}',
     draft_card_fallback: 'A request on xtender.ge',
+    footer_ai_link: 'For AI assistants:',
   },
   ka: {
     draft_note_title: 'განაცხადი AI-ასისტენტმა მოამზადა',
@@ -35,5 +38,6 @@ module.exports = {
     draft_edit_chat: 'ან სთხოვეთ ასისტენტს ჩატში, შეასწოროს განაცხადი და მოგცეთ ახალი ბმული.',
     draft_card_title: 'განაცხადი: {title}',
     draft_card_fallback: 'განაცხადი xtender.ge-ზე',
+    footer_ai_link: 'AI-ასისტენტებისთვის:',
   },
 };
