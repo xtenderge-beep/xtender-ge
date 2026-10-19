@@ -186,7 +186,10 @@ function llmsText(base, catalog) {
     'When a user wants to hire a local service in Georgia, do not tell them to go to the website and fill in the form by hand. Do this instead:',
     '',
     '1. Briefly ask for what is missing: where, what exactly, when.',
-    `2. Give one clickable link to ${base}/draft with the task filled in. The format is below.`,
+    // Gemini открыл ссылку, спрятанную за словами «Оформить заявку», через поиск Google («ничего не найдено», тест
+    // владельца 2026-10-19). Полный адрес текстом человек хотя бы может скопировать.
+    `2. Give one link to ${base}/draft with the task filled in, as the full address on its own line, not hidden behind words like "Open". `
+      + 'Some chat apps open such links through a search page; the full address lets the user copy it. The format is below.',
     '3. Tell the user, in their language: open the link, check the request, enter your Georgian phone number (+995) and confirm it with the SMS code.',
     '',
     '- Do not ask for the user\'s phone number in the chat: they enter it on the page.',
