@@ -6,6 +6,7 @@ const managerService = require('../services/manager.service');
 const { requestMeta } = require('../config/requestMeta');
 const legalContentService = require('../services/legalContent.service');
 const { parseSource } = require('../services/siteAnalytics.service');
+const { DRAFT_SOURCE } = require('../config/agentApi');
 
 const { isGeorgianPhone, georgianPhoneError } = require('../config/phone');
 
@@ -38,7 +39,8 @@ async function send(req, res) {
   // Откуда заказчик пришёл на сайт: метку ссылки или сайт-источник присылает форма
   // (public/js/visit.js). Пустая строка — прямой заход; null — форма источник не прислала.
   const entry = req.body.entry && typeof req.body.entry === 'object' ? req.body.entry : null;
-  const source = entry ? (parseSource(entry.r, entry.us, req.hostname) || '') : null;
+  // Форма, открытая по ссылке-черновику от ИИ-ассистента (/draft), присылает draft: источник — ассистент.
+  const source = req.body.draft === true ? DRAFT_SOURCE : entry ? (parseSource(entry.r, entry.us, req.hostname) || '') : null;
 
   // Форма просит код повторно по своей заявке (token) — черновик остаётся тот же.
   let order = await orderService.reusePendingOrder(req.body.token, phone, description);

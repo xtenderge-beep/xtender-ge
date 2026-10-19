@@ -165,6 +165,19 @@ async function create(req, res) {
   // платного показа номера в каталоге: не гоняем клиента через SMS повторно.
   await catalogSession.issue(res, toE164(phone));
 
+  announceConfirmed(order);
+
+  return res.json({
+    success: true,
+    token: order.token,
+    id: order.id,
+    ownerLink: `/o/${order.owner_token}`,
+  });
+}
+
+// Заявка подтверждена кодом — с формы на сайте или через API для ИИ-ассистентов (rfq.controller).
+// Всё в фоне, ответ заказчику не ждёт.
+function announceConfirmed(order) {
   // Ссылка на заявку — отдельной SMS и только теперь, когда телефон подтверждён: по ней заказчик
   // вернётся посмотреть статус и закрыть заявку. В SMS с кодом её нет намеренно (см.
   // service-message-copy.js). Сбой отправки заявку не трогает: страница заявки уже открывается сама.
@@ -200,13 +213,6 @@ async function create(req, res) {
     // Карточка «Кратко» для менеджера — после уведомления, чтобы его не задерживать. Не бросает.
     await require('../services/orderBrief.service').refresh(order.id);
   })();
-
-  return res.json({
-    success: true,
-    token: order.token,
-    id: order.id,
-    ownerLink: `/o/${order.owner_token}`,
-  });
 }
 
 function adminFlowKey(chatId) {
@@ -1165,6 +1171,7 @@ module.exports = {
   revealContact,
   setLeadSubscription,
   create,
+  announceConfirmed,
   show,
   showByOwnerToken,
   close,

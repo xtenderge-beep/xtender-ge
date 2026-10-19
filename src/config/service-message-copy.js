@@ -43,6 +43,9 @@ const smsMessages = {
   // page, took the request for sent and never entered the code (2026-10-11). The link goes in its
   // own SMS, orderLink, once the phone is confirmed.
   orderCode: 'Xtender code: {code}. Enter it on the site to send your request.',
+  // The same code for a request made through an AI assistant (rfq.controller): the person is not on
+  // the site. «Not you?» — anyone can type someone else's number into a chat.
+  orderCodeAssistant: 'Xtender code: {code}. Give it to your AI assistant to send your request. Not you? Ignore this SMS.',
   orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
   // Last line of the code SMS when the admin setting is on (otp.service adds it after a blank line):
   // the format browsers read to offer the code on the site itself. host is the site's domain.

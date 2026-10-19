@@ -1723,6 +1723,7 @@ const providerCopy = require('./provider-copy');
 for (const locale of LANGS) Object.assign(dictionaries[locale], providerCopy[locale]);
 for (const locale of LANGS) Object.assign(dictionaries[locale], require('./home-explainer-copy')[locale]);
 for (const locale of LANGS) Object.assign(dictionaries[locale], require('./simple-home-copy')[locale]);
+for (const locale of LANGS) Object.assign(dictionaries[locale], require('./draft-link-copy')[locale]);
 const homeExamplesCopy = require('./home-examples-copy');
 for (const locale of LANGS) dictionaries[locale].home_examples_data = homeExamplesCopy[locale];
 const providerNotificationCopy = require('./provider-notification-copy');

@@ -14,6 +14,8 @@ const reviewService = require('../services/review.service');
 const promoService = require('../services/promo.service');
 const settingsService = require('../services/settings.service');
 const asyncHandler = require('../middleware/asyncHandler');
+const draftLink = require('../config/draftLink');
+const { getBaseUrl } = require('../config/url');
 
 const LEGAL_LOCALS = {
   requisites: SERVICE_REQUISITES,
@@ -77,10 +79,12 @@ async function landingSlugs() {
 // страницы свои заголовок вкладки, описание для поиска, пример в поле, нажатый хэштег и текст внизу.
 // page — строка landing_pages или null. options.simple — эта вёрстка (без него — прежняя, сейчас её никто не
 // вызывает). options.auto — страница «услуга + город» ({ category, city } из servicePages.find); false —
-// у услуги в городе нет исполнителей, страницы нет.
+// у услуги в городе нет исполнителей, страницы нет. options.draft — ссылка-черновик от ИИ-ассистента
+// (draftLink.parse): текст в поле задачи, её услуги в каталоге первыми, город — из места в ссылке.
 async function renderHome(req, res, locale, page, options = {}) {
   const catalogCities = await masterService.getActiveCities();
   const catalogCity = (options.auto && catalogCities.find(city => city.id === options.auto.city.id))
+    || (options.draft && draftLink.city(options.draft.loc, catalogCities))
     || catalogCities.find(city => city.slug === req.query.city) || catalogCities.find(city => city.slug === 'tbilisi') || catalogCities[0];
   const [masters, catalogCallPriceTetri] = await Promise.all([
     masterService.listMasters({ language: locale, cityId: catalogCity?.id }),
@@ -123,11 +127,25 @@ async function renderHome(req, res, locale, page, options = {}) {
   }
   // Услуги, на которых стоит страница: у страницы услуги — её услуга, у страницы задачи — отмеченные группы
   // («transport» в группах рассылки — это услуга van). Их исполнители первыми, внутри — прежний порядок.
-  const focusServices = servicePage ? [servicePage.key] : page ? [...new Set((page.categories || []).map(categoryService.toType))] : null;
+  // У ссылки-черновика — коды услуг, которые выбрал ассистент; неизвестные и выключенные отбрасываются.
+  const draftServices = options.draft
+    ? [...new Set(options.draft.cats.map(categoryService.toType))].filter(key => categories.some(c => c.is_active && c.slug === key)) : [];
+  const focusServices = servicePage ? [servicePage.key] : page ? [...new Set((page.categories || []).map(categoryService.toType))]
+    : draftServices.length ? draftServices : null;
+  const servesKey = (m, key) => m.service_type === key || (m.services || []).some(s => s.service_type === key);
   if (focusServices) {
-    const serves = m => focusServices.some(key => m.service_type === key || (m.services || []).some(s => s.service_type === key));
+    const serves = m => focusServices.some(key => servesKey(m, key));
     masters.sort((a, b) => Number(serves(b)) - Number(serves(a)));
   }
+  // Над полем — что текст подготовил ассистент и сколько исполнителей его услуг в каталоге города (живые
+  // числа; кому отправить заявку, решает модератор, как всегда).
+  const draft = options.draft ? {
+    text: draftLink.text(options.draft, locale),
+    card: draftLink.card(options.draft, locale),
+    city: catalogCity ? servicePages.inCity(catalogCity, locale) : '',
+    services: draftServices.map(key => ({ category: categories.find(c => c.slug === key), count: masters.filter(m => servesKey(m, key)).length }))
+      .filter(item => item.count).map(item => ({ label: item.category['name_' + locale] || item.category.name_ru, count: item.count })),
+  } : null;
 
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
@@ -170,6 +188,9 @@ async function renderHome(req, res, locale, page, options = {}) {
     simpleSearch,
     servicePage,
     pageFocus,
+    draft,
+    // Параметры ссылки-черновика, которые переключатель языка уносит с собой (partials/lang-switch).
+    switchQuery: options.switchQuery || '',
     // Ссылки внизу каждой страницы: открытые поиску страницы «услуга + город» (на странице услуги — остальные,
     // соседние первыми), затем страницы задач.
     serviceLinks: servicePage ? servicePage.others : cityPages.filter(item => item.indexable).map(item => ({ href: localizedPath(locale, '/s/' + item.slug), title: servicePages.title(item, locale) })),
@@ -184,6 +205,27 @@ router.get('/', asyncHandler(async (req, res) => {
   // Главная по эскизу владельца 2026-10-16: поле задачи, вкладки услуг, поиск, каталог, SEO-текст;
   // пояснения убраны за «Как это работает?». Страницы задач и услуг (/s/<slug>) — в той же вёрстке.
   await renderHome(req, res, resolveLocale(req, res, '/'), null, { simple: true });
+}));
+
+// Ссылка-черновик от ИИ-ассистента (config/draftLink.js, docs/ai-agent-api.md): главная с вписанным в поле
+// текстом задачи, дальше обычная форма. Язык — из адреса (/ru/draft), иначе параметр lang, иначе по тексту.
+// Страница закрыта от поиска; адрес в карточке предпросмотра — полный, с параметрами.
+router.get('/draft', asyncHandler(async (req, res) => {
+  const draft = draftLink.parse(req.query);
+  if (!draft) return res.redirect(302, localizedPath(normalizeLang(req.params.locale), '/'));
+  const locale = normalizeLang(req.params.locale || draft.lang);
+  res.locals.lang = locale;
+  res.locals.t = translate(locale);
+  res.cookie('lang', locale, LANG_COOKIE_OPTS);
+  const seo = buildSeo(locale, '/draft');
+  seo.canonical = getBaseUrl() + req.originalUrl;
+  // Подсказка «есть версия на вашем языке» вела бы на пустой /draft: выключена. Переключатель языка уносит
+  // параметры ссылки, кроме lang, — язык решает адрес.
+  seo.hreflang = {};
+  res.locals.seo = seo;
+  const carried = new URLSearchParams(req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?') + 1) : '');
+  carried.delete('lang');
+  await renderHome(req, res, locale, null, { simple: true, draft, switchQuery: carried.toString() });
 }));
 
 // Адрес, по которому эта главная проверялась до выкладки (2026-10-16): ведёт на главную того же языка.

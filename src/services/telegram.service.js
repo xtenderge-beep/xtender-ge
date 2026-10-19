@@ -170,6 +170,8 @@ async function notifyModerator(order) {
     `Место: ${order.district_name || 'не уточнено'}`,
     `📞 ${order.phone}`,
     `🔗 ${base}/order/${order.token}`,
+    ...(order.source === require('../config/agentApi').SOURCE ? ['🤖 Через ИИ-ассистента (API): номер подтверждён кодом, согласие передал ассистент'] : []),
+    ...(order.source === require('../config/agentApi').DRAFT_SOURCE ? ['🤖 Текст подготовил ИИ-ассистент (ссылка), заказчик проверил его на сайте'] : []),
     '',
     'Откройте карточку кнопкой ниже, отметьте потребности и выберите получателей. Уже уведомлённые повторно не платят.',
   ].join('\n');

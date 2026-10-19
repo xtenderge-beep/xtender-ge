@@ -91,6 +91,13 @@ app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
 
 app.use('/api', apiRoutes);
 
+// API заявок для ИИ-ассистентов и его описание для моделей (docs/ai-agent-api.md).
+const rfqController = require('./controllers/rfq.controller');
+app.post('/v1/rfq/create', asyncHandler(rfqController.create));
+app.post('/v1/rfq/:rfq_id/verify', asyncHandler(rfqController.verify));
+app.get('/openapi.json', asyncHandler(rfqController.openapi));
+app.get('/llms.txt', asyncHandler(rfqController.llmsTxt));
+
 // Fail closed: без обеих переменных окружения /admin/* должен быть недоступен,
 // а не молча пускать всех без пароля — прецедент именно такой дыры уже был
 // с TELEGRAM_WEBHOOK_SECRET (см. HANDOFF.md), не повторяем для того, что двигает деньги.
@@ -105,8 +112,11 @@ app.use((err, req, res, next) => {
   if (err && (err.name === 'MulterError' || err.message === 'Unsupported file type')) {
     return res.status(400).json({ success: false, message: err.message });
   }
+  if (err && err.type === 'entity.parse.failed' && req.path.startsWith('/v1/')) {
+    return res.status(400).json({ success: false, error: 'invalid_request', message: 'The request body is not valid JSON.' });
+  }
   console.error('Unhandled request error:', err);
-  if (req.path.startsWith('/api')) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/v1/')) {
     return res.status(500).json({ success: false, message: 'Internal server error' });
   }
   return res.status(500).send('Internal server error');

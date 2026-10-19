@@ -697,6 +697,12 @@ html[lang="ka"] .home-hero-title { font-size:clamp(28px,2.8vw,36px); line-height
 .provider-welcome-intro{margin:0;border:0;border-bottom:1px solid #ccdcb2;border-radius:0;padding:18px 22px}
 .provider-welcome-intro h2{font-size:15px}.provider-welcome-intro strong{font-size:30px;margin:5px 0}.provider-welcome-intro p{margin-top:5px}
 .home-free-note{font-size:12px;line-height:1.5;color:#315a43;margin-top:8px}
+/* Ссылка-черновик от ИИ-ассистента (/draft): пояснение над полем задачи. В полноэкранном поле на телефоне
+   его уже прочитали — там оно не занимает место. */
+.draft-note{background:#f1f7f3;border:1px solid #d3e6da;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.5;color:#315a43}
+.draft-note-title{font-weight:800;color:#1d3e2c}
+.draft-note-services{margin-top:4px;font-weight:600}
+body.compose-active .draft-note{display:none}
 @media(max-width:700px){body.signup-started .provider-welcome-intro{display:none}}
 
 /* Transfer instructions are numbered steps, not a paragraph. */

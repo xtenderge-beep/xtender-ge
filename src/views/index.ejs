@@ -18,13 +18,16 @@
       // Услуги, на которых стоит страница задачи или услуги, и её хэштег (public.routes.js, pageFocus): группа
       // этих услуг в каталоге первая, хэштег нажат при открытии, живые числа внизу — только по ним.
       const focus = typeof pageFocus !== 'undefined' && pageFocus ? pageFocus : null;
-      const pageTitle = topic ? topic.seoTitle : autoPage ? autoPage.seoTitle : t('site_title_index');
-      const pageDescription = (topic && topic.seoDescription) || (autoPage && autoPage.seoDescription) || t('meta_description_index');
+      // Ссылка-черновик от ИИ-ассистента (/draft, config/draftLink.js): текст задачи уже в поле, над полем —
+      // пояснение. Карточка предпросмотра в мессенджере — по самой задаче; поиску страница закрыта.
+      const draftPage = typeof draft !== 'undefined' && draft ? draft : null;
+      const pageTitle = draftPage ? draftPage.card.title : topic ? topic.seoTitle : autoPage ? autoPage.seoTitle : t('site_title_index');
+      const pageDescription = (draftPage && draftPage.card.description) || (topic && topic.seoDescription) || (autoPage && autoPage.seoDescription) || t('meta_description_index');
     %>
     <%- include('partials/head', {
       title: pageTitle,
       metaDescription: pageDescription,
-      noindex: Boolean(autoPage && !autoPage.indexable),
+      noindex: Boolean(draftPage || (autoPage && !autoPage.indexable)),
       viewport: 'width=device-width, initial-scale=1.0, interactive-widget=resizes-content',
     }) %>
 
@@ -217,9 +220,19 @@
                                 </div>
                                 <% } %>
 
+                                <% if (draftPage) { %>
+                                <div class="draft-note" role="note">
+                                  <p class="draft-note-title"><%= t('draft_note_title') %></p>
+                                  <p><%= t('draft_note_body') %></p>
+                                  <% if (draftPage.services.length) { %>
+                                  <p class="draft-note-services"><%= t('draft_note_services').replace('{city}', draftPage.city) %> <%= draftPage.services.map(function (item) { return item.label + ' — ' + item.count; }).join(', ') %></p>
+                                  <% } %>
+                                </div>
+                                <% } %>
+
                                 <div class="composer-inputbox mt-2.5 flex flex-col rounded-2xl border border-stone-300 bg-white p-2.5 transition focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/15">
-                                    <textarea id="freeformInput" rows="5" <% if (simple) { %>aria-label="<%= autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder') %>"<% } else { %>aria-describedby="home-description-hint"<% } %> placeholder="<%= simple ? (autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder')) : topic ? topic.placeholder : t('freeform_placeholder') %>"
-                                        class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"></textarea>
+                                    <textarea id="freeformInput" rows="<%= draftPage ? Math.min(12, Math.max(5, draftPage.text.split('\n').length + 1)) : 5 %>" <% if (simple) { %>aria-label="<%= autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder') %>"<% } else { %>aria-describedby="home-description-hint"<% } %> placeholder="<%= simple ? (autoPage ? autoPage.placeholder : topic ? topic.placeholder : t('simple_placeholder')) : topic ? topic.placeholder : t('freeform_placeholder') %>"
+                                        class="composer-textarea w-full text-base outline-none text-stone-800 placeholder:text-stone-400 resize-none bg-transparent leading-snug min-h-[76px] sm:min-h-[104px]"><%= draftPage ? draftPage.text : '' %></textarea>
 
                                     <div id="attachmentsPreview" class="hidden flex-wrap gap-1.5 pt-2"></div>
 
@@ -1267,7 +1280,8 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     // token — повторный код по уже созданной заявке, второй черновик не создаётся.
                     // entry — откуда человек пришёл на сайт (public/js/visit.js): источник заявки для админки.
-                    body: JSON.stringify({ phone, description, token: pendingOrderToken, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null }),
+                    // draft — форма открыта по ссылке-черновику от ИИ-ассистента (/draft): такой источник у заявки.
+                    body: JSON.stringify({ phone, description, token: pendingOrderToken, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null, draft: <%- JSON.stringify(Boolean(draftPage)) %> || undefined }),
                 });
                 const data = await res.json();
                 if (data.success) {
@@ -1987,6 +2001,10 @@
 
         applyFilters();
         resetWizard();
+        <% if (draftPage) { %>
+        // Ссылка-черновик (/draft): текст задачи стоит в разметке поля, сброс выше его стёр — возвращаем.
+        (function () { const field = document.getElementById('freeformInput'); field.value = field.defaultValue; })();
+        <% } %>
 
         (function () {
             const track = document.getElementById('homeExamplesTrack');

@@ -108,8 +108,8 @@ async function recordConsentVerified({ phone, purpose, submittedCode, masterId =
 }
 
 // Transactional audit: the business change and its evidence either both commit or both roll back.
-async function recordAction({ eventType, phone, masterId = null, orderId = null, metadata = {}, meta = {} }, client = pool) {
-  return insertRow({ event_type: eventType, channel: 'web', phone_number: phone, master_id: masterId, order_id: orderId,
+async function recordAction({ eventType, phone, masterId = null, orderId = null, metadata = {}, meta = {}, channel = 'web' }, client = pool) {
+  return insertRow({ event_type: eventType, channel, phone_number: phone, master_id: masterId, order_id: orderId,
     ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata }, client);
 }
 
