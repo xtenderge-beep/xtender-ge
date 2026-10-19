@@ -42,6 +42,8 @@ const providers = [
   { id: 3, service_type: 'junk', description: 'Демонтаж и вывоз. Работаю круглосуточно', attributes: { dump_body: true } },
   { id: 4, service_type: 'movers', description: 'Подъём мебели без лифта. Моя работа — разобраться и так далее.' },
   { id: 5, service_type: 'movers', description: 'Перевозка пианино', services: [{ service_type: 'movers' }, { service_type: 'svc_plumbers' }] },
+  // Английский перевод описания: «for» не должно давать #пианино (прежде совпадало с «фортепиано»).
+  { id: 6, service_type: 'movers', description: 'Ready for any physical labor, looking for work' },
 ];
 const tagged = words.forPage(categories, 'ru', providers);
 const shown = (id) => tagged.byMaster.get(id).display.map((tag) => tag.label);
@@ -52,8 +54,9 @@ assert.ok(tagged.byMaster.get(3).keys.includes('night'), 'the fourth one still f
 assert.deepEqual(shown(4), ['грузчики'], 'no lift, no assembly from «разобраться»');
 assert.deepEqual(shown(5), ['грузчики', 'пианино', 'сантехники']);
 assert.deepEqual(tagged.byMaster.get(5).keys.sort(), ['movers', 'moving', 'piano', 'svc_plumbers']);
+assert.deepEqual(shown(6), ['грузчики'], 'no piano from the English «for»');
 // Ряд каталога — самые частые хэштеги с настоящим числом; хэштегов без исполнителей нет.
-assert.deepEqual(tagged.rowTags.slice(0, 3).map((tag) => [tag.label, tag.count]), [['переезд', 4], ['грузчики', 3], ['пианино', 2]]);
+assert.deepEqual(tagged.rowTags.slice(0, 3).map((tag) => [tag.label, tag.count]), [['переезд', 5], ['грузчики', 4], ['пианино', 2]]);
 assert.ok(!tagged.tags.some((tag) => tag.key === 'tow' || tag.count === 0));
 assert.deepEqual(page.tags.find((tag) => tag.key === 'moving').services, ['movers', 'van']);
 // Подсказка хэштегов по тексту задачи и по запросу поиска (на любом языке страницы).
