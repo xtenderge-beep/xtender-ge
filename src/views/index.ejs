@@ -168,8 +168,11 @@
         собрать заявку в своём чате и дать ссылку. В коде страницы — сразу после шапки: многие инструменты ИИ читают только
         начало страницы, а до каталога и подвала их текст обрезается. На экране — в самом низу, под подвалом (order в
         input.css): людям не мешает. Видимым текстом, не скрытым: скрытый текст для роботов Google считает спамом
-        (docs/seo.md). По-английски: его читают модели. Тексты — agentApi.homeGuide. %>
-    <section class="ai-guide" lang="en" aria-label="For AI assistants">
+        (docs/seo.md). По-английски: его читают модели. Тексты — agentApi.homeGuide.
+        data-nosnippet — не для Google: его ИИ ссылку /draft не собирает, а прочитав блок, обещал «черновик готов» и
+        ставил ссылки на чужие страницы; и в результатах поиска показывал этот текст вместо описания сайта (тест владельца
+        2026-10-19). ChatGPT и Claude, которые открывают страницу сами, эту пометку не учитывают. %>
+    <section class="ai-guide" lang="en" aria-label="For AI assistants" data-nosnippet>
         <div class="ai-guide-inner">
             <p class="ai-guide-title">For AI assistants</p>
             <p><%= aiGuide.intro %></p>

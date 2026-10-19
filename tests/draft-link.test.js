@@ -184,6 +184,8 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.ok(guide[2].includes('Service codes with providers now (Tbilisi, Batumi): van (Transport), movers (Movers). ' + agentApi.CITIES_NOTE), 'коды в порядке каталога, города');
     // В коде страницы — до основной части: инструменты ИИ, читающие только начало страницы, его не обрежут.
     assert.ok(html.indexOf('<section class="ai-guide"') < html.indexOf('<main'), 'блок раньше основной части');
+    // Google его в описание сайта и в свои ответы не берёт: его ИИ ссылку не собирает, а обещал «черновик готов».
+    assert.match(guide[1], /\sdata-nosnippet(\s|$)/);
     assert.ok(guide[2].includes('href="https://xtender.test/llms.txt"'));
 
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.
