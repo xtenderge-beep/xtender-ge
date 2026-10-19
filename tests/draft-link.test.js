@@ -199,6 +199,10 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     const exampleDraft = draftLink.parse(Object.fromEntries(new URL(exampleUrl).searchParams));
     assert.equal(draftLink.text(exampleDraft, 'en'), '2 movers and construction waste removal, about 2 m3 in bags.\nTbilisi, near Isani metro.\nTomorrow at 12:00. 5th floor, there is a lift.');
     assert.ok(guide[2].includes(agentApi.FALLBACK));
+    // Другие задачи, о которых человек уже говорил, — в ту же заявку, если он согласен. Без команды «проверь память»:
+    // защита ассистентов принимает такое со страницы за атаку.
+    assert.ok(guide[2].includes(agentApi.MORE_JOBS), 'другие задачи — в ту же заявку');
+    assert.doesNotMatch(agentApi.MORE_JOBS, /memory|history/i);
     // MCP — советом на следующий раз, после ссылки: сам подключиться посреди разговора ассистент не может.
     assert.ok(guide[2].includes(agentApi.mcpHint('https://xtender.test')));
     assert.ok(guide[2].indexOf('/mcp') > guide[2].indexOf('How to build the link'), 'MCP — после ссылки');
@@ -212,6 +216,8 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.match(llms, /^# xtender\.ge\n\n> .+\n\n## For AI assistants: give the user a ready link\n\nWhen a user wants to hire a local service in Georgia, do not tell them to go to the website and fill in the form by hand\./);
     assert.ok(llms.indexOf('## For AI assistants') < llms.indexOf('## Link format') && llms.indexOf('## Link format') < llms.indexOf('## Create a request through the API'));
     assert.ok(llms.includes('`https://xtender.test/draft?lang=…&cats=…&text=…`'));
+    assert.ok(llms.includes('## If the user needs more than one service\n\n' + agentApi.MORE_JOBS + '\n'));
+    assert.ok(llms.indexOf('## If the user needs more than one service') > llms.indexOf('## How to build the link'), 'после сборки ссылки');
     assert.doesNotMatch(llms, /instantly|concrete|rebar/i, 'без обещаний, которых сайт не держит');
     const example = llms.match(/^Example: (\S+)$/m)[1];
     assert.ok(example.startsWith('https://xtender.test/draft?lang=en&cats=movers&text=Move%20a%20sofa'));

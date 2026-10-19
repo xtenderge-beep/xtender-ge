@@ -22,8 +22,21 @@ const AFTER = 'A moderator checks the request and sends it to matching providers
   + 'also gets an SMS with a link to their request page, where they see its status. The user compares the providers, agrees the price and '
   + 'terms directly with one of them and closes the request on that page once the job is arranged. Free for customers: xtender.ge takes '
   + 'no payment, does not perform the work and does not guarantee its quality.';
+// Другие задачи человека — в ту же заявку (владелец 2026-10-20: ассистент знает, что ещё не решено, и предлагает заодно
+// решить через сайт). Без «проверь память пользователя» из присланного текста: команду со страницы рыться в личной памяти
+// защита ассистентов принимает за атаку и может отбросить всю инструкцию, вместе со ссылкой. Только услуги из списка,
+// сначала спросить: заявка с несколькими категориями уже работает (docs/multi-category-orders.md). how — куда класть
+// коды: в ссылке это cats и text, у MCP-инструмента — services.
+function moreJobs(how) {
+  return 'If the user has already told you about other jobs that fit services on the list, in this chat or earlier, for example '
+    + 'old furniture or construction waste to take away during a move, or a plumber or tiler for a renovation, ask whether to add them to '
+    + `the same request. If they agree, ${how}. It is one link and one SMS confirmation, `
+    + 'the moderator sends each job to providers of that service, and the user does not have to look for each one separately. '
+    + 'Suggest only services from the list, do not add anything without asking, and drop it if the user says no.';
+}
+const MORE_JOBS = moreJobs('put all the codes in cats and describe each job in text');
 // Исполнители есть не во всех городах: ассистент должен знать, где их нет (замечание чужой модели, 2026-10-19).
-const CITIES_NOTE = 'Providers are only in the cities listed; for any other place, tell the user that xtender.ge may have no providers there yet.';
+const CITIES_NOTE ='Providers are only in the cities listed; for any other place, tell the user that xtender.ge may have no providers there yet.';
 
 // MCP — второй строкой, не первой: сам подключиться к MCP посреди разговора ассистент не может, подключает человек в
 // настройках. Ссылка работает сразу; MCP — совет на следующий раз (владелец 2026-10-19: чтобы человек возвращался).
@@ -87,6 +100,7 @@ function homeGuide(base, catalog) {
     link: `${base}/draft?lang=ka|ru|en&cats=…&text=…`,
     steps: buildSteps(base),
     example: workedExample(base),
+    moreJobs: MORE_JOBS,
     fallback: FALLBACK,
     pages: servicePageLinks(catalog),
     codes: codes.map(([code, label]) => `${code} (${label})`).join(', '),
@@ -316,6 +330,10 @@ function llmsText(base, catalog) {
     '',
     `Link: ${workedExample(base).url}`,
     '',
+    '## If the user needs more than one service',
+    '',
+    MORE_JOBS,
+    '',
     '## If you cannot give a link you built',
     '',
     FALLBACK,
@@ -351,5 +369,5 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
-module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, CITIES_NOTE, FALLBACK, agentHint, homeGuide, buildSteps, workedExample,
-  mcpHint, statusOf, openapi, llmsText, draftExample };
+module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, MORE_JOBS, CITIES_NOTE, FALLBACK, agentHint, homeGuide, buildSteps, workedExample,
+  mcpHint, moreJobs, statusOf, openapi, llmsText, draftExample };

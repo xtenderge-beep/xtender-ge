@@ -77,6 +77,8 @@ function startSite() {
     assert.match(instructions, /do not ask for it in the chat/);
     const agentApi = require('../src/config/agentApi');
     assert.ok(instructions.includes(agentApi.WHY) && instructions.includes(agentApi.AFTER), 'зачем так и что дальше — как в llms.txt');
+    // Другие задачи человека — в ту же заявку, коды в services (поля cats у инструмента нет).
+    assert.ok(instructions.includes(agentApi.moreJobs('pass all the codes in services and describe each job')), 'другие задачи — в ту же заявку');
 
     // 2. Два инструмента, оба только читают (так их видят каталоги ChatGPT и Claude).
     const { tools } = await client.listTools();

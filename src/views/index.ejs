@@ -183,6 +183,7 @@
             </ol>
             <p>Worked example. The user says: "<%= aiGuide.example.said %>" Fields: <%= Object.entries(aiGuide.example.fields).map(function (pair) { return pair[0] + ' = ' + pair[1]; }).join('; ') %> Link:</p>
             <p><code class="break-all"><%= aiGuide.example.url %></code></p>
+            <p><%= aiGuide.moreJobs %></p>
             <p><%= aiGuide.fallback %></p>
             <% if (aiGuide.pages.length) { %>
             <ul class="ai-guide-pages">

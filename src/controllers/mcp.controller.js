@@ -19,6 +19,7 @@ const MAX_LINK_LENGTH = 6000;
 const INSTRUCTIONS = 'xtender.ge connects customers in Georgia with independent local service providers. '
   + 'To help a user hire a local service in Georgia: ask briefly for what is missing (where, what exactly, when), call '
   + 'create_request_link and give the user the link as the full address on its own line. ' + agentApi.WHY + ' '
+  + agentApi.moreJobs('pass all the codes in services and describe each job') + ' '
   + 'The user enters a Georgian phone number (+995) on the page; do not ask for it in the chat. ' + agentApi.AFTER + ' '
   + 'list_services shows the cities with providers; for any other place, tell the user that xtender.ge may have no providers there yet. '
   + 'Do not promise a price, a response time or a number of responses.';
