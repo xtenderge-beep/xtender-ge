@@ -184,8 +184,16 @@ const unescape = s => s.replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&
     assert.ok(guide[2].includes('Service codes with providers now (Tbilisi, Batumi): van (Transport), movers (Movers). ' + agentApi.CITIES_NOTE), 'коды в порядке каталога, города');
     // В коде страницы — до основной части: инструменты ИИ, читающие только начало страницы, его не обрежут.
     assert.ok(html.indexOf('<section class="ai-guide"') < html.indexOf('<main'), 'блок раньше основной части');
-    // Google его в описание сайта и в свои ответы не берёт: его ИИ ссылку не собирает, а обещал «черновик готов».
-    assert.match(guide[1], /\sdata-nosnippet(\s|$)/);
+    // Подробная сборка по шагам, разобранный пример (его ссылка открывает ту же заявку) и запасное правило со страницами
+    // услуг для ассистентов, которые не могут дать собранную ими ссылку.
+    assert.equal((guide[2].match(/<li>/g) || []).length >= agentApi.buildSteps('x').length, true);
+    assert.ok(guide[2].includes('URL-encode every value as UTF-8'));
+    const exampleUrl = agentApi.workedExample('https://xtender.test').url;
+    assert.ok(guide[2].includes(exampleUrl.replace(/&/g, '&amp;')), 'пример со ссылкой');
+    const exampleDraft = draftLink.parse(Object.fromEntries(new URL(exampleUrl).searchParams));
+    assert.equal(draftLink.text(exampleDraft, 'en'), '2 movers and construction waste removal\n- Movers — 2 people\n- Construction waste in bags — 2 m3\nTomorrow at 12:00. 5th floor, there is a lift.\nLocation: Tbilisi, near Isani metro');
+    assert.ok(guide[2].includes(agentApi.FALLBACK));
+    assert.ok(guide[2].includes('<li>Movers in Tbilisi: <a href="https://xtender.test/en/s/mushebi-tbilisi">'), 'страница услуги, открытая поиску');
     assert.ok(guide[2].includes('href="https://xtender.test/llms.txt"'));
 
     // 7. /llms.txt: формат ссылки, пример с настоящим кодом, коды услуг с числами по городам, API — вторым путём.

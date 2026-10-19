@@ -495,8 +495,11 @@ html[lang="ka"] .hx-now { font-size:19px; letter-spacing:0; }
 /* Блок «For AI assistants»: в коде — сразу после шапки (его читают ИИ), на экране — последним, под подвалом и в его цвет. */
 .home-page .ai-guide { order:1; background:#eff4ef; color:#78716c; font-size:11px; line-height:1.6; padding:0 0 28px; }
 .ai-guide-inner { max-width:1240px; margin:0 auto; padding:16px 40px 0; border-top:1px solid var(--home-line); }
-.ai-guide-inner p + p { margin-top:6px; }
+.ai-guide-inner > * + * { margin-top:6px; }
 .ai-guide-title { font-weight:700; }
+.ai-guide-steps { list-style:decimal; padding-left:18px; margin-top:4px; }
+.ai-guide-pages { list-style:disc; padding-left:18px; margin-top:4px; }
+.ai-guide-steps li + li, .ai-guide-pages li + li { margin-top:2px; }
 .ai-guide a { text-decoration:underline; }
 .ai-guide a:hover { color:var(--home-green); }
 .home-footer > div { max-width:1240px; padding:0 40px; align-items:flex-start; }

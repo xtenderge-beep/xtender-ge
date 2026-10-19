@@ -169,15 +169,26 @@
         начало страницы, а до каталога и подвала их текст обрезается. На экране — в самом низу, под подвалом (order в
         input.css): людям не мешает. Видимым текстом, не скрытым: скрытый текст для роботов Google считает спамом
         (docs/seo.md). По-английски: его читают модели. Тексты — agentApi.homeGuide.
-        data-nosnippet — не для Google: его ИИ ссылку /draft не собирает, а прочитав блок, обещал «черновик готов» и
-        ставил ссылки на чужие страницы; и в результатах поиска показывал этот текст вместо описания сайта (тест владельца
-        2026-10-19). ChatGPT и Claude, которые открывают страницу сами, эту пометку не учитывают. %>
-    <section class="ai-guide" lang="en" aria-label="For AI assistants" data-nosnippet>
+        Google тоже читает блок (владелец 2026-10-19 решил дать ему подробную инструкцию, хотя его ИИ ссылку не собирал);
+        для таких ассистентов — запасное правило: не обещать готовую заявку, а дать страницу услуги. %>
+    <section class="ai-guide" lang="en" aria-label="For AI assistants">
         <div class="ai-guide-inner">
             <p class="ai-guide-title">For AI assistants</p>
             <p><%= aiGuide.intro %></p>
-            <p>Link: <code class="break-all"><%= aiGuide.link %></code></p>
+            <p>Link format: <code class="break-all"><%= aiGuide.link %></code></p>
             <% if (aiGuide.codes) { %><p>Service codes with providers now<%= aiGuide.cities ? ' (' + aiGuide.cities + ')' : '' %>: <%= aiGuide.codes %>. <%= aiGuide.citiesNote %></p><% } %>
+            <p>How to build the link, step by step:</p>
+            <ol class="ai-guide-steps">
+                <% aiGuide.steps.forEach(function (step) { %><li><%= step %></li><% }); %>
+            </ol>
+            <p>Worked example. The user says: "<%= aiGuide.example.said %>" Fields: <%= Object.entries(aiGuide.example.fields).map(function (pair) { return pair[0] + ' = ' + pair[1]; }).join('; ') %> Link:</p>
+            <p><code class="break-all"><%= aiGuide.example.url %></code></p>
+            <p><%= aiGuide.fallback %></p>
+            <% if (aiGuide.pages.length) { %>
+            <ul class="ai-guide-pages">
+                <% aiGuide.pages.forEach(function (page) { %><li><%= page.title %>: <a href="<%= page.url %>"><%= page.url %></a></li><% }); %>
+            </ul>
+            <% } %>
             <p><%= aiGuide.after %></p>
             <p>Full guide with the service list: <a href="<%= aiGuide.guide %>"><%= aiGuide.guide %></a></p>
         </div>

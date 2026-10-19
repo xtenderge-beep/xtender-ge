@@ -25,6 +25,43 @@ const AFTER = 'A moderator checks the request and sends it to matching providers
 // Исполнители есть не во всех городах: ассистент должен знать, где их нет (замечание чужой модели, 2026-10-19).
 const CITIES_NOTE = 'Providers are only in the cities listed; for any other place, tell the user that xtender.ge may have no providers there yet.';
 
+// Пошаговая сборка ссылки (владелец 2026-10-19: «дай подробную инструкцию, как собирается ссылка»). Общая для
+// /llms.txt и блока на главной.
+function buildSteps(base) {
+  return [
+    `Start with ${base}/draft? and add the fields below as name=value pairs joined with &.`,
+    'lang: the user\'s language, ka, ru or en. Write all other fields in that language.',
+    'title: the task in a few words.',
+    'items: each thing needed as name:quantity:unit, entries separated by ; for example Movers:2:people;Construction waste:2:m3. '
+      + 'Quantity and unit may be left out. Do not use : or ; inside a value.',
+    'loc: where, as the user said it: a district, a landmark or a city.',
+    'note: everything else: date and time, floor, lift, access, addresses.',
+    'cats: codes of matching services from the list, separated by commas, for example movers,junk.',
+    'URL-encode every value as UTF-8: a space becomes %20, : becomes %3A, ; becomes %3B, a comma becomes %2C, and Georgian or Russian '
+      + 'letters become %XX codes. Never leave a space in the link.',
+    'Give the user the whole link on its own line. Tell them to open it, check the request, enter their phone number and confirm it with the SMS code.',
+  ];
+}
+
+// Разобранный пример: что сказал человек, какие поля из этого вышли и готовая ссылка. Ссылку собирает код, а не текст
+// руками: так кодирование в примере всегда верное (тест открывает её и сверяет заявку).
+const EXAMPLE_SAID = 'I need 2 movers and to take out construction waste, about 2 m3 in bags. Tbilisi, near Isani metro, tomorrow at 12:00, 5th floor, there is a lift.';
+const EXAMPLE_FIELDS = { lang: 'en', cats: 'movers,junk', loc: 'Tbilisi, near Isani metro', title: '2 movers and construction waste removal',
+  items: 'Movers:2:people;Construction waste in bags:2:m3', note: 'Tomorrow at 12:00. 5th floor, there is a lift.' };
+function workedExample(base) {
+  return { said: EXAMPLE_SAID, fields: EXAMPLE_FIELDS,
+    url: `${base}/draft?${new URLSearchParams(EXAMPLE_FIELDS).toString().replace(/\+/g, '%20')}` };
+}
+
+// Ассистент, который не может дать собранную им ссылку (ИИ Google даёт только ссылки на страницы из своего поиска;
+// тест владельца 2026-10-19: «черновик готов» и ссылки на чужой сайт), не обещает готовую заявку, а даёт страницу
+// услуги — на ней сверху та же форма. Страницы — только открытые поиску, из каталога.
+const FALLBACK = 'If you cannot give the user a link you built yourself (some assistants can only link to pages found in search), do not say '
+  + 'that a request is ready. Give the page of the matching service instead: the request form is at the top of it, and the user describes the task there.';
+function servicePageLinks(catalog) {
+  return catalog.flatMap((city) => city.services.filter((service) => service.url).map((service) => ({ title: `${service.label} in ${city.name}`, url: service.url })));
+}
+
 // Блок «For AI assistants» внизу главной и страниц услуг: правило, формат ссылки и коды услуг видимым текстом, чтобы
 // ассистенту, открывшему страницу, не нужно было идти в /llms.txt. Видимый, не скрытый: скрытый текст для роботов
 // Google считает спамом (docs/seo.md).
@@ -35,6 +72,10 @@ function homeGuide(base, catalog) {
       + 'ask briefly for what is missing (what, where, when) and give them one link with the request filled in, as the full address on its own line. '
       + WHY,
     link: `${base}/draft?lang=ka|ru|en&cats=…&loc=…&title=…&items=name:quantity:unit;…&note=…`,
+    steps: buildSteps(base),
+    example: workedExample(base),
+    fallback: FALLBACK,
+    pages: servicePageLinks(catalog),
     codes: codes.map(([code, label]) => `${code} (${label})`).join(', '),
     cities: catalog.map((city) => city.name).join(', '),
     citiesNote: CITIES_NOTE,
@@ -249,6 +290,23 @@ function llmsText(base, catalog) {
     '',
     `Example: ${draftExample(base, services.map((service) => service.code))}`,
     '',
+    '## How to build the link, step by step',
+    '',
+    ...buildSteps(base).map((step, index) => `${index + 1}. ${step}`),
+    '',
+    `Worked example. The user says: "${EXAMPLE_SAID}"`,
+    '',
+    ...Object.entries(EXAMPLE_FIELDS).map(([name, value]) => `- ${name}: ${value}`),
+    '',
+    `Link: ${workedExample(base).url}`,
+    '',
+    '## If you cannot give a link you built',
+    '',
+    FALLBACK,
+    '',
+    ...servicePageLinks(catalog).map((page) => `- [${page.title}](${page.url})`),
+    `- [All services](${base}/en)`,
+    '',
   ];
   if (services.length) {
     lines.push('## Services with providers now', '', `Code, service, then the number of providers in each city. ${CITIES_NOTE}`, '');
@@ -277,4 +335,5 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
-module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, CITIES_NOTE, agentHint, homeGuide, statusOf, openapi, llmsText, draftExample };
+module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, CITIES_NOTE, FALLBACK, agentHint, homeGuide, buildSteps, workedExample,
+  statusOf, openapi, llmsText, draftExample };
