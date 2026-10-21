@@ -992,3 +992,18 @@ body.signup-compose-active .provider-focus-promo{display:none}
 .lead-sub-msg { margin-top:8px; font-weight:700; color:#b91c1c; }
 .lead-sub-msg.ok { color:#047857; }
 .lead-sub button:disabled { opacity:.5; }
+
+/* Кнопка «Решить с ChatGPT» (partials/ai-solve.ejs, 2026-10-21). Второй путь рядом с формой: светлая, не спорит с
+   зелёной «Опубликовать задачу». На телефоне кнопка на всю ширину. */
+.ai-solve { margin-top:12px; padding:14px 16px; border:1px solid #dde5e0; border-radius:18px; background:#fff; color:#152e29; }
+.ai-solve-open { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 18px; border-radius:12px; background:#152e29; color:#fff; font-size:15px; font-weight:750; line-height:1.25; text-align:center; transition:background .15s; }
+.ai-solve-open:hover { background:#0d211d; }
+.ai-solve-open:focus-visible, .ai-solve-copy:focus-visible { outline:3px solid #087e6155; outline-offset:2px; }
+.ai-solve-icon { flex:none; width:18px; height:18px; fill:#7ee0b8; }
+.ai-solve-hint { margin-top:8px; font-size:13px; line-height:1.5; color:#57534e; }
+.ai-solve-copy { display:inline-flex; align-items:center; gap:6px; min-height:44px; margin-top:2px; padding:8px 0; font-size:13px; font-weight:700; color:#087e61; }
+.ai-solve-copy svg { width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.ai-solve-copy:hover span { text-decoration:underline; text-underline-offset:3px; }
+.ai-solve-status { font-size:13px; font-weight:650; line-height:1.5; color:#087e61; }
+.ai-solve-status:empty { display:none; }
+@media (max-width:639px) { .ai-solve { padding:12px 14px; } .ai-solve-open { display:flex; width:100%; } }

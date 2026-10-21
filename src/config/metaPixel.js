@@ -17,8 +17,9 @@ function resolveId(env) {
 // часть нельзя, поэтому с параметром из PRIVATE_PARAMS пиксель на просмотре не включается совсем.
 // Новый параметр в public.routes.js нужно отнести к одному из списков (tests/meta-pixel.test.js).
 const PRIVATE_PARAMS = ['ref', 'promo'];
-// ai=1 — включение подбора по смыслу на главной для проверки, ничего личного не содержит.
-const OPEN_PARAMS = ['lang', 'city', 'ai'];
+// ai=1 — включение подбора по смыслу на главной для проверки, gpt=1 — кнопка «Решить с ChatGPT» на странице для
+// проверки (config/chatgptPrompt.js); ничего личного не содержат.
+const OPEN_PARAMS = ['lang', 'city', 'ai', 'gpt'];
 
 const pixelId = resolveId(process.env);
 

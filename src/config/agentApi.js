@@ -369,5 +369,48 @@ function llmsText(base, catalog) {
   return lines.join('\n');
 }
 
+// Инструкция внутри запроса кнопки «Решить с ChatGPT» (config/chatgptPrompt.js, ТЗ владельца 2026-10-21): ChatGPT не
+// обязан открывать /llms.txt, поэтому формат ссылки и коды услуг едут в самом запросе. Те же правила и тот же каталог,
+// что в /llms.txt, только короче: запрос идёт в адресе chatgpt.com, где русская буква занимает 6 знаков, грузинская — 9.
+// По-английски по той же причине; человеку адресована часть запроса на языке страницы. lang — язык страницы.
+function promptGuide(base, catalog, lang) {
+  const services = new Map();
+  for (const city of catalog) {
+    for (const item of city.services) {
+      const names = item.names || {};
+      const label = [...new Set([names.en || item.label, names[lang]].filter(Boolean))].join(' / ');
+      if (!services.has(item.code)) services.set(item.code, { label, cities: [] });
+      services.get(item.code).cities.push(`${city.name} ${item.count}`);
+    }
+  }
+  const list = [...services.entries()].map(([code, service]) => `  - ${code} (${service.label}): ${service.cities.join(', ')}`);
+  return [
+    `xtender.ge instructions for the assistant. The full version is ${base}/llms.txt: read it if you can open links; if you cannot, `
+      + 'this is enough. Do not invent any other link format.',
+    `- Request link: ${base}/draft?lang=${lang}&cats=CODES&text=TEXT`,
+    ...(list.length
+      ? ['- cats: codes of the matching services, separated by commas. Only these services have providers now (number of providers by city):',
+        ...list, `  ${CITIES_NOTE} If no service fits a job, say that xtender.ge has no providers for it yet.`]
+      : [`- cats: the service list is unavailable right now; read it at ${base}/llms.txt, or give the link without cats.`]),
+    '- One request can hold several services: put all their codes in cats and describe each job in text.',
+    '- text: the request in my words, the way I would tell a provider: what is needed, where, when, floor and lift, amounts. '
+      + 'Several lines are fine, up to 2000 characters.',
+    `- lang: ${lang}; if I switch to another of ka, ru or en, use that one.`,
+    '- URL-encode the values as UTF-8 (like encodeURIComponent): a space is %20, a line break %0A. Never leave a space in the link.',
+    '- Give me the whole link on its own line, not hidden behind words.',
+    '- Do not ask for my phone number in the chat: I enter it on the page. Do not promise a price, a response time or a number of responses.',
+    `- After the link: ${AFTER}`,
+    `- Example: ${workedExample(base).url}`,
+  ].join('\n');
+}
+
+// Короткий вариант той же инструкции — для запроса, который не помещается в адрес целиком.
+function promptGuideShort(base, catalog, lang) {
+  const codes = [...new Set(catalog.flatMap((city) => city.services.map((item) => item.code)))];
+  return `xtender.ge link format (details: ${base}/llms.txt): ${base}/draft?lang=${lang}&cats=CODES&text=REQUEST, values URL-encoded `
+    + `(space %20), the whole link on its own line. ${codes.length ? `Service codes with providers now (${catalog.map((city) => city.name).join(', ')}): ${codes.join(', ')}. ` : ''}`
+    + 'Do not invent other codes or link formats; do not ask for my phone number.';
+}
+
 module.exports = { SOURCE, DRAFT_SOURCE, AGENT_PROTOCOL, WHY, AFTER, MORE_JOBS, CITIES_NOTE, FALLBACK, agentHint, homeGuide, buildSteps, workedExample,
-  mcpHint, moreJobs, statusOf, openapi, llmsText, draftExample };
+  mcpHint, moreJobs, statusOf, openapi, llmsText, draftExample, promptGuide, promptGuideShort };

@@ -14,8 +14,9 @@ function resolveId(env) {
 
 // Только открытые страницы. В адресах заявок, кабинетов и отзывов лежат секретные ссылки, а Google
 // Analytics записывает адрес страницы, поэтому там его нет совсем. /s/<slug> — страницы под рекламу
-// и поиск: на них и ведут объявления, без метки Google не свяжет клик с заявкой.
-const PUBLIC_PAGE = /^(?:\/(?:ru|en))?(?:\/(?:join|guides\/request|terms|privacy|s\/[a-z0-9]+(?:-[a-z0-9]+)*))?\/?$/;
+// и поиск: на них и ведут объявления, без метки Google не свяжет клик с заявкой. /chatgpt — тестовая страница
+// кнопки «Решить с ChatGPT»: на ней проверяют события кнопки (config/chatgptPrompt.js).
+const PUBLIC_PAGE = /^(?:\/(?:ru|en))?(?:\/(?:join|guides\/request|terms|privacy|chatgpt|s\/[a-z0-9]+(?:-[a-z0-9]+)*))?\/?$/;
 
 const measurementId = resolveId(process.env);
 

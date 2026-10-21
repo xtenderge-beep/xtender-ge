@@ -1,0 +1,20 @@
+<%#
+  Кнопка «Решить с ChatGPT» — один компонент для всех страниц (ТЗ владельца 2026-10-21). ai — результат
+  chatgptPrompt.build: тексты на языке страницы, адрес chatgpt.com с запросом, полный запрос для копирования.
+  Обычная ссылка, а не переход из скрипта: по нажатию на ссылку телефон открывает приложение ChatGPT, если оно стоит.
+  В новой вкладке — страница xtender остаётся открытой. Скрипт public/js/ai-solve.js (страница подключает его сама)
+  при нажатии копирует полный запрос — на случай, если ChatGPT откроется без текста — и считает события; без скрипта
+  ссылка всё равно работает. Запрос лежит в атрибуте, а не текстом страницы: поисковику он не нужен.
+%>
+<div class="ai-solve" data-ai-solve data-scenario="<%= ai.scenario %>" data-variant="<%= ai.variant %>" data-prompt="<%= ai.full %>" data-opened="<%= ai.opened %>" data-copied="<%= ai.copied %>" data-copy-failed="<%= ai.copyFailed %>">
+  <a class="ai-solve-open" href="<%= ai.href %>" target="_blank" rel="noopener">
+    <svg class="ai-solve-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2.5l1.8 5.2 5.2 1.8-5.2 1.8L11 16.5l-1.8-5.2L4 9.5l5.2-1.8z"/><path d="M18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></svg>
+    <span><%= ai.button %></span>
+  </a>
+  <p class="ai-solve-hint"><%= ai.hint %></p>
+  <button type="button" class="ai-solve-copy">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+    <span><%= ai.copy %></span>
+  </button>
+  <p class="ai-solve-status" role="status" aria-live="polite"></p>
+</div>

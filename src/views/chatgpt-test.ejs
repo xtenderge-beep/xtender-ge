@@ -1,0 +1,50 @@
+<!DOCTYPE html><html lang="<%= lang %>"><head>
+<%#
+  Тестовая страница кнопки «Решить с ChatGPT» (владелец 2026-10-21, маршрут /chatgpt). Для владельца и проверяющих,
+  поэтому пояснения по-русски; запросы — на языке страницы (переключатель вверху). Закрыта от поиска.
+%>
+<%- include('partials/head', { title: 'Решить с ChatGPT — тест | xtender.ge', noindex: true }) %>
+</head>
+<body class="bg-stone-50 text-stone-900 font-sans antialiased">
+<main class="max-w-3xl mx-auto px-4 py-8 sm:py-12">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <a class="text-2xl font-extrabold tracking-tight" href="<%= lang === 'ka' ? '/' : '/' + lang %>">xtender<span class="text-emerald-700">.ge</span></a>
+    <nav class="flex gap-4 text-sm font-bold" aria-label="Language">
+      <% [['ka', 'ქართული', '/chatgpt?lang=ka'], ['ru', 'Русский', '/ru/chatgpt'], ['en', 'English', '/en/chatgpt']].forEach(function (item) { %>
+      <a href="<%= item[2] %>" lang="<%= item[0] %>" class="<%= item[0] === lang ? 'text-emerald-700 underline underline-offset-4' : 'text-stone-600' %>"><%= item[1] %></a>
+      <% }); %>
+    </nav>
+  </div>
+
+  <h1 class="mt-8 text-2xl sm:text-3xl font-extrabold leading-tight">Кнопка «Решить с ChatGPT»: тестовая страница</h1>
+  <p class="mt-3 text-stone-600 leading-relaxed">Здесь кнопку проверяют на телефонах и компьютере, прежде чем она появится на настоящих страницах. В поиске этой страницы нет. Запрос пишется на языке страницы, язык переключается вверху.</p>
+
+  <details class="mt-5 rounded-2xl border border-stone-200 bg-white p-4">
+    <summary class="font-bold cursor-pointer">Что проверить</summary>
+    <ol class="mt-3 list-decimal pl-5 space-y-2 text-sm leading-relaxed text-stone-700">
+      <li>Нажмите «Решить с ChatGPT» на Android (Chrome), на iPhone (Safari) и на компьютере. Проверьте, открылся ли ChatGPT (сайт или приложение) и вставился ли текст целиком: последняя строка запроса начинается с «- Example: https://xtender.ge/draft».</li>
+      <li>Откройте эту страницу по ссылке из WhatsApp и нажмите кнопку там.</li>
+      <li>Посмотрите, отправился ли запрос сам или его нужно отправить вручную.</li>
+      <li>Если текст обрезан или поле пустое, нажмите «Скопировать запрос» и вставьте его в ChatGPT. Затем попробуйте «Открыть короткий вариант». Напишите, на каком устройстве это случилось.</li>
+      <li>Ответ ChatGPT: задаёт по одному-два вопроса, не просит номер телефона и не обещает цену, в конце даёт ссылку xtender.ge/draft…, которая открывает заполненную заявку. Отправляйте заявку только с тестового номера или не отправляйте вовсе.</li>
+    </ol>
+  </details>
+
+  <% items.forEach(function (item) { %>
+  <section class="mt-8 rounded-3xl border border-stone-200 bg-stone-100/60 p-4 sm:p-6">
+    <h2 class="text-xl font-extrabold"><%= item.ai.title %></h2>
+    <%- include('partials/ai-solve', { ai: item.ai }) %>
+    <p class="mt-3 text-xs leading-relaxed text-stone-600">Запрос: <%= item.ai.full.length %> знаков. Адрес ChatGPT: <%= item.ai.fullUrl.length %> знаков, уходит <b><%= item.ai.variant === 'full' ? 'полный' : 'короткий' %></b> вариант (предел <%= maxUrl %>).</p>
+    <p class="mt-1 text-xs leading-relaxed">
+      <a class="font-bold text-emerald-700 underline underline-offset-2" href="<%= item.ai.shortUrl %>" target="_blank" rel="noopener">Открыть короткий вариант</a> <span class="text-stone-500">(<%= item.ai.shortUrl.length %> знаков)</span>
+      <% if (item.page) { %> · <a class="font-bold text-emerald-700 underline underline-offset-2" href="<%= item.page %>">Кнопка на настоящей странице</a><% } %>
+    </p>
+    <details class="mt-3">
+      <summary class="text-sm font-bold cursor-pointer text-stone-700">Текст запроса</summary>
+      <pre class="mt-2 whitespace-pre-wrap break-words rounded-xl bg-white border border-stone-200 p-3 text-xs leading-relaxed text-stone-700"><%= item.ai.full %></pre>
+    </details>
+  </section>
+  <% }); %>
+</main>
+<script src="/js/ai-solve.js" defer></script>
+</body></html>

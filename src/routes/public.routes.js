@@ -16,6 +16,9 @@ const settingsService = require('../services/settings.service');
 const asyncHandler = require('../middleware/asyncHandler');
 const draftLink = require('../config/draftLink');
 const agentApi = require('../config/agentApi');
+const chatgptPrompt = require('../config/chatgptPrompt');
+const aiScenarios = require('../config/ai-scenarios');
+const assistantCatalog = require('../services/assistantCatalog.service');
 const { getBaseUrl } = require('../config/url');
 
 const LEGAL_LOCALS = {
@@ -152,6 +155,20 @@ async function renderHome(req, res, locale, page, options = {}) {
       .filter(item => item.count).map(item => ({ label: item.category['name_' + locale] || item.category.name_ru, count: item.count })),
   } : null;
 
+  // Кнопка «Решить с ChatGPT» (config/chatgptPrompt.js): сценарий — по адресу страницы, иначе по её заголовку. Пока
+  // только по адресу с ?gpt=1: проверка на настоящих страницах до показа всем (на них ведёт тестовая страница /chatgpt).
+  let aiSolve = null;
+  if (req.query.gpt === '1' && !options.draft) {
+    const slug = servicePage ? servicePage.slug : page ? page.slug : '';
+    const content = page && page.content && page.content[locale];
+    const title = servicePage ? servicePage.h1 : content ? [content.title, content.accent].filter(Boolean).join(' ') : '';
+    aiSolve = chatgptPrompt.build({
+      base: getBaseUrl(), lang: locale, catalog: await assistantCatalog.getOrEmpty(), city: catalogCity,
+      scenario: chatgptPrompt.scenarioFor(locale, { slug, title }),
+      source: getBaseUrl() + localizedPath(locale, slug ? '/s/' + slug : '/'),
+    });
+  }
+
   // Пришёл по ссылке менеджера (/z/<token>) — подставим телефон в форму заявки.
   let prefillPhone = '';
   const inviteToken = req.cookies.order_invite;
@@ -206,7 +223,8 @@ async function renderHome(req, res, locale, page, options = {}) {
     llmsUrl: getBaseUrl() + '/llms.txt',
     agentHint: agentApi.agentHint(getBaseUrl()),
     // Блок «For AI assistants» внизу страницы: правило, формат ссылки, коды услуг с исполнителями.
-    aiGuide: agentApi.homeGuide(getBaseUrl(), await require('../services/assistantCatalog.service').getOrEmpty()),
+    aiGuide: agentApi.homeGuide(getBaseUrl(), await assistantCatalog.getOrEmpty()),
+    aiSolve,
     // Параметры ссылки-черновика, которые переключатель языка уносит с собой (partials/lang-switch).
     switchQuery: options.switchQuery || '',
     // Ссылки внизу каждой страницы: открытые поиску страницы «услуга + город» (на странице услуги — остальные,
@@ -244,6 +262,26 @@ router.get('/draft', asyncHandler(async (req, res) => {
   const carried = new URLSearchParams(req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?') + 1) : '');
   carried.delete('lang');
   await renderHome(req, res, locale, null, { simple: true, draft, switchQuery: carried.toString() });
+}));
+
+// Тестовая страница кнопки «Решить с ChatGPT» (владелец 2026-10-21): три сценария первого этапа — проверка на телефонах
+// и компьютере до того, как кнопка встанет на настоящие страницы. Закрыта от поиска, в карте сайта и в ссылках её нет.
+router.get('/chatgpt', asyncHandler(async (req, res) => {
+  if (redirectToCookieLocale(req, res, '/chatgpt')) return;
+  const locale = resolveLocale(req, res, '/chatgpt');
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Robots-Tag', 'noindex, nofollow');
+  const base = getBaseUrl();
+  const [catalog, cities] = await Promise.all([assistantCatalog.getOrEmpty(), masterService.getActiveCities()]);
+  const city = cities.find(item => item.slug === 'tbilisi') || cities[0];
+  // У сценария со своей страницей — ссылка на неё с ?gpt=1 (там кнопка тоже видна); у ремонта страницы нет.
+  const items = chatgptPrompt.TEST_SCENARIOS.map(id => {
+    const slug = aiScenarios[id].pages[0];
+    const path = localizedPath(locale, slug ? '/s/' + slug : '/');
+    const ai = chatgptPrompt.build({ base, lang: locale, catalog, city, scenario: chatgptPrompt.scenarioFor(locale, { id }), source: base + path });
+    return { ai, page: slug ? path + (locale === 'ka' ? '?lang=ka&gpt=1' : '?gpt=1') : null };
+  });
+  res.render('chatgpt-test', { items, maxUrl: chatgptPrompt.MAX_URL });
 }));
 
 // Адрес, по которому эта главная проверялась до выкладки (2026-10-16): ведёт на главную того же языка.
