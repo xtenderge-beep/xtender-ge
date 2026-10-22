@@ -64,6 +64,9 @@ async function sendCode(phone, purpose = 'order', orderId = null, context = {}) 
         catch (error) { console.error(`Order code SMS with the autofill line was not sent, sending without it: ${error.message}`); }
       }
       if (!result) result = await smsService.sendOrderNotification(phone, text, { log: false });
+    } else if (purpose === 'oauth') {
+      // Вход для подключения приложения (oauth.controller): свой текст, чтобы человек понимал, зачем код.
+      result = await smsService.sendOrderNotification(phone, serviceMessage.sms('oauthCode', { code }), { log: false });
     } else {
       result = await smsService.sendOtp(phone, code);
     }

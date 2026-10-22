@@ -11,6 +11,8 @@ Google Analytics и цели для Google Ads: [docs/google-analytics.md](docs/
 Пиксель Meta для рекламы в Facebook и Instagram: [docs/meta-pixel.md](docs/meta-pixel.md).
 Заявка из нескольких категорий (закрытие по категориям, воронка по группам
 исполнителей): [docs/multi-category-orders.md](docs/multi-category-orders.md).
+API v1 и вход OAuth для плагина ChatGPT (этапы 0–1 ТЗ от 23.10.2026, песочница
+`node scripts/api-sandbox.js`): [docs/api-v1/README.md](docs/api-v1/README.md).
 Снимок состояния уточняет и заменяет исторические описания ниже там, где они расходятся.
 
 Сервис-маркетплейс для заказа услуг по районам Тбилиси: перевозки/машины, грузчики, вывоз мусора. Клиент публикует заявку текстом, модератор вручную распределяет её по категориям исполнителей через Telegram, исполнители получают SMS со ссылкой на заявку.

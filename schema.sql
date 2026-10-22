@@ -950,6 +950,73 @@ CREATE TABLE IF NOT EXISTS traffic_sources (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- === API v1 для плагина ChatGPT и других клиентов (docs/api-v1/BACKEND_AUDIT.md, 2026-10-23) ===
+-- Аккаунт — номер телефона, подтверждённый кодом из SMS на странице входа /oauth/authorize. Роль заказчика
+-- есть у каждого аккаунта; роль исполнителя — профиль в masters с тем же номером (masters.phone в E.164).
+-- Отдельной таблицы ролей нет: роль нельзя выдать себе запросом, администратора через API не бывает.
+-- id — непрозрачная строка для API. version растёт при каждой правке (If-Match в PATCH /api/v1/me).
+CREATE TABLE IF NOT EXISTS accounts (
+    id VARCHAR(40) PRIMARY KEY,
+    phone VARCHAR(20) NOT NULL UNIQUE,
+    display_name VARCHAR(80),
+    locale VARCHAR(2) NOT NULL DEFAULT 'ka' CONSTRAINT accounts_locale_check CHECK (locale IN ('ka','ru','en')),
+    timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Tbilisi',
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CONSTRAINT accounts_status_check CHECK (status IN ('active','disabled')),
+    phone_verified_at TIMESTAMPTZ NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- OAuth-клиенты (ChatGPT, Claude, тестовые). Регистрируются сами по RFC 7591 (/oauth/register): публичные
+-- клиенты с PKCE, секрета нет. Адреса возврата — только из списка разрешённых (oauth.service, OAUTH_REDIRECT_ALLOWLIST).
+CREATE TABLE IF NOT EXISTS oauth_clients (
+    client_id VARCHAR(64) PRIMARY KEY,
+    client_name VARCHAR(120) NOT NULL,
+    redirect_uris JSONB NOT NULL,
+    scope TEXT NOT NULL,
+    client_uri TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    disabled_at TIMESTAMPTZ
+);
+
+-- Подключение аккаунта к клиенту — «сессия», которую человек или клиент может отключить (revoked_at). Отзыв
+-- сессии гасит все её токены сразу: токен проверяется вместе со своей сессией.
+CREATE TABLE IF NOT EXISTS oauth_grants (
+    id VARCHAR(40) PRIMARY KEY,
+    account_id VARCHAR(40) NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    client_id VARCHAR(64) NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+    scope TEXT NOT NULL,
+    resource TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    revoke_reason VARCHAR(40)
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_grants_account ON oauth_grants(account_id);
+
+-- Код авторизации и токены хранятся только хешами (sha256). Код живёт две минуты и гасится первым обменом;
+-- повторный обмен того же кода отзывает всю сессию. used_at у refresh-токена — он уже обменян на новый.
+CREATE TABLE IF NOT EXISTS oauth_authorization_codes (
+    code_hash VARCHAR(64) PRIMARY KEY,
+    grant_id VARCHAR(40) NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+    redirect_uri TEXT NOT NULL,
+    code_challenge VARCHAR(128) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    token_hash VARCHAR(64) PRIMARY KEY,
+    grant_id VARCHAR(40) NOT NULL REFERENCES oauth_grants(id) ON DELETE CASCADE,
+    kind VARCHAR(10) NOT NULL CONSTRAINT oauth_tokens_kind_check CHECK (kind IN ('access','refresh')),
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_grant ON oauth_tokens(grant_id);
+CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires ON oauth_tokens(expires_at);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

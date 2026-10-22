@@ -9,6 +9,8 @@ const audit = require('./masterAudit.service');
 const SOURCES = {
   order: 'страница заявки',
   cabinet: 'кабинет',
+  // PUT /api/v1/me/provider-profile — из ChatGPT или другого приложения, подключённого к аккаунту (docs/api-v1).
+  api: 'приложение через API',
 };
 
 // subscribed — true: снова получать заявки, false: больше не присылать. source — ключ SOURCES;

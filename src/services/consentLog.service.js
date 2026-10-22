@@ -25,6 +25,8 @@ const VERIFIED_EVENT_BY_PURPOSE = {
   master_login: 'AUTH_SMS_OTP_VERIFIED',
   order: 'ORDER_SMS_OTP_VERIFIED',
   review: 'REVIEW_SMS_OTP_VERIFIED',
+  // Вход на /oauth/authorize (подключение ChatGPT или другого приложения): подтверждение номера, не согласие.
+  oauth: 'OAUTH_SMS_OTP_VERIFIED',
 };
 const VERIFIED_EVENT_TYPES = [...Object.values(VERIFIED_EVENT_BY_PURPOSE), 'CLIENT_CONSENT_OTP_VERIFIED'];
 

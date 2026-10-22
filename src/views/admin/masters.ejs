@@ -10,7 +10,7 @@
 <% const main = ['ru', 'ka', 'en']; %>
 <% const when = function (v) { return new Date(v).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }; %>
 <% const clip = function (s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n).trimEnd() + '…' : s; }; %>
-<% const actionLabels = { ban: 'заблокировал', unban: 'разблокировал', approve: 'одобрил', unapprove: 'вернул на модерацию', edit: 'изменил профиль', assign_category: 'назначил услуги', edit_contact: 'изменил контакты', edit_description: 'изменил описание',reject: 'отклонил заявку', leads_off: 'получение заявок', leads_on: 'получение заявок' }; %>
+<% const actionLabels = { ban: 'заблокировал', unban: 'разблокировал', approve: 'одобрил', unapprove: 'вернул на модерацию', edit: 'изменил профиль', assign_category: 'назначил услуги', edit_contact: 'изменил контакты', edit_description: 'изменил описание',reject: 'отклонил заявку', leads_off: 'получение заявок', leads_on: 'получение заявок', edit_languages: 'изменил языки' }; %>
 <% const spokenCodes = main.concat(Object.keys(languageNames).filter(function (c) { return main.indexOf(c) === -1 && languageSummary.spoken[c]; })); %>
 <%# Фильтр по менеджеру: число — исполнители в текущем списке (с учётом «На модерации»), без учёта фильтра языка. %>
 <section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4" aria-label="Менеджеры исполнителей">

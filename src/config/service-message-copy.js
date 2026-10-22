@@ -47,6 +47,9 @@ const smsMessages = {
   // the site. «Not you?» — anyone can type someone else's number into a chat.
   orderCodeAssistant: 'Xtender code: {code}. Give it to your AI assistant to send your request. Not you? Ignore this SMS.',
   orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
+  // Вход на странице /oauth/authorize: человек подключает аккаунт к ChatGPT или другому приложению (docs/api-v1/AUTH.md).
+  // Код вводят на сайте, не в чате: в чат его могли бы попросить чужие.
+  oauthCode: 'Xtender code: {code}. Enter it on xtender.ge to connect an app to your account. Never share it in a chat. Not you? Ignore this SMS.',
   // Last line of the code SMS when the admin setting is on (otp.service adds it after a blank line):
   // the format browsers read to offer the code on the site itself. host is the site's domain.
   orderCodeAutofill: '@{host} #{code}',

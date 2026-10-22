@@ -8,6 +8,15 @@ function isDevMode() {
   return process.env.NODE_ENV === 'development' || (process.env.NODE_ENV !== 'production' && !process.env.SMS_GATEWAY_USERNAME);
 }
 
+// Песочница API (XTENDER_SANDBOX=1, docs/api-v1/README.md): SMS не уходит в шлюз ни при каких ключах, а
+// складывается в список, который читает GET /api/v1/sandbox/sms. Хранятся последние 200 сообщений, сутки.
+async function sandboxSink(phone, text) {
+  const redis = require('../config/redis');
+  await redis.lpush('sandbox:sms', JSON.stringify({ to: toE164(phone), text, at: new Date().toISOString() }));
+  await redis.ltrim('sandbox:sms', 0, 199);
+  await redis.expire('sandbox:sms', 24 * 60 * 60);
+}
+
 function normalizePhone(phone) {
   return toE164(phone).slice(1);
 }
@@ -69,7 +78,12 @@ async function send(phone, text, context = {}) {
   let ok = false;
 
   try {
-    if (isDevMode()) {
+    if (require('../config/apiV1').isSandbox()) {
+      console.log(`[SMS SANDBOX] to=${normalizePhone(phone).slice(0, 6)}… stored, not sent`);
+      await sandboxSink(phone, text);
+      providerResponse = { sandbox: true };
+      ok = true;
+    } else if (isDevMode()) {
       console.log(`[SMS DEV MODE] to=${phone} text="${text}"`);
       providerResponse = { dev: true };
       ok = true;

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="<%= lang %>">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title><%= c('page_title') %></title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* Отдельная страница без общей вёрстки сайта: её открывает приложение (ChatGPT и др.) в своём окне. */
+  :root { --bg:#fafaf9; --card:#fff; --text:#1c1917; --muted:#57534e; --line:#e7e5e4; --accent:#047857; --accent-hover:#065f46; --error:#b91c1c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Georgian",sans-serif; }
+  main { max-width:440px; margin:0 auto; padding:32px 16px 48px; }
+  .brand { font-weight:700; font-size:20px; margin:0 0 20px; color:var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:24px 20px; }
+  h1 { font-size:20px; line-height:1.3; margin:0 0 12px; }
+  p { margin:0 0 12px; }
+  .muted { color:var(--muted); font-size:14px; }
+  ul.scopes { margin:0 0 16px; padding-left:20px; }
+  ul.scopes li { margin:4px 0; }
+  label { display:block; font-weight:600; margin:16px 0 6px; }
+  input[type=tel], input[type=text] { width:100%; font-size:18px; padding:12px 14px; border:1px solid #d6d3d1; border-radius:10px; background:#fff; color:var(--text); }
+  input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+  button { font:inherit; cursor:pointer; border-radius:10px; padding:12px 16px; border:1px solid transparent; }
+  .primary { width:100%; margin-top:16px; background:var(--accent); color:#fff; font-weight:600; }
+  .primary:hover { background:var(--accent-hover); }
+  .secondary { width:100%; margin-top:10px; background:#fff; color:var(--text); border-color:#d6d3d1; }
+  .link { background:none; border:none; padding:8px 0; color:var(--accent); text-decoration:underline; }
+  .error { color:var(--error); font-weight:600; margin-top:12px; }
+  .legal { margin-top:20px; font-size:13px; color:var(--muted); }
+  .legal a { color:var(--muted); }
+  .sandbox { background:#fef3c7; border:1px solid #fcd34d; border-radius:10px; padding:8px 12px; font-size:14px; margin-bottom:16px; }
+</style>
+</head>
+<body>
+<main>
+  <p class="brand">xtender.ge</p>
+  <% if (sandbox) { %><p class="sandbox"><%= c('sandbox_note') %></p><% } %>
+  <div class="card">
+  <% if (step === 'error') { %>
+    <h1><%= c('title') %></h1>
+    <p class="error" role="alert"><%= error %></p>
+  <% } else { %>
+    <h1><%= step === 'consent' ? c('consent_title') : c('title') %></h1>
+    <p><%= c('asks', { client: request.client_name }) %></p>
+    <p class="muted"><%= c('scopes_title') %></p>
+    <ul class="scopes">
+      <% scopes.forEach(function (label) { %><li><%= label %></li><% }) %>
+    </ul>
+    <p class="muted"><%= c('return_to', { host: host }) %></p>
+
+    <% if (step === 'phone') { %>
+      <form method="post" action="/oauth/authorize/phone" autocomplete="on">
+        <input type="hidden" name="request_id" value="<%= requestId %>">
+        <label for="phone"><%= c('phone_label') %></label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" value="<%= phoneInput || '+995 ' %>" required>
+        <p class="muted" style="margin-top:8px"><%= c('phone_hint') %></p>
+        <% if (error) { %><p class="error" role="alert"><%= error %></p><% } %>
+        <button class="primary" type="submit"><%= c('send_code') %></button>
+      </form>
+    <% } else if (step === 'code') { %>
+      <form method="post" action="/oauth/authorize/code" autocomplete="off">
+        <input type="hidden" name="request_id" value="<%= requestId %>">
+        <p><%= c('code_sent', { phone: maskedPhone }) %></p>
+        <label for="code"><%= c('code_label') %></label>
+        <input id="code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{4}" maxlength="4" required autofocus>
+        <% if (error) { %><p class="error" role="alert"><%= error %></p><% } %>
+        <button class="primary" type="submit" name="action" value="verify"><%= c('confirm') %></button>
+      </form>
+      <form method="post" action="/oauth/authorize/code">
+        <input type="hidden" name="request_id" value="<%= requestId %>">
+        <button class="link" type="submit" name="action" value="change"><%= c('change_phone') %></button>
+      </form>
+    <% } else if (step === 'consent') { %>
+      <p><%= c('consent_account', { phone: maskedPhone }) %></p>
+      <% if (providerStatus) { %><p><%= c('consent_provider', { status: providerStatusLabel }) %></p><% } %>
+      <p class="muted"><%= c('consent_phone_note') %></p>
+      <form method="post" action="/oauth/authorize/decision">
+        <input type="hidden" name="request_id" value="<%= requestId %>">
+        <button class="primary" type="submit" name="decision" value="allow"><%= c('allow') %></button>
+        <button class="secondary" type="submit" name="decision" value="deny"><%= c('deny') %></button>
+      </form>
+    <% } %>
+  <% } %>
+  </div>
+  <p class="legal"><a href="<%= legal.terms %>" target="_blank" rel="noopener"><%= c('terms') %></a> · <a href="<%= legal.privacy %>" target="_blank" rel="noopener"><%= c('privacy') %></a></p>
+</main>
+</body>
+</html>

@@ -70,6 +70,9 @@ app.get('/health', (req, res) => {
 
 app.get('/lang/:code', require('./controllers/language.controller').change);
 
+// Вход OAuth для API v1 и плагина ChatGPT: /.well-known/*, /oauth/* (docs/api-v1/AUTH.md).
+app.use(require('./routes/oauth.routes'));
+
 app.use('/', require('./routes/crmPublic.routes'));
 app.use('/', publicRoutes);
 app.use('/:locale(ru|en)', publicRoutes);
@@ -89,6 +92,8 @@ app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
 
+// API v1 для плагина ChatGPT и других клиентов (docs/api-v1/README.md). Раньше общего /api: свой формат ошибок и вход по токену.
+app.use('/api/v1', require('./routes/apiV1.routes'));
 app.use('/api', apiRoutes);
 
 // API заявок для ИИ-ассистентов и его описание для моделей (docs/ai-agent-api.md).
@@ -117,6 +122,8 @@ app.use((err, req, res, next) => {
   if (err && (err.name === 'MulterError' || err.message === 'Unsupported file type')) {
     return res.status(400).json({ success: false, message: err.message });
   }
+  // Неверный JSON в запросе к API v1 отклоняет общий разборщик тела ещё до роутера API — ответ в формате API.
+  if (req.path.startsWith('/api/v1/')) return require('./middleware/apiV1').errorHandler(err, req, res, next);
   if (err && err.type === 'entity.parse.failed' && req.path === '/mcp') {
     return res.status(400).json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error: the request body is not valid JSON.' }, id: null });
   }
@@ -164,6 +171,8 @@ runMigrations()
     require('./services/descriptionTranslation.service').start();
     // Посещаемость: удаление записей старше 400 дней раз в сутки.
     require('./services/siteAnalytics.service').start();
+    // OAuth: удаление просроченных кодов и токенов раз в час.
+    require('./services/oauth.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

@@ -1,0 +1,67 @@
+// Действия API v1 для GET /api/v1/capabilities (ТЗ, раздел 16). Список — все действия ТЗ, а не только сделанные:
+// модель видит, что есть и чего пока нет. supported = implemented: несделанное действие никогда не помечается
+// поддержанным. stage — этап сдачи из ТЗ (раздел 18). Описания — для модели, поэтому по-английски.
+// Новое действие требует обновления этого списка, OpenAPI (src/config/openapiV1.js) и MCP-адаптера; новая
+// категория услуг — нет: её находят универсальные searchCategories и getCategorySchema.
+const ACTIONS = [
+  // Этап 1 — сделано.
+  { id: 'get_capabilities', operation_id: 'getCapabilities', stage: 1, implemented: true, roles: [], scopes: [], description: 'What the service can do now and what this account may do.' },
+  { id: 'get_my_profile', operation_id: 'getMe', stage: 1, implemented: true, roles: ['customer'], scopes: ['profile:read'], description: 'The connected account: roles, language, time zone, masked phone.' },
+  { id: 'update_my_profile', operation_id: 'updateMe', stage: 1, implemented: true, roles: ['customer'], scopes: ['profile:write'], confirm: false, side_effects: ['account_settings_changed'], description: 'Change the display name, language or time zone of the account.' },
+  { id: 'get_provider_profile', operation_id: 'getProviderProfile', stage: 1, implemented: true, roles: ['provider'], scopes: ['profile:read'], description: 'The provider profile of this account: services, cities, languages, whether new requests are sent to it.' },
+  { id: 'update_provider_profile', operation_id: 'updateProviderProfile', stage: 1, implemented: true, roles: ['provider'], scopes: ['profile:write'], confirm: true, side_effects: ['provider_languages_changed', 'provider_request_intake_changed'], description: 'Change the languages the provider speaks or stop/resume receiving new requests. Services, cities and description are changed only by Xtender moderators.' },
+  { id: 'list_sessions', operation_id: 'listSessions', stage: 1, implemented: true, roles: ['customer'], scopes: ['profile:read'], description: 'Apps connected to this account.' },
+  { id: 'revoke_session', operation_id: 'revokeSession', stage: 1, implemented: true, roles: ['customer'], scopes: ['profile:write'], confirm: true, side_effects: ['session_revoked'], description: 'Disconnect an app from this account; its tokens stop working at once.' },
+  { id: 'search_categories', operation_id: 'searchCategories', stage: 1, implemented: true, roles: [], scopes: [], description: 'Find service categories by a plain-language description of the need (ka/ru/en, Georgian in Latin letters too).' },
+  { id: 'get_category_schema', operation_id: 'getCategorySchema', stage: 1, implemented: true, roles: [], scopes: [], description: 'Parameters a customer can state for a category, as JSON Schema.' },
+  { id: 'search_locations', operation_id: 'listLocations', stage: 1, implemented: true, roles: [], scopes: [], description: 'Country, cities and districts, and which of them are served.' },
+  { id: 'list_units', operation_id: 'listUnits', stage: 1, implemented: true, roles: [], scopes: [], description: 'Units of measure with stable codes.' },
+
+  // Этап 2 — основная сделка. Не сделано.
+  { id: 'create_tender_draft', operation_id: 'createTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], side_effects: ['draft_saved'], description: 'Save a request draft. Nothing is sent to anyone.' },
+  { id: 'update_tender_draft', operation_id: 'updateTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], side_effects: ['draft_saved'], description: 'Edit a request draft.' },
+  { id: 'validate_tender', operation_id: 'validateTender', stage: 2, roles: ['customer'], scopes: ['tenders:read'], description: 'Check a draft: missing fields, errors, warnings. Publishes nothing.' },
+  { id: 'publish_tender', operation_id: 'publishTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], confirm: true, side_effects: ['tender_published', 'dispatch_queued'], description: 'Publish a confirmed request and queue it for providers.' },
+  { id: 'list_my_tenders', operation_id: 'listMyTenders', stage: 2, roles: ['customer'], scopes: ['tenders:read'], description: 'Requests of this account.' },
+  { id: 'resolve_tender', operation_id: 'resolveTender', stage: 2, roles: ['customer', 'provider'], scopes: ['tenders:read'], description: 'Find an accessible request by its number.' },
+  { id: 'get_tender', operation_id: 'getTender', stage: 2, roles: ['customer', 'provider'], scopes: ['tenders:read'], description: 'A request with the fields this account may see.' },
+  { id: 'get_tender_status', operation_id: 'getTenderStatus', stage: 2, roles: ['customer'], scopes: ['tenders:read'], description: 'Status, active offers, deadline and dispatch counts of a request.' },
+  { id: 'close_tender', operation_id: 'closeTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], confirm: true, side_effects: ['collection_closed'], description: 'Stop accepting offers early.' },
+  { id: 'cancel_tender', operation_id: 'cancelTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], confirm: true, side_effects: ['tender_cancelled', 'providers_notified'], description: 'Cancel a request before a provider is assigned.' },
+  { id: 'get_tender_offers', operation_id: 'listTenderOffers', stage: 2, roles: ['customer'], scopes: ['offers:read'], description: 'Offers on a request of this account.' },
+  { id: 'get_comparison_data', operation_id: 'getComparisonData', stage: 2, roles: ['customer'], scopes: ['offers:read'], description: 'Normalized offers with unknown fields and deviations, without any ranking.' },
+  { id: 'select_offer', operation_id: 'selectOffer', stage: 2, roles: ['customer'], scopes: ['offers:write'], confirm: true, side_effects: ['offer_selected', 'collection_closed', 'provider_notified'], description: 'Choose one offer.' },
+  { id: 'complete_tender', operation_id: 'completeTender', stage: 2, roles: ['customer'], scopes: ['tenders:write'], confirm: true, side_effects: ['tender_completed'], description: 'Confirm the job is done.' },
+  { id: 'create_project', operation_id: 'createProject', stage: 2, roles: ['customer'], scopes: ['tenders:write'], side_effects: ['project_saved'], description: 'Group related requests of this account.' },
+  { id: 'get_project', operation_id: 'getProject', stage: 2, roles: ['customer'], scopes: ['tenders:read'], description: 'A project and its requests.' },
+  { id: 'search_opportunities', operation_id: 'listOpportunities', stage: 2, roles: ['provider'], scopes: ['tenders:read'], description: 'Published requests this provider may answer.' },
+  { id: 'create_offer_draft', operation_id: 'createOffer', stage: 2, roles: ['provider'], scopes: ['offers:write'], side_effects: ['draft_saved'], description: 'Save an offer draft.' },
+  { id: 'update_offer', operation_id: 'updateOffer', stage: 2, roles: ['provider'], scopes: ['offers:write'], side_effects: ['offer_updated'], description: 'Change an own offer that is not selected.' },
+  { id: 'submit_offer', operation_id: 'submitOffer', stage: 2, roles: ['provider'], scopes: ['offers:write'], confirm: true, side_effects: ['offer_sent', 'customer_notified'], description: 'Send a confirmed offer to the customer.' },
+  { id: 'withdraw_offer', operation_id: 'withdrawOffer', stage: 2, roles: ['provider'], scopes: ['offers:write'], confirm: true, side_effects: ['offer_withdrawn'], description: 'Withdraw an own offer that is not selected.' },
+  { id: 'list_my_offers', operation_id: 'listMyOffers', stage: 2, roles: ['provider'], scopes: ['offers:read'], description: 'Offers of this provider.' },
+  { id: 'get_offer', operation_id: 'getOffer', stage: 2, roles: ['customer', 'provider'], scopes: ['offers:read'], description: 'An offer, for its author or the request owner.' },
+  { id: 'accept_selection', operation_id: 'acceptSelection', stage: 2, roles: ['provider'], scopes: ['offers:write'], confirm: true, side_effects: ['selection_accepted', 'customer_notified'], description: 'The chosen provider confirms the job.' },
+  { id: 'decline_selection', operation_id: 'declineSelection', stage: 2, roles: ['provider'], scopes: ['offers:write'], confirm: true, side_effects: ['selection_declined', 'customer_notified'], description: 'The chosen provider declines, with a reason.' },
+
+  // Этап 3 — коммуникации. Не сделано.
+  { id: 'create_thread', operation_id: 'createThread', stage: 3, roles: ['provider'], scopes: ['messages:write'], side_effects: ['thread_created'], description: 'Open a private thread with the request owner.' },
+  { id: 'list_threads', operation_id: 'listThreads', stage: 3, roles: ['customer', 'provider'], scopes: ['messages:read'], description: 'Threads of a request this account takes part in.' },
+  { id: 'get_messages', operation_id: 'listMessages', stage: 3, roles: ['customer', 'provider'], scopes: ['messages:read'], description: 'Messages of a thread.' },
+  { id: 'send_message', operation_id: 'sendMessage', stage: 3, roles: ['customer', 'provider'], scopes: ['messages:write'], confirm: true, side_effects: ['message_sent', 'recipient_notified'], description: 'Send a message, only when the user asks.' },
+  { id: 'upload_attachment', operation_id: 'createAttachmentUpload', stage: 3, roles: ['customer', 'provider'], scopes: ['tenders:write'], side_effects: ['file_stored'], description: 'Upload a photo, PDF or list of goods.' },
+  { id: 'get_notification_preferences', operation_id: 'getNotificationPreferences', stage: 3, roles: ['customer'], scopes: ['profile:read'], description: 'Channels, language, quiet hours.' },
+  { id: 'set_notification_preferences', operation_id: 'updateNotificationPreferences', stage: 3, roles: ['customer'], scopes: ['notifications:write'], confirm: true, side_effects: ['notification_settings_changed'], description: 'Change notification settings.' },
+  { id: 'subscribe_tender_notifications', operation_id: 'putTenderNotificationSubscription', stage: 3, roles: ['customer'], scopes: ['notifications:write'], confirm: true, side_effects: ['sms_may_be_sent'], description: 'SMS rules for a request: first offer, N offers, collection closed.' },
+  { id: 'unsubscribe_tender_notifications', operation_id: 'deleteTenderNotificationSubscription', stage: 3, roles: ['customer'], scopes: ['notifications:write'], side_effects: ['notification_settings_changed'], description: 'Stop notifications for a request.' },
+  { id: 'list_notifications', operation_id: 'listNotifications', stage: 3, roles: ['customer', 'provider'], scopes: ['profile:read'], description: 'Notifications sent to this account.' },
+  { id: 'get_resume_link', operation_id: 'createResumeLink', stage: 3, roles: ['customer'], scopes: ['tenders:read'], description: 'A link back to a request; sends nothing.' },
+];
+
+const SERVICE_DESCRIPTION = {
+  ru: 'xtender.ge — сервис заявок на услуги в Грузии. Заказчик описывает задачу, модератор Xtender проверяет её и отправляет подходящим зарегистрированным исполнителям, исполнители связываются с заказчиком сами. Через API сейчас доступны аккаунт, профиль исполнителя и каталог услуг; заявки и предложения через API — следующий этап.',
+  ka: 'xtender.ge არის მომსახურების განაცხადების სერვისი საქართველოში. დამკვეთი აღწერს ამოცანას, Xtender-ის მოდერატორი ამოწმებს მას და უგზავნის შესაფერის რეგისტრირებულ შემსრულებლებს, შემსრულებლები თავად უკავშირდებიან დამკვეთს. API-ით ახლა ხელმისაწვდომია ანგარიში, შემსრულებლის პროფილი და მომსახურების კატალოგი; განაცხადები და შეთავაზებები API-ით — შემდეგი ეტაპია.',
+  en: 'xtender.ge is a service-request marketplace in Georgia. A customer describes a task, an Xtender moderator checks it and sends it to matching registered providers, and the providers contact the customer themselves. Through the API you can now use the account, the provider profile and the service catalog; requests and offers through the API are the next stage.',
+};
+
+module.exports = { ACTIONS, SERVICE_DESCRIPTION };

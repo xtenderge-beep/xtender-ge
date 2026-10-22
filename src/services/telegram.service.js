@@ -35,6 +35,8 @@ const CONTACT_KEYBOARD = contactKeyboard();
 
 function isEnabled() {
   if (process.env.NODE_ENV === 'development') return false;
+  // Песочница API ничего не шлёт модераторам и исполнителям, даже если ключ бота задан по ошибке.
+  if (require('../config/apiV1').isSandbox()) return false;
   return Boolean(process.env.TELEGRAM_BOT_TOKEN);
 }
 
