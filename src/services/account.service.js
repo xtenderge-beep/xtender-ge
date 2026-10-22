@@ -68,4 +68,21 @@ async function update(id, version, changes) {
   return rows[0] || null;
 }
 
-module.exports = { getById, ensureForVerifiedPhone, providerFor, providerStatus, roles, maskedPhone, update };
+// Состояния аккаунта (уточнение 5 владельца, docs/api-v1/BACKEND_AUDIT.md, раздел 12): active; read_only — читает, но не
+// пишет; blocked — нет доступа совсем: токены не принимаются, все подключения отключаются, вход не выдаёт кода. Блокировка
+// при компрометации должна остановить и чтение личных данных. Интерфейса в админке пока нет — вызывается из кода.
+const STATUSES = ['active', 'read_only', 'blocked'];
+async function setStatus(id, status, reason = 'admin') {
+  if (!STATUSES.includes(status)) throw new Error('Unknown account status: ' + status);
+  return pool.withTransaction(async (client) => {
+    const { rows } = await client.query(
+      'UPDATE accounts SET status = $2, version = version + 1, updated_at = NOW() WHERE id = $1 RETURNING *', [id, status]);
+    if (rows[0] && status === 'blocked') {
+      await client.query("UPDATE oauth_grants SET revoked_at = NOW(), revoke_reason = $2 WHERE account_id = $1 AND revoked_at IS NULL",
+        [id, ('account_blocked:' + reason).slice(0, 40)]);
+    }
+    return rows[0] || null;
+  });
+}
+
+module.exports = { STATUSES, getById, ensureForVerifiedPhone, providerFor, providerStatus, roles, maskedPhone, update, setStatus };

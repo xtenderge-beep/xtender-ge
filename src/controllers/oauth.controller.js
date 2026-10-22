@@ -202,6 +202,8 @@ async function authorizeDecision(req, res) {
     return res.redirect(302, oauthService.redirectWith(request.redirect_uri, { error: 'access_denied', error_description: 'The user did not allow access.', state: request.state }));
   }
   const account = await accountService.ensureForVerifiedPhone(pending.phone, { locale: pending.lang });
+  // Заблокированному аккаунту код не выдаём и к приложению не возвращаем: подключить его нельзя.
+  if (account.status === 'blocked') return render(req, res, 403, { lang: pending.lang, step: 'error', error: oauthCopy.copy(pending.lang)('blocked') });
   const code = await oauthService.approve(request, account.id);
   return res.redirect(302, oauthService.redirectWith(request.redirect_uri, { code, state: request.state }));
 }

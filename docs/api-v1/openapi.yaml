@@ -455,7 +455,7 @@ paths:
       security:
         - oauth2:
             - "profile:write"
-      description: "All tokens of the session stop working at once. Allowed for a disabled account too."
+      description: "All tokens of the session stop working at once. Allowed for a read-only account too."
       x-xtender-side-effects:
         - "session_revoked"
       parameters:
@@ -4021,7 +4021,7 @@ components:
         unavailable_reason:
           oneOf:
             - type: "string"
-              description: "not_implemented, role_required:<roles>, scope_required:<scope>, account_disabled."
+              description: "not_implemented, role_required:<roles>, scope_required:<scope>, account_read_only."
             - type: "null"
         required_roles:
           type: "array"
@@ -4185,7 +4185,8 @@ components:
           type: "string"
           enum:
             - "active"
-            - "disabled"
+            - "read_only"
+          description: "read_only: reads only. A blocked account gets no answer at all (401)."
         provider:
           oneOf:
             - type: "object"

@@ -177,6 +177,11 @@ async function grantById(id, client = pool) {
   return (await client.query('SELECT * FROM oauth_grants WHERE id=$1', [id])).rows[0] || null;
 }
 
+async function accountBlocked(grant) {
+  const account = await require('./account.service').getById(grant.account_id);
+  return !account || account.status === 'blocked';
+}
+
 async function exchangeCode({ code, redirect_uri: redirectUri, client_id: clientId, code_verifier: verifier, resource }) {
   if (typeof code !== 'string' || code.length > 100) throw new OAuthError('invalid_request', 'code is required.');
   const row = (await pool.query('SELECT * FROM oauth_authorization_codes WHERE code_hash=$1', [sha256(code)])).rows[0];
@@ -192,6 +197,7 @@ async function exchangeCode({ code, redirect_uri: redirectUri, client_id: client
   if (!verifierMatches(verifier, row.code_challenge)) throw new OAuthError('invalid_grant', 'PKCE verification failed.');
   if (resource !== undefined && resource !== '' && resource !== grant.resource) throw new OAuthError('invalid_target', 'resource does not match the authorization request.');
   if (!await getClient(clientId)) throw new OAuthError('invalid_client', 'Unknown client_id.', 401);
+  if (await accountBlocked(grant)) throw new OAuthError('invalid_grant', 'The account is blocked.');
   const tokens = await pool.withTransaction(async (client) => {
     const used = await client.query('UPDATE oauth_authorization_codes SET used_at = NOW() WHERE code_hash = $1 AND used_at IS NULL RETURNING code_hash', [row.code_hash]);
     return used.rows[0] ? issueTokens(grant, client) : null;
@@ -213,6 +219,7 @@ async function refresh({ refresh_token: token, client_id: clientId, scope, resou
   if (scope !== undefined && scope !== '' && parseScope(scope, grant.scope.split(' ')) === null) throw new OAuthError('invalid_scope', 'scope is wider than the granted one.');
   if (resource !== undefined && resource !== '' && resource !== grant.resource) throw new OAuthError('invalid_target', 'resource does not match the session.');
   if (!await getClient(clientId)) throw new OAuthError('invalid_client', 'Unknown client_id.', 401);
+  if (await accountBlocked(grant)) throw new OAuthError('invalid_grant', 'The account is blocked.');
   const tokens = await pool.withTransaction(async (client) => {
     const used = await client.query('UPDATE oauth_tokens SET used_at = NOW() WHERE token_hash = $1 AND used_at IS NULL RETURNING token_hash', [row.token_hash]);
     return used.rows[0] ? issueTokens(grant, client) : null;
@@ -233,7 +240,8 @@ async function verifyAccessToken(token) {
   if (!row || row.revoked_at || row.disabled_at || new Date(row.token_expires_at).getTime() < Date.now() || !apiConfig.isResource(row.resource)) return null;
   const grant = await grantById(row.grant_id);
   const account = await require('./account.service').getById(grant.account_id);
-  if (!account) return null;
+  // Заблокированный аккаунт не читает и не пишет ничего, даже если какой-то токен уцелел.
+  if (!account || account.status === 'blocked') return null;
   const minuteAgo = new Date(Date.now() - 60 * 1000);
   if (!row.last_used_at || new Date(row.last_used_at) < minuteAgo) {
     await pool.query('UPDATE oauth_grants SET last_used_at = NOW() WHERE id = $1', [row.grant_id]).catch(() => {});

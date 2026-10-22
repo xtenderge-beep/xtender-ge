@@ -37,7 +37,7 @@ SMS складываются в `GET /api/v1/sandbox/sms`. Продовый `.en
 - **Ответ** всегда содержит `request_id`; заголовки `X-Request-Id` и `X-Xtender-Environment: production|sandbox`.
 - **Ошибка**: `{"error": {"code", "message", "fields"?: [{"path","code"}], "retryable"}, "request_id"}`. Коды: 400 `INVALID_JSON`,
   `INVALID_REQUEST`, `INVALID_CURSOR`; 401 `UNAUTHORIZED` (+ `WWW-Authenticate`); 403 `INSUFFICIENT_SCOPE`,
-  `ACCOUNT_DISABLED`, `PROVIDER_BLOCKED`; 404 `NOT_FOUND`, `CATEGORY_NOT_FOUND`, `PROVIDER_PROFILE_NOT_FOUND`; 409
+  `ACCOUNT_READ_ONLY`, `PROVIDER_BLOCKED`; 404 `NOT_FOUND`, `CATEGORY_NOT_FOUND`, `PROVIDER_PROFILE_NOT_FOUND`; 409
   `PROVIDER_REGISTRATION_REQUIRED`, `SNAPSHOT_CHANGED`; 412 `VERSION_MISMATCH` (+ `current_version`); 422 `VALIDATION_FAILED`
   с полями; 428 `PRECONDITION_REQUIRED`; 429 `RATE_LIMITED` (+ `Retry-After`); 500 `INTERNAL_ERROR`. Сообщения
   по-английски — их читает модель; коды стабильны.

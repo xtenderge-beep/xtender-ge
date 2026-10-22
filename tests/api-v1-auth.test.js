@@ -167,19 +167,33 @@ function pkce() {
     assert.deepEqual([r.status, r.json.revoked], [200, true]);
     assert.equal((await call('GET', '/api/v1/me', { token: other.access_token })).status, 401);
 
-    // 10. Просроченный токен и отключённый аккаунт (читает, но не пишет).
+    // 10. Просроченный токен; аккаунт «только чтение» (читает, но не пишет) и заблокированный (ничего).
     await harness.pool.query("UPDATE oauth_tokens SET expires_at = $1 WHERE kind='access' AND grant_id IN (SELECT id FROM oauth_grants WHERE account_id IN (SELECT id FROM accounts WHERE phone=$2))", [new Date(Date.now() - 1000), CUSTOMER]);
     assert.equal((await call('GET', '/api/v1/me', { token: mine.access_token })).status, 401);
-    const fresh = await harness.login(base, CUSTOMER);
-    await harness.pool.query("UPDATE accounts SET status='disabled' WHERE phone=$1", [CUSTOMER]);
+    const accountService = require('../src/services/account.service');
+    const accountId = (await harness.pool.query('SELECT id FROM accounts WHERE phone=$1', [CUSTOMER])).rows[0].id;
+    let fresh = await harness.login(base, CUSTOMER);
+    await accountService.setStatus(accountId, 'read_only');
     r = await call('GET', '/api/v1/me', { token: fresh.access_token });
-    assert.deepEqual([r.status, r.json.account_status], [200, 'disabled']);
+    assert.deepEqual([r.status, r.json.account_status], [200, 'read_only']);
     r = await call('PATCH', '/api/v1/me', { token: fresh.access_token, body: { locale: 'ru' }, headers: { 'if-match': '"' + r.json.version + '"' } });
-    assert.deepEqual([r.status, r.json.error.code], [403, 'ACCOUNT_DISABLED']);
-    const disabledCaps = (await call('GET', '/api/v1/capabilities', { token: fresh.access_token })).json;
-    assert.equal(disabledCaps.actions.find((a) => a.id === 'update_my_profile').unavailable_reason, 'account_disabled');
-    assert.equal(disabledCaps.actions.find((a) => a.id === 'get_my_profile').available_to_user, true);
-    await harness.pool.query("UPDATE accounts SET status='active' WHERE phone=$1", [CUSTOMER]);
+    assert.deepEqual([r.status, r.json.error.code], [403, 'ACCOUNT_READ_ONLY']);
+    const readOnlyCaps = (await call('GET', '/api/v1/capabilities', { token: fresh.access_token })).json;
+    assert.equal(readOnlyCaps.actions.find((a) => a.id === 'update_my_profile').unavailable_reason, 'account_read_only');
+    assert.equal(readOnlyCaps.actions.find((a) => a.id === 'get_my_profile').available_to_user, true);
+    // Блокировка (например, при компрометации): чтение тоже прекращается, сессии отключены, refresh не работает.
+    const second = await harness.login(base, CUSTOMER);
+    await accountService.setStatus(accountId, 'blocked', 'compromised');
+    for (const token of [fresh.access_token, second.access_token]) assert.equal((await call('GET', '/api/v1/me', { token })).status, 401, 'заблокированный не читает');
+    assert.equal((await refresh(second.refresh_token, second.client_id)).error, 'invalid_grant');
+    const open = (await harness.pool.query('SELECT COUNT(*)::int AS n FROM oauth_grants WHERE account_id=$1 AND revoked_at IS NULL', [accountId])).rows[0].n;
+    assert.equal(open, 0, 'все сессии отключены');
+    let blockedLogin = null;
+    try { await harness.login(base, CUSTOMER); } catch (error) { blockedLogin = error; }
+    assert.ok(blockedLogin, 'вход заблокированного не выдаёт кода');
+    assert.equal((await harness.pool.query('SELECT COUNT(*)::int AS n FROM oauth_grants WHERE account_id=$1 AND revoked_at IS NULL', [accountId])).rows[0].n, 0, 'новой сессии нет');
+    await accountService.setStatus(accountId, 'active');
+    fresh = await harness.login(base, CUSTOMER);
 
     // 11. Лимит запросов на сессию: 120 в минуту, затем 429 с Retry-After.
     let limited = null;

@@ -76,7 +76,7 @@ function paths() {
     '/me/sessions': { get: { ...done, operationId: 'listSessions', tags: ['Account'], summary: 'Apps connected to this account', security: oauth('profile:read'),
       responses: { ...ok(ref('SessionList')), ...errors(401, 403, 429) } } },
     '/me/sessions/{id}': { delete: { ...done, operationId: 'revokeSession', tags: ['Account'], summary: 'Disconnect an app', security: oauth('profile:write'),
-      description: 'All tokens of the session stop working at once. Allowed for a disabled account too.', ...sideEffect(['session_revoked']),
+      description: 'All tokens of the session stop working at once. Allowed for a read-only account too.', ...sideEffect(['session_revoked']),
       parameters: [P.id('Session id (grt_…).')], responses: { ...ok(obj({ id: str(), revoked: bool(), request_id: str() })), ...errors(401, 403, 404, 429) } } },
     '/categories': { get: { ...done, operationId: 'searchCategories', tags: ['Catalog'], summary: 'Find categories for a need',
       description: 'q is a plain-language need ("bring 20 bags of rubbish down from the 2nd floor"). Matching folds Georgian, Russian and Latin spelling and compares word beginnings; there is no server-side AI. match_status: none — nothing matched (do not invent a category); matched — one category; ambiguous — several (the task may need several, or the user must choose). match_rank is an order, not a probability. availability and supply_status refer to location_id; a supported category does not promise a free provider, a price or a reply. The catalog itself is read fresh on each request; supply counts are cached up to 5 minutes (checked_at).',
@@ -234,7 +234,7 @@ function schemas() {
 
     // --- Этап 1 ---
     Action: obj({ id: str(), description: str(), operation_id: str(), stage: int(), supported: bool('false = not implemented yet.'),
-      available_to_user: nullable(bool('null for an anonymous request.')), unavailable_reason: nullable(str('not_implemented, role_required:<roles>, scope_required:<scope>, account_disabled.')),
+      available_to_user: nullable(bool('null for an anonymous request.')), unavailable_reason: nullable(str('not_implemented, role_required:<roles>, scope_required:<scope>, account_read_only.')),
       required_roles: arr(str()), required_scopes: arr(str()), requires_confirmation: bool('The user must confirm in the chat before the call.'), side_effects: arr(str()) },
     ['id', 'operation_id', 'supported', 'available_to_user', 'required_roles', 'required_scopes', 'requires_confirmation', 'side_effects']),
     Capabilities: obj({ api_version: str(), capabilities_version: str(), catalog_version: str(), updated_at: time('When the catalog took its current version.'),
@@ -245,7 +245,7 @@ function schemas() {
       auth: { type: 'object' }, existing_integrations: { type: 'object' }, request_id: str() },
     ['api_version', 'capabilities_version', 'catalog_version', 'updated_at', 'service_description', 'actions', 'request_id']),
     Me: obj({ id, display_name: nullable(str()), roles: arr({ type: 'string', enum: ['customer', 'provider'] }), locale: LANG, timezone: str('IANA, default Asia/Tbilisi.'),
-      phone_verified: bool(), masked_phone: nullable(str('The full number is never returned.')), account_status: { type: 'string', enum: ['active', 'disabled'] },
+      phone_verified: bool(), masked_phone: nullable(str('The full number is never returned.')), account_status: { type: 'string', enum: ['active', 'read_only'], description: 'read_only: reads only. A blocked account gets no answer at all (401).' },
       provider: nullable(obj({ status: { type: 'string', enum: ['pending', 'active', 'banned'] }, profile_operation_id: str() })), available_actions: arr(str()),
       usage_limits: { type: 'object' }, session: obj({ id: str(), client_name: str(), scopes: arr(str()) }), environment: str(), version: int(), created_at: time(), updated_at: time(), request_id: str() },
     ['id', 'roles', 'locale', 'timezone', 'account_status', 'version', 'request_id']),

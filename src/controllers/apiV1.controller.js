@@ -65,7 +65,7 @@ function actionView(action, auth, roles) {
     if (!supported) available = false;
     else if (missingRole) { available = false; reason = 'role_required:' + action.roles.join('|'); }
     else if (missingScope) { available = false; reason = 'scope_required:' + missingScope; }
-    else if (writes && auth.account.status !== 'active') { available = false; reason = 'account_disabled'; }
+    else if (writes && auth.account.status !== 'active') { available = false; reason = 'account_read_only'; }
     else available = true;
   }
   return {

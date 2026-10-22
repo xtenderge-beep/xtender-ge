@@ -96,9 +96,10 @@ function requireScope(scope) {
   };
 }
 
-// Запись разрешена только действующему аккаунту: отключённый читает свой профиль, но ничего не меняет.
+// Запись разрешена только действующему аккаунту: «только чтение» читает свой профиль, но ничего не меняет.
+// Заблокированный сюда не доходит: его токены не принимает oauth.service.verifyAccessToken.
 function requireActiveAccount(req, res, next) {
-  if (req.auth?.account?.status !== 'active') return next(fail(403, 'ACCOUNT_DISABLED', 'This account is disabled; changes are not allowed.'));
+  if (req.auth?.account?.status !== 'active') return next(fail(403, 'ACCOUNT_READ_ONLY', 'This account is read-only; changes are not allowed.'));
   return next();
 }
 

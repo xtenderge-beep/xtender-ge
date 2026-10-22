@@ -27,6 +27,7 @@ const COPY = {
     expired: 'Время входа истекло. Вернитесь в приложение и начните подключение заново.',
     bad_request: 'Ссылка для входа неверна. Вернитесь в приложение и начните подключение заново.',
     forbidden: 'Вход нужно продолжить в той же вкладке, где он начался.',
+    blocked: 'Этот аккаунт заблокирован, подключить его к приложению нельзя. Напишите в поддержку Xtender.',
     sandbox_note: 'Песочница: настоящие SMS не отправляются.',
   },
   ka: {
@@ -54,6 +55,7 @@ const COPY = {
     expired: 'შესვლის დრო ამოიწურა. დაბრუნდით აპლიკაციაში და დაიწყეთ დაკავშირება თავიდან.',
     bad_request: 'შესვლის ბმული არასწორია. დაბრუნდით აპლიკაციაში და დაიწყეთ დაკავშირება თავიდან.',
     forbidden: 'შესვლა გააგრძელეთ იმავე ჩანართში, სადაც დაიწყეთ.',
+    blocked: 'ეს ანგარიში დაბლოკილია, აპლიკაციასთან მისი დაკავშირება შეუძლებელია. მიწერეთ Xtender-ის მხარდაჭერას.',
     sandbox_note: 'სატესტო გარემო: ნამდვილი SMS არ იგზავნება.',
   },
   en: {
@@ -81,6 +83,7 @@ const COPY = {
     expired: 'The sign-in has expired. Go back to the app and start connecting again.',
     bad_request: 'The sign-in link is not valid. Go back to the app and start connecting again.',
     forbidden: 'Continue signing in in the same tab where you started.',
+    blocked: 'This account is blocked and cannot be connected to an app. Contact Xtender support.',
     sandbox_note: 'Sandbox: no real SMS is sent.',
   },
 };

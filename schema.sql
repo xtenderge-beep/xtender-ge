@@ -955,13 +955,15 @@ CREATE TABLE IF NOT EXISTS traffic_sources (
 -- есть у каждого аккаунта; роль исполнителя — профиль в masters с тем же номером (masters.phone в E.164).
 -- Отдельной таблицы ролей нет: роль нельзя выдать себе запросом, администратора через API не бывает.
 -- id — непрозрачная строка для API. version растёт при каждой правке (If-Match в PATCH /api/v1/me).
+-- status: active; read_only — читает, но ничего не меняет; blocked — ни чтения, ни записи, сессии отключены
+-- (например, при компрометации). Меняет account.service.setStatus.
 CREATE TABLE IF NOT EXISTS accounts (
     id VARCHAR(40) PRIMARY KEY,
     phone VARCHAR(20) NOT NULL UNIQUE,
     display_name VARCHAR(80),
     locale VARCHAR(2) NOT NULL DEFAULT 'ka' CONSTRAINT accounts_locale_check CHECK (locale IN ('ka','ru','en')),
     timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Tbilisi',
-    status VARCHAR(20) NOT NULL DEFAULT 'active' CONSTRAINT accounts_status_check CHECK (status IN ('active','disabled')),
+    status VARCHAR(20) NOT NULL DEFAULT 'active' CONSTRAINT accounts_status_check CHECK (status IN ('active','read_only','blocked')),
     phone_verified_at TIMESTAMPTZ NOT NULL,
     version INTEGER NOT NULL DEFAULT 1,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
