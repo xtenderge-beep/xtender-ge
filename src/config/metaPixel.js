@@ -8,7 +8,9 @@ const PRODUCTION_ID = '1012072607880558';
 
 // На локальной копии (dev-server) пиксель работает, только если идентификатор задан явно.
 function resolveId(env) {
-  const raw = env.META_PIXEL_ID !== undefined ? env.META_PIXEL_ID : (env.NODE_ENV === 'development' ? '' : PRODUCTION_ID);
+  // Песочница API (XTENDER_SANDBOX) — как локальная копия: без пикселя, если он не задан явно.
+  const quiet = env.NODE_ENV === 'development' || env.XTENDER_SANDBOX === '1' || env.XTENDER_SANDBOX === 'true';
+  const raw = env.META_PIXEL_ID !== undefined ? env.META_PIXEL_ID : (quiet ? '' : PRODUCTION_ID);
   const id = String(raw).trim();
   return /^\d{10,20}$/.test(id) ? id : '';
 }

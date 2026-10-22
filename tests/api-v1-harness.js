@@ -56,6 +56,8 @@ function buildApp() {
   });
   app.use(require('../src/routes/oauth.routes'));
   app.use('/api/v1', require('../src/routes/apiV1.routes'));
+  const mcp = require('../src/controllers/mcp.controller');
+  app.post('/mcp', require('../src/middleware/asyncHandler')(mcp.handle));
   // Как в src/app.js: неверный JSON к /api/v1 отклоняет общий разборщик тела.
   app.use((err, req, res, next) => {
     if (req.path.startsWith('/api/v1/')) return require('../src/middleware/apiV1').errorHandler(err, req, res, next);

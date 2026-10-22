@@ -23,7 +23,9 @@ async function obtainToken({ base = 'http://127.0.0.1:3100', phone, scope = 'pro
     headers: { 'content-type': 'application/x-www-form-urlencoded', cookie }, body: new URLSearchParams({ request_id: requestId, ...fields }) });
   const phoneStep = await form('/oauth/authorize/phone', { phone });
   if (phoneStep.status !== 200) throw new Error('Phone step failed: ' + phoneStep.status);
-  const sms = await json(await fetchImpl(base + '/api/v1/sandbox/sms?phone=' + encodeURIComponent(phone)));
+  // На тестовом сервере приёмник закрыт ключом: SANDBOX_SINK_KEY=… node scripts/api-sandbox-token.js …
+  const sinkKey = process.env.SANDBOX_SINK_KEY ? '&key=' + encodeURIComponent(process.env.SANDBOX_SINK_KEY) : '';
+  const sms = await json(await fetchImpl(base + '/api/v1/sandbox/sms?phone=' + encodeURIComponent(phone) + sinkKey));
   const code = /code: (\d{4})/.exec(sms.items?.[0]?.text || '')?.[1];
   if (!code) throw new Error('No code in the sandbox SMS sink: is the server running with XTENDER_SANDBOX=1?');
   const codeStep = await form('/oauth/authorize/code', { code, action: 'verify' });

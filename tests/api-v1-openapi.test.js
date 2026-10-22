@@ -49,7 +49,8 @@ const harness = require('./api-v1-harness');
 
   // 4. YAML в docs собран из этого же кода.
   const { build, OUT } = require('../scripts/build-openapi-yaml');
-  assert.equal(fs.readFileSync(OUT, 'utf8'), build(), 'docs/api-v1/openapi.yaml устарел: node scripts/build-openapi-yaml.js');
+  // git на Windows может выдать файл с CRLF: сравниваем содержимое, а не окончания строк.
+  assert.equal(fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n'), build(), 'docs/api-v1/openapi.yaml устарел: node scripts/build-openapi-yaml.js');
 
   // 5. Сервер отдаёт тот же раздаваемый контракт.
   const { server, base } = await harness.start();

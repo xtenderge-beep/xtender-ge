@@ -7,7 +7,10 @@ const PRODUCTION_ID = 'G-RP7E07YTBH';
 
 // На локальной копии (dev-server) Google Analytics работает, только если идентификатор задан явно.
 function resolveId(env) {
-  const raw = env.GA_MEASUREMENT_ID !== undefined ? env.GA_MEASUREMENT_ID : (env.NODE_ENV === 'development' ? '' : PRODUCTION_ID);
+  // В песочнице API (XTENDER_SANDBOX, docs/api-v1/README.md) — как на локальной копии: просмотры тестового окружения
+  // не должны попадать в боевую статистику и рекламу.
+  const quiet = env.NODE_ENV === 'development' || env.XTENDER_SANDBOX === '1' || env.XTENDER_SANDBOX === 'true';
+  const raw = env.GA_MEASUREMENT_ID !== undefined ? env.GA_MEASUREMENT_ID : (quiet ? '' : PRODUCTION_ID);
   const id = String(raw).trim();
   return /^G-[A-Z0-9]{4,20}$/.test(id) ? id : '';
 }

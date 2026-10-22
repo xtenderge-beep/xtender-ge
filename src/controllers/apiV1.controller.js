@@ -312,6 +312,9 @@ async function listUnits(req, res) {
 // --- Песочница: SMS, которые «ушли» бы на этот номер ------------------------------------------------------------------
 async function sandboxSms(req, res) {
   if (!apiConfig.isSandbox()) return api.notFound(req, res);
+  // Песочница в интернете (тестовое окружение): приёмник открывается только с ключом SANDBOX_SINK_KEY, если он задан.
+  const key = process.env.SANDBOX_SINK_KEY;
+  if (key && req.query.key !== key) return api.notFound(req, res);
   const phone = typeof req.query.phone === 'string' ? require('../config/phone').toE164(req.query.phone) : null;
   const raw = await redis.lrange('sandbox:sms', 0, 199);
   const items = raw.map((line) => JSON.parse(line)).filter((sms) => !phone || sms.to === phone);

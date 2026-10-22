@@ -12,7 +12,7 @@ process.env.DOMAIN = '127.0.0.1:' + process.env.PORT;
 process.env.SKIP_DB_MIGRATIONS = '1';
 process.env.DATABASE_URL = '';
 process.env.REDIS_URL = '';
-for (const name of ['SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_MODERATOR_CHAT_ID', 'OPENROUTER_API_KEY']) process.env[name] = '';
+for (const name of ['SMS_GATEWAY_USERNAME', 'SMS_GATEWAY_PASSWORD', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_MODERATOR_CHAT_ID', 'OPENROUTER_API_KEY', 'SANDBOX_REAL_SMS_NUMBERS', 'SANDBOX_SINK_KEY']) process.env[name] = '';
 
 const fs = require('fs');
 const path = require('path');

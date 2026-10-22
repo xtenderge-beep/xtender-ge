@@ -80,9 +80,13 @@ function startSite() {
     // Другие задачи человека — в ту же заявку, коды в services (поля cats у инструмента нет).
     assert.ok(instructions.includes(agentApi.moreJobs('pass all the codes in services and describe each job')), 'другие задачи — в ту же заявку');
 
-    // 2. Два инструмента, оба только читают (так их видят каталоги ChatGPT и Claude).
+    // 2. Три инструмента, все только читают (так их видят каталоги ChatGPT и Claude). get_my_account — только после входа
+    // (docs/api-v1, этап 1б): без токена он просит подключить аккаунт, прежние два работают без входа.
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ['create_request_link', 'list_services']);
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ['create_request_link', 'get_my_account', 'list_services']);
+    const anonymous = await client.callTool({ name: 'get_my_account', arguments: {} });
+    assert.equal(anonymous.isError, true);
+    assert.match(anonymous._meta['mcp/www_authenticate'][0], /^Bearer resource_metadata="https:\/\/xtender\.test\/\.well-known\/oauth-protected-resource", error="insufficient_scope", error_description="/);
     for (const tool of tools) {
       assert.deepEqual([tool.annotations.readOnlyHint, tool.annotations.destructiveHint], [true, false], tool.name);
       assert.ok(tool.title && tool.description, tool.name);

@@ -35,6 +35,8 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Песочница API на отдельном адресе — копия сайта с тестовыми данными: поиску её не показываем.
+  if (require('./config/apiV1').isSandbox()) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
   next();
 });
 

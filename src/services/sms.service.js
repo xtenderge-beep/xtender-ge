@@ -10,6 +10,15 @@ function isDevMode() {
 
 // Песочница API (XTENDER_SANDBOX=1, docs/api-v1/README.md): SMS не уходит в шлюз ни при каких ключах, а
 // складывается в список, который читает GET /api/v1/sandbox/sms. Хранятся последние 200 сообщений, сутки.
+// Тестовое окружение (решение 11 владельца, docs/api-v1/BACKEND_AUDIT.md, раздел 12): настоящая SMS — только код
+// подтверждения (context.otp) и только на номера из SANDBOX_REAL_SMS_NUMBERS через запятую. Рассылки исполнителям и
+// любые другие SMS остаются в приёмнике даже для этих номеров. Код на разрешённый номер в приёмник не кладём.
+function sandboxRealSms(phone, context) {
+  if (!context.otp) return false;
+  const allowed = String(process.env.SANDBOX_REAL_SMS_NUMBERS || '').split(',').map((n) => n.trim()).filter(Boolean).map(toE164);
+  return allowed.includes(toE164(phone));
+}
+
 async function sandboxSink(phone, text) {
   const redis = require('../config/redis');
   await redis.lpush('sandbox:sms', JSON.stringify({ to: toE164(phone), text, at: new Date().toISOString() }));
@@ -78,7 +87,9 @@ async function send(phone, text, context = {}) {
   let ok = false;
 
   try {
-    if (require('../config/apiV1').isSandbox()) {
+    const sandbox = require('../config/apiV1').isSandbox();
+    if (sandbox && sandboxRealSms(phone, context)) console.log('[SMS SANDBOX] code to an allowed test number: real SMS');
+    if (sandbox && !sandboxRealSms(phone, context)) {
       console.log(`[SMS SANDBOX] to=${normalizePhone(phone).slice(0, 6)}… stored, not sent`);
       await sandboxSink(phone, text);
       providerResponse = { sandbox: true };
@@ -141,7 +152,7 @@ async function send(phone, text, context = {}) {
 // хэша, purpose и метаданные запроса).
 function sendOtp(phone, code, context = {}) {
   if (!isGeorgianPhone(phone)) throw new Error('OTP is available only for Georgian numbers (+995 and 9 digits)');
-  return send(phone, require('../config/service-message-copy').sms('code', { code }), { ...context, log: false });
+  return send(phone, require('../config/service-message-copy').sms('code', { code }), { ...context, log: false, otp: true });
 }
 
 function sendOrderNotification(phone, text, context = {}) {

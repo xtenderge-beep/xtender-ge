@@ -135,5 +135,7 @@ node scripts/build-openapi-yaml.js       # после правки src/config/op
 | `scripts/api-sandbox.js`, `scripts/api-sandbox-token.js`, `scripts/build-openapi-yaml.js` | Песочница, токен, сборка YAML |
 | `tests/api-v1-*.test.js`, `tests/api-v1-harness.js` | Тесты и общий стенд |
 
-Переменные окружения: `XTENDER_SANDBOX=1` (песочница), `PUBLIC_BASE_URL` (полный адрес с протоколом, если не `https://$DOMAIN`),
-`OAUTH_REDIRECT_ALLOWLIST`, `OAUTH_ALLOW_LOOPBACK=1`.
+Переменные окружения: `XTENDER_SANDBOX=1` (песочница), `SANDBOX_REAL_SMS_NUMBERS` (номера, на которые в песочнице код
+входа уходит настоящей SMS), `SANDBOX_SINK_KEY` (ключ приёмника SMS), `PUBLIC_BASE_URL` (полный адрес с протоколом, если
+не `https://$DOMAIN`), `OAUTH_REDIRECT_ALLOWLIST`, `OAUTH_ALLOW_LOOPBACK=1`. Тестовое окружение на сервере —
+[BACKEND_AUDIT.md](BACKEND_AUDIT.md), раздел 13.

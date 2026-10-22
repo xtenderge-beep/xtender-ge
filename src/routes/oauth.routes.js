@@ -7,7 +7,9 @@ const wrap = require('../middleware/asyncHandler');
 const router = express.Router();
 
 router.get('/.well-known/oauth-authorization-server', controller.authorizationServer);
-router.get('/.well-known/oauth-protected-resource', controller.protectedResource('api'));
+// Корневой адрес читает ChatGPT для MCP-сервера (developers.openai.com/plugins/build/auth): он описывает /mcp.
+// REST-клиенты получают свой адрес …/api/v1 в WWW-Authenticate. Токен на любой из ресурсов принимают оба.
+router.get('/.well-known/oauth-protected-resource', controller.protectedResource('mcp'));
 router.get('/.well-known/oauth-protected-resource/api/v1', controller.protectedResource('api'));
 router.get('/.well-known/oauth-protected-resource/mcp', controller.protectedResource('mcp'));
 

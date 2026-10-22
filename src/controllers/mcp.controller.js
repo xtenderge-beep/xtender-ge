@@ -3,6 +3,9 @@
 // человек подтверждает сам, на сайте, кодом из SMS: сервер ничего не записывает и номер телефона не спрашивает.
 // Без состояния: на каждый запрос свой сервер и транспорт, ответ — JSON, без потока. Описание — docs/ai-agent-api.md,
 // раздел 10.
+// Этап 1б ТЗ «API для плагина ChatGPT» (docs/api-v1/BACKEND_AUDIT.md, раздел 13): третий инструмент get_my_account —
+// только после входа OAuth. Прежние два работают без входа (securitySchemes noauth). Без токена get_my_account отвечает
+// ошибкой с _meta["mcp/www_authenticate"] — по ней ChatGPT предлагает подключить аккаунт. Неверный токен — HTTP 401.
 const { McpServer } = require('@modelcontextprotocol/sdk/server/mcp.js');
 const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/server/streamableHttp.js');
 const { z } = require('zod');
@@ -11,6 +14,9 @@ const agentApi = require('../config/agentApi');
 const draftLink = require('../config/draftLink');
 const { getBaseUrl } = require('../config/url');
 const { version } = require('../../package.json');
+const { ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
+const oauthService = require('../services/oauth.service');
+const accountService = require('../services/account.service');
 
 // Длиннее ссылку не все чаты и браузеры донесут целиком; столько не набрать и в пределах полей (draftLink.LIMITS).
 const MAX_LINK_LENGTH = 6000;
@@ -22,7 +28,48 @@ const INSTRUCTIONS = 'xtender.ge connects customers in Georgia with independent 
   + agentApi.moreJobs('pass all the codes in services and describe each job') + ' '
   + 'The user enters a Georgian phone number (+995) on the page; do not ask for it in the chat. ' + agentApi.AFTER + ' '
   + 'list_services shows the cities with providers; for any other place, tell the user that xtender.ge may have no providers there yet. '
-  + 'Do not promise a price, a response time or a number of responses.';
+  + 'Do not promise a price, a response time or a number of responses. '
+  + 'get_my_account shows which xtender.ge account the user connected; if it is not connected, the app offers to sign in '
+  + 'on xtender.ge with a phone number and an SMS code. Never ask for the phone number or the code in the chat.';
+
+// Политика входа каждого инструмента (developers.openai.com/plugins/build/auth, «securitySchemes»). Библиотека MCP 1.32.1
+// не передаёт это поле в tools/list, поэтому buildServer дописывает его в ответ сам.
+const SECURITY = {
+  list_services: [{ type: 'noauth' }],
+  create_request_link: [{ type: 'noauth' }],
+  get_my_account: [{ type: 'oauth2', scopes: ['profile:read'] }],
+};
+
+// Адрес метаданных ресурса для ChatGPT — корневой, он описывает /mcp (oauth.routes).
+const resourceMetadataUrl = () => getBaseUrl() + '/.well-known/oauth-protected-resource';
+
+// Ошибка инструмента, по которой ChatGPT показывает «Подключить аккаунт»: нужны и error, и error_description.
+function connectRequired(error, description) {
+  return {
+    isError: true,
+    content: [{ type: 'text', text: 'Authentication required: connect your xtender.ge account to continue.' }],
+    _meta: { 'mcp/www_authenticate': [`Bearer resource_metadata="${resourceMetadataUrl()}", error="${error}", error_description="${description}"`] },
+  };
+}
+
+// Без входных полей библиотека MCP вызывает обработчик с одним аргументом — extra (в нём authInfo).
+async function getMyAccount(extra) {
+  const session = extra?.authInfo?.extra?.session;
+  if (!session) return connectRequired('insufficient_scope', 'Connect your xtender.ge account to continue');
+  if (!session.scopes.has('profile:read')) return connectRequired('insufficient_scope', 'The profile:read scope is required');
+  const { account } = session;
+  const { roles, providerStatus } = await accountService.roles(account);
+  const data = {
+    id: account.id, display_name: account.display_name, roles, locale: account.locale, timezone: account.timezone,
+    masked_phone: accountService.maskedPhone(account.phone), account_status: account.status,
+    provider_status: providerStatus, connected_app: session.grant.client_name,
+  };
+  const who = roles.includes('provider') ? 'customer and provider (' + providerStatus + ')' : 'customer';
+  return {
+    content: [{ type: 'text', text: `Connected xtender.ge account: ${data.masked_phone}, roles: ${who}, language: ${data.locale}.` }],
+    structuredContent: data,
+  };
+}
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
@@ -114,10 +161,39 @@ function buildServer() {
     },
     annotations: { title: 'Create a request link', ...READ_ONLY },
   }, createRequestLink);
+  server.registerTool('get_my_account', {
+    title: 'Your xtender.ge account',
+    description: 'Shows which xtender.ge account is connected: roles (customer, provider), language, masked phone. '
+      + 'Needs the user to connect their account (sign-in on xtender.ge with a phone number and an SMS code).',
+    annotations: { title: 'Your xtender.ge account', ...READ_ONLY },
+  }, getMyAccount);
+  // tools/list от библиотеки + securitySchemes каждого инструмента.
+  const listTools = server.server._requestHandlers.get('tools/list');
+  server.server.setRequestHandler(ListToolsRequestSchema, async (request, extra) => {
+    const result = await listTools(request, extra);
+    return { ...result, tools: result.tools.map((tool) => ({ ...tool, securitySchemes: SECURITY[tool.name] || [{ type: 'noauth' }] })) };
+  });
   return server;
 }
 
+// Токен необязателен: без него работают инструменты без входа. Неверный, просроченный или отозванный токен — HTTP 401
+// с WWW-Authenticate, чтобы клиент подключил аккаунт заново. Верный — req.auth, его библиотека передаёт инструментам.
+async function authenticate(req, res) {
+  const header = req.get('authorization');
+  if (!header) return true;
+  const match = /^Bearer\s+([A-Za-z0-9._~-]{20,200})$/.exec(header.trim());
+  const session = match ? await oauthService.verifyAccessToken(match[1]) : null;
+  if (!session) {
+    res.status(401).set('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl()}", error="invalid_token", error_description="The access token is invalid, expired or revoked"`)
+      .json({ jsonrpc: '2.0', error: { code: -32001, message: 'Unauthorized: reconnect your xtender.ge account.' }, id: req.body?.id ?? null });
+    return false;
+  }
+  req.auth = { token: match[1], clientId: session.grant.client_id, scopes: [...session.scopes], extra: { session } };
+  return true;
+}
+
 async function handle(req, res) {
+  if (!await authenticate(req, res)) return;
   const server = buildServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => { transport.close(); server.close(); });
@@ -130,4 +206,4 @@ function notAllowed(req, res) {
   res.status(405).set('Allow', 'POST').json({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed: use POST.' }, id: null });
 }
 
-module.exports = { handle, notAllowed, INSTRUCTIONS };
+module.exports = { handle, notAllowed, INSTRUCTIONS, SECURITY };

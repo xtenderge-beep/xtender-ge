@@ -23,6 +23,7 @@ const base = 'http://127.0.0.1:' + PORT;
 
     // Сайт по-прежнему отвечает, OAuth и API подключены рядом.
     assert.equal((await fetch(base + '/health')).status, 200);
+    assert.equal((await fetch(base + '/health')).headers.get('x-robots-tag'), 'noindex, nofollow', 'песочница закрыта от поиска');
     const meta = await (await fetch(base + '/.well-known/oauth-authorization-server')).json();
     assert.equal(meta.issuer, base);
     const caps = await fetch(base + '/api/v1/capabilities');
