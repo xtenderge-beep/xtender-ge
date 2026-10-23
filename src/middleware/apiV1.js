@@ -212,5 +212,5 @@ function errorHandler(err, req, res, next) {
 
 module.exports = {
   ApiError, fail, requestId, send, publicCache, authenticate, requireScope, requireActiveAccount, setVersion, expectedVersion,
-  checkVersion, notFound, errorHandler, challenge, unauthorized, protectedResourceMetadataUrl, redact, idempotent,
+  checkVersion, notFound, errorHandler, challenge, unauthorized, protectedResourceMetadataUrl, redact, idempotent, rateLimit,
 };

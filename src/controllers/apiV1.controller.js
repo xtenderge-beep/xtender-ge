@@ -133,7 +133,8 @@ async function capabilities(req, res) {
       scopes: apiConfig.activeScopes(), planned_scopes: apiConfig.SCOPE_NAMES.filter((scope) => !apiConfig.activeScopes().includes(scope)),
     },
     existing_integrations: {
-      mcp_endpoint: { url: base + '/mcp', authenticated: false, tools: ['list_services', 'create_request_link'] },
+      mcp_endpoint: { url: base + '/mcp', authentication: 'optional: catalog tools work without sign-in, deal tools need the connected account',
+        tools: ['list_services', 'create_request_link', 'get_my_account', ...require('./mcpDeal.tools').TOOLS.map((tool) => tool.name)] },
       request_link: base + '/draft',
       llms_txt: base + '/llms.txt',
     },

@@ -33,7 +33,10 @@ const PHONE = '+995533000001';
       list_services: [{ type: 'noauth' }],
       create_request_link: [{ type: 'noauth' }],
       get_my_account: [{ type: 'oauth2', scopes: ['profile:read'] }],
+      ...require('../src/controllers/mcpDeal.tools').SECURITY,
     });
+    assert.deepEqual(schemes.search_categories, [{ type: 'noauth' }], 'каталог — без входа');
+    assert.deepEqual(schemes.publish_tender, [{ type: 'oauth2', scopes: ['tenders:write'] }]);
 
     // 3. Без токена: прежние инструменты работают, get_my_account просит подключить аккаунт.
     const anonymous = await connect();
