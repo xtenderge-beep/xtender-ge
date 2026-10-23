@@ -91,22 +91,26 @@ const IRRELEVANT = ['нотариус', 'ремонт ванной', '4 этаж
     assert.equal(r.status, 422);
     assert.match(r.json.request_id, /^req_/);
 
-    // 5. Схема категории: правила подбора, единицы, поля исполнителя в параметры заявки не попадают.
+    // 5. Схема категории — параметры заявки отдельно от характеристик исполнителя, с явным правилом подбора (уточнение 1):
+    // «объём мусора, м³» заказчика сравнивается с «объёмом кузова» исполнителя; этаж — только для исполнителя.
     let schema = await get('/api/v1/categories/junk/schema?lang=en');
     assert.match(schema.schema_version, /^cs_[a-f0-9]{16}$/);
-    assert.deepEqual(schema.required_for_publish, []);
+    assert.deepEqual([schema.kind, schema.required_for_publish, schema.item_rules.items_required], ['service', [], false]);
     const props = schema.json_schema.properties;
-    assert.deepEqual(Object.keys(props).sort(), ['dump_body', 'payload_t', 'volume_m3']);
-    assert.deepEqual([props.volume_m3['x-xtender-match'], props.volume_m3['x-xtender-unit'], props.volume_m3.oneOf.map((o) => o.const)], ['gte', 'm3', ['2', '4', '8', '15']]);
-    assert.deepEqual([props.payload_t.type, props.payload_t.minimum, props.payload_t['x-xtender-unit']], ['number', 0.1, 't']);
+    assert.deepEqual(Object.keys(props).sort(), ['dump_body', 'floor', 'waste_volume_m3']);
+    assert.deepEqual([props.waste_volume_m3.type, props.waste_volume_m3['x-xtender-unit'], props.waste_volume_m3['x-xtender-maps-to']],
+      ['number', 'm3', { field: 'volume_m3', rule: 'provider_gte' }]);
+    assert.equal(props.floor['x-xtender-maps-to'], undefined, 'этаж не участвует в подборе');
     assert.equal(props.dump_body.title, 'Dump truck needed');
     assert.match(props.dump_body.description, /never "no"/, 'отсутствие отметки — неизвестно, не false');
     assert.equal(schema.json_schema.additionalProperties, false);
     schema = await get('/api/v1/categories/van/schema?lang=ru');
     assert.equal(schema.json_schema.properties.with_helpers.title, 'Нужна машина с грузчиками', 'слова заказчика, не исполнителя');
-    assert.equal(schema.json_schema.properties.size.oneOf.find((o) => o.const === 'M').title, 'M — кузов от 260×130×150 см (Д×Ш×В)');
+    assert.equal(schema.json_schema.properties.cargo_size.oneOf.find((o) => o.const === 'M').title, 'M — кузов от 260×130×150 см (Д×Ш×В)');
+    assert.deepEqual(schema.json_schema.properties.cargo_size['x-xtender-maps-to'], { field: 'size', rule: 'provider_gte' });
     schema = await get('/api/v1/categories/movers/schema?lang=en');
-    assert.deepEqual([schema.json_schema.properties.crew_size.minimum, schema.json_schema.properties.crew_size['x-xtender-unit']], [1, 'person']);
+    assert.deepEqual([schema.json_schema.properties.workers.minimum, schema.json_schema.properties.workers['x-xtender-unit'],
+      schema.json_schema.properties.workers['x-xtender-maps-to'].field], [1, 'person', 'crew_size']);
     assert.equal((await call('GET', '/api/v1/categories/notary/schema')).status, 404);
 
     // 6. Новая категория через админку (category.service.save) — без нового маршрута и правки кода.
@@ -132,6 +136,29 @@ const IRRELEVANT = ['нотариус', 'ремонт ванной', '4 этаж
     schema = await get(`/api/v1/categories/${created.slug}/schema?lang=en`);
     assert.notEqual(schema.schema_version, firstSchemaVersion, 'правка полей меняет schema_version');
     assert.equal(Object.keys(schema.json_schema.properties).length, 2);
+    // Свои параметры заявки из редактора: обязательный для публикации и связанный с характеристикой исполнителя.
+    const withFlag = await categoryService.get(created.slug);
+    const experienceKey = withFlag.fields.find((f) => f.labels.ru === 'Стаж').key;
+    await categoryService.save(created.slug, { name_ka: withFlag.name_ka, name_ru: withFlag.name_ru, name_en: withFlag.name_en, icon: withFlag.icon, sort_order: 50, is_active: true, version: withFlag.version,
+      fields: withFlag.fields.map((f) => ({ key: f.key, input: f.input, name_ru: f.labels.ru, name_en: f.labels.en, unit: f.unit, min: f.min, max: f.max, match: f.match })),
+      request_fields: [
+        { input: 'number', name_ru: 'Минимальный стаж мастера, лет', name_en: 'Minimum experience, years', min: 0, max: 50, required: true, maps_field: experienceKey, maps_rule: 'provider_gte' },
+        { input: 'enum', name_ru: 'Что сломалось', name_en: 'What broke', options: [{ name_ru: 'Кран', name_en: 'Tap' }, { name_ru: 'Трубы', name_en: 'Pipes' }] },
+      ] });
+    schema = await get(`/api/v1/categories/${created.slug}/schema?lang=en`);
+    const own = Object.entries(schema.json_schema.properties);
+    assert.deepEqual(own.map(([, p]) => p.title), ['Minimum experience, years', 'What broke']);
+    assert.deepEqual(own[0][1]['x-xtender-maps-to'], { field: experienceKey, rule: 'provider_gte' });
+    assert.deepEqual(schema.required_for_publish, [own[0][0]]);
+    await assert.rejects(categoryService.save(created.slug, { ...withFlag, version: (await categoryService.get(created.slug)).version,
+      fields: withFlag.fields.map((f) => ({ key: f.key, input: f.input, name_ru: f.labels.ru, match: f.match })),
+      request_fields: [{ input: 'text', name_ru: 'Описание', maps_field: experienceKey, maps_rule: 'provider_flag' }] }), { status: 400 }, 'правило не подходит к типам');
+    // Категория товаров: позиции закупки обязательны, поиск по виду.
+    const goods = await categoryService.save(null, { name_ka: 'სამშენებლო მასალები', name_ru: 'Стройматериалы', name_en: 'Building materials', kind: 'goods', is_active: true, sort_order: 70, fields: [] });
+    schema = await get(`/api/v1/categories/${goods.slug}/schema?lang=ru`);
+    assert.deepEqual([schema.kind, schema.required_for_publish, schema.item_rules.items_required], ['goods', ['items'], true]);
+    assert.deepEqual((await get('/api/v1/categories?kind=goods')).items.map((i) => [i.id, i.kind]), [[goods.slug, 'goods']]);
+    assert.ok((await get('/api/v1/categories?q=стройматериалы')).items.some((i) => i.id === goods.slug));
 
     // 7. Выключенная категория: не предлагается, но читается (исторические заявки), с active_only=false — с причиной.
     const current = await categoryService.get(created.slug);

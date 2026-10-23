@@ -11,6 +11,13 @@
     required:f.required, match:f.match || 'ignore', filter:f.filter, unit:f.unit, min:f.min, max:f.max,
     options:(f.options || []).map(v=>({value:v, name_ru:f.optionLabels?.[v]?.ru || v, name_ka:f.optionLabels?.[v]?.ka, name_en:f.optionLabels?.[v]?.en})),
   }));
+  // Параметры заявки: свои из базы, иначе действующие по умолчанию (src/config/requestFields.js) — их видно и можно поменять.
+  const providerFieldOptions=typeof locals.providerFieldOptions !== 'undefined' ? locals.providerFieldOptions : (category?.fields || []).map(f=>[f.key, f.labels?.ru || f.key]);
+  const rfields=submitted && submitted.request_fields ? submitted.request_fields : (locals.effectiveRequestFields || []).map(f=>({
+    key:f.key, input:f.input, name_ru:f.labels?.ru, name_ka:f.labels?.ka, name_en:f.labels?.en, unit:f.unit, min:f.min, max:f.max,
+    required:f.required, maps_field:f.maps_to?.field || '', maps_rule:f.maps_to?.rule || 'provider_gte',
+    options:(f.options || []).map(v=>({value:v, name_ru:f.optionLabels?.[v]?.ru || v, name_ka:f.optionLabels?.[v]?.ka, name_en:f.optionLabels?.[v]?.en})),
+  }));
 %>
 <a href="/admin/categories" class="text-sm">← Категории услуг</a>
 <% if(typeof returnTo !== 'undefined' && returnTo){ %><a href="<%= returnTo %>" class="text-sm ml-3">← Карточка специалиста</a><% } %>
@@ -21,6 +28,7 @@
 <% if(typeof returnTo !== 'undefined' && returnTo){ %><input type="hidden" name="returnTo" value="<%= returnTo %>"><% } %>
 <% [['ru','Название на русском'],['ka','Название на грузинском'],['en','Название на английском']].forEach(([lang,label])=>{ %><label class="block text-sm"><%= label %><input required maxlength="80" name="name_<%= lang %>" value="<%= value['name_'+lang] || '' %>" class="block w-full border rounded-xl px-3 py-2"></label><% }); %>
 <div class="flex gap-3"><label class="text-sm">Значок (необязательно)<input name="icon" maxlength="16" value="<%= value.icon || '' %>" class="block w-full border rounded-xl px-3 py-2"></label><label class="text-sm">Порядок в списке<input type="number" name="sort_order" min="0" max="10000" value="<%= value.sort_order ?? 100 %>" class="block w-full border rounded-xl px-3 py-2"></label></div>
+<label class="block text-sm">Вид<select name="kind" class="block border rounded-xl px-3 py-2"><option value="service" <%= (value.kind || 'service')==='service'?'selected':'' %>>Услуга</option><option value="goods" <%= value.kind==='goods'?'selected':'' %>>Товары (закупка: позиции, количество, доставка)</option></select></label>
 <label class="flex items-center gap-2"><input type="checkbox" name="is_active" <%= value.is_active !== false ? 'checked' : '' %>>Категория активна</label>
 <p class="text-sm text-stone-500">При отключении категория исчезает из новых назначений, каталога и рассылки. Профили и история сохраняются.</p>
 <% if(fieldsLocked){ %>
@@ -51,6 +59,14 @@
 </div>
 <button type="button" id="addCategoryField" class="px-3 py-2 border rounded-xl">Добавить характеристику</button>
 <template id="categoryFieldTemplate"><%- include('./_category-field',{field:{},index:'INDEX'}) %></template>
+<h2 class="font-bold">Параметры заявки — что спрашивать у заказчика</h2>
+<p class="text-sm text-stone-500">Отдельно от характеристик исполнителя. Пример: «Объём мусора, м³» сравнивается с характеристикой «Объём кузова» по правилу «у исполнителя не меньше». Параметр без сравнения просто показывается исполнителю. Их видят ИИ-ассистенты (схема категории в API) и заказчик при оформлении. Для товаров позиции закупки (название, количество, единица) спрашиваются всегда.</p>
+<input type="hidden" name="request_fields_touched" id="requestFieldsTouched" value="<%= submitted && submitted.request_fields ? '1' : '' %>">
+<div id="requestFields" class="space-y-3">
+<% rfields.forEach((field,i)=>{ %><%- include('./_category-request-field',{field,index:i,providerFieldOptions}) %><% }); %>
+</div>
+<button type="button" id="addRequestField" class="px-3 py-2 border rounded-xl">Добавить параметр заявки</button>
+<template id="requestFieldTemplate"><%- include('./_category-request-field',{field:{},index:'INDEX',providerFieldOptions}) %></template>
 <div><button class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Сохранить категорию</button></div>
 </form>
 <% if(fieldsLocked){ %><form id="vanSizesForm" method="post" action="/admin/categories/<%= category.slug %>/size-thresholds"><input type="hidden" name="_csrf" value="<%= csrfToken %>"></form><% } %>
@@ -100,6 +116,25 @@
  });
  document.getElementById('addCategoryField').addEventListener('click',()=>{if(container.children.length>=12)return;container.append(document.getElementById('categoryFieldTemplate').content.cloneNode(true));renumber();updateRule(container.lastElementChild);});
  container.querySelectorAll('[data-field]').forEach(updateRule);
+})();
+(() => {
+ // Параметры заявки: та же механика, что у характеристик; любая правка помечает список как изменённый.
+ const box=document.getElementById('requestFields'); if(!box)return;
+ const touched=()=>{document.getElementById('requestFieldsTouched').value='1';};
+ function renumber(){box.querySelectorAll('[data-rfield]').forEach((row,i)=>row.querySelectorAll('[name]').forEach(input=>input.name=input.name.replace(/request_fields\[[^\]]+\]/,'request_fields['+i+']')));}
+ function renumberOptions(row){const list=row.querySelector('[data-options-list]');list.querySelectorAll('[data-option]').forEach((opt,j)=>opt.querySelectorAll('[name]').forEach(input=>input.name=input.name.replace(/\[options\]\[[^\]]+\]/,'[options]['+j+']')));}
+ function addOption(row){const list=row.querySelector('[data-options-list]'),tpl=row.querySelector('[data-option-template]');if(list.children.length>=20)return;list.appendChild(tpl.content.cloneNode(true));renumberOptions(row);}
+ box.addEventListener('click',e=>{
+  if(e.target.matches('[data-remove-rfield]')){e.target.closest('[data-rfield]').remove();renumber();touched();return;}
+  if(e.target.matches('[data-remove-option]')){const row=e.target.closest('[data-rfield]');e.target.closest('[data-option]').remove();renumberOptions(row);touched();return;}
+  if(e.target.matches('[data-add-option]')){addOption(e.target.closest('[data-rfield]'));touched();}
+ });
+ box.addEventListener('input',touched);
+ box.addEventListener('change',e=>{touched();if(!e.target.matches('[data-rfield-input]'))return;const row=e.target.closest('[data-rfield]');
+  row.querySelector('[data-rnumber-block]').classList.toggle('hidden',e.target.value!=='number');
+  row.querySelector('[data-roptions-block]').classList.toggle('hidden',e.target.value!=='enum');
+  if(e.target.value==='enum'&&!row.querySelector('[data-options-list]').children.length){addOption(row);addOption(row);}});
+ document.getElementById('addRequestField').addEventListener('click',()=>{if(box.children.length>=12)return;box.append(document.getElementById('requestFieldTemplate').content.cloneNode(true));renumber();touched();});
 })();
 </script>
 <%- include('./_footer') %>

@@ -1,0 +1,28 @@
+<%# Параметр заявки — что спрашивают у заказчика (src/config/requestFields.js), с необязательным правилом подбора к
+    характеристике исполнителя. Пример: «Объём мусора, м³» → «Объём кузова», правило «у исполнителя не меньше». %>
+<div data-rfield class="border rounded-xl p-3 space-y-2">
+<input type="hidden" name="request_fields[<%= index %>][key]" value="<%= field.key || '' %>">
+<label class="block text-sm">Что спросить у заказчика (русский)<input required maxlength="100" name="request_fields[<%= index %>][name_ru]" value="<%= field.name_ru || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+<label class="block text-sm">На грузинском (необязательно)<input maxlength="100" name="request_fields[<%= index %>][name_ka]" value="<%= field.name_ka || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+<label class="block text-sm">На английском (необязательно)<input maxlength="100" name="request_fields[<%= index %>][name_en]" value="<%= field.name_en || '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+<label class="block text-sm">Тип ответа<select data-rfield-input name="request_fields[<%= index %>][input]" class="block border rounded-xl px-3 py-2"><% [['number','Число'],['enum','Выбор из списка'],['bool','Да / нет'],['text','Текст'],['date','Дата']].forEach(([type,label])=>{ %><option value="<%= type %>" <%= field.input===type?'selected':'' %>><%= label %></option><% }); %></select></label>
+<div data-rnumber-block class="<%= field.input==='number' || !field.input ? '' : 'hidden' %> grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+<label class="text-sm">Единица (напр. «м³», «чел.»)<input maxlength="16" name="request_fields[<%= index %>][unit]" value="<%= field.unit || '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
+<label class="text-sm">Минимум<input type="number" step="any" name="request_fields[<%= index %>][min]" value="<%= field.min ?? '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
+<label class="text-sm">Максимум<input type="number" step="any" name="request_fields[<%= index %>][max]" value="<%= field.max ?? '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
+</div>
+<div data-roptions-block class="<%= field.input==='enum' ? '' : 'hidden' %> space-y-1.5">
+<div class="text-sm font-semibold">Варианты ответа</div>
+<div data-options-list class="space-y-1.5">
+<% (field.options || []).forEach(function (opt, j) { %><%- include('./_category-field-option', { prefix: 'request_fields', fieldIndex: index, optIndex: j, opt }) %><% }); %>
+</div>
+<button type="button" data-add-option class="text-xs border rounded-lg px-2.5 py-1.5">Добавить вариант</button>
+<template data-option-template><%- include('./_category-field-option', { prefix: 'request_fields', fieldIndex: index, optIndex: 'OPTIDX', opt: {} }) %></template>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+<label class="text-sm">Сравнивать с характеристикой исполнителя<select name="request_fields[<%= index %>][maps_field]" class="block w-full border rounded-xl px-3 py-2"><option value="">Не сравнивать (только для исполнителя)</option><% providerFieldOptions.forEach(([key,label])=>{ %><option value="<%= key %>" <%= field.maps_field===key?'selected':'' %>><%= label %></option><% }); %></select></label>
+<label class="text-sm">Правило<select name="request_fields[<%= index %>][maps_rule]" class="block w-full border rounded-xl px-3 py-2"><% [['provider_gte','У исполнителя не меньше'],['provider_eq','У исполнителя то же значение'],['provider_flag','Нужно → у исполнителя есть отметка']].forEach(([value,label])=>{ %><option value="<%= value %>" <%= field.maps_rule===value?'selected':'' %>><%= label %></option><% }); %></select></label>
+</div>
+<label class="flex gap-2 text-sm"><input type="checkbox" name="request_fields[<%= index %>][required]" <%= field.required?'checked':'' %>>Обязательно для публикации заявки</label>
+<button type="button" data-remove-rfield class="text-sm text-red-600">Убрать параметр</button>
+</div>

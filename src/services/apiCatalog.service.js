@@ -13,6 +13,7 @@ const { SEARCH_WORDS, FEATURE_TAGS } = require('../config/service-search-words')
 const { NEED_WORDING } = require('../config/serviceTypes');
 const { translate } = require('../config/i18n');
 const units = require('../config/units');
+const requestFields = require('../config/requestFields');
 const { getBaseUrl } = require('../config/url');
 const { PREFIX } = require('../config/apiV1');
 
@@ -31,10 +32,12 @@ function stable(value) {
 }
 const hash = (value) => crypto.createHash('sha256').update(stable(value)).digest('hex').slice(0, 16);
 
-// Версия схемы — от определения полей, а не от подписей на языке ответа: правка в /admin/categories меняет её сама.
+// Версия схемы — от определения параметров заявки (и характеристик, из которых они могут выводиться), а не от подписей
+// на языке ответа: правка в /admin/categories меняет её сама.
 function schemaVersion(row, sizes) {
   const fields = (row.fields || []).map(({ need, ...field }) => field);
-  return 'cs_' + hash({ slug: row.slug, fields, sizes: fields.some((f) => f.input === 'size') ? sizes : null });
+  return 'cs_' + hash({ slug: row.slug, kind: row.kind || 'service', request: requestFields.forCategory(row), fields,
+    sizes: fields.some((f) => f.input === 'size') ? sizes : null });
 }
 
 // Слова поиска входят в версию каталога: их правка меняет выдачу так же, как новая услуга.
@@ -183,7 +186,7 @@ async function categoryView(category, lang, location, extra = {}) {
   return {
     id: category.slug,
     parent_id: null,
-    kind: 'service',
+    kind: category.kind || 'service',
     name: category['name_' + lang] || category.name_en,
     names: names(category),
     language_used: category['name_' + lang] ? lang : 'en',
@@ -207,7 +210,7 @@ async function categoryView(category, lang, location, extra = {}) {
 async function searchCategories({ q, lang, kind, location, activeOnly = true }) {
   const snap = await snapshot();
   let categories = snap.categories.filter((c) => !activeOnly || c.is_active);
-  if (kind && kind !== 'service') categories = [];
+  if (kind) categories = categories.filter((c) => (c.kind || 'service') === kind);
   if (!q) {
     return { snapshot: snap, matchStatus: null,
       items: await Promise.all(categories.map((c) => categoryView(c, lang, location))) };
@@ -220,14 +223,13 @@ async function searchCategories({ q, lang, kind, location, activeOnly = true }) 
 }
 
 // --- Схема параметров заявки --------------------------------------------------------------------------------------
-// Характеристики услуги в справочнике описывают исполнителя («Размер кузова», «Бригада»); по ним же модератор
-// подбирает исполнителей под заявку. Параметры заявки — характеристики с правилом подбора (exact, gte, flag): это
-// требования, которые заказчик может назвать. Поля с правилом ignore (точные размеры кузова, текст) — данные
-// исполнителя, в заявке их нет. Обязательных для публикации параметров у категорий пока нет: на сайте заявка — текст.
-const MATCH_HELP = {
-  exact: 'The provider must have exactly this value.',
-  gte: 'The provider must have at least this value; list options go from smallest to largest.',
-  flag: 'true means the customer needs it. Leave the field out when the customer did not say; false only means "not required", never "no".',
+// Параметры заявки — что заказчик называет в заявке (src/config/requestFields.js), отдельно от характеристик исполнителя.
+// У параметра может быть правило подбора к характеристике исполнителя (x-xtender-maps-to). Обязательные для публикации —
+// отмеченные в редакторе категории; у категории товаров обязательны позиции закупки.
+const RULE_HELP = {
+  provider_gte: 'Matched against the provider characteristic: the provider must have at least this value.',
+  provider_eq: 'Matched against the provider characteristic: the provider must have exactly this value.',
+  provider_flag: 'true means the customer needs it and the provider must have it. Leave the field out when the customer did not say; false only means "not required", never "no".',
 };
 const SIZE_SPEC = {
   ru: (s) => `кузов от ${s.length}×${s.width}×${s.height} см (Д×Ш×В)`,
@@ -235,14 +237,15 @@ const SIZE_SPEC = {
   en: (s) => `cargo space from ${s.length}×${s.width}×${s.height} cm (L×W×H)`,
 };
 
-// Отметки встроенных услуг подписаны в справочнике от лица исполнителя («Приезжаю с грузчиками»); в параметрах
-// заявки нужны слова заказчика. Русские — из NEED_WORDING и junkBody (экран модератора), здесь — ka и en.
+// Параметры, выведенные из характеристик услуги из админки, подписаны словами исполнителя; для заявки берём слова
+// заказчика, где они есть (NEED_WORDING, отметка «Самосвал»).
 const REQUEST_TITLES = {
   van: { tail_lift: { en: 'Tail lift needed', ka: 'საჭიროა ჰიდრობორტი' }, with_helpers: { en: 'Van that comes with loaders', ka: 'მანქანა მტვირთავებით' } },
   junk: { dump_body: { en: 'Dump truck needed', ka: 'საჭიროა თვითმცლელი' } },
 };
 
 function fieldTitle(category, field, lang) {
+  if (!field.derived) return requestFields.label(field, lang);
   const need = field.need?.label || NEED_WORDING[category.slug]?.[field.key]?.label;
   if (lang === 'ru' && need) return need;
   if (REQUEST_TITLES[category.slug]?.[field.key]?.[lang]) return REQUEST_TITLES[category.slug][field.key][lang];
@@ -253,33 +256,45 @@ function fieldTitle(category, field, lang) {
 
 function categorySchema(category, lang, sizes) {
   const properties = {};
-  for (const field of (category.fields || []).filter((f) => f.match && f.match !== 'ignore')) {
-    const base = { title: fieldTitle(category, field, lang), description: MATCH_HELP[field.match] || undefined, 'x-xtender-match': field.match };
+  for (const field of requestFields.forCategory(category)) {
+    const rule = field.maps_to?.rule;
+    const base = { title: fieldTitle(category, field, lang),
+      description: RULE_HELP[rule] || 'Information for providers; not used to choose recipients.',
+      ...(field.maps_to ? { 'x-xtender-maps-to': { field: field.maps_to.field, rule } } : {}) };
     const unit = units.codeFor(field.unit);
-    if (field.input === 'size') {
-      properties[field.key] = { ...base, type: 'string', oneOf: (field.options || []).map((code) => {
-        const spec = sizes.find((s) => s.code === code);
-        return { const: code, title: spec ? `${code} — ${(SIZE_SPEC[lang] || SIZE_SPEC.en)(spec)}` : code };
+    if (field.input === 'enum') {
+      const sized = field.maps_to?.field === 'size';
+      properties[field.key] = { ...base, type: 'string', oneOf: (field.options || []).map((value) => {
+        const spec = sized ? sizes.find((s) => s.code === value) : null;
+        const title = spec ? `${value} — ${(SIZE_SPEC[lang] || SIZE_SPEC.en)(spec)}`
+          : field.optionLabels?.[value]?.[lang] || field.optionLabels?.[value]?.ru
+            || (unit ? `${value} ${units.view(units.UNITS.find((u) => u.code === unit), lang).short}` : value);
+        return { const: value, title };
       }) };
-    } else if (field.input === 'enum') {
-      properties[field.key] = { ...base, type: 'string', oneOf: (field.options || []).map((value) => ({ const: value,
-        title: field.optionLabels?.[value]?.[lang] || field.optionLabels?.[value]?.ru || (unit ? `${value} ${units.view(units.UNITS.find((u) => u.code === unit), lang).short}` : value) })) };
     } else if (field.input === 'number') {
       properties[field.key] = { ...base, type: 'number', ...(field.min != null ? { minimum: field.min } : {}), ...(field.max != null ? { maximum: field.max } : {}) };
     } else if (field.input === 'bool') {
       properties[field.key] = { ...base, type: 'boolean' };
-    } else continue;
+    } else if (field.input === 'date') {
+      properties[field.key] = { ...base, type: 'string', format: 'date' };
+    } else {
+      properties[field.key] = { ...base, type: 'string', maxLength: 500 };
+    }
     if (unit) properties[field.key]['x-xtender-unit'] = unit;
   }
   return {
     $schema: 'https://json-schema.org/draft/2020-12/schema',
     $id: getBaseUrl() + PREFIX + '/categories/' + encodeURIComponent(category.slug) + '/schema#' + category.schema_version,
     title: category['name_' + lang] || category.name_en,
-    description: 'Parameters a customer can state for a request in this category. Every parameter is optional; an absent value means unknown.',
+    description: 'Parameters a customer can state for a request in this category. An absent value means unknown; required_for_publish lists what publishing needs.',
     type: 'object',
     properties,
     additionalProperties: false,
   };
+}
+
+function requiredForPublish(category) {
+  return [...requestFields.requiredKeys(category), ...(category.kind === 'goods' ? ['items'] : [])];
 }
 
 async function getSchema(slug, lang) {
@@ -290,16 +305,22 @@ async function getSchema(slug, lang) {
     snapshot: snap,
     body: {
       category_id: category.slug,
+      kind: category.kind || 'service',
       active: category.is_active,
       schema_version: category.schema_version,
       catalog_version: snap.version,
       json_schema: categorySchema(category, lang, snap.sizes),
-      required_for_publish: [],
+      required_for_publish: requiredForPublish(category),
+      // Позиции закупки: у категории товаров — обязательны (название, количество, единица), замена — только если
+      // заказчик разрешил её у позиции.
+      item_rules: category.kind === 'goods'
+        ? { items_required: true, item_fields: requestFields.ITEM_FIELDS, quantity: 'decimal string', unit: 'unit code (listUnits)', substitutions: 'only where substitutions_allowed = true' }
+        : { items_required: false, item_fields: requestFields.ITEM_FIELDS },
     },
   };
 }
 
 module.exports = {
-  Q_MAX_LENGTH, snapshot, schemaVersion, searchCategories, getSchema, categorySchema, locations, resolveLocation, supply, resetSupply,
+  Q_MAX_LENGTH, snapshot, schemaVersion, searchCategories, getSchema, categorySchema, requiredForPublish, locations, resolveLocation, supply, resetSupply,
   matchQuery, stable, hash,
 };

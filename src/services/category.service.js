@@ -154,6 +154,51 @@ function parseFields(input, previous) {
     return out;
   });
 }
+// Параметры заявки (что спрашивают у заказчика) — отдельный список с необязательным правилом подбора к характеристике
+// исполнителя (src/config/requestFields.js). Ключ существующего параметра сохраняется, новый получает r_xxxxxxxx.
+function parseRequestFields(input, previous, providerFields) {
+  const rf = require('../config/requestFields');
+  if (input === undefined || input === null || input === '') return [];
+  if (!Array.isArray(input) || input.length > 12) throw fail('Можно добавить до 12 параметров заявки.');
+  const seen = new Set();
+  return input.map((f) => {
+    const key = f.key || 'r_' + randomBytes(4).toString('hex');
+    if (seen.has(key) || (f.key && !previous.some((p) => p.key === key)) || (!f.key && !/^r_[a-f0-9]{8}$/.test(key))) throw fail('Некорректный параметр заявки.');
+    seen.add(key);
+    if (!rf.INPUTS.includes(f.input)) throw fail('Неизвестный тип параметра заявки.');
+    const labels = { ru: text(f.name_ru, 100, 'Название параметра заявки') };
+    ['ka', 'en'].forEach((lang) => { const raw = typeof f['name_' + lang] === 'string' ? f['name_' + lang].trim() : ''; if (raw) labels[lang] = raw.slice(0, 100); });
+    const out = { key, input: f.input, labels, required: f.required === true };
+    if (f.input === 'number') {
+      const unit = typeof f.unit === 'string' ? f.unit.trim() : '';
+      if (unit) { if (unit.length > 16) throw fail('Единица измерения: до 16 символов.'); out.unit = unit; }
+      for (const bound of ['min', 'max']) {
+        if (f[bound] === '' || f[bound] == null) continue;
+        const n = Number(f[bound]);
+        if (!Number.isFinite(n)) throw fail('Параметр заявки: некорректное число.');
+        out[bound] = n;
+      }
+      if (out.min != null && out.max != null && out.min > out.max) throw fail('Минимум не может быть больше максимума.');
+    }
+    if (f.input === 'enum') {
+      const prev = previous.find((p) => p.key === key);
+      const parsed = parseOptions(Array.isArray(f.options) ? f.options : [], prev?.options || []);
+      out.options = parsed.options; out.optionLabels = parsed.optionLabels;
+    }
+    const target = typeof f.maps_field === 'string' && f.maps_field ? providerFields.find((p) => p.key === f.maps_field) : null;
+    if (f.maps_field && !target) throw fail('Правило подбора ссылается на неизвестную характеристику исполнителя.');
+    if (target) {
+      if (!rf.RULES.includes(f.maps_rule)) throw fail('Выберите правило подбора для параметра заявки.');
+      const ok = f.maps_rule === 'provider_flag' ? out.input === 'bool' && target.input === 'bool'
+        : f.maps_rule === 'provider_gte' ? (out.input === 'number' && ['number', 'enum'].includes(target.input)) || (out.input === 'enum' && ['enum', 'size'].includes(target.input))
+          : ['number', 'enum'].includes(out.input) && ['number', 'enum', 'size'].includes(target.input);
+      if (!ok) throw fail('Правило подбора не подходит к типам параметра и характеристики.');
+      out.maps_to = { field: target.key, rule: f.maps_rule };
+    }
+    return out;
+  });
+}
+
 async function save(slug, input) {
   return pool.withTransaction(async client=> {
     const previous=slug ? await get(slug,client) : null;
@@ -182,13 +227,19 @@ async function save(slug, input) {
       }
     }
     const active=input.is_active===true;
+    // Вид категории и параметры заявки (решения 6–7 владельца). Без поля в форме — прежнее значение.
+    const kind=input.kind===undefined ? (previous?.kind || 'service') : input.kind;
+    if(!['service','goods'].includes(kind)) throw fail('Вид категории: услуга или товары.');
+    // Ключи прежних параметров — действующего списка, в том числе встроенного по умолчанию: его можно сохранить как свой.
+    const requestFields=input.request_fields===undefined ? (previous?.request_fields || [])
+      : parseRequestFields(input.request_fields, previous ? require('../config/requestFields').forCategory(previous) : [], fields);
     if(previous) {
-      const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version)]);
+      const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,kind=$10,request_fields=$11::jsonb,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version),kind,JSON.stringify(requestFields)]);
       if(!result.rows[0]) throw fail('Категория уже изменена. Обновите страницу перед сохранением.',409);
       return result.rows[0];
     }
     const key='svc_'+randomBytes(6).toString('hex');
-    return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order])).rows[0];
+    return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order,kind,request_fields) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order,kind,JSON.stringify(requestFields)])).rows[0];
   });
 }
 // Полное удаление — только если категорией никто не пользуется: иначе профили
@@ -221,4 +272,4 @@ function decorateForCatalog(masters, categories, locale) {
   });
   return masters;
 }
-module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,decorateForCatalog,save,remove,toType,toCategory,hasLockedField};
+module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,decorateForCatalog,save,remove,toType,toCategory,hasLockedField,parseRequestFields};
