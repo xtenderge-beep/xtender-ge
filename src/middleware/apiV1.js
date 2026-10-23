@@ -122,6 +122,64 @@ function checkVersion(req, current) {
   }
 }
 
+// Idempotency-Key для действий с внешним эффектом (публикация, предложение, выбор, сообщение). Повтор с тем же ключом и
+// тем же телом возвращает первый успешный ответ без нового эффекта (заголовок Idempotent-Replayed: true); тот же ключ с
+// другим телом — 409. Сохраняется только успешный ответ: после отказа (например, CONSENT_REQUIRED) тот же ключ можно
+// повторить, когда причина устранена, — отказ ничего не менял. Ключи старше 48 часов удаляет фоновый обработчик.
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9_.:-]{8,100}$/;
+const STALE_RESERVATION_MS = 5 * 60 * 1000;
+
+function idempotent() {
+  return async (req, res, next) => {
+    try {
+      const pool = require('../config/db');
+      const key = req.get('idempotency-key');
+      if (!key) throw fail(400, 'IDEMPOTENCY_KEY_REQUIRED', 'Send an Idempotency-Key header (8–100 letters, digits, _ . : -) unique for this action.');
+      if (!IDEMPOTENCY_KEY.test(key)) throw fail(400, 'INVALID_IDEMPOTENCY_KEY', 'Idempotency-Key: 8–100 letters, digits, _ . : -');
+      const accountId = req.auth.account.id;
+      const path = (req.baseUrl + req.path).slice(0, 200);
+      const bodyHash = require('node:crypto').createHash('sha256').update(JSON.stringify(req.body ?? null)).digest('hex');
+      // Обычный INSERT: занятый ключ — нарушение первичного ключа (так одинаково и в Postgres, и в pg-mem тестов).
+      const reserve = async () => {
+        try {
+          await pool.query('INSERT INTO api_idempotency_keys (account_id, idem_key, method, path, body_hash) VALUES ($1,$2,$3,$4,$5)', [accountId, key, req.method, path, bodyHash]);
+          return true;
+        } catch (error) {
+          if (error.code === '23505' || /duplicate|unique|already exists/i.test(error.message || '')) return false;
+          throw error;
+        }
+      };
+      let reserved = await reserve();
+      if (!reserved) {
+        const row = (await pool.query('SELECT * FROM api_idempotency_keys WHERE account_id=$1 AND idem_key=$2', [accountId, key])).rows[0];
+        if (row && (row.method !== req.method || row.path !== path || row.body_hash !== bodyHash)) {
+          throw fail(409, 'IDEMPOTENCY_KEY_REUSED', 'This Idempotency-Key was used for another request. Use a new key for a new action.');
+        }
+        if (row && row.status_code) {
+          res.set('Idempotent-Replayed', 'true');
+          return res.status(row.status_code).json(row.response);
+        }
+        // Первый запрос ещё выполняется — или прервался вместе с процессом: тогда резерв снимаем и выполняем заново.
+        if (row && Date.now() - new Date(row.created_at).getTime() < STALE_RESERVATION_MS) {
+          throw fail(409, 'REQUEST_IN_PROGRESS', 'The first request with this Idempotency-Key is still running. Retry in a moment.', { retryable: true, headers: { 'Retry-After': '2' } });
+        }
+        await pool.query('DELETE FROM api_idempotency_keys WHERE account_id=$1 AND idem_key=$2 AND status_code IS NULL', [accountId, key]);
+        reserved = await reserve();
+        if (!reserved) throw fail(409, 'REQUEST_IN_PROGRESS', 'Retry in a moment.', { retryable: true, headers: { 'Retry-After': '2' } });
+      }
+      const json = res.json.bind(res);
+      res.json = (body) => {
+        const done = res.statusCode >= 200 && res.statusCode < 300
+          ? pool.query('UPDATE api_idempotency_keys SET status_code=$3, response=$4::jsonb WHERE account_id=$1 AND idem_key=$2', [accountId, key, res.statusCode, JSON.stringify(body)])
+          : pool.query('DELETE FROM api_idempotency_keys WHERE account_id=$1 AND idem_key=$2', [accountId, key]);
+        done.catch((error) => console.error('[api] idempotency store failed:', error.message)).finally(() => json(body));
+        return res;
+      };
+      return next();
+    } catch (error) { return next(error); }
+  };
+}
+
 function notFound(req, res) {
   return send(req, res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.', retryable: false } });
 }
@@ -139,7 +197,8 @@ function errorHandler(err, req, res, next) {
     res.set('X-Request-Id', req.requestId);
     res.set('X-Xtender-Environment', apiConfig.environment());
   }
-  if (err instanceof ApiError) {
+  // DealError — ошибки правил сделки (src/config/deal.js): тот же формат, что у ApiError.
+  if (err instanceof ApiError || err instanceof require('../config/deal').DealError) {
     if (err.headers) res.set(err.headers);
     return send(req, res, err.status, { error: { code: err.code, message: err.message, ...(err.fields ? { fields: err.fields } : {}),
       retryable: err.retryable }, ...(err.details || {}) });
@@ -153,5 +212,5 @@ function errorHandler(err, req, res, next) {
 
 module.exports = {
   ApiError, fail, requestId, send, publicCache, authenticate, requireScope, requireActiveAccount, setVersion, expectedVersion,
-  checkVersion, notFound, errorHandler, challenge, unauthorized, protectedResourceMetadataUrl, redact,
+  checkVersion, notFound, errorHandler, challenge, unauthorized, protectedResourceMetadataUrl, redact, idempotent,
 };

@@ -103,7 +103,7 @@ async function capabilities(req, res) {
     actions: ACTIONS.map((action) => actionView(action, req.auth, roles)),
     category_search: {
       operation_id: 'searchCategories', supports_q: true, q_max_length: catalog.Q_MAX_LENGTH, languages: LANGS,
-      georgian_in_latin_letters: true, location_filter: true, kinds: ['service'], semantic_search: false,
+      georgian_in_latin_letters: true, location_filter: true, kinds: ['service', 'goods'], semantic_search: false,
       note: 'Matching is by words and their beginnings, with Georgian, Russian and Latin spellings folded together. match_rank is an order, not a probability.',
     },
     constraints: {
@@ -114,8 +114,18 @@ async function capabilities(req, res) {
       money: { unit: 'minor (tetri): 20000 = 200.00 GEL' },
     },
     notification_channels: [
-      { channel: 'sms', supported: false, requires_verified_contact: true, requires_consent: true, note: 'SMS rules for API requests are planned (stage 3).' },
+      { channel: 'sms', supported: true, requires_verified_contact: true, requires_consent: true,
+        note: 'SMS to the verified phone of the account, only with the user’s consent. Default rules: first offer and end of collection. The SMS carries a link to a light page on xtender.ge; it does not reopen a ChatGPT conversation.' },
     ],
+    deal: {
+      response_modes: { calls: 'providers call the customer (phone visible to providers)', offers: 'written offers first; phone after the chosen provider confirms', both: 'either' },
+      default_response_mode: 'offers',
+      moderation: 'Every published request is checked by an Xtender moderator before dispatch; collection starts at dispatch.',
+      collection_hours: { default: 24, min: 1, max: 168, note: 'Ends at least 2 hours before requested_start_at.' },
+      provider_confirmation_hours: 24,
+      billing: 'Offers and selection are free; selection is not a contract and charges nothing.',
+      idempotency: 'Send Idempotency-Key with every POST that has side effects.',
+    },
     auth: {
       type: 'oauth2_authorization_code_pkce',
       authorization_server_metadata: base + '/.well-known/oauth-authorization-server',
@@ -323,5 +333,5 @@ async function sandboxSms(req, res) {
 
 module.exports = {
   capabilities, getMe, updateMe, getProviderProfile, updateProviderProfile, listSessions, revokeSession,
-  searchCategories, getCategorySchema, listLocations, listUnits, sandboxSms, langOf, paginate,
+  searchCategories, getCategorySchema, listLocations, listUnits, sandboxSms, langOf, paginate, pageParams, actionView,
 };

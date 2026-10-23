@@ -27,7 +27,8 @@ function pkce() {
     assert.equal(as.authorization_response_iss_parameter_supported, true);
     assert.equal(as.registration_endpoint, base + '/oauth/register');
     assert.deepEqual(as.token_endpoint_auth_methods_supported, ['none']);
-    assert.deepEqual(as.scopes_supported, ['profile:read', 'profile:write'], 'объявлены только области со сделанными операциями');
+    assert.deepEqual(as.scopes_supported, require('../src/config/apiV1').activeScopes(), 'объявлены только области со сделанными операциями');
+    assert.deepEqual(as.scopes_supported, require('../src/config/apiV1').SCOPE_NAMES, 'после этапа сделки сделаны операции всех областей');
     const prm = (await call('GET', '/.well-known/oauth-protected-resource/api/v1')).json;
     assert.equal(prm.resource, base + '/api/v1');
     assert.deepEqual(prm.authorization_servers, [as.issuer], 'issuer совпадает побайтно');
@@ -60,8 +61,8 @@ function pkce() {
     assert.equal(new URL(page.headers.get('location')).searchParams.get('error'), 'invalid_request', 'только S256');
     page = await fetch(authorizeUrl({ ...valid, scope: 'admin' }), { redirect: 'manual' });
     assert.equal(new URL(page.headers.get('location')).searchParams.get('error'), 'invalid_scope');
-    page = await fetch(authorizeUrl({ ...valid, scope: 'profile:read tenders:write' }), { redirect: 'manual' });
-    assert.equal(new URL(page.headers.get('location')).searchParams.get('error'), 'invalid_scope', 'заявок через API ещё нет — и доступа к ним не просим');
+    page = await fetch(authorizeUrl({ ...valid, scope: 'profile:read payments:write' }), { redirect: 'manual' });
+    assert.equal(new URL(page.headers.get('location')).searchParams.get('error'), 'invalid_scope', 'неизвестная область вместе с известной — тоже отказ');
     page = await fetch(authorizeUrl({ ...valid, resource: 'https://other.example/api' }), { redirect: 'manual' });
     assert.equal(new URL(page.headers.get('location')).searchParams.get('error'), 'invalid_target');
 

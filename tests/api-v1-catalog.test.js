@@ -42,11 +42,16 @@ const IRRELEVANT = ['нотариус', 'ремонт ванной', '4 этаж
     const action = (id) => caps.actions.find((a) => a.id === id);
     assert.equal(action('search_categories').supported, true);
     for (const id of ['publish_tender', 'select_offer', 'submit_offer', 'send_message', 'subscribe_tender_notifications']) {
+      assert.deepEqual([action(id).supported, action(id).available_to_user], [true, null], id);
+    }
+    for (const id of ['upload_attachment', 'create_project']) {
       assert.deepEqual([action(id).supported, action(id).unavailable_reason], [false, 'not_implemented'], id);
     }
     assert.equal(action('publish_tender').requires_confirmation, true);
     assert.ok(caps.actions.every((a) => a.available_to_user === null));
-    assert.equal(caps.notification_channels.find((c) => c.channel === 'sms').supported, false, 'SMS по заявкам API ещё не сделаны');
+    const smsChannel = caps.notification_channels.find((c) => c.channel === 'sms');
+    assert.deepEqual([smsChannel.supported, smsChannel.requires_consent], [true, true], 'SMS по заявкам — только с согласием');
+    assert.equal(caps.deal.default_response_mode, 'offers');
     assert.equal(caps.constraints.attachments.supported, false);
 
     // 2. Эталонные запросы: найдены именно ожидаемые категории, с найденными словами.

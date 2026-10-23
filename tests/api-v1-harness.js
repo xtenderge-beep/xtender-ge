@@ -23,7 +23,18 @@ if (realPg) {
   db.public.none(fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8'));
   const { Pool } = db.adapters.createPg();
   pool = new Pool();
-  pool.withTransaction = async (fn) => { const backup = db.backup(); try { return await fn(pool); } catch (e) { backup.restore(); throw e; } };
+  // Откат в pg-mem — восстановление снимка всей базы: две одновременные транзакции стёрли бы друг друга. Поэтому
+  // транзакции здесь идут по очереди (вложенная выполняется внутри внешней). Одновременность проверяет прогон на
+  // настоящем Postgres (API_TEST_DATABASE_URL): там второй выбор падает на уникальном active_key.
+  const { AsyncLocalStorage } = require('node:async_hooks');
+  const inside = new AsyncLocalStorage();
+  let queue = Promise.resolve();
+  pool.withTransaction = (fn) => {
+    if (inside.getStore()) return fn(pool);
+    const run = queue.then(() => inside.run(true, async () => { const backup = db.backup(); try { return await fn(pool); } catch (e) { backup.restore(); throw e; } }));
+    queue = run.catch(() => {});
+    return run;
+  };
 }
 const redis = new (require('ioredis-mock'))();
 const stub = (name, exports) => (require.cache[require.resolve(name)] = { exports });
