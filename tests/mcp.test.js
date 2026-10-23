@@ -82,15 +82,19 @@ function startSite() {
 
     // 2. Три инструмента, все только читают (так их видят каталоги ChatGPT и Claude). get_my_account — только после входа
     // (docs/api-v1, этап 1б): без токена он просит подключить аккаунт, прежние два работают без входа.
+    // Сделка через подключённый аккаунт — отдельные инструменты (mcpDeal.tools.js, tests/deal-mcp.test.js).
     const { tools } = await client.listTools();
-    assert.deepEqual(tools.map(tool => tool.name).sort(), ['create_request_link', 'get_my_account', 'list_services']);
+    const dealTools = require('../src/controllers/mcpDeal.tools').TOOLS.map(tool => tool.name);
+    assert.deepEqual(tools.map(tool => tool.name).sort(), ['create_request_link', 'get_my_account', 'list_services', ...dealTools].sort());
     const anonymous = await client.callTool({ name: 'get_my_account', arguments: {} });
     assert.equal(anonymous.isError, true);
     assert.match(anonymous._meta['mcp/www_authenticate'][0], /^Bearer resource_metadata="https:\/\/xtender\.test\/\.well-known\/oauth-protected-resource", error="insufficient_scope", error_description="/);
     for (const tool of tools) {
+      if (!['create_request_link', 'get_my_account', 'list_services'].includes(tool.name)) continue;
       assert.deepEqual([tool.annotations.readOnlyHint, tool.annotations.destructiveHint], [true, false], tool.name);
       assert.ok(tool.title && tool.description, tool.name);
     }
+    for (const tool of tools) assert.ok(tool.title && tool.description, tool.name);
     const create = tools.find(tool => tool.name === 'create_request_link');
     assert.deepEqual(create.inputSchema.required, ['lang']);
     assert.deepEqual(create.inputSchema.properties.lang.enum, ['ka', 'ru', 'en']);
