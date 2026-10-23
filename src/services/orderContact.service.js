@@ -20,16 +20,20 @@ async function reveal(token, masterToken, channel, meta = {}, access = 'session'
     const category = sold?.metadata?.category || (master.category === 'transport' && master.is_flatbed && !targets.includes('transport') && targets.includes('flatbed') ? 'flatbed' : master.category);
     const matching = require('./serviceMatching.service');
     const openMatches = await matching.openMatches(master,order,client);
+    // Сделка через Xtender (docs/api-v1/WORKFLOWS.md): в режиме «сначала предложения» телефон открывается только
+    // исполнителю, чей выбор подтверждён; подтверждённому он открыт в любом режиме.
+    const selected = (await client.query("SELECT id FROM order_selections WHERE order_id=$1 AND master_id=$2 AND status='accepted'", [order.id, master.id])).rows[0];
     let code = null;
-    if (!charged || master.is_technical !== order.is_technical) code = 'forbidden';
-    else if (!['new', 'pending_review'].includes(order.status) || !openMatches.length || !order.phone) code = 'unavailable';
+    if (order.response_mode === 'offers' && !selected) code = 'offers_only';
+    else if ((!charged && !selected) || master.is_technical !== order.is_technical) code = 'forbidden';
+    else if (!['new', 'pending_review'].includes(order.status) || (!selected && !openMatches.length) || !order.phone) code = 'unavailable';
     await consentLog.recordAction({
       eventType: code ? 'ORDER_CONTACT_DENIED' : 'ORDER_CONTACT_RELEASED',
       phone: order.phone, masterId: master.id, orderId: order.id, meta,
       metadata: { channel, category, order_status: order.status, reason: code, access,
         balance_transaction_id: charged?.id || null },
     }, client);
-    if (code) return { status: code === 'forbidden' ? 403 : 409, code };
+    if (code) return { status: code === 'forbidden' || code === 'offers_only' ? 403 : 409, code };
     await client.query('INSERT INTO order_views (order_id,master_id,event_type) VALUES($1,$2,$3) ON CONFLICT (order_id,master_id,event_type) DO NOTHING', [order.id, master.id, channel]);
     return { status: 200, order };
   });

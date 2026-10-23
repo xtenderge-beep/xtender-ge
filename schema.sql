@@ -796,6 +796,9 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_closed_at TIMESTAMPTZ;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS deal_status VARCHAR(20) CONSTRAINT orders_deal_status_check CHECK (deal_status IS NULL OR deal_status IN ('open','selection_pending','awarded','completed','cancelled'));
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS api_version INTEGER NOT NULL DEFAULT 1;
+-- Услуги, которые назвал заказчик (target_categories ставит модератор при рассылке), и время последнего изменения сделки.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS requested_categories JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS deal_updated_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_orders_account ON orders(account_id);
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;

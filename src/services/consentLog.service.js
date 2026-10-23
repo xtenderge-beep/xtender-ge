@@ -274,8 +274,17 @@ async function exportForMaster(masterId) {
   return report;
 }
 
+// Согласие, данное на странице xtender.ge без кода из SMS (аккаунт API уже подтвердил номер при входе): Оферта и Политика
+// перед первой публикацией заявки из ChatGPT, отдельно — SMS-уведомления (docs/api-v1/NOTIFICATIONS.md). Снимок текста,
+// версия и язык — в тех же колонках, что у согласия с формы заявки.
+async function recordPageConsent({ eventType, phone, orderId = null, termsVersion = null, language = null, text = null, metadata = {}, meta = {} }, client = pool) {
+  return insertRow({ event_type: eventType, channel: 'web', phone_number: phone, order_id: orderId, terms_version: termsVersion, consent_language: language,
+    consent_text_snapshot: text, ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata }, client);
+}
+
 module.exports = {
   recordAction,
+  recordPageConsent,
   applyConsent,
   recordOtpSent,
   recordConsentVerified,

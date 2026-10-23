@@ -47,6 +47,16 @@ const smsMessages = {
   // the site. «Not you?» — anyone can type someone else's number into a chat.
   orderCodeAssistant: 'Xtender code: {code}. Give it to your AI assistant to send your request. Not you? Ignore this SMS.',
   orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
+  // Сделка через Xtender (docs/api-v1/NOTIFICATIONS.md). Ссылка — страница возврата /r/<токен>: личных данных она не открывает.
+  dealFirstOffer: 'Xtender: request #{id} got its first offer. View: {link}',
+  dealCollectionClosed: 'Xtender: request #{id} is closed for offers, {n} received. Compare and choose: {link}',
+  dealCollectionClosedNone: 'Xtender: request #{id} is closed for offers, none received. Details: {link}',
+  dealNewQuestion: 'Xtender: a provider asked a question about request #{id}. Reply: {link}',
+  dealSelectionAccepted: 'Xtender: the provider confirmed request #{id}. Contacts: {link}',
+  dealSelectionDeclined: 'Xtender: the provider declined request #{id}. Choose another offer: {link}',
+  dealSelectionExpired: 'Xtender: the provider did not confirm request #{id} in time. Choose another offer: {link}',
+  dealProviderSelected: 'Xtender: your offer for request #{id} was chosen. Confirm by {time}: {link}',
+  dealProviderReply: 'Xtender: the customer replied about request #{id}: {link}',
   // Вход на странице /oauth/authorize: человек подключает аккаунт к ChatGPT или другому приложению (docs/api-v1/AUTH.md).
   // Код вводят на сайте, не в чате: в чат его могли бы попросить чужие.
   oauthCode: 'Xtender code: {code}. Enter it on xtender.ge to connect an app to your account. Never share it in a chat. Not you? Ignore this SMS.',

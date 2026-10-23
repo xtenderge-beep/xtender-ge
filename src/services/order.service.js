@@ -444,6 +444,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   if (!order || !['pending_review', 'new'].includes(order.status)) return 0;
   if(!order.requirements?.configured && !(Array.isArray(order.target_categories) && order.target_categories.includes(category))) order=await addTargetCategories(order.token,[category]);
   if(!order) return 0;
+  // Модератор разрешил рассылку — с этого момента идёт сбор предложений (срок не тратится на модерацию, уточнение 2).
+  await pool.withTransaction(client => require('./tender.service').startCollection(client, order.id));
   const isTechnical = order.is_technical === true;
   const telegramService = require('./telegram.service');
   const leadPrice = confirmedPrice ?? await settingsService.getLeadPriceTetri();
@@ -491,6 +493,9 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const billingConsent = paid ? await billing.permission(master.id, rates, client) : { basis: 'free_period', consent_log_id: null };
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
       const amount = paid ? leadPrice : 0;
+      // Право на заявку — решение рассылки, а не исход доставки (решение 3): записывается до отправки и остаётся,
+      // даже если SMS не дойдёт. Им пользуются вопросы, предложения и API (orderAccess.service).
+      await require('./orderAccess.service').grant(order.id, master.id, { source: 'dispatch', runId: run.id }, client);
       // Личная ссылка: ключ открывает заявку и контакт без входа, но только в первом браузере (leadLink.service).
       const link = getBaseUrl() + '/order/' + order.token + '?k=' + await require('./leadLink.service').issue(order.id, master.id, client);
       let receipt = null;
@@ -617,6 +622,7 @@ module.exports = {
   recordModerationMessages,
   getModerationMessages,
   closeOrder,
+  finalizeClose,
   closeOrderCategory,
   getClosedCategories,
   deleteOrder,

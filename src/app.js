@@ -175,6 +175,8 @@ runMigrations()
     require('./services/siteAnalytics.service').start();
     // OAuth: удаление просроченных кодов и токенов раз в час.
     require('./services/oauth.service').start();
+    // Сделка: закрытие сбора по сроку, истечение выбора и предложений, очередь событий и уведомлений — каждые 20 секунд.
+    require('./services/dealWorker.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

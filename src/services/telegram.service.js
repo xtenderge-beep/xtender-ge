@@ -411,6 +411,22 @@ async function sendToChat(chatId, text, replyMarkup) {
     });
 }
 
+// Уведомление исполнителю по сделке (вопрос заказчика, выбор предложения) с кнопкой-ссылкой. В отличие от sendToChat
+// возвращает результат: { ok } — принято, { ok:false, uncertain } — неясно (повторно не шлём), { ok:false, disabled } —
+// бот выключен (песочница, локальная копия): тогда уведомление уходит SMS.
+async function sendNotice(chatId, text, link, label) {
+  if (!isEnabled()) return { ok: false, disabled: true };
+  try {
+    const response = await axios.post(apiUrl('sendMessage'), {
+      chat_id: chatId, text, ...(link ? { reply_markup: { inline_keyboard: [[{ text: label || '📄', url: link }]] } } : {}),
+    }, { timeout: 15000 });
+    if (response.data?.ok !== true) return { ok: false, uncertain: response.data?.ok !== false };
+    return { ok: true, providerMessageId: String(response.data.result?.message_id || '') };
+  } catch (err) {
+    return { ok: false, uncertain: !err.response?.data || err.response.data.ok !== false };
+  }
+}
+
 // Вопрос в поддержку от исполнителя → модератору. Шапка "💬 #<id> · имя · категория"
 // — по ней бот находит мастера, когда модератор отвечает (native reply или кнопка).
 // replyToMessageId связывает сообщения одного треда в цепочку. Возвращает message_id.
@@ -645,6 +661,7 @@ module.exports = {
   buildMessageText,
   setWebhook,
   sendToChat,
+  sendNotice,
   sendLeadToMaster,
   leadMessage,
   forwardSupportMessage,
