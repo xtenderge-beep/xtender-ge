@@ -741,6 +741,12 @@ UPDATE service_categories SET name_en='Waste removal' WHERE slug='junk' AND name
 DELETE FROM service_categories WHERE slug='junk_manual'
   AND NOT EXISTS (SELECT 1 FROM masters WHERE category='junk_manual')
   AND NOT EXISTS (SELECT 1 FROM master_services WHERE service_type='junk_manual');
+-- Вид категории (услуга или товары) и параметры заявки отдельно от характеристик исполнителя (решения 6–7 владельца,
+-- docs/api-v1/BACKEND_AUDIT.md, раздел 12). request_fields — что спрашивают у заказчика; у поля может быть maps_to —
+-- характеристика исполнителя и правило подбора. Пустой список у встроенных услуг — параметры по умолчанию из кода
+-- (src/config/requestFields.js), у услуги из админки — из характеристик с правилом подбора. Строк здесь не пишем.
+ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS kind VARCHAR(10) NOT NULL DEFAULT 'service' CONSTRAINT service_categories_kind_check CHECK (kind IN ('service','goods'));
+ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS request_fields JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 
 -- Parallel technical requests. Existing orders and providers remain production.
@@ -763,6 +769,34 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_mode BOOLEAN NOT NULL DEFAULT 
 -- «Кто вы?» при регистрации на /join (2026-10-17): worker / vehicle / store, подсказка модератору
 -- (src/config/providerKinds.js). Пустой массив — зарегистрировался раньше или не отметил.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_kinds JSONB NOT NULL DEFAULT '[]'::jsonb;
+-- Сделка через Xtender (2026-10-23, docs/api-v1/WORKFLOWS.md): источник заявки и способ ответа — независимые настройки.
+-- channel — откуда пришла заявка (site, chatgpt, api, manager); orders.source по-прежнему метка трафика («Источники»).
+-- response_mode: calls — исполнители звонят (как было, у всех прежних заявок); offers — письменные предложения, телефон
+-- скрыт до подтверждённого выбора; both — и то и другое. Колонки объявлены до представлений business_*: те получают их
+-- с первого запуска. deal_status ведёт сделку (NULL — прежняя заявка без предложений); «сбор закрыт» не хранится отдельно:
+-- open + collection_closed_at или истёкший submission_deadline. api_version — версия заявки для If-Match.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'site';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS response_mode VARCHAR(10) NOT NULL DEFAULT 'calls' CONSTRAINT orders_response_mode_check CHECK (response_mode IN ('calls','offers','both'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS account_id VARCHAR(40);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS kind VARCHAR(10) CONSTRAINT orders_kind_check CHECK (kind IS NULL OR kind IN ('service','goods','mixed'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS title VARCHAR(120);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS original_text TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS request_attributes JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS schema_versions JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS private_address TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS requested_start_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS requested_end_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Tbilisi';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS budget_max_minor INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS budget_visibility VARCHAR(10);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'GEL';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_hours INTEGER;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS submission_deadline TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS collection_closed_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS deal_status VARCHAR(20) CONSTRAINT orders_deal_status_check CHECK (deal_status IS NULL OR deal_status IN ('open','selection_pending','awarded','completed','cancelled'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS api_version INTEGER NOT NULL DEFAULT 1;
+CREATE INDEX IF NOT EXISTS idx_orders_account ON orders(account_id);
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_balance_transactions AS
@@ -1018,6 +1052,192 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
 );
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_grant ON oauth_tokens(grant_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_expires ON oauth_tokens(expires_at);
+
+-- Согласия и уведомления аккаунта API. Согласие с Офертой и Политикой даётся на странице xtender.ge при первой публикации
+-- (решение 9): версии текстов и строка журнала sms_consent_logs. Согласие на SMS-уведомления — отдельно (notify_sms).
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS terms_version_accepted VARCHAR(40);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS privacy_version_accepted VARCHAR(40);
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS consent_log_id BIGINT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS notify_sms BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS notify_consent_log_id BIGINT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS quiet_from VARCHAR(5) NOT NULL DEFAULT '22:00';
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS quiet_to VARCHAR(5) NOT NULL DEFAULT '09:00';
+
+-- === Сделка: позиции, доступ, предложения, переписка, выбор (2026-10-23, docs/api-v1/WORKFLOWS.md) ===
+-- Позиции заявки (товар, доставка, разгрузка, услуга). quantity — десятичное число строкой, unit — код справочника.
+CREATE TABLE IF NOT EXISTS order_items (
+    id VARCHAR(40) PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    kind VARCHAR(12) NOT NULL CONSTRAINT order_items_kind_check CHECK (kind IN ('service','goods','delivery','unloading')),
+    category_id VARCHAR(32),
+    name VARCHAR(200) NOT NULL,
+    quantity VARCHAR(20),
+    unit VARCHAR(12),
+    specifications JSONB NOT NULL DEFAULT '{}',
+    substitutions_allowed BOOLEAN NOT NULL DEFAULT false,
+    required BOOLEAN NOT NULL DEFAULT true
+);
+CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
+
+-- Право исполнителя на заявку: даётся, когда модератор включил его в рассылку, — отдельно от того, дошла ли SMS
+-- (решение 3). Читают страница заявки, предложения, переписка и API. Прежние заявки — строкой ниже (один раз).
+CREATE TABLE IF NOT EXISTS order_access (
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    source VARCHAR(20) NOT NULL DEFAULT 'dispatch',
+    run_id INTEGER,
+    granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (order_id, master_id)
+);
+CREATE INDEX IF NOT EXISTS idx_order_access_master ON order_access(master_id);
+
+-- Одно предложение исполнителя на заявку (UNIQUE): правка создаёт новую версию в offer_versions, отозванное можно
+-- отправить снова той же строкой. data — условия и посчитанные сервером суммы текущей версии.
+CREATE TABLE IF NOT EXISTS offers (
+    id VARCHAR(40) PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CONSTRAINT offers_status_check CHECK (status IN ('draft','submitted','selected','accepted','withdrawn','expired','not_selected','declined')),
+    version INTEGER NOT NULL DEFAULT 1,
+    data JSONB NOT NULL DEFAULT '{}',
+    tender_version INTEGER,
+    valid_until TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (order_id, master_id)
+);
+CREATE TABLE IF NOT EXISTS offer_versions (
+    offer_id VARCHAR(40) NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL,
+    data JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (offer_id, version)
+);
+
+-- Личная переписка заказчика с исполнителем по заявке: одна ветка на пару заявка + исполнитель (UNIQUE).
+CREATE TABLE IF NOT EXISTS order_threads (
+    id VARCHAR(40) PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ,
+    customer_seen_at TIMESTAMPTZ,
+    provider_seen_at TIMESTAMPTZ,
+    UNIQUE (order_id, master_id)
+);
+CREATE TABLE IF NOT EXISTS order_messages (
+    id VARCHAR(40) PRIMARY KEY,
+    thread_id VARCHAR(40) NOT NULL REFERENCES order_threads(id) ON DELETE CASCADE,
+    author_role VARCHAR(10) NOT NULL CONSTRAINT order_messages_author_check CHECK (author_role IN ('customer','provider')),
+    body TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_messages_thread ON order_messages(thread_id, created_at);
+
+-- Выбор предложения. active_key = order_id, пока выбор ждёт подтверждения или подтверждён, иначе NULL: UNIQUE даёт
+-- один действующий выбор на заявку на уровне базы (NULL не равны друг другу) — второй одновременный выбор падает.
+CREATE TABLE IF NOT EXISTS order_selections (
+    id VARCHAR(40) PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    offer_id VARCHAR(40) NOT NULL REFERENCES offers(id) ON DELETE CASCADE,
+    offer_version INTEGER NOT NULL,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    status VARCHAR(12) NOT NULL DEFAULT 'pending' CONSTRAINT order_selections_status_check CHECK (status IN ('pending','accepted','declined','expired','cancelled')),
+    active_key INTEGER UNIQUE,
+    confirm_by TIMESTAMPTZ NOT NULL,
+    decline_reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    decided_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_order_selections_order ON order_selections(order_id);
+
+-- Очередь событий (transactional outbox): событие пишется в той же транзакции, что и изменение. Обработчик
+-- (deal.worker) берёт строку блокировкой locked_until и по событию заводит уведомления. dedupe_key — повтор события
+-- не создаёт второй строки.
+CREATE TABLE IF NOT EXISTS outbox_events (
+    id BIGSERIAL PRIMARY KEY,
+    event_type VARCHAR(40) NOT NULL,
+    order_id INTEGER,
+    payload JSONB NOT NULL DEFAULT '{}',
+    dedupe_key VARCHAR(160) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    available_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    locked_until TIMESTAMPTZ,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    processed_at TIMESTAMPTZ,
+    failed_at TIMESTAMPTZ,
+    last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox_events(processed_at, available_at);
+
+-- Уведомления участникам. dedupe_key — одно уведомление на событие, получателя, канал и правило; порог «первое
+-- предложение» — одно на заявку. status: queued, sending, sent, failed, cancelled, unknown (шлюз не ответил ясно —
+-- повторно не шлём, чтобы не задвоить). sent — шлюз принял, не «доставлено на телефон».
+CREATE TABLE IF NOT EXISTS notification_deliveries (
+    id BIGSERIAL PRIMARY KEY,
+    event_id BIGINT,
+    order_id INTEGER,
+    recipient_role VARCHAR(10) NOT NULL,
+    recipient_ref VARCHAR(60) NOT NULL,
+    channel VARCHAR(10) NOT NULL,
+    rule VARCHAR(30) NOT NULL,
+    dedupe_key VARCHAR(200) NOT NULL UNIQUE,
+    body TEXT NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'queued',
+    send_after TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    provider_message_id VARCHAR(120),
+    error_code VARCHAR(60),
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_due ON notification_deliveries(status, send_after);
+CREATE INDEX IF NOT EXISTS idx_notification_deliveries_order ON notification_deliveries(order_id);
+
+-- SMS заказчику по заявке (решение 8): включаются только с отдельным согласием (consent_log_id), правила — какие события.
+CREATE TABLE IF NOT EXISTS order_notifications (
+    order_id INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+    sms_enabled BOOLEAN NOT NULL DEFAULT false,
+    rules JSONB NOT NULL DEFAULT '{}',
+    consent_log_id BIGINT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Ссылка возврата /r/<токен> из SMS: только хеш, срок, заявка. Сама ссылка личных данных не открывает.
+CREATE TABLE IF NOT EXISTS resume_links (
+    token_hash VARCHAR(64) PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Idempotency-Key для внешне значимых POST API: повтор с тем же ключом и телом возвращает прежний ответ.
+CREATE TABLE IF NOT EXISTS api_idempotency_keys (
+    account_id VARCHAR(40) NOT NULL,
+    idem_key VARCHAR(100) NOT NULL,
+    method VARCHAR(8) NOT NULL,
+    path VARCHAR(200) NOT NULL,
+    body_hash VARCHAR(64) NOT NULL,
+    status_code INTEGER,
+    response JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (account_id, idem_key)
+);
+
+-- Доступ по прежним заявкам: все, кого модератор включал в рассылку, и все со строкой заявки в балансе — один раз,
+-- по отметке в app_settings (файл выполняется при каждом старте; подзапросы без корреляции — их понимает pg-mem).
+INSERT INTO order_access (order_id, master_id, source)
+SELECT DISTINCT order_id, master_id, 'legacy' FROM dispatch_deliveries
+WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
+ON CONFLICT DO NOTHING;
+INSERT INTO order_access (order_id, master_id, source)
+SELECT DISTINCT order_id, master_id, 'legacy' FROM balance_transactions
+WHERE reason = 'lead_charge' AND order_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
+ON CONFLICT DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('order_access_backfill_v1', 'done') ON CONFLICT (key) DO NOTHING;
 
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
