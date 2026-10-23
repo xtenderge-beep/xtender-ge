@@ -1,8 +1,12 @@
 # Xtender API v1
 
-REST API xtender.ge для плагина ChatGPT (MCP-адаптер, этап 5) и любых других клиентов. Префикс `/api/v1`, только JSON
-UTF-8. Сделан этап 1 ТЗ: обнаружение возможностей, вход, аккаунт, профиль исполнителя, каталог. Заявки, предложения,
-переписка и уведомления — этапы 2–3, их контракт уже в [openapi.yaml](openapi.yaml) с пометкой `x-xtender-status: planned`.
+REST API xtender.ge для плагина ChatGPT (MCP-адаптер `/mcp`) и любых других клиентов. Префикс `/api/v1`, только JSON
+UTF-8. Сделано (ветка `api-v1-stage1`, не выложено): обнаружение возможностей, вход, аккаунт, профиль исполнителя,
+каталог (этап 1) и вся сделка — заявки, модерация, предложения, сравнение, выбор, подтверждение, переписка, SMS-уведомления
+(этапы 2–3). Не сделаны вложения, проекты и долгие операции: в [openapi.yaml](openapi.yaml) они `x-xtender-status: planned`.
+
+- Сделка: [WORKFLOWS.md](WORKFLOWS.md); уведомления: [NOTIFICATIONS.md](NOTIFICATIONS.md); инструменты ChatGPT:
+  [MCP_MAPPING.md](MCP_MAPPING.md); проверка владельцем: [OWNER_CHECK.md](OWNER_CHECK.md).
 
 - Контракт: [openapi.yaml](openapi.yaml) (весь, собирается `node scripts/build-openapi-yaml.js` из `src/config/openapiV1.js`);
   сервер отдаёт только сделанное на `GET /api/v1/openapi.json`.
@@ -52,7 +56,9 @@ SMS складываются в `GET /api/v1/sandbox/sms`. Продовый `.en
 - **Неизвестно** — `null` или явная причина, никогда не ноль и не пустой список «на всякий случай».
 - **Кеш**: личные ответы — `Cache-Control: private, no-store`; справочники без токена — `public` на 60–300 секунд.
   Каталог читается из базы при каждом запросе; число исполнителей — до 5 минут (`checked_at`).
-- **GET ничего не меняет.** Внешних действий (публикация, отправка, SMS) на этапе 1 нет.
+- **GET ничего не меняет.** Действия с внешним эффектом (публикация, предложение, выбор, сообщение) — POST с
+  `Idempotency-Key`; публикация и выбор — ещё и с `confirmed_by_user: true`.
+- **Деньги** — целые тетри (`*_minor`); неизвестная сумма — `null` с причиной, итог тогда `incomplete`.
 
 ## 3. Методы этапа 1
 
@@ -97,6 +103,16 @@ SMS складываются в `GET /api/v1/sandbox/sms`. Продовый `.en
 одобренных модератором отзывов или `null`; выдуманного рейтинга нет. `version` — непрозрачная строка, меняется при любой
 правке профиля, откуда бы она ни пришла.
 
+### Сделка (этапы 2–3)
+
+Все методы — в [openapi.yaml](openapi.yaml) (`x-xtender-status: implemented`), правила — [WORKFLOWS.md](WORKFLOWS.md).
+Коротко: заказчик `POST /tenders` → `POST /tenders/{id}/validate` → `POST /tenders/{id}/publish` (первый раз — 409
+`CONSENT_REQUIRED` со ссылкой на страницу согласия) → модератор рассылает → `GET /tenders/{id}/comparison-data` →
+`POST /tenders/{id}/selection` → исполнитель `POST /offers/{id}/accept-selection` → `POST /tenders/{id}/complete`.
+Исполнитель: `GET /opportunities`, `POST /tenders/{id}/threads`, `POST /tenders/{id}/offers`, `POST /offers/{id}/submit`.
+Вопросы — `/threads/{id}/messages`, SMS — `/me/notification-preferences`, `/tenders/{id}/notification-subscription`,
+ссылка для нового чата — `POST /tenders/{id}/resume-link`.
+
 ## 4. Примеры
 
 ```bash
@@ -117,7 +133,7 @@ curl -s -X PUT "$B/me/provider-profile" -H "Authorization: Bearer $T" -H 'If-Mat
 ## 5. Проверка
 
 ```bash
-node --test tests/api-v1-*.test.js       # pg-mem; api-v1-sandbox запускает scripts/api-sandbox.js целиком
+node --test tests/api-v1-*.test.js tests/deal-*.test.js   # pg-mem; api-v1-sandbox запускает scripts/api-sandbox.js целиком
 API_TEST_DATABASE_URL=postgres://… node tests/api-v1-profile.test.js   # то же на настоящем Postgres (пустая база)
 node scripts/build-openapi-yaml.js       # после правки src/config/openapiV1.js; тест сверяет файл
 ```
@@ -133,9 +149,16 @@ node scripts/build-openapi-yaml.js       # после правки src/config/op
 | `src/services/oauth.service.js`, `src/controllers/oauth.controller.js`, `src/views/oauth-authorize.ejs` | Вход OAuth |
 | `src/config/apiV1.js`, `src/config/apiCapabilities.js`, `src/config/units.js`, `src/config/openapiV1.js` | Константы, действия, единицы, контракт |
 | `scripts/api-sandbox.js`, `scripts/api-sandbox-token.js`, `scripts/build-openapi-yaml.js` | Песочница, токен, сборка YAML |
-| `tests/api-v1-*.test.js`, `tests/api-v1-harness.js` | Тесты и общий стенд |
+| `src/controllers/apiDeal.controller.js`, `src/services/dealApi.service.js` | REST сделки и общий слой для REST и MCP |
+| `src/services/tender.service.js`, `offer.service.js`, `selection.service.js`, `thread.service.js` | Заявка, предложения, выбор, переписка |
+| `src/services/orderAccess.service.js`, `outbox.service.js`, `dealNotify.service.js`, `dealWorker.service.js`, `resumeLink.service.js`, `accountConsent.service.js` | Доступ, очередь событий, уведомления, фоновая работа, ссылка возврата, согласие |
+| `src/controllers/deal.controller.js`, `src/views/partials/deal-*.ejs`, `src/views/deal-page.ejs`, `public/js/deal.js` | Сделка на сайте, `/consent`, `/t` |
+| `src/controllers/mcpDeal.tools.js` | Инструменты MCP для сделки |
+| `src/config/deal.js`, `src/config/deal-copy.js`, `src/config/requestFields.js` | Правила, тексты ka/ru/en, параметры заявки по категориям |
+| `tests/api-v1-*.test.js`, `tests/deal-*.test.js`, `tests/api-v1-harness.js` | Тесты и общий стенд |
 
 Переменные окружения: `XTENDER_SANDBOX=1` (песочница), `SANDBOX_REAL_SMS_NUMBERS` (номера, на которые в песочнице код
-входа уходит настоящей SMS), `SANDBOX_SINK_KEY` (ключ приёмника SMS), `PUBLIC_BASE_URL` (полный адрес с протоколом, если
+входа уходит настоящей SMS), `SANDBOX_REAL_DEAL_SMS=1` (туда же — уведомления сделки), `SANDBOX_SEED=1` (тестовые
+исполнители в тестовом окружении), `SANDBOX_SINK_KEY` (ключ приёмника SMS), `PUBLIC_BASE_URL` (полный адрес с протоколом, если
 не `https://$DOMAIN`), `OAUTH_REDIRECT_ALLOWLIST`, `OAUTH_ALLOW_LOOPBACK=1`. Тестовое окружение на сервере —
 [BACKEND_AUDIT.md](BACKEND_AUDIT.md), раздел 13.
