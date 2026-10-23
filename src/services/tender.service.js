@@ -29,7 +29,8 @@ function status(order, now = new Date()) {
   if (order.status === 'unverified') return 'draft';
   if (order.deal_status && order.deal_status !== 'open') return order.deal_status;
   if (order.deal_status === 'open') {
-    if (order.status === 'closed') return 'cancelled';
+    // Закрыта прежним путём (заказчик со страницы заявки со звонками, модератор): «нашёл исполнителя» — выполнена.
+    if (order.status === 'closed') return order.closing_reason === 'found_provider' ? 'completed' : 'cancelled';
     return collectionClosed(order, now) ? 'closed' : 'open';
   }
   return order.status === 'closed' ? 'closed' : 'open';

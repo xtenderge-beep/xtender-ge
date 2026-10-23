@@ -19,7 +19,8 @@ const { toE164 } = require('../config/phone');
 
 const { DealError } = deal;
 const DEAL_MODES = ['offers', 'both'];
-const isDealOrder = (order) => Boolean(order) && (DEAL_MODES.includes(order.response_mode) || Boolean(order.deal_status));
+// Блок сделки — у заявок с письменными предложениями. Заявка со звонками (и из API тоже) показывается как раньше.
+const isDealOrder = (order) => Boolean(order) && DEAL_MODES.includes(order.response_mode);
 
 // --- Данные для страницы ---------------------------------------------------------------------------------------------
 async function providerName(masterId) {
@@ -308,7 +309,7 @@ async function resumeSendLink(req, res) {
   if (count > RESEND_LIMIT) return resumePage(req, res, { status: 429, error: c('error_generic') });
   const serviceMessage = require('../config/service-message-copy');
   await require('../services/sms.service').sendOrderNotification(order.phone,
-    serviceMessage.sms('orderLink', { id: order.id, link: `${require('../config/url').getBaseUrl()}/o/${order.owner_token}` }), { orderId: order.id, kind: 'transactional' })
+    serviceMessage.sms('orderLink', { id: order.id, link: `${require('../config/url').getBaseUrl()}/o/${order.owner_token}` }), { orderId: order.id, kind: 'transactional', deal: true })
     .catch((error) => console.error('Resume link SMS failed:', error.message));
   return resumePage(req, res, { sent: c('resume_link_sent', { phone: require('../services/account.service').maskedPhone(order.phone) || '' }) });
 }

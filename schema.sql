@@ -1229,19 +1229,6 @@ CREATE TABLE IF NOT EXISTS api_idempotency_keys (
     PRIMARY KEY (account_id, idem_key)
 );
 
--- Доступ по прежним заявкам: все, кого модератор включал в рассылку, и все со строкой заявки в балансе — один раз,
--- по отметке в app_settings (файл выполняется при каждом старте; подзапросы без корреляции — их понимает pg-mem).
-INSERT INTO order_access (order_id, master_id, source)
-SELECT DISTINCT order_id, master_id, 'legacy' FROM dispatch_deliveries
-WHERE NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
-ON CONFLICT DO NOTHING;
-INSERT INTO order_access (order_id, master_id, source)
-SELECT DISTINCT order_id, master_id, 'legacy' FROM balance_transactions
-WHERE reason = 'lead_charge' AND order_id IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
-ON CONFLICT DO NOTHING;
-INSERT INTO app_settings (key, value) VALUES ('order_access_backfill_v1', 'done') ON CONFLICT (key) DO NOTHING;
-
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';
@@ -1265,3 +1252,19 @@ ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS matched_categories JSON
 ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS service_snapshot JSONB NOT NULL DEFAULT '[]';
 ALTER TABLE dispatch_runs ADD COLUMN IF NOT EXISTS retry_of INTEGER;
 ALTER TABLE dispatch_deliveries ADD COLUMN IF NOT EXISTS retry_run_id INTEGER;
+
+-- Доступ по прежним заявкам (в конце файла: нужна колонка dispatch_deliveries.reason выше). Все, кому рассылка пыталась
+-- отправить заявку — как в живой рассылке, где доступ даётся перед отправкой, поэтому и при неясном или неудачном итоге
+-- («пропущен» и before_send_error — отправки не было), — и все со строкой заявки в балансе. Один раз, по отметке в
+-- app_settings (файл выполняется при каждом старте; подзапросы без корреляции — их понимает pg-mem).
+INSERT INTO order_access (order_id, master_id, source)
+SELECT DISTINCT order_id, master_id, 'legacy' FROM dispatch_deliveries
+WHERE status <> 'skipped' AND COALESCE(reason, '') <> 'before_send_error'
+  AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
+ON CONFLICT DO NOTHING;
+INSERT INTO order_access (order_id, master_id, source)
+SELECT DISTINCT order_id, master_id, 'legacy' FROM balance_transactions
+WHERE reason = 'lead_charge' AND order_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM app_settings WHERE key = 'order_access_backfill_v1')
+ON CONFLICT DO NOTHING;
+INSERT INTO app_settings (key, value) VALUES ('order_access_backfill_v1', 'done') ON CONFLICT (key) DO NOTHING;

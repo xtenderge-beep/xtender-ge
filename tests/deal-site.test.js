@@ -14,6 +14,8 @@ const day = 24 * 60 * 60 * 1000;
 const sms = async (phone) => (await redis.lrange('sandbox:sms', 0, -1)).map((line) => JSON.parse(line)).filter((m) => m.to === phone).reverse();
 
 (async () => {
+  // Стенд API: на настоящем Postgres (API_TEST_DATABASE_URL) он же накатывает схему.
+  const { server: apiServer } = await harness.start();
   const express = require('express');
   const wrap = require('../src/middleware/asyncHandler');
   const i18n = require('../src/config/i18n');
@@ -191,5 +193,6 @@ const sms = async (phone) => (await redis.lrange('sandbox:sms', 0, -1)).map((lin
     process.stdout.write('deal site tests passed\n');
   } finally {
     server.close();
+    apiServer.close();
   }
 })().catch((error) => { process.stderr.write(String(error && error.stack || error) + '\n'); process.exitCode = 1; });

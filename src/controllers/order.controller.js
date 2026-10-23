@@ -184,7 +184,8 @@ function announceConfirmed(order) {
   Promise.resolve()
     .then(() => smsService.sendOrderNotification(order.phone,
       serviceMessage.sms('orderLink', { id: order.id, link: `${getBaseUrl()}/o/${order.owner_token}` }),
-      { orderId: order.id, kind: 'transactional' }))
+      // deal — в тестовом окружении с SANDBOX_REAL_DEAL_SMS=1 эта SMS приходит владельцу (sms.service); на сайте не влияет.
+      { orderId: order.id, kind: 'transactional', deal: true }))
     .catch((err) => console.error('Order link SMS failed:', err.message));
 
   // Перевод текста заявки + уведомление модератора — в фоне, ответ клиенту не ждёт.

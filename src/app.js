@@ -183,6 +183,8 @@ runMigrations()
     require('./services/oauth.service').start();
     // Сделка: закрытие сбора по сроку, истечение выбора и предложений, очередь событий и уведомлений — каждые 20 секунд.
     require('./services/dealWorker.service').start();
+    // Только тестовое окружение (XTENDER_SANDBOX=1 и SANDBOX_SEED=1): тестовые исполнители для проверки сделки.
+    require('./services/sandboxSeed.service').run().catch((err) => console.error('[sandbox] seed failed:', err.message));
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

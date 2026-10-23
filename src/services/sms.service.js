@@ -13,8 +13,10 @@ function isDevMode() {
 // Тестовое окружение (решение 11 владельца, docs/api-v1/BACKEND_AUDIT.md, раздел 12): настоящая SMS — только код
 // подтверждения (context.otp) и только на номера из SANDBOX_REAL_SMS_NUMBERS через запятую. Рассылки исполнителям и
 // любые другие SMS остаются в приёмнике даже для этих номеров. Код на разрешённый номер в приёмник не кладём.
+// Для проверки сделки владельцем: SANDBOX_REAL_DEAL_SMS=1 пускает на те же номера и уведомления сделки (context.deal —
+// первое предложение, конец сбора, ссылка со страницы возврата); рассылки исполнителям по-прежнему в приёмнике.
 function sandboxRealSms(phone, context) {
-  if (!context.otp) return false;
+  if (!context.otp && !(context.deal && process.env.SANDBOX_REAL_DEAL_SMS === '1')) return false;
   const allowed = String(process.env.SANDBOX_REAL_SMS_NUMBERS || '').split(',').map((n) => n.trim()).filter(Boolean).map(toE164);
   return allowed.includes(toE164(phone));
 }

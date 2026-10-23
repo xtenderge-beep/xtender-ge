@@ -36,17 +36,7 @@ Module._load = function (request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const SANDBOX = {
-  customer: '+995500000001',
-  providers: [
-    { phone: '+995500000002', name: 'SANDBOX Movers Giorgi', service: 'movers', attributes: { crew_size: 3 }, languages: ['ka', 'ru'], active: true,
-      description: 'SANDBOX: loading, unloading, furniture assembly. Test profile, not a real person.' },
-    { phone: '+995500000003', name: 'SANDBOX Van Levan', service: 'van', attributes: { size: 'L', body: 'closed', tail_lift: true, cargo_length_cm: 400, cargo_width_cm: 180, cargo_height_cm: 190 },
-      languages: ['ru', 'en'], active: true, description: 'SANDBOX: closed van with a tail lift. Test profile, not a real person.' },
-    { phone: '+995500000004', name: 'SANDBOX Junk Nika (pending)', service: 'junk', attributes: { volume_m3: '4' }, languages: ['ka'], active: false,
-      description: 'SANDBOX: waste removal, awaiting moderation. Test profile, not a real person.' },
-  ],
-};
+const { SANDBOX } = require('../src/config/sandboxData');
 
 async function seed() {
   const city = (await pool.query("SELECT id FROM cities WHERE slug='tbilisi'")).rows[0].id;

@@ -207,7 +207,7 @@ async function sendOne(delivery, now) {
     [delivery.recipient_ref, new Date(now.getTime() - 24 * 60 * 60 * 1000)])).rows[0].n;
   if (sentToday >= DAILY_SMS_LIMIT) return mark(delivery.id, 'cancelled', { errorCode: 'daily_limit' });
   try {
-    const receipt = await smsService.sendOrderNotification(phone, delivery.body, { kind: 'transactional', orderId: delivery.order_id });
+    const receipt = await smsService.sendOrderNotification(phone, delivery.body, { kind: 'transactional', orderId: delivery.order_id, deal: true });
     return mark(delivery.id, 'sent', { providerMessageId: receipt?.providerMessageId || null });
   } catch (error) {
     // Ответ шлюза неясен — повтор мог бы задвоить SMS: оставляем «неизвестно» для оператора.

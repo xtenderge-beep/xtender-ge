@@ -161,17 +161,17 @@ const TOOLS = [
     input: { tender_id: tenderId },
     run: (ctx, args) => dealApi.tenderStatus(ctx, args.tender_id),
     text: (s) => `${s.tender_id}: ${s.status}, publication ${s.publication_status}, active offers ${s.active_offer_count}, deadline ${s.submission_deadline || 'not started'}, providers reached ${s.dispatch_summary.providers_with_access}` },
-  { name: 'close_tender', scopes: ['tenders:write'], write: true, title: 'Stop collecting offers', annotations: WRITE,
+  { name: 'close_tender', confirm: true, scopes: ['tenders:write'], write: true, title: 'Stop collecting offers', annotations: WRITE,
     description: 'Stop accepting offers early. Only after the user asked.',
     input: { tender_id: tenderId, version: version('request') },
     run: (ctx, args) => dealApi.closeTender(ctx, args.tender_id, args.version),
     text: (t) => 'Collection closed: ' + tenderLine(t) },
-  { name: 'cancel_tender', scopes: ['tenders:write'], write: true, title: 'Cancel a request', annotations: FINAL,
+  { name: 'cancel_tender', confirm: true, scopes: ['tenders:write'], write: true, title: 'Cancel a request', annotations: FINAL,
     description: 'Cancel a request before a provider confirmed it. A reason is required. Only after the user confirmed.',
     input: { tender_id: tenderId, version: version('request'), reason: z.string().min(3).max(500) },
     run: (ctx, args) => dealApi.cancelTender(ctx, args.tender_id, args.version, args.reason),
     text: (t) => 'Cancelled: ' + tenderLine(t) },
-  { name: 'complete_tender', scopes: ['tenders:write'], write: true, title: 'Mark the job done', annotations: FINAL,
+  { name: 'complete_tender', confirm: true, scopes: ['tenders:write'], write: true, title: 'Mark the job done', annotations: FINAL,
     description: 'The customer confirms the job is done (after a provider confirmed the selection).',
     input: { tender_id: tenderId, version: version('request') },
     run: (ctx, args) => dealApi.completeTender(ctx, args.tender_id, args.version),
@@ -209,12 +209,12 @@ const TOOLS = [
     input: { offer_id: offerId, version: version('offer'), ...offerFields },
     run: (ctx, args) => dealApi.updateOffer(ctx, args.offer_id, args.version, pick(args, offerKeys)),
     text: (o) => 'Offer updated: ' + offerLine(o) },
-  { name: 'submit_offer', scopes: ['offers:write'], write: true, title: 'Send my offer', annotations: OUTWARD,
+  { name: 'submit_offer', confirm: true, scopes: ['offers:write'], write: true, title: 'Send my offer', annotations: OUTWARD,
     description: 'Send an offer draft to the customer after the provider confirmed it.',
     input: { offer_id: offerId, version: version('offer') },
     run: (ctx, args) => dealApi.submitOffer(ctx, args.offer_id, args.version),
     text: (o) => 'Offer sent: ' + offerLine(o) },
-  { name: 'withdraw_offer', scopes: ['offers:write'], write: true, title: 'Withdraw my offer', annotations: OUTWARD,
+  { name: 'withdraw_offer', confirm: true, scopes: ['offers:write'], write: true, title: 'Withdraw my offer', annotations: OUTWARD,
     description: 'Withdraw an own offer that is not chosen.',
     input: { offer_id: offerId, version: version('offer') },
     run: (ctx, args) => dealApi.withdrawOffer(ctx, args.offer_id, args.version),
@@ -229,12 +229,12 @@ const TOOLS = [
     input: { offer_id: offerId },
     run: (ctx, args) => dealApi.getOffer(ctx, args.offer_id),
     text: offerLine },
-  { name: 'accept_selection', scopes: ['offers:write'], write: true, title: 'Confirm the job', annotations: OUTWARD,
+  { name: 'accept_selection', confirm: true, scopes: ['offers:write'], write: true, title: 'Confirm the job', annotations: OUTWARD,
     description: 'The chosen provider confirms the job. Then both sides get each other’s phone.',
     input: { offer_id: offerId },
     run: (ctx, args) => dealApi.acceptSelection(ctx, args.offer_id),
     text: (s) => `Selection ${s.status}. Read get_tender for the customer contact.` },
-  { name: 'decline_selection', scopes: ['offers:write'], write: true, title: 'Decline the job', annotations: OUTWARD,
+  { name: 'decline_selection', confirm: true, scopes: ['offers:write'], write: true, title: 'Decline the job', annotations: OUTWARD,
     description: 'The chosen provider declines, with a reason; the customer may choose another offer.',
     input: { offer_id: offerId, reason: z.string().min(3).max(500) },
     run: (ctx, args) => dealApi.declineSelection(ctx, args.offer_id, args.reason),
@@ -251,7 +251,7 @@ const TOOLS = [
     input: { thread_id: z.string().max(40) },
     run: async (ctx, args) => ({ items: await dealApi.messages(ctx, args.thread_id) }),
     text: (r) => r.items.map((m) => `[${m.author_role} ${m.created_at}] ${m.text}`).join('\n') || 'No messages.' },
-  { name: 'send_message', scopes: ['messages:write'], write: true, title: 'Send a message', annotations: OUTWARD,
+  { name: 'send_message', confirm: true, scopes: ['messages:write'], write: true, title: 'Send a message', annotations: OUTWARD,
     description: 'Send a message only when the user asked, with the text they approved. A provider starts a thread with tender_id; replies use thread_id.',
     input: { thread_id: z.string().max(40).optional(), tender_id: z.string().max(40).optional(), text: z.string().min(1).max(2000) },
     run: async (ctx, args) => {
@@ -308,7 +308,9 @@ function errorResult(error) {
 // helpers.connectRequired — ответ, по которому ChatGPT предлагает подключить аккаунт (mcp.controller).
 function register(server, { connectRequired, channelOf }) {
   for (const tool of TOOLS) {
-    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: tool.input, annotations: { title: tool.title, ...tool.annotations } },
+    // Действие, которое видят другие люди или которое не отменить: только с confirmed_by_user (сервер проверяет сам).
+    const input = tool.confirm && !tool.input.confirmed_by_user ? { ...tool.input, confirmed_by_user: confirmed } : tool.input;
+    server.registerTool(tool.name, { title: tool.title, description: tool.description, inputSchema: input, annotations: { title: tool.title, ...tool.annotations } },
       async (args, extra) => {
         try {
           let ctx = null;
@@ -319,6 +321,10 @@ function register(server, { connectRequired, channelOf }) {
             if (missing) return connectRequired('insufficient_scope', `The ${missing} scope is required`);
             if (tool.write && session.account.status !== 'active') throw new DealError(403, 'ACCOUNT_READ_ONLY', 'This account is read-only; changes are not allowed.');
             ctx = await dealApi.context(session.account, { lang: args?.lang || session.account.locale || 'en', channel: channelOf(session) });
+          }
+          if (tool.confirm && args?.confirmed_by_user !== true) {
+            throw new DealError(422, 'CONFIRMATION_REQUIRED', 'This action affects other people or cannot be undone: ask the user and pass confirmed_by_user = true only after they agreed.',
+              { fields: [{ path: 'confirmed_by_user', code: 'REQUIRED' }] });
           }
           const result = await tool.run(ctx, args || {});
           return { content: [{ type: 'text', text: tool.text(result) }], structuredContent: result };

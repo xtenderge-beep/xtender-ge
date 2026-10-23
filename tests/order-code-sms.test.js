@@ -90,7 +90,7 @@ let server;
   assert.equal(created.success, true, JSON.stringify(created));
   assert.equal(created.ownerLink, '/o/' + order.owner_token);
   assert.equal(sms.length, 2);
-  assert.deepEqual(sms[1], { phone, text: 'Xtender: request #' + order.id + ' is sent. Status and closing: https://xtender.test/o/' + order.owner_token, context: { orderId: order.id, kind: 'transactional' } });
+  assert.deepEqual(sms[1], { phone, text: 'Xtender: request #' + order.id + ' is sent. Status and closing: https://xtender.test/o/' + order.owner_token, context: { orderId: order.id, kind: 'transactional', deal: true } });
   html = await page('/o/' + order.owner_token);
   assert.ok(badge(html, 'ru', 'status_pending_review') && !notice(html, 'ru') && html.includes('id="closeBtn"'));
 

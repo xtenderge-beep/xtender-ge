@@ -45,7 +45,7 @@ const base = 'http://127.0.0.1:' + PORT;
     const profile = await (await fetch(base + '/api/v1/me/provider-profile', { headers: { authorization: 'Bearer ' + provider.access_token } })).json();
     assert.deepEqual([profile.category_ids, profile.status], [['van'], 'active']);
     const categories = await (await fetch(base + '/api/v1/categories?q=movers&location_id=city:tbilisi')).json();
-    assert.deepEqual([categories.items[0].id, categories.items[0].supply_status.provider_count], ['movers', 1]);
+    assert.deepEqual([categories.items[0].id, categories.items[0].supply_status.provider_count], ['movers', 2], 'две команды грузчиков — для сравнения предложений');
     assert.match(output, /\[SMS SANDBOX\]/);
     assert.doesNotMatch(output, /\[SMS GATEWAY\]/, 'шлюз не вызывался');
   } finally {

@@ -42,6 +42,20 @@ const harness = require('./api-v1-harness');
     let items = (await (await sink('+995544000001')).json()).items;
     assert.deepEqual(items.map((item) => item.text), ['Xtender: Zakazi (Order) #1: https://example.test/order/x']);
 
+    // 3а. Уведомление сделки на разрешённый номер: по умолчанию в приёмник; с SANDBOX_REAL_DEAL_SMS=1 — настоящая SMS,
+    // и только на разрешённый номер.
+    await sms.sendOrderNotification('+995544000001', 'Xtender: request #1 got its first offer.', { kind: 'transactional', deal: true });
+    assert.equal(gateway.length, 2);
+    process.env.SANDBOX_REAL_DEAL_SMS = '1';
+    await sms.sendOrderNotification('+995544000001', 'Xtender: request #2 got its first offer.', { kind: 'transactional', deal: true });
+    assert.equal(gateway.length, 3);
+    assert.equal(gateway[2].msg, 'Xtender: request #2 got its first offer.');
+    await sms.sendOrderNotification('+995544000009', 'Xtender: request #3 got its first offer.', { kind: 'transactional', deal: true });
+    await sms.sendOrderNotification('+995544000001', 'Xtender: Zakazi (Order) #4', { kind: 'lead' });
+    assert.equal(gateway.length, 3, 'other numbers and provider mailings stay in the sink');
+    delete process.env.SANDBOX_REAL_DEAL_SMS;
+    gateway.splice(2);
+
     // 4. Код на номер не из списка — в приёмник, шлюз не вызван.
     await harness.resetLimits('+995544000009');
     await otp.sendCode('+995544000009', 'oauth');

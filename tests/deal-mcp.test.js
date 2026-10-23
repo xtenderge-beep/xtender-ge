@@ -79,10 +79,15 @@ const day = 24 * 60 * 60 * 1000;
     // Исполнитель: заявка, вопрос, предложение.
     const opps = await ok(chosen, 'search_opportunities', {});
     assert.deepEqual(opps.items.map((t) => t.id), [draft.id]);
-    const message = await ok(chosen, 'send_message', { tender_id: draft.id, text: 'Does the sofa fit in the stairwell?' });
+    const message = await ok(chosen, 'send_message', { tender_id: draft.id, text: 'Does the sofa fit in the stairwell?', confirmed_by_user: true });
     assert.equal(message.author_role, 'provider');
     const offerDraft = await ok(chosen, 'create_offer_draft', { tender_id: draft.id, line_items: [{ offered_name: 'Two movers', line_total_minor: 9000 }], start_at: start });
-    const offer = await ok(chosen, 'submit_offer', { offer_id: offerDraft.id, version: offerDraft.version });
+    // Отправку видит заказчик: без подтверждения пользователя — отказ, предложение остаётся черновиком.
+    const unconfirmed = await tool(chosen, 'submit_offer', { offer_id: offerDraft.id, version: offerDraft.version });
+    assert.equal(unconfirmed.isError, true);
+    assert.match(JSON.stringify(unconfirmed.content), /confirmed_by_user/);
+    assert.equal((await tool(chosen, 'submit_offer', { offer_id: offerDraft.id, version: offerDraft.version, confirmed_by_user: false })).structuredContent.error.code, 'CONFIRMATION_REQUIRED');
+    const offer = await ok(chosen, 'submit_offer', { offer_id: offerDraft.id, version: offerDraft.version, confirmed_by_user: true });
     assert.equal(offer.status, 'submitted');
     // Заказчику предложение нельзя отправить от своего имени: у него нет роли исполнителя.
     const notProvider = await tool(customer, 'create_offer_draft', { tender_id: draft.id, line_items: [{ offered_name: 'x', line_total_minor: 1 }] });
@@ -91,7 +96,7 @@ const day = 24 * 60 * 60 * 1000;
     // Заказчик: переписка, сравнение, выбор.
     const threads = await ok(customer, 'list_threads', { tender_id: draft.id });
     assert.equal(threads.items.length, 1);
-    await ok(customer, 'send_message', { thread_id: threads.items[0].id, text: 'Yes, it fits.' });
+    await ok(customer, 'send_message', { thread_id: threads.items[0].id, text: 'Yes, it fits.', confirmed_by_user: true });
     const comparison = await ok(customer, 'get_comparison_data', { tender_id: draft.id });
     assert.equal(comparison.offers.length, 1);
     assert.equal(comparison.offers[0].offer.total_amount_minor, 9000);
@@ -103,7 +108,7 @@ const day = 24 * 60 * 60 * 1000;
     assert.equal((await ok(customer, 'select_offer', { tender_id: draft.id, offer_id: offer.id, expected_offer_version: offer.version, expected_tender_version: comparison.tender_version, confirmed_by_user: true })).id, selection.id);
 
     // Подтверждение исполнителем: контакты открыты обоим.
-    assert.equal((await ok(chosen, 'accept_selection', { offer_id: offer.id })).status, 'accepted');
+    assert.equal((await ok(chosen, 'accept_selection', { offer_id: offer.id, confirmed_by_user: true })).status, 'accepted');
     const awarded = await ok(customer, 'get_tender', { tender_id: draft.id });
     assert.equal(awarded.status, 'awarded');
     assert.equal(awarded.provider_contact.phone, provider.phone);

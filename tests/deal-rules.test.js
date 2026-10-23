@@ -217,6 +217,18 @@ const tbilisiTime = (at) => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/T
     assert.ok(await outbox.retry(broken.id));
     assert.equal((await pool.query("SELECT failed_at FROM outbox_events WHERE dedupe_key='broken-1'")).rows[0].failed_at, null);
 
+    // 9. Засев тестового окружения: только в песочнице и только с SANDBOX_SEED=1, без дублей при повторном старте.
+    const seed = require('../src/services/sandboxSeed.service');
+    delete process.env.SANDBOX_SEED;
+    assert.equal(await seed.run(), 0);
+    process.env.SANDBOX_SEED = '1';
+    process.env.XTENDER_SANDBOX = '';
+    assert.equal(await seed.run(), 0, 'never on the live site');
+    process.env.XTENDER_SANDBOX = '1';
+    assert.equal(await seed.run(), require('../src/config/sandboxData').SANDBOX.providers.length);
+    assert.equal(await seed.run(), 0);
+    delete process.env.SANDBOX_SEED;
+
     process.stdout.write('deal rules tests passed\n');
   } finally {
     server.close();
