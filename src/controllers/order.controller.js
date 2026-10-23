@@ -913,9 +913,13 @@ async function show(req, res) {
   const requestLang = isOwner ? null : requestLanguage.ofOrder(order);
   // Услуги заявки, по которым исполнитель ей сейчас подходит.
   const matched = m ? await require('../services/serviceMatching.service').openMatches(m, order) : [];
+  // Блок сделки (письменные предложения): писать может только вошедший в кабинет, по личной ссылке — только чтение.
+  const deal = await require('./deal.controller').pageLocals(order, { isOwner, master: isOwner ? null : provider, sessionMaster, lang: pageLang });
 
   return res.render('order', {
     ...revisionLocals(order, pageLang),
+    deal,
+    dealStrings: require('../config/deal-copy').clientStrings(pageLang),
     order,
     files,
     isOwner,
@@ -984,6 +988,8 @@ async function showByOwnerToken(req, res) {
 
   return res.render('order', {
     ...revisionLocals(order, ownerLang),
+    deal: await require('./deal.controller').pageLocals(order, { isOwner: true, lang: ownerLang }),
+    dealStrings: require('../config/deal-copy').clientStrings(ownerLang),
     order,
     files,
     isOwner: true,

@@ -110,7 +110,7 @@ const day = 24 * 60 * 60 * 1000;
     assert.equal((await ok(chosen, 'get_tender', { tender_id: draft.id })).customer_contact.phone, customerPhone);
     // Новый чат: найти заявку по номеру и получить ссылку возврата.
     assert.equal((await ok(customer, 'resolve_tender', { number: String(orderId) })).id, draft.id);
-    assert.match((await ok(customer, 'get_resume_link', { tender_id: draft.id })).url, /\/r\//);
+    assert.match((await ok(customer, 'get_resume_link', { tender_id: draft.id })).url, /\/t\//);
 
     // Аккаунт «только чтение»: читать можно, менять — нет.
     const accountId = (await harness.pool.query('SELECT id FROM accounts WHERE phone=$1', [customerPhone])).rows[0].id;

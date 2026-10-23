@@ -82,6 +82,12 @@ app.use('/:locale(ru|en)', publicRoutes);
 app.get('/order/:token', asyncHandler(orderController.show));
 app.get('/o/:ownerToken', asyncHandler(orderController.showByOwnerToken));
 app.get('/my-orders', asyncHandler(orderController.myOrders));
+// Сделка: согласие перед первой публикацией из ChatGPT и страница возврата по ссылке из SMS (deal.controller).
+const dealController = require('./controllers/deal.controller');
+app.get('/consent/:token', asyncHandler(dealController.consentPage));
+app.post('/consent/:token', asyncHandler(dealController.consentSubmit));
+app.get('/t/:token', asyncHandler(dealController.resumePage));
+app.post('/t/:token/link', asyncHandler(dealController.resumeSendLink));
 
 app.get('/master', asyncHandler(masterController.statusPage));
 app.get('/master/logout', asyncHandler(masterController.logout));

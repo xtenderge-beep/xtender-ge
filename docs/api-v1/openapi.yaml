@@ -6200,7 +6200,7 @@ components:
       properties:
         url:
           type: "string"
-          description: "https://xtender.ge/r/<opaque token>; opens a light page, performs nothing."
+          description: "https://xtender.ge/t/<opaque token>; opens a light page, performs nothing."
         expires_at:
           type: "string"
           description: "RFC 3339 with offset; stored in UTC."

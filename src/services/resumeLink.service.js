@@ -1,4 +1,4 @@
-// Ссылка возврата из SMS: https://xtender.ge/r/<токен> (ТЗ, раздел 9). В базе только хеш и срок. Страница по ссылке
+// Ссылка возврата из SMS: https://xtender.ge/t/<токен> (ТЗ, раздел 9). В базе только хеш и срок. Страница по ссылке
 // показывает номер и состояние заявки, команду для ChatGPT и повтор ссылки на страницу заявки по SMS — но не предложения,
 // контакты и переписку: пересланная ссылка личных данных не открывает.
 const crypto = require('node:crypto');
@@ -12,7 +12,7 @@ async function create(orderId, client = pool) {
   const token = crypto.randomBytes(24).toString('base64url');
   await client.query('INSERT INTO resume_links (token_hash, order_id, expires_at) VALUES ($1,$2,$3)',
     [sha(token), orderId, new Date(Date.now() + TTL_DAYS * 24 * 60 * 60 * 1000)]);
-  return { url: getBaseUrl() + '/r/' + token, expiresAt: new Date(Date.now() + TTL_DAYS * 24 * 60 * 60 * 1000) };
+  return { url: getBaseUrl() + '/t/' + token, expiresAt: new Date(Date.now() + TTL_DAYS * 24 * 60 * 60 * 1000) };
 }
 
 async function resolve(token) {

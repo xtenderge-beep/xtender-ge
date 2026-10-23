@@ -1,0 +1,38 @@
+<%- include('./_header', { active: 'outbox' }) %>
+<% const when = v => v ? new Date(v).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+   const rules = { first_offer: 'Первое предложение', collection_closed: 'Сбор закрыт', new_question: 'Вопрос исполнителя', selection_changed: 'Ответ исполнителя на выбор', selected: 'Выбрано предложение (исполнителю)', customer_reply: 'Ответ заказчика (исполнителю)' };
+   const statuses = { failed: 'Ошибка', unknown: 'Неизвестно' }; %>
+
+<h1 class="text-2xl font-black text-stone-900">Очередь сделки: сбои</h1>
+<p class="mt-3 text-sm text-stone-600 max-w-3xl">Уведомления по письменным предложениям: SMS заказчику и Telegram или SMS исполнителю. Здесь — то, что не ушло. «Неизвестно» — шлюз ответил неясно, SMS могла дойти; сервер такие не повторяет, чтобы человек не получил две. За 14 дней отправлено: <b><%= counts.sent || 0 %></b>, ошибок: <b><%= counts.failed || 0 %></b>, неизвестно: <b><%= counts.unknown || 0 %></b>, отменено (отписка, лимит, совпадение событий): <b><%= counts.cancelled || 0 %></b>. Событий в очереди: <b><%= pending %></b>.</p>
+<% if (retried) { %><p role="status" class="p-4 bg-emerald-50 text-emerald-800 rounded-xl mt-4">Событие снова в очереди.</p><% } %>
+
+<h2 class="mt-8 text-lg font-black text-stone-900">События, не обработанные после всех попыток</h2>
+<% if (!events.length) { %><p class="mt-2 text-sm text-stone-500">Нет.</p><% } else { %>
+  <div class="mt-3 space-y-2">
+    <% events.forEach(function (e) { %>
+      <div class="bg-white border border-stone-200 rounded-xl p-3 text-sm flex flex-wrap items-center gap-3">
+        <span class="font-bold"><%= e.event_type %></span>
+        <% if (e.order_id) { %><a class="underline" href="/admin/orders/<%= tokens[e.order_id] %>">заявка #<%= e.order_id %></a><% } %>
+        <span class="text-stone-500"><%= when(e.failed_at) %> · попыток <%= e.attempts %></span>
+        <span class="text-red-700 text-xs break-all"><%= e.last_error %></span>
+        <form method="POST" action="/admin/outbox/<%= e.id %>/retry" class="ml-auto"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="px-3 py-1.5 rounded-lg bg-stone-900 text-white text-xs font-bold">Повторить</button></form>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+
+<h2 class="mt-8 text-lg font-black text-stone-900">Уведомления с ошибкой или неизвестным итогом (14 дней)</h2>
+<% if (!deliveries.length) { %><p class="mt-2 text-sm text-stone-500">Нет.</p><% } else { %>
+  <div class="mt-3 space-y-2">
+    <% deliveries.forEach(function (d) { %>
+      <div class="bg-white border border-stone-200 rounded-xl p-3 text-sm flex flex-wrap items-center gap-3">
+        <span class="font-bold <%= d.status === 'failed' ? 'text-red-700' : 'text-amber-700' %>"><%= statuses[d.status] || d.status %></span>
+        <span><%= rules[d.rule] || d.rule %> · <%= d.channel %> · <%= d.recipient_role === 'customer' ? 'заказчику' : 'исполнителю' %></span>
+        <% if (d.order_id) { %><a class="underline" href="/admin/orders/<%= tokens[d.order_id] %>">заявка #<%= d.order_id %></a><% } %>
+        <span class="text-stone-500"><%= when(d.created_at) %> · попыток <%= d.attempts %> · <%= d.error_code || '' %></span>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+<%- include('./_footer') %>

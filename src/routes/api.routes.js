@@ -44,6 +44,8 @@ router.post('/orders/:token/close-category', asyncHandler(orderController.closeC
 router.post('/orders/:token/log-view', asyncHandler(orderController.logView));
 router.post('/orders/:token/contact', asyncHandler(orderController.revealContact));
 router.post('/orders/:token/lead-subscription', asyncHandler(orderController.setLeadSubscription));
+// Сделка на странице заявки: предложение, вопрос, выбор, подтверждение, SMS (deal.controller).
+router.post('/orders/:token/deal/:action', asyncHandler(require('../controllers/deal.controller').action));
 
 router.get('/masters', asyncHandler(masterController.list));
 router.post('/masters/otp/send', asyncHandler(masterController.sendOtp));

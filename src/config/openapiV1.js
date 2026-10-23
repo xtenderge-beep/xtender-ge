@@ -375,7 +375,7 @@ function schemas() {
     NotificationList: list(obj({ id: str(), rule: str(), channel: { type: 'string', enum: ['sms', 'telegram'] }, status: { type: 'string', enum: ['queued', 'sending', 'sent', 'unknown', 'failed', 'cancelled'],
       description: 'sent — accepted by the gateway (not a delivery receipt); unknown — the gateway answer was unclear, not retried to avoid a double SMS.' },
       tender_id: nullable(str()), created_at: time(), sent_at: nullable(time()), error_code: nullable(str()) })),
-    ResumeLink: obj({ url: str('https://xtender.ge/r/<opaque token>; opens a light page, performs nothing.'), expires_at: time(),
+    ResumeLink: obj({ url: str('https://xtender.ge/t/<opaque token>; opens a light page, performs nothing.'), expires_at: time(),
       chat_prompt: str('Ready text the user can paste into ChatGPT; it does not reopen an earlier conversation.'), request_id: str() }),
   };
 }

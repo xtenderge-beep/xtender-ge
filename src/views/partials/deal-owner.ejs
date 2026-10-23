@@ -1,0 +1,176 @@
+<%# Сделка — заказчику (deal.controller.ownerLocals): статус, предложения с условиями и историей, вопросы исполнителей,
+    выбор, подтверждение, закрытие, отмена, SMS. Все тексты исполнителей выводятся экранированными. %>
+<% const c = deal.c; const gel = function (m) { return m === null || m === undefined ? null : (m / 100).toFixed(m % 100 ? 2 : 0) + ' ₾'; }; %>
+<section id="deal" class="space-y-4 pt-4 border-t border-stone-100" data-deal-token="<%= order.token %>" data-deal-lang="<%= lang %>"
+  data-deal-strings="<%= JSON.stringify(dealStrings) %>">
+  <div class="p-3.5 rounded-2xl border text-sm font-medium <%= ['cancelled', 'completed'].includes(deal.status) ? 'bg-stone-50 border-stone-200 text-stone-600' : deal.status === 'awarded' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-sky-50 border-sky-200 text-sky-900' %>">
+    <div class="font-bold"><%= deal.publication === 'published' || deal.status !== 'open' ? c('deal_' + deal.status) : c('resume_review') %></div>
+    <% if (deal.status === 'open' && deal.deadline) { %><div class="text-xs mt-1"><%= c('deadline', { time: deal.deadline }) %></div><% } %>
+  </div>
+
+  <div class="text-sm">
+    <span class="text-[11px] font-bold text-stone-400 uppercase tracking-wider"><%= c('mode_label') %></span>
+    <div class="text-stone-800"><%= c('mode_' + deal.mode) %></div>
+    <% if (deal.canAllowCalls) { %>
+      <form data-deal-action="allow-calls" data-confirm="<%= c('enable_calls_hint') %>" class="mt-2">
+        <input type="hidden" name="version" value="<%= deal.version %>">
+        <button class="text-xs font-bold text-emerald-700 underline"><%= c('enable_calls') %></button>
+        <span class="block text-xs text-stone-500"><%= c('enable_calls_hint') %></span>
+        <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div>
+      </form>
+    <% } %>
+  </div>
+
+  <% if (deal.selection) { const s = deal.selection; %>
+    <div class="p-3.5 rounded-2xl border text-sm <%= s.status === 'accepted' ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : s.status === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-stone-50 border-stone-200 text-stone-700' %>">
+      <% if (s.status === 'pending') { %><%= c('pending_owner', { name: s.providerName || '', time: s.confirmBy }) %>
+      <% } else if (s.status === 'accepted') { %>
+        <div class="font-bold"><%= c('awarded_owner', { name: s.providerName || '' }) %></div>
+        <% if (s.providerPhone) { %><div class="mt-1"><%= c('provider_phone') %>: <a class="font-bold underline" href="tel:<%= s.providerPhone %>"><%= s.providerPhone %></a></div><% } %>
+      <% } else if (s.status === 'declined') { %><%= c('declined_owner') %><% if (s.decline_reason) { %> «<%= s.decline_reason %>»<% } %>
+      <% } else if (s.status === 'expired') { %><%= c('expired_owner') %><% } %>
+    </div>
+  <% } %>
+
+  <div>
+    <h2 class="text-sm font-extrabold text-stone-900 mb-2"><%= c('offers_title') %> (<%= deal.offers.filter(function (o) { return ['submitted', 'selected', 'accepted'].includes(o.status); }).length %>)</h2>
+    <% if (!deal.offers.length) { %><p class="text-sm text-stone-500"><%= c('no_offers') %></p><% } %>
+    <div class="space-y-3">
+      <% deal.offers.forEach(function (o) { const active = ['submitted', 'selected', 'accepted'].includes(o.status); %>
+        <article class="p-3.5 rounded-2xl border break-words <%= active ? 'border-stone-200 bg-white' : 'border-stone-100 bg-stone-50 text-stone-500' %>" data-offer="<%= o.id %>">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 break-words">
+              <div class="font-bold text-stone-900"><%= o.provider.display_name || o.provider_id %></div>
+              <div class="text-xs text-stone-500"><%= o.provider.review_count ? c('rating', { r: o.provider.rating, n: o.provider.review_count }) : c('no_reviews') %></div>
+            </div>
+            <div class="text-right shrink-0 max-w-[50%]">
+              <% if (o.total_status === 'complete') { %>
+                <div class="font-black text-stone-900"><%= gel(o.total_amount_minor) %></div>
+              <% } else { %>
+                <div class="font-bold text-amber-700 text-sm"><%= c('total_incomplete') %></div>
+                <% if (o.known_amount_minor) { %><div class="text-xs text-stone-500"><%= c('known_part') %>: <%= gel(o.known_amount_minor) %></div><% } %>
+              <% } %>
+              <div class="text-[11px] text-stone-400"><%= c('pricing_' + o.pricing_type) %> · <%= c('version_label', { v: o.version }) %></div>
+            </div>
+          </div>
+          <% if (!active) { %><div class="mt-1 text-xs font-bold"><%= c('offer_status_' + o.status) %></div><% } %>
+          <% if (o.total_status !== 'complete') { %>
+            <div class="mt-1 text-xs text-amber-800"><%= o.incomplete_reasons.map(function (r) { return c('reason_' + r); }).join(', ') %></div>
+          <% } %>
+          <ul class="mt-2 space-y-1 text-sm text-stone-700">
+            <% o.line_items.forEach(function (l) { %>
+              <li class="flex justify-between gap-3"><span class="min-w-0 break-words"><%= l.offered_name %><%= l.quantity ? ' × ' + l.quantity : '' %><% if (l.is_substitution) { %> · <b><%= c('substitution_label') %></b>: <%= l.deviation_description %><% } %></span><span class="shrink-0"><%= gel(l.line_total_minor) || '—' %></span></li>
+            <% }); %>
+            <% ['delivery', 'unloading'].forEach(function (key) { const ch = o[key]; if (ch && ch.state !== 'not_applicable') { %>
+              <li class="flex justify-between gap-3"><span class="min-w-0 break-words"><%= c('f_' + key) %>: <%= c('charge_' + ch.state) %></span><span class="shrink-0"><%= ch.state === 'separate' ? (gel(ch.amount_minor) || '—') : '' %></span></li>
+            <% } }); %>
+            <% o.additional_costs.forEach(function (x) { %><li class="flex justify-between gap-3"><span class="min-w-0 break-words"><%= x.name %></span><span class="shrink-0"><%= gel(x.amount_minor) || '—' %></span></li><% }); %>
+          </ul>
+          <dl class="mt-2 grid grid-cols-1 gap-1 text-xs text-stone-600">
+            <% if (o.start_at) { %><div><dt class="inline font-bold"><%= c('starts') %>:</dt> <dd class="inline"><%= deal.at(o.start_at) %></dd></div><% } %>
+            <% if (o.completion_at) { %><div><dt class="inline font-bold"><%= c('finishes') %>:</dt> <dd class="inline"><%= deal.at(o.completion_at) %></dd></div><% } %>
+            <% if (o.payment_terms && (o.payment_terms.text || o.payment_terms.deposit_percent !== null)) { %><div><dt class="inline font-bold"><%= c('f_payment') %>:</dt> <dd class="inline"><%= o.payment_terms.deposit_percent !== null ? o.payment_terms.deposit_percent + '% · ' : '' %><%= o.payment_terms.text || '' %></dd></div><% } %>
+            <% if (o.warranty) { %><div><dt class="inline font-bold"><%= c('f_warranty') %>:</dt> <dd class="inline"><%= o.warranty %></dd></div><% } %>
+            <% if (o.exclusions.length) { %><div><dt class="inline font-bold"><%= c('f_exclusions').split(' (')[0] %>:</dt> <dd class="inline"><%= o.exclusions.join('; ') %></dd></div><% } %>
+            <% if (o.assumptions.length) { %><div><dt class="inline font-bold"><%= c('f_assumptions').split(' (')[0] %>:</dt> <dd class="inline"><%= o.assumptions.join('; ') %></dd></div><% } %>
+            <% if (o.valid_until) { %><div><dt class="inline font-bold"><%= c('valid_until') %>:</dt> <dd class="inline"><%= deal.at(o.valid_until) %></dd></div><% } %>
+          </dl>
+          <% if (o.notes) { %><p class="mt-2 text-sm text-stone-700 whitespace-pre-line break-words"><%= o.notes %></p><% } %>
+          <% if (o.history && o.history.length > 1) { %>
+            <details class="mt-2 text-xs text-stone-500"><summary class="cursor-pointer font-bold"><%= c('history_title') %></summary>
+              <ul class="mt-1 space-y-0.5"><% o.history.forEach(function (h) { %><li><%= c('version_label', { v: h.version }) %>: <%= h.total_status === 'complete' ? gel(h.total_amount_minor) : c('total_incomplete') %> · <%= deal.at(h.saved_at) %></li><% }); %></ul>
+            </details>
+          <% } %>
+          <% if (deal.canSelect && o.status === 'submitted') { %>
+            <form data-deal-action="select" data-confirm="<%= c('choose_confirm') %>" class="mt-3">
+              <input type="hidden" name="offer_id" value="<%= o.id %>"><input type="hidden" name="offer_version" value="<%= o.version %>"><input type="hidden" name="tender_version" value="<%= deal.version %>">
+              <button class="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm transition"><%= c('choose') %></button>
+              <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div>
+            </form>
+          <% } %>
+        </article>
+      <% }); %>
+    </div>
+  </div>
+
+  <% if (deal.threads.length) { %>
+    <div>
+      <h2 class="text-sm font-extrabold text-stone-900 mb-2"><%= c('thread_title_owner') %></h2>
+      <div class="space-y-3">
+        <% deal.threads.forEach(function (th) { %>
+          <div class="p-3.5 rounded-2xl border border-stone-200 bg-white" data-thread="<%= th.id %>">
+            <div class="text-xs font-bold text-stone-500 mb-2"><%= th.provider_name || th.provider_id %></div>
+            <ul class="space-y-1.5 text-sm">
+              <% th.messages.forEach(function (m) { %>
+                <li class="<%= m.author_role === 'customer' ? 'text-right' : '' %>"><span class="inline-block max-w-full break-words px-3 py-1.5 rounded-xl whitespace-pre-line <%= m.author_role === 'customer' ? 'bg-emerald-50' : 'bg-stone-100' %>"><%= m.text %></span>
+                  <span class="block text-[10px] text-stone-400"><%= m.author_role === 'customer' ? c('author_you') : c('author_provider') %> · <%= deal.at(m.created_at) %></span></li>
+              <% }); %>
+            </ul>
+            <% if (deal.acceptsMessages) { %>
+              <form data-deal-action="reply" class="mt-2 flex gap-2">
+                <input type="hidden" name="thread_id" value="<%= th.id %>">
+                <textarea name="text" rows="1" maxlength="2000" required class="flex-1 p-2 rounded-xl border border-stone-300 text-sm" placeholder="<%= c('reply_placeholder') %>"></textarea>
+                <button class="px-3 rounded-xl bg-stone-900 text-white text-sm font-bold"><%= c('send') %></button>
+                <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+              </form>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  <% } %>
+
+  <div class="space-y-2">
+    <% if (deal.canClose) { %>
+      <form data-deal-action="close-collection"><input type="hidden" name="version" value="<%= deal.version %>">
+        <button class="w-full py-2.5 rounded-2xl bg-white border border-stone-300 text-stone-800 font-bold text-sm"><%= c('close_collection') %></button>
+        <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div></form>
+    <% } %>
+    <% if (deal.canComplete) { %>
+      <form data-deal-action="complete"><input type="hidden" name="version" value="<%= deal.version %>">
+        <button class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-black text-sm"><%= c('complete') %></button>
+        <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div></form>
+    <% } %>
+    <% if (deal.canCancel) { %>
+      <details class="text-sm"><summary class="cursor-pointer text-xs font-bold text-red-600"><%= c('cancel') %></summary>
+        <form data-deal-action="cancel" class="mt-2 space-y-2"><input type="hidden" name="version" value="<%= deal.version %>">
+          <label class="block text-xs text-stone-600" for="dealCancelReason"><%= c('cancel_reason') %></label>
+          <input id="dealCancelReason" name="reason" required minlength="3" maxlength="500" class="w-full p-2.5 rounded-xl border border-stone-300 text-sm">
+          <button class="w-full py-2.5 rounded-2xl bg-red-600 text-white font-bold text-sm"><%= c('cancel') %></button>
+          <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+        </form>
+      </details>
+    <% } %>
+  </div>
+
+  <% if (!['cancelled', 'completed'].includes(deal.status)) { %>
+    <form data-deal-action="notifications" class="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2 text-sm">
+      <div class="font-bold text-stone-900"><%= c('notify_title') %></div>
+      <label class="flex items-center gap-2"><input type="checkbox" name="sms" <%= deal.notify.smsEnabled ? 'checked' : '' %>><span><%= c('notify_enable') %></span></label>
+      <div class="pl-6 space-y-1">
+        <% ['first_offer', 'collection_closed', 'new_question', 'selection_changed'].forEach(function (rule) { %>
+          <label class="flex items-center gap-2 text-xs"><input type="checkbox" name="rules.<%= rule %>" <%= deal.notify.rules[rule] ? 'checked' : '' %>><span><%= c('rule_' + rule) %></span></label>
+        <% }); %>
+      </div>
+      <% if (!deal.notify.consentGiven) { %>
+        <label class="flex items-start gap-2 text-xs text-stone-600"><input type="checkbox" name="consent" class="mt-0.5"><span><%= c('notify_consent') %></span></label>
+      <% } %>
+      <button class="px-4 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold"><%= c('save') %></button>
+      <div data-deal-ok class="hidden text-xs font-bold text-emerald-700"><%= c('saved') %></div>
+      <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+    </form>
+  <% } %>
+
+  <% if (deal.offers.length && ['open', 'closed'].includes(deal.status)) { %>
+    <div class="p-3.5 rounded-2xl border border-stone-200 text-sm space-y-2">
+      <div class="font-bold text-stone-900"><%= c('chatgpt_title') %></div>
+      <p class="text-xs text-stone-600"><%= c('chatgpt_hint') %></p>
+      <textarea id="dealChatPrompt" readonly rows="3" class="w-full p-2 rounded-xl border border-stone-200 text-xs bg-stone-50"><%= deal.chatPrompt %></textarea>
+      <div class="flex gap-2">
+        <button type="button" data-copy-target="dealChatPrompt" class="px-3 py-2 rounded-xl bg-white border border-stone-300 text-xs font-bold"><%= c('copy') %></button>
+        <a href="https://chatgpt.com/?q=<%= encodeURIComponent(deal.chatPrompt) %>" target="_blank" rel="noopener" class="px-3 py-2 rounded-xl bg-stone-900 text-white text-xs font-bold"><%= c('open_chatgpt') %></a>
+      </div>
+    </div>
+  <% } %>
+</section>
+<script src="/js/deal.js" defer></script>

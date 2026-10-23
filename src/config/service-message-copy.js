@@ -47,7 +47,7 @@ const smsMessages = {
   // the site. «Not you?» — anyone can type someone else's number into a chat.
   orderCodeAssistant: 'Xtender code: {code}. Give it to your AI assistant to send your request. Not you? Ignore this SMS.',
   orderLink: 'Xtender: request #{id} is sent. Status and closing: {link}',
-  // Сделка через Xtender (docs/api-v1/NOTIFICATIONS.md). Ссылка — страница возврата /r/<токен>: личных данных она не открывает.
+  // Сделка через Xtender (docs/api-v1/NOTIFICATIONS.md). Ссылка — страница возврата /t/<токен>: личных данных она не открывает.
   dealFirstOffer: 'Xtender: request #{id} got its first offer. View: {link}',
   dealCollectionClosed: 'Xtender: request #{id} is closed for offers, {n} received. Compare and choose: {link}',
   dealCollectionClosedNone: 'Xtender: request #{id} is closed for offers, none received. Details: {link}',

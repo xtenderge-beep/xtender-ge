@@ -179,10 +179,10 @@ const worker = () => require('../src/services/dealWorker.service').runOnce(new D
     // Чужое предложение исполнителю не видно.
     assert.equal((await call('GET', `/api/v1/offers/${draft1.json.id}`, { token: prov2 })).status, 404);
 
-    // 8. Уведомление заказчику: одна SMS о первом предложении (порог по исполнителям), со ссылкой /r/.
+    // 8. Уведомление заказчику: одна SMS о первом предложении (порог по исполнителям), со ссылкой /t/.
     await worker();
     await worker();
-    const notices = (await sms(customerPhone)).filter((m) => /offer/i.test(m.text) && m.text.includes('/r/'));
+    const notices = (await sms(customerPhone)).filter((m) => /offer/i.test(m.text) && m.text.includes('/t/'));
     assert.equal(notices.length, 1, JSON.stringify(await sms(customerPhone)));
     const notes = await call('GET', '/api/v1/me/notifications', { token: customer });
     assert.ok(notes.json.items.some((n) => n.rule === 'first_offer' && n.status === 'sent'));
@@ -272,7 +272,7 @@ const worker = () => require('../src/services/dealWorker.service').runOnce(new D
     assert.equal((await call('GET', `/api/v1/tenders/resolve?number=${order.id}`, { token: prov3 })).status, 404);
     const resume = await call('POST', `/api/v1/tenders/${tender.id}/resume-link`, { token: customer });
     assert.equal(resume.status, 201);
-    assert.match(resume.json.url, /\/r\/[A-Za-z0-9_-]+$/);
+    assert.match(resume.json.url, /\/t\/[A-Za-z0-9_-]+$/);
     assert.ok(['#', '№'].some((sign) => resume.json.chat_prompt.includes(sign + order.id)));
 
     // Журнал сервера без телефонов и токенов.

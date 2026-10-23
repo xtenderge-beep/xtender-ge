@@ -1,0 +1,157 @@
+<%# Сделка — исполнителю (deal.controller.providerLocals): способ ответа и срок, своё предложение (отправить, изменить,
+    отозвать), вопросы заказчику, подтверждение выбора. Писать может только вошедший в кабинет (deal.canWrite). %>
+<% const c = deal.c; const gel = function (m) { return m === null || m === undefined ? null : (m / 100).toFixed(m % 100 ? 2 : 0) + ' ₾'; };
+   const toGel = function (m) { return m === null || m === undefined ? '' : (m / 100).toFixed(m % 100 ? 2 : 0); };
+   const toLocal = function (iso) { if (!iso) return ''; const d = new Date(new Date(iso).getTime() + 4 * 3600 * 1000); return d.toISOString().slice(0, 16); };
+   const o = deal.offer; const src = o || deal.draft || null; %>
+<section id="deal" class="space-y-4" data-deal-token="<%= order.token %>" data-deal-lang="<%= lang %>" data-deal-strings="<%= JSON.stringify(dealStrings) %>">
+  <div class="p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sm text-sky-900">
+    <div class="font-bold"><%= c(deal.mode === 'offers' ? 'mode_offers_title' : 'mode_both_title') %></div>
+    <% if (deal.mode === 'offers' && !deal.confirmed) { %><div class="text-xs mt-1"><%= c('mode_offers_hint') %></div><% } %>
+    <% if (deal.acceptsOffers && deal.deadline) { %><div class="text-xs mt-1 font-semibold"><%= c('deadline', { time: deal.deadline }) %></div>
+    <% } else if (!deal.acceptsOffers && !deal.selection) { %><div class="text-xs mt-1 font-semibold"><%= c('collection_closed') %></div><% } %>
+  </div>
+
+  <% if (!deal.canWrite) { %>
+    <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-sm text-amber-900">
+      <%= c('login_to_write') %>
+      <a href="<%= deal.loginHref %>" class="block mt-2 font-bold underline"><%= c('login_btn') %></a>
+    </div>
+  <% } %>
+
+  <% if (deal.selection && deal.selection.status === 'pending') { %>
+    <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-900 space-y-2">
+      <div class="font-bold"><%= c('selected_title') %></div>
+      <div class="text-xs"><%= c('selected_hint', { time: deal.selection.confirmBy }) %></div>
+      <% if (deal.canWrite) { %>
+        <form data-deal-action="accept"><button class="w-full py-3 rounded-2xl bg-emerald-600 text-white font-black text-sm"><%= c('accept') %></button>
+          <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div></form>
+        <details><summary class="cursor-pointer text-xs font-bold text-stone-600"><%= c('decline') %></summary>
+          <form data-deal-action="decline" class="mt-2 space-y-2">
+            <label class="block text-xs" for="dealDeclineReason"><%= c('decline_reason') %></label>
+            <input id="dealDeclineReason" name="reason" required minlength="3" maxlength="500" class="w-full p-2.5 rounded-xl border border-stone-300 text-sm">
+            <button class="w-full py-2.5 rounded-2xl bg-white border border-stone-300 font-bold text-sm"><%= c('decline') %></button>
+            <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+          </form>
+        </details>
+      <% } %>
+    </div>
+  <% } else if (deal.confirmed) { %>
+    <div class="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-900">
+      <div class="font-bold"><%= c('accepted_title') %></div>
+      <div class="mt-1"><%= c('customer_phone') %>: <a class="font-bold underline" href="tel:<%= deal.customerPhone %>"><%= deal.customerPhone %></a></div>
+      <% if (deal.privateAddress) { %><div class="mt-1"><%= deal.privateAddress %></div><% } %>
+    </div>
+  <% } %>
+
+  <% if (o) { %>
+    <article class="p-3.5 rounded-2xl border break-words border-stone-200 bg-white text-sm">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="font-bold text-stone-900"><%= c('my_offer_title') %></div>
+          <div class="text-xs text-stone-500"><%= c('offer_status_' + o.status) %> · <%= c('version_label', { v: o.version }) %></div>
+        </div>
+        <div class="text-right">
+          <% if (o.total_status === 'complete') { %><div class="font-black"><%= gel(o.total_amount_minor) %></div>
+          <% } else { %><div class="font-bold text-amber-700"><%= c('total_incomplete') %></div><div class="text-xs text-stone-500"><%= o.incomplete_reasons.map(function (r) { return c('reason_' + r); }).join(', ') %></div><% } %>
+        </div>
+      </div>
+      <% if (deal.canWrite && o.status === 'submitted' && deal.acceptsOffers) { %>
+        <form data-deal-action="withdraw" data-confirm="<%= c('withdraw_confirm') %>" class="mt-2"><input type="hidden" name="version" value="<%= o.version %>">
+          <button class="text-xs font-bold text-red-600 underline"><%= c('withdraw_offer') %></button>
+          <div data-deal-error class="hidden mt-1 text-xs font-bold text-red-700"></div></form>
+      <% } %>
+    </article>
+  <% } %>
+
+  <% if (deal.canEditOffer) { const goods = deal.items.filter(function (i) { return i.kind === 'goods' || i.kind === 'service'; });
+       const line = function (id) { return src && (src.line_items || []).find(function (l) { return l.tender_item_id === id; }); };
+       const work = src && (src.line_items || []).find(function (l) { return !l.tender_item_id; }); %>
+    <details <%= o ? '' : 'open' %> class="rounded-2xl border border-stone-200 bg-white">
+      <summary class="cursor-pointer p-3.5 font-bold text-sm text-stone-900"><%= o ? c('offer_edit_title') : c('offer_form_title') %></summary>
+      <form data-deal-action="offer" class="px-3.5 pb-3.5 space-y-3 text-sm">
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_pricing_type') %></span>
+          <select name="pricing_type" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300">
+            <% ['fixed', 'estimate', 'on_inspection'].forEach(function (p) { %><option value="<%= p %>" <%= src && src.pricing_type === p ? 'selected' : '' %>><%= c('pricing_' + p) %></option><% }); %>
+          </select></label>
+        <% goods.forEach(function (item) { const l = line(item.id); %>
+          <fieldset class="p-2.5 rounded-xl bg-stone-50 border border-stone-200 space-y-1.5">
+            <legend class="text-xs font-bold text-stone-700 break-words"><%= item.name %><%= item.quantity ? ' — ' + item.quantity + (item.unitLabel ? ' ' + item.unitLabel : '') : '' %></legend>
+            <label class="block"><span class="text-xs text-stone-600"><%= c('f_item_price') %></span>
+              <input name="item_<%= item.id %>_price" inputmode="decimal" value="<%= l ? toGel(l.unit_price_minor) : '' %>" class="mt-1 w-full p-2 rounded-lg border border-stone-300"></label>
+            <% if (item.substitutions_allowed) { %>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" name="item_<%= item.id %>_sub" <%= l && l.is_substitution ? 'checked' : '' %>><span><%= c('f_substitution') %></span></label>
+              <input name="item_<%= item.id %>_note" maxlength="300" value="<%= l && l.deviation_description || '' %>" placeholder="<%= c('f_substitution_note') %>" class="w-full p-2 rounded-lg border border-stone-300 text-xs">
+            <% } %>
+          </fieldset>
+        <% }); %>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_work') %></span>
+          <input name="work_name" maxlength="200" value="<%= work ? work.offered_name : '' %>" placeholder="<%= c('f_work_default') %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"></label>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_price') %></span>
+          <input name="work_price" inputmode="decimal" value="<%= work ? toGel(work.line_total_minor) : '' %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300">
+          <span class="block text-[11px] text-stone-500 mt-0.5"><%= c('f_price_hint') %></span></label>
+        <% ['delivery', 'unloading'].forEach(function (key) { if (!deal.need[key]) return; const ch = src && src[key]; %>
+          <div class="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 items-end">
+            <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_' + key) %></span>
+              <select name="<%= key %>_state" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300">
+                <% ['included', 'separate', 'not_provided', 'unknown'].forEach(function (s) { %><option value="<%= s %>" <%= (ch ? ch.state : 'unknown') === s ? 'selected' : '' %>><%= c('charge_' + s) %></option><% }); %>
+              </select></label>
+            <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_charge_amount') %></span>
+              <input name="<%= key %>_amount" inputmode="decimal" value="<%= ch ? toGel(ch.amount_minor) : '' %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"></label>
+          </div>
+        <% }); %>
+        <fieldset>
+          <legend class="text-xs font-bold text-stone-600"><%= c('f_extra') %></legend>
+          <div class="mt-1 grid grid-cols-3 gap-2">
+            <input name="extra_name" maxlength="120" aria-label="<%= c('f_extra_name') %>" placeholder="<%= c('f_extra_name') %>" value="<%= src && src.additional_costs && src.additional_costs[0] ? src.additional_costs[0].name : '' %>" class="col-span-2 w-full p-2.5 rounded-xl border border-stone-300">
+            <input name="extra_amount" inputmode="decimal" aria-label="<%= c('f_charge_amount') %>" placeholder="₾" value="<%= src && src.additional_costs && src.additional_costs[0] ? toGel(src.additional_costs[0].amount_minor) : '' %>" class="w-full p-2.5 rounded-xl border border-stone-300">
+          </div>
+        </fieldset>
+        <div class="grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 items-end">
+          <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_start') %></span>
+            <input type="datetime-local" name="start_at" value="<%= src ? toLocal(src.start_at) : '' %>" class="mt-1 w-full p-2 rounded-xl border border-stone-300 text-xs"></label>
+          <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_complete') %></span>
+            <input type="datetime-local" name="completion_at" value="<%= src ? toLocal(src.completion_at) : '' %>" class="mt-1 w-full p-2 rounded-xl border border-stone-300 text-xs"></label>
+        </div>
+        <div class="grid grid-cols-3 gap-2 items-end">
+          <label class="block col-span-2"><span class="text-xs font-bold text-stone-600"><%= c('f_payment') %></span>
+            <input name="payment_text" maxlength="2000" value="<%= src && src.payment_terms ? src.payment_terms.text || '' : '' %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"></label>
+          <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_deposit') %></span>
+            <input name="deposit_percent" inputmode="numeric" value="<%= src && src.payment_terms && src.payment_terms.deposit_percent !== null && src.payment_terms.deposit_percent !== undefined ? src.payment_terms.deposit_percent : '' %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"></label>
+        </div>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_warranty') %></span>
+          <input name="warranty" maxlength="300" value="<%= src && src.warranty || '' %>" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"></label>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_exclusions') %></span>
+          <textarea name="exclusions" rows="2" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"><%= src && src.exclusions ? src.exclusions.join('\n') : '' %></textarea></label>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_notes') %></span>
+          <textarea name="notes" rows="3" maxlength="2000" class="mt-1 w-full p-2.5 rounded-xl border border-stone-300"><%= src && src.notes || '' %></textarea></label>
+        <label class="block"><span class="text-xs font-bold text-stone-600"><%= c('f_valid_until') %></span>
+          <input type="date" name="valid_until" value="<%= src && src.valid_until ? toLocal(src.valid_until).slice(0, 10) : '' %>" class="mt-1 w-full p-2 rounded-xl border border-stone-300 text-xs"></label>
+        <button class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm"><%= o ? c('save_offer') : c('submit_offer') %></button>
+        <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+      </form>
+    </details>
+  <% } %>
+
+  <% if (deal.thread || (deal.canWrite && deal.acceptsMessages)) { %>
+    <div class="p-3.5 rounded-2xl border border-stone-200 bg-white">
+      <h2 class="text-sm font-extrabold text-stone-900 mb-2"><%= c('thread_title_provider') %></h2>
+      <% if (deal.thread && deal.thread.messages.length) { %>
+        <ul class="space-y-1.5 text-sm">
+          <% deal.thread.messages.forEach(function (m) { %>
+            <li class="<%= m.author_role === 'provider' ? 'text-right' : '' %>"><span class="inline-block max-w-full break-words px-3 py-1.5 rounded-xl whitespace-pre-line <%= m.author_role === 'provider' ? 'bg-emerald-50' : 'bg-stone-100' %>"><%= m.text %></span>
+              <span class="block text-[10px] text-stone-400"><%= m.author_role === 'provider' ? c('author_you') : c('author_customer') %> · <%= deal.at(m.created_at) %></span></li>
+          <% }); %>
+        </ul>
+      <% } else { %><p class="text-xs text-stone-500"><%= c('no_messages') %></p><% } %>
+      <% if (deal.canWrite && deal.acceptsMessages) { %>
+        <form data-deal-action="message" class="mt-2 flex gap-2">
+          <textarea name="text" rows="2" maxlength="2000" required class="flex-1 p-2 rounded-xl border border-stone-300 text-sm" placeholder="<%= c('ask_placeholder') %>"></textarea>
+          <button class="px-3 rounded-xl bg-stone-900 text-white text-sm font-bold"><%= c('send') %></button>
+          <div data-deal-error class="hidden text-xs font-bold text-red-700"></div>
+        </form>
+      <% } %>
+    </div>
+  <% } %>
+</section>
+<script src="/js/deal.js" defer></script>

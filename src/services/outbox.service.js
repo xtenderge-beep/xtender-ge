@@ -48,4 +48,10 @@ async function failures(limit = 50) {
   return (await pool.query('SELECT * FROM outbox_events WHERE failed_at IS NOT NULL ORDER BY id DESC LIMIT $1', [limit])).rows;
 }
 
-module.exports = { emit, claim, finish, failures, MAX_ATTEMPTS, LOCK_MS };
+// Повтор из /admin/outbox после исправления причины: событие снова в очереди с нуля попыток.
+async function retry(id) {
+  const { rows } = await pool.query('UPDATE outbox_events SET failed_at = NULL, attempts = 0, available_at = NOW(), last_error = NULL WHERE id = $1 AND failed_at IS NOT NULL RETURNING id', [id]);
+  return Boolean(rows[0]);
+}
+
+module.exports = { emit, claim, finish, failures, retry, MAX_ATTEMPTS, LOCK_MS };

@@ -116,6 +116,9 @@ router.post('/reviews/:id/approve', verifyCsrf, asyncHandler(adminController.app
 router.post('/reviews/:id/reject', verifyCsrf, asyncHandler(adminController.rejectReview));
 
 router.get('/consent', asyncHandler(adminController.consentLog));
+// Сбои уведомлений сделки (письменные предложения): ссылку присылает Telegram модератору.
+router.get('/outbox', asyncHandler(require('../controllers/dealAdmin.controller').index));
+router.post('/outbox/:id(\\d+)/retry', verifyCsrf, asyncHandler(require('../controllers/dealAdmin.controller').retry));
 router.get('/consent/export', asyncHandler(adminController.consentExport));
 
 router.get('/legal', asyncHandler(adminController.legalPage));
