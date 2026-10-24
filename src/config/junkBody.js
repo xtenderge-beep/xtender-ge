@@ -27,7 +27,16 @@ const BUILT_IN_KEYS = [VOLUME_FIELD.key, ...EXTRA_FIELDS.map(field => field.key)
 // The required three-way "vehicle kind" list lived for a few hours on 2026-10-01 and was replaced
 // by the dump mark. A category saved in the editor meanwhile may still carry it.
 const RETIRED_KEYS = ['vehicle_kind'];
+// Грузоподъёмность каждой машины перевозки в тоннах — числом, а не классом кузова S…XXL: заявка «перевезти 18 тонн»
+// подбирает машины с подтверждённой грузоподъёмностью не меньше (правило gte; неизвестная не подходит). Поле системное:
+// если его нет в справочнике, оно добавляется при чтении, как поля мусоровоза ниже.
+const VAN_PAYLOAD_FIELD = { key: 'payload_t', input: 'number', unit: 't', min: 0.1, max: 60, match: 'gte',
+  labels: { ru: 'Грузоподъёмность', ka: 'ტვირთამწეობა', en: 'Payload capacity' } };
 function withBuiltInFields(row) {
+  if (row && row.slug === 'van') {
+    const fields = row.fields || [];
+    return fields.some((field) => field.key === VAN_PAYLOAD_FIELD.key) ? row : { ...row, fields: [...fields, VAN_PAYLOAD_FIELD] };
+  }
   if (!row || row.slug !== 'junk') return row;
   const fields = (row.fields || []).filter(field => !RETIRED_KEYS.includes(field.key));
   if (!fields.some(field => field.key === 'volume_m3')) fields.unshift(VOLUME_FIELD);
@@ -53,4 +62,4 @@ function derive(lengthCm, widthCm, sideHeightCm) {
   if (!tier) return null;
   return { cubicMetres, tier: String(tier), lengthCm: dimensions[0], widthCm: dimensions[1], sideHeightCm: dimensions[2] };
 }
-module.exports = { derive, withBuiltInFields, BUILT_IN_KEYS };
+module.exports = { derive, withBuiltInFields, BUILT_IN_KEYS, VAN_PAYLOAD_FIELD };

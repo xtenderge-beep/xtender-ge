@@ -24,4 +24,7 @@
   </label>
   <% } %>
   <% if (liftField) { %><label class="service-choice text-sm"><%= liftField.label %><input type="checkbox" name="<%= prefix %>tail_lift" <%= vehicle.tail_lift ? 'checked' : '' %>></label><% } %>
+  <%# Грузоподъёмность этой машины, т — по ней подбираются заявки с весом груза. Пусто — неизвестна: такие заявки машина не получит. %>
+  <label class="block text-sm">Грузоподъёмность, т<input type="number" name="<%= prefix %>payload_t" min="0.1" max="60" step="0.1" value="<%= vehicle.payload_t ?? '' %>" class="block w-full border rounded-xl px-3 py-2"></label>
+  <p class="text-xs">Подтверждённая, по документам или со слов исполнителя после проверки. Пусто — заявки с весом груза машина не получит.</p>
 </div>

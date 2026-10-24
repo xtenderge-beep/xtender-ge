@@ -472,6 +472,7 @@ async function orderDetail(req, res, result = null) {
   const detail = await adminService.getOrderDetailAdmin(req.params.token);
   res.render('admin/order-detail', { ...screen, result, error: req.query.error || req.query.dispatchError || null,
     notifiedMasters: detail.notifiedMasters,
+    requirementEvents: await require('../services/requestMatching.service').events(screen.order.id),
     sourceLabel: trafficSources.label(detail.source, await trafficSources.list()),
     revisionNotice: ['failed', 'sent'].includes(req.query.revisionNotice) ? req.query.revisionNotice : null,
     date: value => value ? new Date(value).toLocaleString('ru-RU', { timeZone: 'Asia/Tbilisi' }) : '—' });
@@ -864,7 +865,7 @@ async function cancelTopup(req, res) {
 async function saveOrderNeeds(req,res) {
   const token=req.params.token;
   try {
-    await require('../services/orderNeeds.service').save(token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId);
+    await require('../services/orderNeeds.service').save(token,req.body.needs,req.body.transportSize,req.body.needAttributes,req.body.cityId,'admin');
     res.redirect('/admin/orders/'+encodeURIComponent(token));
   } catch(e) {res.redirect('/admin/orders/'+encodeURIComponent(token)+'?dispatchError='+encodeURIComponent(e.message));}
 }

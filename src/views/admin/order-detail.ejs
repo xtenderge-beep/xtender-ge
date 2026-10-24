@@ -34,6 +34,12 @@
 <% } %>
 <form method="post" action="/admin/orders/<%= order.token %>/delete" onsubmit="return confirm('Удалить эту заявку без возможности восстановления?')"><input type="hidden" name="_csrf" value="<%= csrfToken %>"><button class="danger">Удалить заявку</button></form>
 </div>
+<% if(typeof requirementEvents !== 'undefined' && requirementEvents.length){ const brief = v => { const r = v && v.requirements; if(!r) return '—'; const parts = Object.entries(r.services || {}).map(([k, vals]) => k + (Object.keys(vals || {}).length ? ': ' + Object.entries(vals).map(([f, x]) => f + ' ' + x).join(', ') : '')); if((r.transport_sizes || []).length) parts.push('кузов ' + r.transport_sizes.join('/')); return (v.target_categories || []).length ? parts.join('; ') || (v.target_categories || []).join(', ') : '—'; }; %>
+<h3>Требования к исполнителям: журнал</h3>
+<div class="scroll"><table><thead><tr><th>Когда</th><th>Кто</th><th>Что</th><th>Было</th><th>Стало</th></tr></thead><tbody>
+<% requirementEvents.forEach(e => { %><tr><td><%= date(e.created_at) %></td><td><%= e.actor === 'system:request' ? 'Параметры заказчика' : e.actor %></td><td><%= e.action === 'prepared' ? 'Подготовлены' : 'Изменены вручную' %></td><td><%= e.before_value ? brief(e.before_value) : '' %></td><td><%= brief(e.after_value) %></td></tr><% }); %>
+</tbody></table></div>
+<% } %>
 <h3>Кто получил заявку и сколько списано</h3>
 <% if(!notifiedMasters.length){ %><p class="muted">Пока никто не получил.</p><% } else { %>
 <div class="scroll"><table><thead><tr><th>Исполнитель</th><th>Телефон</th><th>Списано</th><th>Когда</th></tr></thead><tbody>

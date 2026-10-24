@@ -38,7 +38,7 @@ label.service-choice input[type=checkbox]{min-height:0;width:18px;height:18px;fl
       <label class="text-sm">Класс объёма<select name="junk_volume_m3" class="block w-full border rounded-xl px-3 py-2"><option value="">Не выбран</option><% (svc.fields.find(f=>f.key==='volume_m3')?.options || []).forEach(o=>{ %><option value="<%= o.value %>" <%= attrs.volume_m3===o.value?'selected':'' %>><%= o.label %></option><% }); %></select></label>
     </details>
   <% } %>
-  <% svc.fields.filter(f => f.input !== 'size' && !(vanList && ['body','tail_lift'].includes(f.key)) && !(svc.type === 'junk' && ['dump_body','volume_m3','body_length_cm','body_width_cm','side_height_cm'].includes(f.key))).forEach(f => { %>
+  <% svc.fields.filter(f => f.input !== 'size' && !(vanList && ['body','tail_lift','payload_t'].includes(f.key)) && !(svc.type === 'junk' && ['dump_body','volume_m3','body_length_cm','body_width_cm','side_height_cm'].includes(f.key))).forEach(f => { %>
     <label class="<%= f.input === 'bool' ? 'service-choice' : 'block' %> text-sm"><%= f.label %><%= f.required ? ' *' : '' %>
     <% if (f.input === 'enum') { %>
       <select name="<%= svc.type %>_<%= f.key %>" <%= f.required ? 'required' : '' %> class="block w-full border rounded-xl px-3 py-2">

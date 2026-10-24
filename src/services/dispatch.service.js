@@ -180,7 +180,7 @@ async function sendNeeds(token, input, expected = null, languageRaw = '', contex
     throw new Error('Состав получателей, тариф или заявка изменились. Проверьте числа и отправьте ещё раз.');
   }
   if (!plan.total) throw new Error('Отправлять некому: новых получателей нет.');
-  await orderNeeds.apply(token, input);
+  await orderNeeds.apply(token, input, context.actor || 'admin');
   if (context.shareBrief !== undefined) await require('./orderBrief.service').setShared(token, context.shareBrief === true);
   const results = [];
   for (const service of plan.services) for (const group of service.groups.filter(item => item.sendable)) {

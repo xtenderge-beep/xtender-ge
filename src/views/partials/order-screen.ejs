@@ -116,6 +116,13 @@
 <input type="hidden" name="_csrf" value="<%= csrf %>"><input type="hidden" name="revision" value="<%= planView?planView.revision:0 %>"><input type="hidden" name="expectedTotal"><input type="hidden" name="expectedPrice">
 <h2 style="margin-top:0">Что нужно клиенту и кто получит заявку</h2>
 <p class="muted">Отметьте услуги из заявки и уточните требования. Список получателей и сумма пересчитываются сразу, отправка — одной кнопкой внизу.<% if(sentAny){ %> Заявка уже отправлялась: отправленные услуги и их требования не меняются, можно добавить услугу или класс кузова.<% } %></p>
+<%# Заявка через ChatGPT или API: требования подготовлены из параметров заказчика (requestMatching.service). Модератор проверяет и отправляет; правки — в журнал. %>
+<% const prepared = order.requirements && order.requirements.prepared; if(prepared && !sentAny){ const noteText = { ABOVE_LARGEST_OPTION: 'больше самого крупного класса — подставлен самый крупный, проверьте', TARGET_MISSING: 'не перенесён: характеристики нет в справочнике', TARGET_NOT_MATCHED: 'не перенесён: характеристика не участвует в подборе', NO_MATCHING_OPTION: 'не перенесён: нет подходящего варианта', TYPE_MISMATCH: 'не перенесён: другой тип значения' }; %>
+<div class="prepared-note" style="background:#eef6ff;border:1px solid #c7dcf5;border-radius:12px;padding:10px 14px;margin:8px 0">
+<b>Требования подготовлены из параметров заказчика.</b> Проверьте их ниже и отправьте. Ваши изменения попадут в журнал заявки.
+<% (prepared.notes||[]).forEach(n=>{ %><div class="muted">«<%= n.parameter %>» (<%= n.category_id %>): <%= noteText[n.code] || n.code %><%= n.value ? ' — ' + n.value : '' %></div><% }); %>
+</div>
+<% } %>
 <div class="send-options"><label>Город заявки <select name="cityId" <%= sentAny||!open?'disabled':'' %>><% activeCities.forEach(city=>{ %><option value="<%= city.id %>" <%= order.city_id===city.id||(!order.city_id&&city.slug==='tbilisi')?'selected':'' %>><%= city.name_ru %></option><% }); %></select></label>
 <label>Кому отправить <select name="language"><option value="">Всем подходящим</option><% Object.entries(speakLabels).forEach(([code,label])=>{ %><option value="<%= code %>" <%= language===code?'selected':'' %>>Только кто говорит <%= label %></option><% }); %></select></label></div>
 <div class="service-list">

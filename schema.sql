@@ -747,6 +747,10 @@ DELETE FROM service_categories WHERE slug='junk_manual'
 -- (src/config/requestFields.js), у услуги из админки — из характеристик с правилом подбора. Строк здесь не пишем.
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS kind VARCHAR(10) NOT NULL DEFAULT 'service' CONSTRAINT service_categories_kind_check CHECK (kind IN ('service','goods'));
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS request_fields JSONB NOT NULL DEFAULT '[]'::jsonb;
+-- Описание категории {ka,ru,en} и слова поиска {ka,ru,en,latin: [...]} из админки. NULL — ещё не перенесено из кода
+-- (i18n service_desc_*, service-search-words.js): при старте categoryTexts.service переносит их один раз, только в NULL.
+ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS descriptions JSONB;
+ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS synonyms JSONB;
 
 
 -- Parallel technical requests. Existing orders and providers remain production.
@@ -1228,6 +1232,19 @@ CREATE TABLE IF NOT EXISTS api_idempotency_keys (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (account_id, idem_key)
 );
+
+-- Журнал требований рассылки: подготовлены из параметров заказчика при публикации (prepared) и каждое ручное изменение
+-- модератора (changed) — что было и что стало (requestMatching.service).
+CREATE TABLE IF NOT EXISTS order_requirement_events (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id),
+    actor VARCHAR(120) NOT NULL,
+    action VARCHAR(20) NOT NULL,
+    before_value JSONB,
+    after_value JSONB,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_order_requirement_events_order ON order_requirement_events(order_id);
 
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;

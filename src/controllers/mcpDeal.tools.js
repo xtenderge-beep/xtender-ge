@@ -126,13 +126,16 @@ const TOOLS = [
     run: (ctx, args) => dealApi.updateTender(ctx, args.tender_id, args.version, pick(args, tenderKeys)),
     text: (t) => 'Draft updated: ' + tenderLine(t) },
   { name: 'validate_tender', scopes: ['tenders:read'], title: 'Check a request draft', annotations: READ,
-    description: 'Missing fields, errors and warnings of a draft. Publishes nothing.',
+    description: 'Checks the whole draft against the current category schema (types, allowed values, ranges, units, required fields) and lists fixes. Also estimates how many providers fit the service, city and parameters now — not a promise that anyone is free. Publishes nothing.',
     input: { tender_id: tenderId },
     run: (ctx, args) => dealApi.validateTender(ctx, args.tender_id),
-    text: (v) => `ready_to_publish ${v.ready_to_publish}; missing: ${v.missing_fields.join(', ') || 'none'}; errors: ${v.field_errors.map((e) => e.path + ' ' + e.code).join(', ') || 'none'}; warnings: ${v.warnings.map((w) => w.message).join(' ') || 'none'}` },
+    text: (v) => `ready_to_publish ${v.ready_to_publish}; fixes: ${v.fixes.map((f) => f.message).join(' ') || 'none'}; warnings: ${v.warnings.map((w) => w.message).join(' ') || 'none'}`
+      + (v.schema_changes.length ? `; the category changed since the draft was saved: ${v.schema_changes.map((c) => c.category_id).join(', ')}` : '')
+      + (v.supply_estimate ? `; providers that fit now: ${v.supply_estimate.matching_providers} (not a promise that anyone is free)` : '') },
   { name: 'publish_tender', scopes: ['tenders:write'], write: true, title: 'Publish a request', annotations: OUTWARD,
     description: 'Pass a confirmed request to Xtender moderation. First show the user the final request and ask them to confirm. A moderator checks it before providers get it. '
-      + 'The first publication of an account returns CONSENT_REQUIRED with consent_url: give the user that link (they accept the Terms on xtender.ge), then call again.',
+      + 'The first publication of an account returns CONSENT_REQUIRED with consent_url: give the user that link (they accept the Terms on xtender.ge), then call again. '
+      + 'CATEGORY_SCHEMA_CHANGED means the category changed after the draft was saved: show the user the fixes, read get_category_schema again, update the draft and publish again.',
     input: { tender_id: tenderId, version: version('request'), confirmed_by_user: confirmed },
     run: (ctx, args) => dealApi.publishTender(ctx, args.tender_id, args.version, { confirmed: args.confirmed_by_user }),
     text: (r) => `${r.message} ${tenderLine(r.tender)}. The customer page on xtender.ge: ${r.tender.customer_page_url}` },

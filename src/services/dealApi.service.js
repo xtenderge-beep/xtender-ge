@@ -46,9 +46,14 @@ async function updateTender(ctx, id, version, body) {
   return tenders.view(await tenders.updateDraft(ctx.account, id, version, body), { role: 'customer', lang: ctx.lang });
 }
 
+// Проверка черновика и оценка: сколько исполнителей подходят сейчас по услуге, городу и параметрам — той же функцией,
+// что выберет получателей рассылки. Без города или с ошибками в параметрах оценки нет (null).
 async function validateTender(ctx, id) {
   const order = await tenders.forCustomer(ctx.account, id);
-  return tenders.validate(order, await tenders.items(order.id));
+  const result = await tenders.validate(order, await tenders.items(order.id));
+  const blocked = result.field_errors.some((e) => /^(attributes|category_ids|location)/.test(e.path));
+  const estimate = order.city_id && (order.requested_categories || []).length && !blocked ? await require('./requestMatching.service').estimate(order) : null;
+  return { ...result, supply_estimate: estimate };
 }
 
 async function publishTender(ctx, id, version, { confirmed }) {

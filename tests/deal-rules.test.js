@@ -30,7 +30,8 @@ async function newDeal({ mode, sms = true, startInDays = 3, quiet = null } = {})
   phones += 1;
   const phone = '+99559977' + String(1000 + phones);
   let account = await accounts.ensureForVerifiedPhone(phone);
-  if (quiet) await pool.query('UPDATE accounts SET quiet_from=$2, quiet_to=$3 WHERE id=$1', [account.id, quiet[0], quiet[1]]);
+  // Тихие часы — явно: иначе вечером (22:00–09:00 по Тбилиси) SMS честно ждала бы утра и тест зависел от времени суток.
+  await pool.query('UPDATE accounts SET quiet_from=$2, quiet_to=$3 WHERE id=$1', [account.id, quiet ? quiet[0] : '00:00', quiet ? quiet[1] : '00:00']);
   const draft = await tenders.createDraft(account, { title: 'Job ' + phones, description: 'Details', language: 'en', category_ids: ['movers'], location: { city_id: 'city:tbilisi' },
     requested_start_at: new Date(Date.now() + startInDays * day).toISOString(), ...(mode ? { response_mode: mode } : {}) });
   try { await tenders.publish(account, tenders.apiId(draft), draft.api_version); } catch (error) {

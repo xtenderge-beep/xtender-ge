@@ -13,6 +13,8 @@ const { generateShortId } = require('../config/shortId');
 const { DealError, HOUR, LIMITS } = deal;
 const newId = (prefix) => prefix + crypto.randomBytes(10).toString('hex');
 const notFound = () => new DealError(404, 'NOT_FOUND', 'The request does not exist or is not accessible to this account.');
+// JSONB-поле: объект (Postgres) или строка (значение по умолчанию в pg-mem тестов).
+const json = (value, fallback) => (typeof value === 'string' ? JSON.parse(value) : value ?? fallback);
 
 function apiId(order) { return 'tnd_' + order.id; }
 function parseId(id) {
@@ -285,7 +287,9 @@ async function createDraft(account, raw, { channel = 'api' } = {}) {
     await applyColumns(client, row.id, cols);
     if (parsed.items) await writeItems(client, row.id, parsed.items);
     const order = await lockById(client, row.id);
-    await client.query('UPDATE orders SET description=$2 WHERE id=$1', [row.id, await describe(order, await items(row.id, client), client)]);
+    // Версии схем на момент сохранения: по ним публикация заметит, что категорию изменили (validate.schema_changes).
+    await client.query('UPDATE orders SET description=$2, schema_versions=$3::jsonb WHERE id=$1',
+      [row.id, await describe(order, await items(row.id, client), client), JSON.stringify(await draftSchemaVersions(order.requested_categories))]);
     return lockById(client, row.id);
   });
 }
@@ -316,8 +320,8 @@ async function updateDraft(account, tenderId, expected, raw) {
     await applyColumns(client, order.id, await columnsFrom(parsed, client));
     if (parsed.items) await writeItems(client, order.id, parsed.items);
     const fresh = await lockById(client, order.id);
-    await client.query('UPDATE orders SET description=$2, api_version = api_version + 1, deal_updated_at = NOW() WHERE id=$1',
-      [order.id, await describe(fresh, await items(order.id, client), client)]);
+    await client.query('UPDATE orders SET description=$2, schema_versions=$3::jsonb, api_version = api_version + 1, deal_updated_at = NOW() WHERE id=$1',
+      [order.id, await describe(fresh, await items(order.id, client), client), JSON.stringify(await draftSchemaVersions(fresh.requested_categories))]);
     return lockById(client, order.id);
   });
 }
@@ -326,11 +330,13 @@ async function updateDraft(account, tenderId, expected, raw) {
 async function validate(order, list, client = pool, now = new Date()) {
   const categories = await require('./category.service').list(client);
   const catalog = require('./apiCatalog.service');
+  const units = require('../config/units');
   const snap = await catalog.snapshot();
   const missing = [];
   const errors = [];
   const warnings = [];
-  const requested = Array.isArray(order.requested_categories) ? order.requested_categories : [];
+  const requested = json(order.requested_categories, []);
+  const attributes = json(order.request_attributes, {});
   if (!order.title && !order.original_text) missing.push('title');
   if (!requested.length) missing.push('category_ids');
   if (!order.city_id) missing.push('location.city_id');
@@ -339,20 +345,32 @@ async function validate(order, list, client = pool, now = new Date()) {
     if (!city?.is_active) errors.push({ path: 'location.city_id', code: 'CITY_NOT_SERVED' });
   }
   const schemaVersions = {};
-  for (const slug of requested) {
+  requested.forEach((slug, i) => {
     const category = categories.find((c) => c.slug === slug);
-    if (!category) { errors.push({ path: 'category_ids', code: 'UNKNOWN_CATEGORY' }); continue; }
-    if (!category.is_active) errors.push({ path: 'category_ids', code: 'CATEGORY_INACTIVE' });
+    if (!category) { errors.push({ path: `category_ids[${i}]`, code: 'UNKNOWN_CATEGORY', category_id: slug }); return; }
+    if (!category.is_active) errors.push({ path: `category_ids[${i}]`, code: 'CATEGORY_INACTIVE', category_id: slug });
     schemaVersions[slug] = snap.categories.find((c) => c.slug === slug)?.schema_version || null;
-    const values = (order.request_attributes || {})[slug] || {};
+    const values = attributes[slug] || {};
     for (const key of requestFields.requiredKeys(category)) if (values[key] === undefined) missing.push(`attributes.${slug}.${key}`);
     if (category.kind === 'goods' && !list.some((item) => item.kind === 'goods')) missing.push('items');
+  });
+  // Все сохранённые значения — заново по текущей схеме категории: тип, допустимые варианты, диапазон. Устаревшее не
+  // исправляется молча — заказчик (или ассистент) получает перечень того, что поправить.
+  for (const [slug, values] of Object.entries(attributes)) {
+    const category = categories.find((c) => c.slug === slug);
+    if (!requested.includes(slug)) { errors.push({ path: `attributes.${slug}`, code: 'CATEGORY_NOT_SELECTED', category_id: slug }); continue; }
+    if (!category) continue;
+    errors.push(...requestFields.validateValues(category, values, `attributes.${slug}`).errors.map((error) => ({ ...error, ...fieldHelp(category, error.path) })));
   }
   const kind = order.kind || 'service';
   if (['goods', 'mixed'].includes(kind)) {
     if (!list.some((item) => item.kind === 'goods')) missing.push('items');
     list.forEach((item, i) => { if (item.kind === 'goods' && (!item.quantity || !item.unit)) errors.push({ path: `items[${i}]`, code: 'QUANTITY_AND_UNIT_REQUIRED' }); });
   }
+  list.forEach((item, i) => {
+    if (item.unit && !units.UNITS.some((u) => u.code === item.unit)) errors.push({ path: `items[${i}].unit`, code: 'UNKNOWN_UNIT', allowed: units.UNITS.map((u) => u.code) });
+    if (item.category_id && !categories.some((c) => c.slug === item.category_id && c.is_active)) errors.push({ path: `items[${i}].category_id`, code: 'UNKNOWN_CATEGORY', category_id: item.category_id });
+  });
   if (order.requested_start_at && new Date(order.requested_start_at) <= now) errors.push({ path: 'requested_start_at', code: 'IN_THE_PAST' });
   if (order.requested_end_at && order.requested_start_at && new Date(order.requested_end_at) < new Date(order.requested_start_at)) errors.push({ path: 'requested_end_at', code: 'BEFORE_START' });
   // Срок сбора согласуем с датой работ (решение 5): если до начала меньше, чем длится сбор, сбор сократится.
@@ -365,7 +383,53 @@ async function validate(order, list, client = pool, now = new Date()) {
   if (order.response_mode === 'offers' && require('../config/phoneInText').hasPhone(`${order.original_text || ''} ${order.title || ''}`)) {
     warnings.push({ code: 'PHONE_IN_TEXT', message: 'The text contains a phone number although the phone is hidden until a provider is chosen.' });
   }
-  return { ready_to_publish: !missing.length && !errors.length, missing_fields: [...new Set(missing)], field_errors: errors, warnings, schema_versions: schemaVersions };
+  // Схема категории изменилась с тех пор, как черновик сохранили: какие категории и с какой версии на какую.
+  const saved = json(order.schema_versions, {}) || {};
+  const schemaChanges = Object.entries(schemaVersions).filter(([slug, current]) => saved[slug] && saved[slug] !== current)
+    .map(([slug, current]) => ({ category_id: slug, saved_version: saved[slug], current_version: current }));
+  const uniqueMissing = [...new Set(missing)];
+  return { ready_to_publish: !uniqueMissing.length && !errors.length, missing_fields: uniqueMissing, field_errors: errors, warnings, schema_versions: schemaVersions,
+    schema_changes: schemaChanges, fixes: fixesFor(uniqueMissing, errors) };
+}
+
+// Подсказка к ошибке параметра: допустимые варианты, границы, единица — из текущей схемы.
+function fieldHelp(category, path) {
+  const key = String(path).split('.').pop();
+  const field = requestFields.forCategory(category).find((f) => f.key === key);
+  if (!field) return {};
+  return { ...(field.options ? { allowed: field.options } : {}), ...(field.min != null ? { min: field.min } : {}), ...(field.max != null ? { max: field.max } : {}),
+    ...(field.unit ? { unit: require('../config/units').codeFor(field.unit) || field.unit } : {}) };
+}
+
+// Перечень исправлений простыми словами — для заказчика и ассистента (по-английски: его читает модель).
+function fixesFor(missing, errors) {
+  const range = (e) => [e.min != null ? `from ${e.min}` : '', e.max != null ? `to ${e.max}` : '', e.unit || ''].filter(Boolean).join(' ');
+  const messages = {
+    UNKNOWN_PARAMETER: (e) => `${e.path} is not a parameter of this category any more; remove it (read the category schema again).`,
+    INVALID_OPTION: (e) => `${e.path}: the value is not allowed any more; choose one of: ${(e.allowed || []).join(', ')}.`,
+    OUT_OF_RANGE: (e) => `${e.path}: give a number ${range(e)}.`,
+    INVALID_VALUE: (e) => `${e.path}: the value has the wrong type for this parameter.`,
+    INVALID_DATE: (e) => `${e.path}: give a date in RFC 3339 format.`,
+    CATEGORY_INACTIVE: (e) => `${e.path}: category ${e.category_id} is no longer available; choose another category.`,
+    UNKNOWN_CATEGORY: (e) => `${e.path}: category ${e.category_id || ''} does not exist; search the catalog again.`,
+    CATEGORY_NOT_SELECTED: (e) => `${e.path}: parameters are given for a category that is not in category_ids; remove them or add the category.`,
+    UNKNOWN_UNIT: (e) => `${e.path}: use a unit code from listUnits.`,
+    QUANTITY_AND_UNIT_REQUIRED: (e) => `${e.path}: goods need a quantity and a unit.`,
+    CITY_NOT_SERVED: () => 'location.city_id: Xtender does not serve this city now; choose a served city.',
+    IN_THE_PAST: (e) => `${e.path}: the date is in the past.`,
+    BEFORE_START: (e) => `${e.path}: the end is before the start.`,
+    TOO_SOON_FOR_OFFERS: () => 'requested_start_at: too soon to collect written offers; choose a later start or response_mode calls.',
+  };
+  return [
+    ...missing.map((path) => ({ path, code: 'REQUIRED', message: `${path} is required.` })),
+    ...errors.map((e) => ({ ...e, message: (messages[e.code] || ((x) => `${x.path}: ${x.code}.`))(e) })),
+  ];
+}
+
+// Версии схем выбранных категорий на момент сохранения черновика — по ним публикация замечает, что схема изменилась.
+async function draftSchemaVersions(requested) {
+  const snap = await require('./apiCatalog.service').snapshot();
+  return Object.fromEntries((requested || []).map((slug) => [slug, snap.categories.find((c) => c.slug === slug)?.schema_version || null]));
 }
 
 // --- Публикация -------------------------------------------------------------------------------------------------------
@@ -389,17 +453,25 @@ async function publish(account, tenderId, expected, meta = {}) {
     const list = await items(order.id, client);
     const check = await validate(order, list, client);
     if (!check.ready_to_publish) {
-      throw new DealError(422, 'NOT_READY', 'The request is not ready to publish; see missing_fields and field_errors.', { details: { validation: check } });
+      // Схема категории поменялась после сохранения черновика, и черновик ей больше не соответствует — конфликт с
+      // перечнем исправлений. Ничего не исправляется молча.
+      if (check.schema_changes.length) {
+        throw new DealError(409, 'CATEGORY_SCHEMA_CHANGED', 'The category changed after the draft was saved and the draft no longer fits it. Show the user the fixes, read the category schema again, update the draft and publish again.',
+          { details: { schema_changes: check.schema_changes, fixes: check.fixes, validation: check } });
+      }
+      throw new DealError(422, 'NOT_READY', 'The request is not ready to publish; see fixes.', { details: { fixes: check.fixes, validation: check } });
     }
     const isTechnical = await require('./technical.service').isClientPhone(order.phone, client).catch(() => false);
-    // Модератор видит услуги заявки уже отмеченными (группы рассылки: van → transport); требования к исполнителям он
-    // задаёт сам, параметры заказчика — в тексте заявки.
-    const targets = [...new Set((order.requested_categories || []).map((slug) => (slug === 'van' ? 'transport' : slug)))];
+    // Требования рассылки — из параметров заказчика по связям справочника (requestMatching.service): модератор видит их
+    // готовыми в форме рассылки, проверяет и подтверждает; его правки пишутся в журнал.
+    const matching = require('./requestMatching.service');
+    const prepared = await matching.prepare(order, client);
     const updated = (await client.query(
       `UPDATE orders SET status = 'pending_review', confirmed_at = NOW(), deal_status = 'open', schema_versions = $2::jsonb, is_technical = $3,
-         description = $4, target_categories = $5, api_version = api_version + 1, deal_updated_at = NOW()
+         description = $4, target_categories = $5, requirements = $6::jsonb, api_version = api_version + 1, deal_updated_at = NOW()
        WHERE id = $1 AND status = 'unverified' RETURNING *`,
-      [order.id, JSON.stringify(check.schema_versions), isTechnical, await describe(order, list, client), targets])).rows[0];
+      [order.id, JSON.stringify(check.schema_versions), isTechnical, await describe(order, list, client), prepared.categories, JSON.stringify(prepared.requirements)])).rows[0];
+    await matching.log(client, order.id, 'system:request', 'prepared', null, matching.snapshot(updated));
     await consent.applyToOrder(client, account, updated, meta);
     await outbox.emit(client, 'tender.published', order.id, { tender_id: apiId(order), version: updated.api_version }, `tender.published:${order.id}`);
     return updated;

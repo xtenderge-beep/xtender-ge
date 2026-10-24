@@ -24,7 +24,7 @@ const MAX_LINK_LENGTH = 6000;
 
 // Сделка через подключённый аккаунт (инструменты mcpDeal.tools.js, docs/api-v1/MCP_MAPPING.md).
 const DEAL_INSTRUCTIONS = 'With a connected account you can also run the whole request on xtender.ge. Customer: search_categories, get_category_schema and list_locations, '
-  + 'then create_tender_draft and validate_tender; show the user the final request and publish_tender only after they confirm. The first publication returns '
+  + 'then create_tender_draft and validate_tender (it lists fixes and estimates how many providers fit now — not a promise anyone is free); show the user the final request and publish_tender only after they confirm. If the category changed after the draft was saved, publish returns CATEGORY_SCHEMA_CHANGED with fixes: ask the user, update the draft and publish again. The first publication returns '
   + 'CONSENT_REQUIRED with consent_url: give the user the link, they accept the Terms on xtender.ge, then publish again. After publication an Xtender moderator '
   + 'checks the request; providers get it only after that, and offers are collected for about a day. By default providers answer with written offers and the '
   + 'phone stays hidden until the chosen provider confirms. To compare offers call get_comparison_data and compare facts: total price (total_amount_minor null '

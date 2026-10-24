@@ -20,11 +20,14 @@ const worker = () => require('../src/services/dealWorker.service').runOnce(new D
   const call = harness.client(base);
   try {
     const customerPhone = '+995599111001';
-    const p1 = await harness.addMaster({ phone: '+995599222001', name: 'Giorgi Movers' });
-    const p2 = await harness.addMaster({ phone: '+995599222002', name: 'Nika Team' });
+    // Заявка просит двух грузчиков: подходят бригады от двух человек (неизвестный размер бригады не подходит).
+    const p1 = await harness.addMaster({ phone: '+995599222001', name: 'Giorgi Movers', attributes: { crew_size: 3 } });
+    const p2 = await harness.addMaster({ phone: '+995599222002', name: 'Nika Team', attributes: { crew_size: 2 } });
     const outsider = await harness.addMaster({ phone: '+995599222003', service: 'junk_removal', name: 'Other' });
 
     const customer = (await harness.login(base, customerPhone, SCOPES)).access_token;
+    // Тихие часы выключены явно: тест не зависит от времени суток.
+    await pool.query("UPDATE accounts SET quiet_from='00:00', quiet_to='00:00' WHERE phone=$1", [customerPhone]);
     const prov1 = (await harness.login(base, p1.phone, SCOPES)).access_token;
     const prov2 = (await harness.login(base, p2.phone, SCOPES)).access_token;
     const prov3 = (await harness.login(base, outsider.phone, SCOPES)).access_token;

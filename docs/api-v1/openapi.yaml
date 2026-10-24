@@ -1124,6 +1124,7 @@ paths:
       security:
         - oauth2:
             - "tenders:read"
+      description: "Checks the whole draft against the current category schemas: active categories, value types, allowed options, ranges, units, required fields. fixes lists what to correct in plain words; schema_changes lists categories changed since the draft was saved. supply_estimate counts providers that fit the service, city and parameters now, with the same matching the dispatch uses (an unknown provider characteristic never fits a requirement); it is not a promise that anyone is free."
       parameters:
         - name: "id"
           in: "path"
@@ -1181,7 +1182,7 @@ paths:
       security:
         - oauth2:
             - "tenders:write"
-      description: "Show the user the final request first and send confirmed_by_user only after they agree. The request goes to Xtender moderation (publication_status in_review); providers receive it after a moderator approves the dispatch, and the offer collection starts then. The first publication of an account gives 409 CONSENT_REQUIRED with consent_url: the user accepts the Terms and Privacy policy on xtender.ge, then publish again. The draft is validated again against the current category schemas (422 NOT_READY with validation). A repeat of a published request returns it unchanged."
+      description: "Show the user the final request first and send confirmed_by_user only after they agree. The request goes to Xtender moderation (publication_status in_review); providers receive it after a moderator approves the dispatch, and the offer collection starts then. The first publication of an account gives 409 CONSENT_REQUIRED with consent_url: the user accepts the Terms and Privacy policy on xtender.ge, then publish again. The draft is validated again against the current category schemas: if a category changed after the draft was saved and the draft no longer fits, 409 CATEGORY_SCHEMA_CHANGED with schema_changes and fixes; other problems give 422 NOT_READY with fixes. Nothing is corrected silently. On success the provider requirements of the dispatch are prepared from the request parameters; the moderator checks them before the dispatch. A repeat of a published request returns it unchanged."
       x-xtender-side-effects:
         - "tender_published"
         - "dispatch_queued"
@@ -4599,11 +4600,13 @@ components:
         description:
           oneOf:
             - type: "string"
+              description: "From the admin category editor."
             - type: "null"
         synonyms:
           type: "array"
           items:
             type: "string"
+          description: "Search words from the admin category editor; for ka also Georgian in Latin letters."
         included_services:
           oneOf:
             - type: "array"
@@ -4751,7 +4754,7 @@ components:
           type: "array"
           items:
             type: "string"
-          description: "Empty today: requests on the site are free text."
+          description: "Parameters the request must have before publication (set in the admin category editor)."
         request_id:
           type: "string"
       required:
@@ -5250,6 +5253,32 @@ components:
           type: "integer"
           description: "Providers the moderator included in the dispatch."
       description: "Owner only."
+    Fix:
+      type: "object"
+      properties:
+        path:
+          type: "string"
+        code:
+          type: "string"
+          description: "REQUIRED, INVALID_OPTION, OUT_OF_RANGE, UNKNOWN_PARAMETER, CATEGORY_INACTIVE, UNKNOWN_UNIT …"
+        message:
+          type: "string"
+          description: "What to correct, in plain words."
+        allowed:
+          type: "array"
+          items:
+            type: "string"
+          description: "Allowed values now."
+        min:
+          type: "number"
+        max:
+          type: "number"
+        unit:
+          type: "string"
+      required:
+        - "path"
+        - "code"
+        - "message"
     TenderValidation:
       type: "object"
       properties:
@@ -5279,14 +5308,47 @@ components:
                 type: "string"
               message:
                 type: "string"
+        fixes:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Fix"
         schema_versions:
           type: "object"
+        schema_changes:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              category_id:
+                type: "string"
+              saved_version:
+                type: "string"
+              current_version:
+                type: "string"
+          description: "Categories whose schema changed after the draft was saved."
+        supply_estimate:
+          oneOf:
+            - type: "object"
+              properties:
+                matching_providers:
+                  type: "integer"
+                by_category:
+                  type: "object"
+                checked_at:
+                  type: "string"
+                  description: "RFC 3339 with offset; stored in UTC."
+                  format: "date-time"
+                note:
+                  type: "string"
+              description: "Same matching as the dispatch; not a promise of availability. null without a city or with invalid parameters."
+            - type: "null"
         request_id:
           type: "string"
       required:
         - "ready_to_publish"
         - "missing_fields"
         - "field_errors"
+        - "fixes"
     PublishResult:
       type: "object"
       properties:

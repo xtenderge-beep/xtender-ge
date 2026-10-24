@@ -29,7 +29,7 @@ const day = 24 * 60 * 60 * 1000;
   };
   try {
     const customerPhone = '+995599333001';
-    const provider = await harness.addMaster({ phone: '+995599444001', name: 'Levan Movers' });
+    const provider = await harness.addMaster({ phone: '+995599444001', name: 'Levan Movers', attributes: { crew_size: 2 } });
 
     // Каталог без входа: категория и город для черновика.
     const anonymous = await connect();

@@ -33,6 +33,8 @@ const BUILT_IN = {
       optionLabels: { closed: { ru: 'Закрытый', ka: 'დახურული', en: 'Enclosed' }, flatbed: { ru: 'Борт (открытый)', ka: 'ბორტიანი (ღია)', en: 'Flatbed (open)' } },
       maps_to: { field: 'body', rule: 'provider_eq' } },
     { key: 'tail_lift', input: 'bool', labels: { ru: 'Нужен гидроборт', ka: 'საჭიროა ჰიდრობორტი', en: 'Tail lift needed' }, maps_to: { field: 'tail_lift', rule: 'provider_flag' } },
+    // Вес груза — числом в тоннах против подтверждённой грузоподъёмности машины, не через класс кузова.
+    { key: 'cargo_weight_t', input: 'number', unit: 't', min: 0.1, max: 60, labels: { ru: 'Вес груза, т', ka: 'ტვირთის წონა, ტ', en: 'Cargo weight, t' }, maps_to: { field: 'payload_t', rule: 'provider_gte' } },
     { key: 'with_helpers', input: 'bool', labels: { ru: 'Нужна машина с грузчиками', ka: 'მანქანა მტვირთავებით', en: 'Van that comes with loaders' }, maps_to: { field: 'with_helpers', rule: 'provider_flag' } },
   ],
   junk: [

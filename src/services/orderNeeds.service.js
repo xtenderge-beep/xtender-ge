@@ -19,6 +19,12 @@ function parseSizes(rawSize, categories) {
 // transport_sizes — все подходящие классы; transport_size остаётся для прежних читателей, когда класс один.
 // marks — отметки для подсказок исполнителю: moversVehicle («Клиенту нужна и машина», config/vehicleHint.js)
 // и tools (услуги с «Нужен инструмент», config/toolsHint.js). Ключ пишется, только когда отметка стоит.
+// Пометка «подготовлено из параметров заказчика» (requestMatching.service) переходит в новые требования: это сведение о
+// происхождении, а не требование; без неё отправка без правок выглядела бы изменением.
+const keepPrepared = (order, requirements) => {
+  const stored = typeof order.requirements === 'string' ? JSON.parse(order.requirements) : order.requirements;
+  return stored?.prepared ? { ...requirements, prepared: stored.prepared } : requirements;
+};
 const requirementsOf = (sizes, details, marks = {}) => ({
   configured: true, transport_size: sizes.length === 1 ? sizes[0] : '', transport_sizes: sizes, ...details,
   ...(marks.moversVehicle ? { [vehicleHint.FLAG]: true } : {}), ...(marks.tools?.length ? { [toolsHint.FLAG]: marks.tools } : {}),
@@ -33,7 +39,8 @@ async function cityFor(order, rawCityId) {
   return selected;
 }
 
-async function save(token, rawCategories, rawSize, rawAttributes, rawCityId) {
+// actor — кто меняет (admin, manager:<id>): каждое изменение требований пишется в журнал (requestMatching.log).
+async function save(token, rawCategories, rawSize, rawAttributes, rawCityId, actor = 'admin') {
   const categories = [...new Set([].concat(rawCategories || []))];
   const groups = await categoryService.groups();
   if (!categories.length || categories.some(key => typeof key !== 'string' || !Object.hasOwn(groups,key))) throw new Error(INVALID);
@@ -42,8 +49,10 @@ async function save(token, rawCategories, rawSize, rawAttributes, rawCityId) {
   await pool.withTransaction(async client => {
     const order = (await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
     if (!order || order.first_dispatched_at || order.status !== 'pending_review') throw new Error('Потребности можно настроить до первой рассылки. После неё можно закрывать отдельные потребности.');
+    const next = { target_categories: categories, requirements: keepPrepared(order, requirementsOf(sizes,details)), city_id: await cityFor(order,rawCityId) };
     await client.query('UPDATE orders SET target_categories=$2,requirements=$3::jsonb,city_id=$4,revision_version=revision_version+1 WHERE token=$1',
-      [token,categories,JSON.stringify(requirementsOf(sizes,details)),await cityFor(order,rawCityId)]);
+      [token,next.target_categories,JSON.stringify(next.requirements),next.city_id]);
+    await journal(client, order, next, actor);
   });
   const order = await orderService.getOrderByToken(token);
   await require('./telegram.service').updateMessage(order);
@@ -109,17 +118,25 @@ const stable = value => JSON.stringify(value, (key, item) => item && typeof item
 
 // Сохраняет потребности с экрана менеджера по правилам draft. Версия заявки растёт, только если
 // что-то изменилось, — по ней рассылка замечает чужую правку между расчётом и отправкой.
-async function apply(token, input) {
+// Журнал: что было и что стало, если требования действительно изменились.
+async function journal(client, order, next, actor) {
+  const matching = require('./requestMatching.service');
+  const before = matching.snapshot(order);
+  if (stable(before) !== stable(matching.snapshot(next))) await matching.log(client, order.id, actor, 'changed', before, matching.snapshot(next));
+}
+
+async function apply(token, input, actor = 'admin') {
   const changed = await pool.withTransaction(async client => {
     const order = (await client.query('SELECT * FROM orders WHERE token=$1 FOR UPDATE',[token])).rows[0];
     if (!order || !['pending_review','new'].includes(order.status)) throw new Error('Заявка закрыта или не найдена');
     const next = await draft(order, input, client);
     if (!next.categories.length) throw new Error('Отметьте хотя бы одну услугу');
-    const requirements = requirementsOf(next.sizes, next.details, next);
+    const requirements = keepPrepared(order, requirementsOf(next.sizes, next.details, next));
     const before = [Array.isArray(order.target_categories) ? order.target_categories : [], order.requirements?.configured ? order.requirements : null, order.city_id];
     if (stable(before) === stable([next.categories, requirements, next.cityId])) return false;
     await client.query('UPDATE orders SET target_categories=$2,requirements=$3::jsonb,city_id=$4,revision_version=revision_version+1 WHERE token=$1',
       [token,next.categories,JSON.stringify(requirements),next.cityId]);
+    await journal(client, order, { target_categories: next.categories, requirements, city_id: next.cityId }, actor);
     return true;
   });
   const order = await orderService.getOrderByToken(token);
