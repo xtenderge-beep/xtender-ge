@@ -6,8 +6,8 @@
 
 ## Что нужно от вас заранее
 
-1. **Разрешение отправить ветку `api-v1-stage1` на GitHub** (не `main`: `main` выкладывает сайт). Репозиторий открытый —
-   код ветки станет виден; паролей и ключей в нём нет.
+1. ~~Разрешение отправить ветку `api-v1-stage1` на GitHub~~ — **сделано 2026-10-24**: ветка на GitHub, `main` не тронут.
+   Новые коммиты в эту ветку Railway staging будет собирать сам.
 2. **Railway — пустое окружение** `staging` в проекте `fabulous-luck` (шаги — [BACKEND_AUDIT.md](BACKEND_AUDIT.md), раздел 13):
    «+ New Environment» → **Empty Environment** (не Duplicate: копия перенесла бы ключ Telegram-бота и ключи шлюза), в нём
    PostgreSQL, Redis и приложение из репозитория с веткой `api-v1-stage1`, Networking → «Generate Domain».

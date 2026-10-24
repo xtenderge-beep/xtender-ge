@@ -353,25 +353,18 @@ docs.railway.com 2026-10-23 (Environments, Public Networking, GitHub Autodeploys
 
 1. **Ветка на GitHub.** Railway собирает из ветки репозитория, поэтому ветку `api-v1-stage1` надо отправить на GitHub (не в
    `main`: отправка `main` выкладывает сайт). Это внешнее действие — нужно разрешение владельца. К репозиторию подключён ещё
-   и Vercel (зачем — не выяснено); он может собрать предпросмотр ветки.
+   и Vercel (зачем — не выяснено); он может собрать предпросмотр ветки. **Сделано 2026-10-24** с разрешения владельца:
+   `main` не тронут, у коммита ветки статус только от Vercel, Railway ничего не собирал.
 2. **Пустое окружение.** Проект `fabulous-luck` → «+ New Environment» → **«Empty Environment»**, имя `staging`.
    Не «Duplicate Environment»: копия переносит переменные прода — ключ Telegram-бота, ключи шлюза и, возможно, адрес боевой
    базы, а тестовая копия, запущенная до того, как задан `XTENDER_SANDBOX=1`, переставила бы вебхук бота на себя.
 3. **Сервисы окружения**: PostgreSQL, Redis и приложение из репозитория `xtenderge-beep/xtender-ge`. В настройках сервиса
    приложения выбрать ветку `api-v1-stage1` — без выбора Railway берёт ветку по умолчанию (`main`).
 4. **Адрес**: настройки сервиса приложения → Networking → Public Networking → «Generate Domain».
-5. **Переменные приложения — до первого запуска**:
-
-   | Переменная | Значение |
-   |---|---|
-   | `DATABASE_URL`, `REDIS_URL` | Ссылки на PostgreSQL и Redis **этого** окружения |
-   | `XTENDER_SANDBOX` | `1` |
-   | `DOMAIN` | Адрес из шага 4, без `https://` |
-   | `NODE_ENV` | `production` |
-   | `SMS_GATEWAY_USERNAME`, `SMS_GATEWAY_PASSWORD` | Те же, что на проде; владелец вписывает сам, в чат не присылает |
-   | `SANDBOX_REAL_SMS_NUMBERS` | Номер владельца (+995…), можно несколько через запятую |
-   | `SANDBOX_SINK_KEY` | Длинная случайная строка |
-   | Не задавать | `TELEGRAM_*`, `OPENROUTER_API_KEY`, `GA_MEASUREMENT_ID`, `META_PIXEL_ID`, `ADMIN_*` (без них админка отвечает 503) |
+5. **Переменные приложения — до первого запуска**: актуальная таблица — [OWNER_CHECK.md](OWNER_CHECK.md), шаг 3. После
+   этапов 2–3 она шире первоначальной: `SANDBOX_SEED` и `SANDBOX_REAL_DEAL_SMS` для сделки и **новые** `ADMIN_PASSWORD`,
+   `ADMIN_SESSION_SECRET` — тестовой админке нужна модерация. `TELEGRAM_*`, `OPENROUTER_API_KEY`, `GA_MEASUREMENT_ID`,
+   `META_PIXEL_ID`, `ADMIN_PHONE` по-прежнему не задавать.
 
 6. **Запуск и проверка сессией**: в Deploy Logs «Database schema is up to date»; `https://<адрес>/api/v1/capabilities` —
    `environment: sandbox`; `/.well-known/oauth-authorization-server` — `issuer: https://<адрес>`; корневые метаданные —
