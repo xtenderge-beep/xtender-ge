@@ -13,6 +13,10 @@
   }));
   // Параметры заявки: свои из базы, иначе действующие по умолчанию (src/config/requestFields.js) — их видно и можно поменять.
   const providerFieldOptions=typeof locals.providerFieldOptions !== 'undefined' ? locals.providerFieldOptions : (category?.fields || []).map(f=>[f.key, f.labels?.ru || f.key]);
+  const unitOptions=typeof locals.unitOptions !== 'undefined' ? locals.unitOptions : [];
+  // Описание и слова поиска: отправленные (после ошибки) или действующие.
+  const texts=typeof locals.categoryTexts !== 'undefined' ? locals.categoryTexts : {descriptions:{},synonyms:{}};
+  const textValue=(name, fallback)=>submitted && submitted[name] !== undefined ? submitted[name] : fallback;
   const rfields=submitted && submitted.request_fields ? submitted.request_fields : (locals.effectiveRequestFields || []).map(f=>({
     key:f.key, input:f.input, name_ru:f.labels?.ru, name_ka:f.labels?.ka, name_en:f.labels?.en, unit:f.unit, min:f.min, max:f.max,
     required:f.required, maps_field:f.maps_to?.field || '', maps_rule:f.maps_to?.rule || 'provider_gte',
@@ -31,6 +35,10 @@
 <label class="block text-sm">Вид<select name="kind" class="block border rounded-xl px-3 py-2"><option value="service" <%= (value.kind || 'service')==='service'?'selected':'' %>>Услуга</option><option value="goods" <%= value.kind==='goods'?'selected':'' %>>Товары (закупка: позиции, количество, доставка)</option></select></label>
 <label class="flex items-center gap-2"><input type="checkbox" name="is_active" <%= value.is_active !== false ? 'checked' : '' %>>Категория активна</label>
 <p class="text-sm text-stone-500">При отключении категория исчезает из новых назначений, каталога и рассылки. Профили и история сохраняются.</p>
+<h2 class="font-bold">Описание и слова для поиска</h2>
+<p class="text-sm text-stone-500">Описание видят ИИ-ассистенты в каталоге: что входит в услугу. Слова поиска — как люди называют услугу («уборка», «клининг», «dalageba»); через запятую или каждое с новой строки. По ним заявку находят в ChatGPT и в поиске на главной. Правка сразу меняет версию каталога.</p>
+<% [['ru','на русском'],['ka','на грузинском'],['en','на английском']].forEach(([lang,label])=>{ %><label class="block text-sm">Описание <%= label %><textarea name="description_<%= lang %>" maxlength="600" rows="2" class="block w-full border rounded-xl px-3 py-2"><%= textValue('description_'+lang, texts.descriptions[lang] || '') %></textarea></label><% }); %>
+<% [['ru','Слова поиска на русском'],['ka','Слова поиска на грузинском'],['en','Слова поиска на английском'],['latin','Грузинские слова латиницей (как пишут в переписке)']].forEach(([key,label])=>{ %><label class="block text-sm"><%= label %><textarea name="synonyms_<%= key %>" rows="2" class="block w-full border rounded-xl px-3 py-2"><%= textValue('synonyms_'+key, (texts.synonyms[key] || []).join(', ')) %></textarea></label><% }); %>
 <% if(fieldsLocked){ %>
 <h2 class="font-bold">Размер кузова (S / M / L / XL / XXL)</h2>
 <p class="text-sm text-stone-500">Буквы фиксированы (на них завязана проверка в базе), но что каждая буква значит в сантиметрах — можно менять здесь, без участия разработчика. По умолчанию — минимумы тарифа «Грузовой» Яндекса.</p>
@@ -55,18 +63,18 @@
 <% if(fieldsLocked){ %><p class="text-sm">Поле «Размер» само по себе (буквы S/M/L/XL/XXL) настраивается в сантиметрах выше и не показано в списке ниже. Остальные характеристики редактируются как обычно.</p><% } %>
 <p class="text-sm text-stone-500">Поля описывают возможности исполнителя. Для участия в точном подборе выберите правило сравнения с требованием заявки. Поле «Текст» служит только описанием.</p>
 <div id="categoryFields" class="space-y-3">
-<% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i}) %><% }); %>
+<% fields.forEach((field,i)=>{ %><%- include('./_category-field',{field,index:i,unitOptions}) %><% }); %>
 </div>
 <button type="button" id="addCategoryField" class="px-3 py-2 border rounded-xl">Добавить характеристику</button>
-<template id="categoryFieldTemplate"><%- include('./_category-field',{field:{},index:'INDEX'}) %></template>
+<template id="categoryFieldTemplate"><%- include('./_category-field',{field:{},index:'INDEX',unitOptions}) %></template>
 <h2 class="font-bold">Параметры заявки — что спрашивать у заказчика</h2>
 <p class="text-sm text-stone-500">Отдельно от характеристик исполнителя. Пример: «Объём мусора, м³» сравнивается с характеристикой «Объём кузова» по правилу «у исполнителя не меньше». Параметр без сравнения просто показывается исполнителю. Их видят ИИ-ассистенты (схема категории в API) и заказчик при оформлении. Для товаров позиции закупки (название, количество, единица) спрашиваются всегда.</p>
 <input type="hidden" name="request_fields_touched" id="requestFieldsTouched" value="<%= submitted && submitted.request_fields ? '1' : '' %>">
 <div id="requestFields" class="space-y-3">
-<% rfields.forEach((field,i)=>{ %><%- include('./_category-request-field',{field,index:i,providerFieldOptions}) %><% }); %>
+<% rfields.forEach((field,i)=>{ %><%- include('./_category-request-field',{field,index:i,providerFieldOptions,unitOptions}) %><% }); %>
 </div>
 <button type="button" id="addRequestField" class="px-3 py-2 border rounded-xl">Добавить параметр заявки</button>
-<template id="requestFieldTemplate"><%- include('./_category-request-field',{field:{},index:'INDEX',providerFieldOptions}) %></template>
+<template id="requestFieldTemplate"><%- include('./_category-request-field',{field:{},index:'INDEX',providerFieldOptions,unitOptions}) %></template>
 <div><button class="px-4 py-2 bg-emerald-600 text-white rounded-xl">Сохранить категорию</button></div>
 </form>
 <% if(fieldsLocked){ %><form id="vanSizesForm" method="post" action="/admin/categories/<%= category.slug %>/size-thresholds"><input type="hidden" name="_csrf" value="<%= csrfToken %>"></form><% } %>

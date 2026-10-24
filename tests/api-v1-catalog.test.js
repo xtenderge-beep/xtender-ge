@@ -121,8 +121,11 @@ const IRRELEVANT = ['нотариус', 'ремонт ванной', '4 этаж
     // 6. Новая категория через админку (category.service.save) — без нового маршрута и правки кода.
     const categoryService = require('../src/services/category.service');
     const before = (await get('/api/v1/capabilities')).catalog_version;
+    // Единица — только из справочника: «лет» в нём нет, редактор её не примет.
+    await assert.rejects(categoryService.save(null, { name_ka: 'სანტექნიკი', name_ru: 'Сантехники', name_en: 'Plumbers', is_active: true,
+      fields: [{ input: 'number', name_ru: 'Стаж', unit: 'лет', match: 'gte' }] }), /выберите из списка/);
     const created = await categoryService.save(null, { name_ka: 'სანტექნიკი', name_ru: 'Сантехники', name_en: 'Plumbers', icon: '🔧', sort_order: 50, is_active: true,
-      fields: [{ input: 'number', name_ru: 'Стаж', name_en: 'Experience', unit: 'лет', min: 1, max: 50, match: 'gte' }, { input: 'text', name_ru: 'Инструмент' }] });
+      fields: [{ input: 'number', name_ru: 'Стаж', name_en: 'Experience', unit: '', min: 1, max: 50, match: 'gte' }, { input: 'text', name_ru: 'Инструмент' }] });
     caps = await get('/api/v1/capabilities');
     assert.notEqual(caps.catalog_version, before, 'catalog_version сменилась');
     for (const [q, lang] of [['сантехник', 'ru'], ['სანტექნიკი', 'ka'], ['plumber', 'en'], ['santeqniki', 'en']]) {

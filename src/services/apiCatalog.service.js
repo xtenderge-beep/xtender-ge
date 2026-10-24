@@ -1,7 +1,7 @@
 // Каталог для API v1: категории с поиском по описанию потребности, схема параметров заявки по категории, география,
 // наличие исполнителей и версии каталога. Источник — тот же справочник услуг, что в /admin/categories
-// (service_categories), и тот же словарь слов, что у поиска на главной (service-search-words.js): новая услуга из
-// админки появляется здесь без правки кода. Серверного ИИ нет: поиск — нормализация (одна латиница для ka/ru/en)
+// (service_categories): названия, описания и слова поиска категорий правятся там же (config/categoryTexts.js), новая услуга
+// из админки и новые слова появляются здесь без правки кода. Серверного ИИ нет: поиск — нормализация (одна латиница для ka/ru/en)
 // и совпадение по началу слова. Описание — docs/api-v1/README.md, раздел «Каталог».
 const crypto = require('node:crypto');
 const categoryService = require('./category.service');
@@ -9,7 +9,8 @@ const masterService = require('./master.service');
 const settingsService = require('./settings.service');
 const redis = require('../config/redis');
 const search = require('../../public/js/service-search');
-const { SEARCH_WORDS, FEATURE_TAGS } = require('../config/service-search-words');
+const { FEATURE_TAGS } = require('../config/service-search-words');
+const categoryTexts = require('../config/categoryTexts');
 const { NEED_WORDING } = require('../config/serviceTypes');
 const { translate } = require('../config/i18n');
 const units = require('../config/units');
@@ -19,7 +20,6 @@ const { PREFIX } = require('../config/apiV1');
 
 const SUPPLY_TTL_MS = 5 * 60 * 1000;
 const Q_MAX_LENGTH = 300;
-const LINE_BY_LANG = { ru: 0, ka: 1, en: 2 };
 
 // --- Версии ----------------------------------------------------------------------------------------------------
 function stable(value) {
@@ -40,14 +40,16 @@ function schemaVersion(row, sizes) {
     sizes: fields.some((f) => f.input === 'size') ? sizes : null });
 }
 
-// Слова поиска входят в версию каталога: их правка меняет выдачу так же, как новая услуга.
-const WORDS_VERSION = hash({ SEARCH_WORDS, FEATURE_TAGS: FEATURE_TAGS.map(({ attribute, ...tag }) => tag) });
+// Слова особенностей (самосвал, гидроборт) — в коде; слова и описания категорий — в базе и входят в версию каталога
+// построчно (snapshot): их правка в админке меняет выдачу так же, как новая услуга.
+const WORDS_VERSION = hash({ FEATURE_TAGS: FEATURE_TAGS.map(({ attribute, ...tag }) => tag) });
 
 async function snapshot() {
   const [rows, sizes] = await Promise.all([categoryService.list(), settingsService.getVanSizeThresholds()]);
   const categories = rows.map((row) => ({ ...row, schema_version: schemaVersion(row, sizes) }));
   const version = 'cat_' + hash({ words: WORDS_VERSION, categories: categories.map((c) => ({
-    slug: c.slug, names: [c.name_ka, c.name_ru, c.name_en], active: c.is_active, order: c.sort_order, icon: c.icon, schema: c.schema_version })) });
+    slug: c.slug, names: [c.name_ka, c.name_ru, c.name_en], active: c.is_active, order: c.sort_order, icon: c.icon, schema: c.schema_version,
+    texts: { descriptions: categoryTexts.descriptions(c), synonyms: categoryTexts.synonyms(c) } })) });
   return { categories, sizes, version, updatedAt: await versionSince(version) };
 }
 
@@ -134,10 +136,10 @@ async function availabilityFor(category, location) {
 // --- Поиск ------------------------------------------------------------------------------------------------------
 function searchEntries(categories) {
   const active = new Set(categories.map((c) => c.slug));
-  const entries = [...SEARCH_WORDS, ...FEATURE_TAGS.filter((tag) => tag.services)]
+  const entries = FEATURE_TAGS.filter((tag) => tag.services)
     .map((entry) => ({ services: entry.services.filter((s) => active.has(s)), words: search.tokens(entry.words.join(' ') + ' ' + Object.values(entry.tag || {}).join(' ')) }))
     .filter((entry) => entry.services.length);
-  categories.forEach((c) => entries.push({ services: [c.slug], words: search.tokens([c.name_ka, c.name_ru, c.name_en].join(' ')) }));
+  categories.forEach((c) => entries.push({ services: [c.slug], words: search.tokens([c.name_ka, c.name_ru, c.name_en, categoryTexts.searchText(c)].join(' ')) }));
   return entries;
 }
 
@@ -167,18 +169,15 @@ function matchQuery(q, categories) {
   return matched;
 }
 
-function synonyms(slug, lang) {
-  const lines = [LINE_BY_LANG[lang], ...(lang === 'ka' ? [3] : [])];
-  const words = SEARCH_WORDS.filter((entry) => entry.services.includes(slug))
-    .flatMap((entry) => lines.flatMap((line) => String(entry.words[line] || '').split(/\s+/)))
-    .filter(Boolean);
-  return [...new Set(words)];
+// Слова поиска на языке ответа (у грузинского — и латиницей), из админки.
+function synonyms(category, lang) {
+  const all = categoryTexts.synonyms(category);
+  return [...new Set([...(all[lang] || []), ...(lang === 'ka' ? all.latin : [])])];
 }
 
-function description(slug, lang) {
-  const key = `service_desc_${slug}_body`;
-  const text = translate(lang)(key);
-  return text === key ? null : text;
+function description(category, lang) {
+  const texts = categoryTexts.descriptions(category);
+  return texts[lang] || texts.en || texts.ru || null;
 }
 
 async function categoryView(category, lang, location, extra = {}) {
@@ -190,8 +189,8 @@ async function categoryView(category, lang, location, extra = {}) {
     name: category['name_' + lang] || category.name_en,
     names: names(category),
     language_used: category['name_' + lang] ? lang : 'en',
-    description: description(category.slug, lang),
-    synonyms: synonyms(category.slug, lang),
+    description: description(category, lang),
+    synonyms: synonyms(category, lang),
     // Состава работ («что входит / не входит») в справочнике нет: неизвестно, а не «ничего».
     included_services: null,
     excluded_services: null,

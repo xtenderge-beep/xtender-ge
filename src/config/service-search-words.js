@@ -132,7 +132,9 @@ function forPage(categories, locale, masters) {
   const entries = SEARCH_WORDS
     .map((entry) => ({ services: entry.services.filter((s) => slugs.has(s)), words: entry.words.join(' ') }))
     .filter((entry) => entry.services.length);
-  active.forEach((c) => entries.push({ services: [c.slug], words: [c.name_ka, c.name_ru, c.name_en].filter(Boolean).join(' ') }));
+  // Слова поиска категории из админки (config/categoryTexts.js) — к словарю групп ниже; группы с хэштегами остаются здесь.
+  const texts = require('./categoryTexts');
+  active.forEach((c) => entries.push({ services: [c.slug], words: [c.name_ka, c.name_ru, c.name_en, texts.searchText(c)].filter(Boolean).join(' ') }));
   const labels = Object.fromEntries(active.map((c) => [c.slug, c['name_' + locale] || c.name_ru]));
   const own = new Set(SEARCH_WORDS.filter((entry) => entry.tag && entry.services.length === 1).map((entry) => entry.services[0]));
   const serviceTags = [
@@ -141,7 +143,7 @@ function forPage(categories, locale, masters) {
       services: entry.services.filter((s) => slugs.has(s)), kind: entry.services.length > 1 ? 'group' : 'service',
     })),
     ...active.filter((c) => !own.has(c.slug)).map((c) => ({
-      key: c.slug, label: String(c['name_' + locale] || c.name_ru).toLowerCase(), words: [c.name_ka, c.name_ru, c.name_en].filter(Boolean).join(' '),
+      key: c.slug, label: String(c['name_' + locale] || c.name_ru).toLowerCase(), words: [c.name_ka, c.name_ru, c.name_en, texts.searchText(c)].filter(Boolean).join(' '),
       services: [c.slug], kind: 'service',
     })),
   ].filter((tag) => tag.services.length);

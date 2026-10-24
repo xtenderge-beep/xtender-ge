@@ -164,6 +164,8 @@ async function runMigrations() {
   // Триггеры/функции, которые не тянет pg-mem (dev-server сюда не заходит). Идемпотентны.
   const pgOnly = fs.readFileSync(path.join(__dirname, '..', 'schema.postgres.sql'), 'utf8');
   await pool.query(pgOnly);
+  // Описания и слова поиска категорий — в базу, только в ещё не перенесённые строки (category.service.migrateTexts).
+  await require('./services/category.service').migrateTexts();
   console.log('Database schema is up to date');
 }
 

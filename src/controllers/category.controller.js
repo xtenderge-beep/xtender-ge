@@ -8,8 +8,11 @@ async function index(req,res) { res.render('admin/categories',{categories:await 
 function providerFieldOptions(category) {
  return (category?.fields || []).map(f=>[f.key, (f.labels?.ru || f.key) + (f.input==='size' ? ' (S…XXL)' : '')]);
 }
+// Единицы — только из справочника src/config/units.js; описание и слова поиска — действующие (из базы или прежние из кода).
 function formLocals(category, extra) {
- return {category, effectiveRequestFields:requestFields.forCategory(category), providerFieldOptions:providerFieldOptions(category), ...extra};
+ const texts=require('../config/categoryTexts');
+ return {category, effectiveRequestFields:requestFields.forCategory(category), providerFieldOptions:providerFieldOptions(category),
+   unitOptions:require('../config/units').list('ru'), categoryTexts:{descriptions:texts.descriptions(category || {}), synonyms:texts.synonyms(category || {})}, ...extra};
 }
 async function form(req,res) {
  const category=req.params.slug ? await categories.get(req.params.slug) : null;

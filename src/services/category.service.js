@@ -12,9 +12,22 @@ function validate(row, raw, vanSizes) {
   if (!row || !row.is_active) return { attributes: {}, errors: ['category'] };
   return base.validateAttributes(row.slug, raw || {}, row.fields, vanSizes);
 }
-// Единицы в конфиге услуг записаны по-русски; известные переводим, остальные показываем как есть.
-const UNITS = { 'м³': { ka: 'მ³', en: 'm³' }, 'см': { ka: 'სმ', en: 'cm' }, 'м': { ka: 'მ', en: 'm' }, 'т': { ka: 'ტ', en: 't' }, 'кг': { ka: 'კგ', en: 'kg' } };
-function unitFor(unit, lang) { return (unit && UNITS[unit]?.[lang]) || unit; }
+// Единица характеристики — код справочника src/config/units.js (редактор даёт выбрать только их). Старые записи хранят
+// русскую подпись («т», «м³», «чел.»): её переводим в код, подпись — на языке страницы.
+const units = require('../config/units');
+function unitFor(unit, lang) {
+  const code = units.codeFor(unit);
+  const known = code && units.UNITS.find((u) => u.code === code);
+  return known ? units.view(known, lang).short : unit;
+}
+// Единица из формы редактора: пусто или код справочника (старую русскую подпись тоже примем — переведём в код).
+function unitInput(raw) {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value) return null;
+  const code = units.codeFor(value);
+  if (!code) throw fail('Единица измерения: выберите из списка.');
+  return code;
+}
 function view(row, lang = 'ru') {
   const t = translate(lang);
   return { type: row.slug, label: row['name_'+lang] || row.name_ru, icon: row.icon, active: row.is_active,
@@ -134,8 +147,8 @@ function parseFields(input, previous) {
     if (f.filter === true || (f.filter === undefined && prevField?.filter)) out.filter = true;
     if (prevField?.optionIcons) out.optionIcons = prevField.optionIcons;
     if (out.input==='number') {
-      const unit = typeof f.unit==='string' ? f.unit.trim() : '';
-      if (unit) { if (unit.length>16) throw fail('Единица измерения: до 16 символов.'); out.unit=unit; }
+      const unit = unitInput(f.unit);
+      if (unit) out.unit = unit;
       const min = f.min==='' || f.min==null ? null : Number(f.min);
       const max = f.max==='' || f.max==null ? null : Number(f.max);
       if (min!==null) { if(!Number.isFinite(min)) throw fail('Минимум: некорректное число.'); out.min=min; }
@@ -145,7 +158,7 @@ function parseFields(input, previous) {
       // Число с единицей может прийти и в enum-поле (напр. тоннаж эвакуатора — список
       // вариантов, но подпись "8 т"). Форма пока не даёт редактировать unit не у number —
       // просто переносим как было, чтобы не терять его при обычном сохранении.
-      out.unit = prevField.unit;
+      out.unit = units.codeFor(prevField.unit) || prevField.unit;
     }
     if(out.input==='enum') {
       const parsed = parseOptions(Array.isArray(f.options) ? f.options : [], prevField?.options || []);
@@ -170,8 +183,8 @@ function parseRequestFields(input, previous, providerFields) {
     ['ka', 'en'].forEach((lang) => { const raw = typeof f['name_' + lang] === 'string' ? f['name_' + lang].trim() : ''; if (raw) labels[lang] = raw.slice(0, 100); });
     const out = { key, input: f.input, labels, required: f.required === true };
     if (f.input === 'number') {
-      const unit = typeof f.unit === 'string' ? f.unit.trim() : '';
-      if (unit) { if (unit.length > 16) throw fail('Единица измерения: до 16 символов.'); out.unit = unit; }
+      const unit = unitInput(f.unit);
+      if (unit) out.unit = unit;
       for (const bound of ['min', 'max']) {
         if (f[bound] === '' || f[bound] == null) continue;
         const n = Number(f[bound]);
@@ -233,14 +246,30 @@ async function save(slug, input) {
     // Ключи прежних параметров — действующего списка, в том числе встроенного по умолчанию: его можно сохранить как свой.
     const requestFields=input.request_fields===undefined ? (previous?.request_fields || [])
       : parseRequestFields(input.request_fields, previous ? require('../config/requestFields').forCategory(previous) : [], fields);
+    // Описание и слова поиска (config/categoryTexts.js). Без полей в форме — прежние значения (у прежней строки без
+    // перенесённых текстов — то, что действует сейчас: из кода).
+    const texts=require('../config/categoryTexts');
+    const parsedTexts=texts.touched(input) ? texts.parseInput(input, fail)
+      : { descriptions: previous ? texts.descriptions(previous) : {}, synonyms: previous ? texts.synonyms(previous) : {} };
     if(previous) {
-      const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,kind=$10,request_fields=$11::jsonb,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version),kind,JSON.stringify(requestFields)]);
+      const result=await client.query('UPDATE service_categories SET name_ka=$1,name_ru=$2,name_en=$3,icon=$4,fields=$5::jsonb,is_active=$6,sort_order=$7,kind=$10,request_fields=$11::jsonb,descriptions=$12::jsonb,synonyms=$13::jsonb,version=version+1 WHERE slug=$8 AND version=$9 RETURNING *', [...names,icon,JSON.stringify(fields),active,order,slug,Number(input.version),kind,JSON.stringify(requestFields),JSON.stringify(parsedTexts.descriptions),JSON.stringify(parsedTexts.synonyms)]);
       if(!result.rows[0]) throw fail('Категория уже изменена. Обновите страницу перед сохранением.',409);
       return result.rows[0];
     }
     const key='svc_'+randomBytes(6).toString('hex');
-    return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order,kind,request_fields) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order,kind,JSON.stringify(requestFields)])).rows[0];
+    return (await client.query('INSERT INTO service_categories(slug,name_ka,name_ru,name_en,icon,fields,is_active,sort_order,kind,request_fields,descriptions,synonyms) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb) RETURNING *',[key,...names,icon,JSON.stringify(fields),active,order,kind,JSON.stringify(requestFields),JSON.stringify(parsedTexts.descriptions),JSON.stringify(parsedTexts.synonyms)])).rows[0];
   });
+}
+// Перенос описаний и слов поиска из кода в базу — при каждом старте, но только в ещё не перенесённые строки (NULL):
+// правка из админки, в том числе пустая, больше никогда не перезаписывается.
+async function migrateTexts(client = pool) {
+  const texts = require('../config/categoryTexts');
+  const rows = (await client.query('SELECT slug, descriptions, synonyms FROM service_categories WHERE descriptions IS NULL OR synonyms IS NULL')).rows;
+  for (const row of rows) {
+    if (row.descriptions == null) await client.query('UPDATE service_categories SET descriptions=$2::jsonb WHERE slug=$1 AND descriptions IS NULL', [row.slug, JSON.stringify(texts.defaultDescriptions(row.slug))]);
+    if (row.synonyms == null) await client.query('UPDATE service_categories SET synonyms=$2::jsonb WHERE slug=$1 AND synonyms IS NULL', [row.slug, JSON.stringify(texts.defaultSynonyms(row.slug))]);
+  }
+  return rows.length;
 }
 // Полное удаление — только если категорией никто не пользуется: иначе профили
 // специалистов останутся с category/service_type, которого больше нет в
@@ -272,4 +301,4 @@ function decorateForCatalog(masters, categories, locale) {
   });
   return masters;
 }
-module.exports={list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,decorateForCatalog,save,remove,toType,toCategory,hasLockedField,parseRequestFields};
+module.exports={migrateTexts,unitFor,list,get,validate,view,configForView,groups,labelMap,catalogGroups,badges,decorateForCatalog,save,remove,toType,toCategory,hasLockedField,parseRequestFields};

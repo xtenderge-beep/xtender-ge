@@ -8,7 +8,7 @@
 <label class="flex gap-2 text-sm"><input type="checkbox" name="fields[<%= index %>][filter]" value="on" <%= field.filter?'checked':'' %>> Показывать как фильтр в каталоге</label>
 
 <div data-number-block class="<%= field.input==='number' ? '' : 'hidden' %> grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-<label class="text-sm">Единица (напр. «м», «т», «чел.»)<input maxlength="16" name="fields[<%= index %>][unit]" value="<%= field.unit || '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
+<label class="text-sm">Единица<select name="fields[<%= index %>][unit]" class="block w-full border rounded-lg px-2 py-1.5 text-sm"><option value="">Без единицы</option><% const unitCode=(typeof unitOptions !== 'undefined' ? unitOptions : []).find(u=>u.code===field.unit || u.short===field.unit)?.code; (typeof unitOptions !== 'undefined' ? unitOptions : []).forEach(u=>{ %><option value="<%= u.code %>" <%= unitCode===u.code?'selected':'' %>><%= u.short %> — <%= u.name %></option><% }); %></select></label>
 <label class="text-sm">Минимум<input type="number" step="any" name="fields[<%= index %>][min]" value="<%= field.min ?? '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
 <label class="text-sm">Максимум<input type="number" step="any" name="fields[<%= index %>][max]" value="<%= field.max ?? '' %>" class="block w-full border rounded-lg px-2 py-1.5 text-sm"></label>
 </div>
