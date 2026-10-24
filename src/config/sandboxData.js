@@ -12,6 +12,9 @@ const SANDBOX = {
       description: 'SANDBOX: waste removal, awaiting moderation. Test profile, not a real person.' },
     { phone: '+995500000005', name: 'SANDBOX Movers Dato', service: 'movers', attributes: { crew_size: 2 }, languages: ['ru', 'en'], active: true,
       description: 'SANDBOX: movers, second test team for comparing offers. Test profile, not a real person.' },
+    // Активный вывоз мусора: первая проверка в ChatGPT (2026-10-25) началась со строительного мусора, а был только Nika на модерации.
+    { phone: '+995500000006', name: 'SANDBOX Junk Tamaz', service: 'junk', attributes: { volume_m3: '4', dump_body: true }, languages: ['ka', 'ru'], active: true,
+      description: 'SANDBOX: construction and household waste removal, dump truck. Test profile, not a real person.' },
   ],
 };
 

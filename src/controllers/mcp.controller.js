@@ -23,8 +23,10 @@ const dealTools = require('./mcpDeal.tools');
 const MAX_LINK_LENGTH = 6000;
 
 // Сделка через подключённый аккаунт (инструменты mcpDeal.tools.js, docs/api-v1/MCP_MAPPING.md).
-const DEAL_INSTRUCTIONS = 'With a connected account you can also run the whole request on xtender.ge. Customer: search_categories, get_category_schema and list_locations, '
-  + 'then create_tender_draft and validate_tender (it lists fixes and estimates how many providers fit now — not a promise anyone is free); show the user the final request and publish_tender only after they confirm. If the category changed after the draft was saved, publish returns CATEGORY_SCHEMA_CHANGED with fixes: ask the user, update the draft and publish again. The first publication returns '
+const DEAL_INSTRUCTIONS = 'Steps with a connected account. Customer: search_categories, get_category_schema and list_locations, '
+  + 'then create_tender_draft and validate_tender (it lists fixes and estimates how many providers fit now — not a promise anyone is free); show the user the final request and publish_tender only after they confirm. '
+  + 'If no provider fits now, say so plainly and let the user decide whether to publish; never leave out a category or a parameter silently. '
+  + 'If the category changed after the draft was saved, publish returns CATEGORY_SCHEMA_CHANGED with fixes: ask the user, update the draft and publish again. The first publication returns '
   + 'CONSENT_REQUIRED with consent_url: give the user the link, they accept the Terms on xtender.ge, then publish again. After publication an Xtender moderator '
   + 'checks the request; providers get it only after that, and offers are collected for about a day. By default providers answer with written offers and the '
   + 'phone stays hidden until the chosen provider confirms. To compare offers call get_comparison_data and compare facts: total price (total_amount_minor null '
@@ -34,17 +36,22 @@ const DEAL_INSTRUCTIONS = 'With a connected account you can also run the whole r
   + 'resolve_tender with the number from the SMS. Provider: search_opportunities, get_tender, send_message, create_offer_draft, then submit_offer after the provider '
   + 'confirmed; accept_selection or decline_selection when chosen. Xtender charges nothing for offers or selection; selection is not a contract.';
 
-// Тот же порядок, что в начале /llms.txt (agentApi.llmsText): уточнить, дать ссылку полным адресом, зачем так и что дальше.
+// Главный путь — заявка через подключённый аккаунт: предложения и переписка возвращаются в чат (решение владельца, BACKEND_AUDIT
+// §12). Ссылка /draft — запасной путь для тех, кто не хочет подключать аккаунт; её часть — в том же порядке, что в начале
+// /llms.txt (agentApi.llmsText): уточнить, дать ссылку полным адресом, зачем так и что дальше. Первая проверка в ChatGPT
+// (2026-10-25) показала: когда ссылка стояла первой, ChatGPT выбирал её и при подключённом аккаунте.
 const INSTRUCTIONS = 'xtender.ge connects customers in Georgia with independent local service providers. '
-  + 'To help a user hire a local service in Georgia: ask briefly for what is missing (where, what exactly, when), call '
-  + 'create_request_link and give the user the link as the full address on its own line. ' + agentApi.WHY + ' '
+  + 'To help a user hire a local service in Georgia, the main way is a request through their connected xtender.ge account: offers, '
+  + 'questions and the comparison then come back to this chat. Ask briefly for what is missing (where, what exactly, when) and follow '
+  + 'the steps below. If the account is not connected, the first account tool offers to sign in on xtender.ge with a phone number and '
+  + 'an SMS code. Never ask for the phone number or the code in the chat. get_my_account shows which account is connected. '
+  + 'Do not promise a price, a response time or a number of responses. '
+  + DEAL_INSTRUCTIONS + ' '
+  + 'Only if the user does not want to connect an account: call create_request_link and give the user the link as the full address '
+  + 'on its own line. ' + agentApi.WHY + ' '
   + agentApi.moreJobs('pass all the codes in services and describe each job') + ' '
   + 'The user enters a Georgian phone number (+995) on the page; do not ask for it in the chat. ' + agentApi.AFTER + ' '
-  + 'list_services shows the cities with providers; for any other place, tell the user that xtender.ge may have no providers there yet. '
-  + 'Do not promise a price, a response time or a number of responses. '
-  + 'get_my_account shows which xtender.ge account the user connected; if it is not connected, the app offers to sign in '
-  + 'on xtender.ge with a phone number and an SMS code. Never ask for the phone number or the code in the chat. '
-  + DEAL_INSTRUCTIONS;
+  + 'list_services shows the cities with providers for that link; for any other place, tell the user that xtender.ge may have no providers there yet.';
 
 // Политика входа каждого инструмента (developers.openai.com/plugins/build/auth, «securitySchemes»). Библиотека MCP 1.32.1
 // не передаёт это поле в tools/list, поэтому buildServer дописывает его в ответ сам.
@@ -155,12 +162,15 @@ function buildServer() {
   const server = new McpServer({ name: 'xtender', title: 'xtender.ge', version }, { instructions: INSTRUCTIONS });
   server.registerTool('list_services', {
     title: 'Services with providers',
-    description: 'Lists the services on xtender.ge (Georgia) that have providers now, by city, with service codes and provider counts. Use the codes in create_request_link.',
+    description: 'Lists the services on xtender.ge (Georgia) that have providers now, by city, with service codes and provider counts. Use the codes in create_request_link. '
+      + 'For a request through a connected account use search_categories instead.',
     annotations: { title: 'Services with providers', ...READ_ONLY },
   }, listServices);
   server.registerTool('create_request_link', {
     title: 'Create a request link',
-    description: 'Builds a link to xtender.ge with the user\'s request filled in. Nothing is sent: the user opens the link, checks the request '
+    description: 'Only when the user does not want to connect an xtender.ge account: builds a link to xtender.ge with the request filled in. '
+      + 'Offers do not come back to this chat then; with a connected account use create_tender_draft and publish_tender instead. '
+      + 'Nothing is sent: the user opens the link, checks the request '
       + 'and confirms it with their phone number and an SMS code. Give the link to the user as the full address on its own line.',
     inputSchema: {
       lang: z.enum(['ka', 'ru', 'en']).describe('The user\'s language: Georgian, Russian or English. The page opens in it; write the other fields in it too.'),

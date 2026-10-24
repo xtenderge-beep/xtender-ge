@@ -79,6 +79,10 @@ function startSite() {
     assert.ok(instructions.includes(agentApi.WHY) && instructions.includes(agentApi.AFTER), 'зачем так и что дальше — как в llms.txt');
     // Другие задачи человека — в ту же заявку, коды в services (поля cats у инструмента нет).
     assert.ok(instructions.includes(agentApi.moreJobs('pass all the codes in services and describe each job')), 'другие задачи — в ту же заявку');
+    // Главный путь — заявка через подключённый аккаунт, ссылка — запасной (первая проверка в ChatGPT 2026-10-25 выбрала ссылку).
+    assert.ok(instructions.indexOf('create_tender_draft') < instructions.indexOf('create_request_link'), 'сначала заявка в чате, потом ссылка');
+    assert.match(instructions, /Only if the user does not want to connect an account: call create_request_link/);
+    assert.match(instructions, /never leave out a category or a parameter silently/);
 
     // 2. Три инструмента, все только читают (так их видят каталоги ChatGPT и Claude). get_my_account — только после входа
     // (docs/api-v1, этап 1б): без токена он просит подключить аккаунт, прежние два работают без входа.
