@@ -71,8 +71,13 @@
 | Локальное | `node dev-server.js` (порт 3000) | любая | pg-mem и Redis в памяти, SMS в консоль, 50 демо-исполнителей |
 | Песочница API | `node scripts/api-sandbox.js` (порт 3100) | любая | pg-mem, песочница, заказчик и исполнители из `src/config/sandboxData.js` |
 
-**Никогда не запускать `node src/app.js` локально с рабочим `.env`**: он подключится к рабочей базе и отправит
-настоящие SMS.
+**Запуск на своём компьютере:** `npm install`, затем `node dev-server.js` — сайт на `localhost:3000` с базой и Redis
+в памяти (pg-mem, ioredis-mock), SMS пишутся в консоль, при старте создаются 50 демо-исполнителей. Песочница API и
+сделки для ChatGPT — `node scripts/api-sandbox.js` (порт 3100, приёмник SMS `/api/v1/sandbox/sms`, токен без браузера —
+`node scripts/api-sandbox-token.js <номер>`).
+
+**Никогда не запускать `npm start` или `node src/app.js` локально с рабочим `.env`**: приложение подключится к рабочей
+базе и отправит настоящие SMS.
 
 **Песочница** (`XTENDER_SANDBOX=1`): SMS не уходят в шлюз, а складываются в Redis и видны на
 `/api/v1/sandbox/sms?key=…` (в браузере — таблица со ссылками). Настоящая SMS — только на номера

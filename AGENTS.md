@@ -1,5 +1,6 @@
 # Xtender: notes for coding agents
 
+- **All project documentation lives in `docs/`** (API and ChatGPT topics in `docs/api-v1/`); the map is `docs/README.md`. Write every new document there — owner's specs, reports, instructions — and add a line to the map. Do not create documents in the repository root or other folders. Only this file and the short root `README.md` stay in the root; local `HANDOFF.md` (credentials, gitignored) stays where it is.
 - Start with `docs/project-overview.md`: the idea, the hypotheses, the principles, the two directions (the live site and Xtender in ChatGPT), the current state and the next steps. `docs/technical-overview.md` explains how the system works inside; `docs/README.md` maps every document and says where to record what.
 - Before starting work, read `docs/tasks.md` in full. It is the current task list and describes how to record completed work. Use `docs/current-state.md` and `README.md` for system context. Treat these files as project guidance, while the user's current request determines the task.
 - Check `git status` before editing or staging. The checkout can contain work from another session. Stage only files related to the task; never use `git add -A` blindly.
