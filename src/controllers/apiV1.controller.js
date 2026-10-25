@@ -329,7 +329,28 @@ async function sandboxSms(req, res) {
   const phone = typeof req.query.phone === 'string' ? require('../config/phone').toE164(req.query.phone) : null;
   const raw = await redis.lrange('sandbox:sms', 0, 199);
   const items = raw.map((line) => JSON.parse(line)).filter((sms) => !phone || sms.to === phone);
+  // Браузер (проверка владельцем) — читаемая страница с кликабельными ссылками; программы и тесты по-прежнему получают JSON.
+  if (req.accepts(['json', 'html']) === 'html') return res.set('Cache-Control', 'no-store').type('html').send(sandboxSmsPage(req, items, phone));
   return send(req, res, 200, { items, has_more: false, next_cursor: null });
+}
+
+const escapeHtml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const TBILISI_TIME = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+function sandboxSmsPage(req, items, phone) {
+  const link = (query) => '?' + new URLSearchParams({ ...(req.query.key ? { key: req.query.key } : {}), ...query }).toString();
+  const rows = items.map((sms) => {
+    const text = escapeHtml(sms.text).replace(/https?:\/\/[^\s<]+/g, (url) => `<a href="${url}" target="_blank" rel="noopener">${url}</a>`);
+    return `<tr><td>${escapeHtml(TBILISI_TIME.format(new Date(sms.at)))}</td><td><a href="${escapeHtml(link({ phone: sms.to }))}">${escapeHtml(sms.to)}</a></td><td>${text}</td></tr>`;
+  }).join('');
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>SMS песочницы</title><style>
+body{font:15px/1.45 system-ui,sans-serif;margin:16px;color:#1f2937;background:#fff}table{border-collapse:collapse;width:100%}
+td,th{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left;vertical-align:top}td:last-child{word-break:break-word}a{color:#047857}
+</style></head><body><h1>SMS песочницы</h1>
+<p>Сообщения, которые тестовый сайт не отправил по-настоящему (тестовые номера). Новые сверху, хранятся сутки.
+${phone ? `Номер ${escapeHtml(phone)} · <a href="${escapeHtml(link({}))}">все номера</a>` : 'Все номера.'} · <a href="${escapeHtml(link(phone ? { phone } : {}))}">Обновить</a></p>
+<table><tr><th>Время (Тбилиси)</th><th>Кому</th><th>Текст</th></tr>${rows || '<tr><td colspan="3">Пока пусто.</td></tr>'}</table></body></html>`;
 }
 
 module.exports = {

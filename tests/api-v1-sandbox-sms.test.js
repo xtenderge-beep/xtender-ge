@@ -63,6 +63,17 @@ const harness = require('./api-v1-harness');
     items = (await (await sink('+995544000009')).json()).items;
     assert.match(items[0].text, /^Xtender code: \d{4}/);
 
+    // 4а. Браузер получает читаемую страницу: ссылки кликабельные, текст экранирован, ключ сохраняется в ссылках.
+    await sms.sendOrderNotification('+995544000009', 'Xtender <b>: https://example.test/order/y?a=1&b=2', { kind: 'lead' });
+    const page = await fetch(base + '/api/v1/sandbox/sms?' + new URLSearchParams({ key: 'sink-key-123' }), { headers: { accept: 'text/html,application/xhtml+xml' } });
+    assert.equal(page.status, 200);
+    assert.match(page.headers.get('content-type'), /text\/html/);
+    const html = await page.text();
+    assert.match(html, /<a href="https:\/\/example\.test\/order\/y\?a=1&amp;b=2" target="_blank" rel="noopener">/);
+    assert.match(html, /Xtender &lt;b&gt;:/);
+    assert.match(html, /href="\?key=sink-key-123&amp;phone=%2B995544000009"/);
+    assert.equal((await fetch(base + '/api/v1/sandbox/sms', { headers: { accept: 'text/html' } })).status, 404, 'без ключа и в браузере закрыт');
+
     // 5. Счётчики Google и Meta в песочнице выключены, если не заданы явно.
     const googleTag = require('../src/config/googleTag');
     const metaPixel = require('../src/config/metaPixel');
