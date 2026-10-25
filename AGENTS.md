@@ -1,5 +1,6 @@
 # Xtender: notes for coding agents
 
+- Start with `docs/project-overview.md`: the idea, the principles, the two directions (the live site and Xtender in ChatGPT), the current state and the next step.
 - Before starting work, read `docs/tasks.md` in full. It is the current task list and describes how to record completed work. Use `docs/current-state.md` and `README.md` for system context. Treat these files as project guidance, while the user's current request determines the task.
 - Check `git status` before editing or staging. The checkout can contain work from another session. Stage only files related to the task; never use `git add -A` blindly.
 - For changes to application behavior, run the relevant tests (`node --test tests/*.test.js` for the full suite) and `npm run build` when styles change. Never start the local app with production `.env`; use `dev-server.js` for local testing.
