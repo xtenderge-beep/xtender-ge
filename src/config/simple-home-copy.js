@@ -40,6 +40,7 @@ module.exports = {
     seo_now_count: 'შემსრულებლები კატალოგში: {n} ({city}, {date}-ის მდგომარეობით). სია ავტომატურად ახლდება.',
     seo_now_services: 'სერვისების მიხედვით',
     // Автоматическая страница «услуга + город» (servicePages.service.js).
+    page_examples_title: 'დაიწყეთ მაგალითით, დანარჩენს თქვენ დაწერთ:',
     seo_auto_lead: 'აღწერეთ დავალება — მას შესაბამისი შემსრულებლები მიიღებენ, ან თავად დაურეკეთ რომელიმე მათგანს. დამკვეთისთვის უფასოა.',
     seo_auto_description: '{h1} — xtender.ge. შემსრულებლები კატალოგში: {n}. აღწერეთ დავალება — მას შესაბამისი შემსრულებლები მიიღებენ, ან თავად დაურეკეთ. დამკვეთისთვის უფასოა.',
     seo_auto_features: 'მახასიათებლები',
@@ -82,6 +83,7 @@ module.exports = {
     seo_now_title: 'Исполнители в каталоге сейчас',
     seo_now_count: 'Исполнителей в каталоге: {n} ({city}, на {date}). Список обновляется сам.',
     seo_now_services: 'По услугам',
+    page_examples_title: 'Начните с примера и допишите своё:',
     seo_auto_lead: 'Опишите задачу — её получат подходящие исполнители, или позвоните кому-то из них сами. Для заказчика бесплатно.',
     seo_auto_description: '{h1} на xtender.ge. Исполнителей в каталоге: {n}. Опишите задачу — её получат подходящие исполнители, или позвоните им сами. Для заказчика бесплатно.',
     seo_auto_features: 'Характеристики',
@@ -123,6 +125,7 @@ module.exports = {
     seo_now_title: 'Providers in the catalog now',
     seo_now_count: 'Providers in the catalog: {n} ({city}, as of {date}). The list updates itself.',
     seo_now_services: 'By service',
+    page_examples_title: 'Start from an example and add your details:',
     seo_auto_lead: 'Describe your task — matching providers will receive it, or call one of them yourself. Free for customers.',
     seo_auto_description: '{h1} on xtender.ge. Providers in the catalog: {n}. Describe your task — matching providers will receive it, or call them yourself. Free for customers.',
     seo_auto_features: 'Features',

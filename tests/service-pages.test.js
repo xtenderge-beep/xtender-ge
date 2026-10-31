@@ -26,6 +26,7 @@ const { translate, normalizeLang } = require('../src/config/i18n');
 const googleTag = require('../src/config/googleTag');
 const PLACEHOLDERS = require('../src/config/service-pages-copy');
 const ARTICLES = require('../src/config/service-pages-article');
+const EXAMPLES = require('../src/config/page-examples');
 const { FEATURE_TAGS } = require('../src/config/service-search-words');
 const root = path.join(__dirname, '..');
 
@@ -109,6 +110,10 @@ function startSite() {
       assert.ok(html.includes(`placeholder="${PLACEHOLDERS.movers[lang]}"`), `${lang}: the example fits the service`);
       assert.ok(html.includes(`"@type":"Service","name":"${h1}"`), `${lang}: Service markup`);
       assert.ok(html.includes(`"preset":{"key":"movers","label":"#`), `${lang}: the service hashtag is pressed on open`);
+      // Заголовок запроса стоит над полем, примеры заявок — под ним (владелец 2026-10-31).
+      assert.ok(html.indexOf('<h1 id="simple-seo-title">') < html.indexOf('id="post-section"'), `${lang}: the headline is above the form`);
+      assert.ok(html.indexOf('id="post-section"') < html.indexOf('class="page-examples"') && html.indexOf('class="page-examples"') < html.indexOf('id="phoneStep"'), `${lang}: examples are under the field`);
+      assert.ok(EXAMPLES.service.movers[lang].every(example => html.includes(`data-example="${example}"`)), `${lang}: the examples of this service`);
       // Живое число — только исполнители услуги, а не весь каталог; рядом другие услуги города.
       assert.ok(html.includes('<p>' + t('seo_now_count').replace('{n}', 4).split('{city}')[0]), `${lang}: four movers`);
       assert.ok(html.includes(`/s/santekniki-tbilisi">${lang === 'ka' ? 'სანტექნიკი თბილისში' : lang === 'ru' ? 'Сантехники в Тбилиси' : 'Plumbing in Tbilisi'}<i`), `${lang}: link to the other open page`);
@@ -123,6 +128,9 @@ function startSite() {
       assert.ok(html.includes(`"@type":"Question","name":"${copy.faq[0].q}"`) && html.includes(`<h3>${copy.faq[0].q}</h3>`), `${lang}: own questions in markup and on the page`);
       assert.ok(!html.includes(`"name":"${t('faq_q5')}"`), `${lang}: general questions are not in the markup`);
       assert.ok(html.includes(`<a href="${lang === 'ka' ? '' : '/' + lang}/join">${copy.join.cta}</a>`), `${lang}: link for job seekers`);
+      // Как устроена система: настоящее число грузчиков в статье, без пустого места под него.
+      const why = copy.article.find(block => block.p && block.p.includes('{n}')).p;
+      assert.ok(html.includes(`<p>${why.replace('{n}', 4)}</p>`) && !html.includes(why), `${lang}: the live number of movers in the article`);
       const assembly = FEATURE_TAGS.find(tag => tag.key === 'assembly').tag[lang];
       assert.ok(html.includes(`<strong>${t('seo_auto_features')}:</strong> ${assembly} — 1.`), `${lang}: furniture assembly counted from the description`);
     }
@@ -132,8 +140,13 @@ function startSite() {
     assert.equal(junk.status, 200);
     const junkHtml = await junk.text();
     assert.match(junkHtml, /<meta name="robots" content="noindex, nofollow">/);
-    // У услуги без своего текста — общий текст и общие вопросы, как раньше.
-    assert.ok(junkHtml.includes(`<h2>${translate('en')('seo_how_title')}</h2>`) && junkHtml.includes(`"name":"${translate('en')('faq_q5')}"`), 'a service without its own copy keeps the general text');
+    // Свой текст вывоза мусора: статья, вопросы и примеры заявок.
+    assert.ok(junkHtml.includes(`<h2>${ARTICLES.junk.en.article[0].h}</h2>`) && junkHtml.includes(`"name":"${ARTICLES.junk.en.faq[0].q}"`), 'waste removal has its own copy');
+    assert.ok(EXAMPLES.service.junk.en.every(example => junkHtml.includes(`data-example="${example}"`)), 'waste removal has its own examples');
+    // У услуги без своего текста — общий текст, общие вопросы и никаких примеров, как раньше.
+    const plainHtml = await (await get('/en/s/santekniki-tbilisi')).text();
+    assert.ok(plainHtml.includes(`<h2>${translate('en')('seo_how_title')}</h2>`) && plainHtml.includes(`"name":"${translate('en')('faq_q5')}"`), 'a service without its own copy keeps the general text');
+    assert.ok(!plainHtml.includes('class="page-example"'), 'a service without its own examples shows none');
     for (const url of ['/ru/s/evakuatori-tbilisi', '/ru/s/mushebi-batumi', '/ru/s/nothing-tbilisi', '/s/mushebi-tbilisi-extra'])
       assert.equal((await get(url)).status, 404, url);
 

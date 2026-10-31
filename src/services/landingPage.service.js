@@ -7,6 +7,8 @@ const settingsService = require('./settings.service');
 const orderService = require('./order.service');
 const providerName = require('../config/providerName');
 const { parseDocBody } = require('../config/legalTextFormat');
+const EXAMPLES = require('../config/page-examples');
+const FAQ = require('../config/landing-faq');
 
 const LANGS = ['ka', 'ru', 'en'];
 const LANG_NAMES = { ka: 'грузинском', ru: 'русском', en: 'английском' };
@@ -145,6 +147,8 @@ async function view(page, lang, cityId) {
     choose: text.choose,
     facts: [text.fact1, text.fact2].filter(Boolean),
     placeholder: text.placeholder,
+    examples: EXAMPLES.task[page.slug]?.[lang] || [],
+    faq: FAQ[page.slug]?.[lang] || [],
     seoTitle: text.seo_title || [text.title, text.accent].filter(Boolean).join(' ') + ' | xtender.ge',
     seoDescription: text.seo_description || '',
     article: text.article_on && text.article ? parseDocBody(text.article) : [],

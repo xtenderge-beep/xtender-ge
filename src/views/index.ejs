@@ -75,6 +75,7 @@
       };
       // У страницы услуги со своим текстом (config/service-pages-article.js) — свои вопросы, и в разметке, и внизу.
       const faqItems = autoPage && autoPage.faq.length ? autoPage.faq
+        : topic && topic.faq && topic.faq.length ? topic.faq
         : [1, 2, 3, 4, 5].map((n) => ({ q: t('faq_q' + n), a: t(n === 2 ? 'home_faq_response' : 'faq_a' + n) }));
       const faqJsonLd = {
         '@context': 'https://schema.org',
@@ -222,6 +223,20 @@
             <% } %>
           </div>
           <% } %>
+          <% if (simple && (autoPage || topic)) { %>
+          <%# Страница услуги или задачи: заголовок запроса над полем, человек сразу видит, что попал куда нужно (владелец
+              2026-10-31). На главной его нет: там поле без заголовка по эскизу владельца, h1 внизу. На английской версии
+              страницы задачи в заголовке ещё и сам запрос латиницей (куда ведёт реклама по грузинским запросам). %>
+          <div class="simple-page-head">
+            <% if (autoPage) { %>
+            <h1 id="simple-seo-title"><%= autoPage.h1 %></h1>
+            <p class="simple-seo-lead"><%= t('seo_auto_lead') %></p>
+            <% } else { %>
+            <h1 id="simple-seo-title"><%= topic.title %><% if (topic.accent) { %> <%= topic.accent %><% } %><% if (topic.queryWords) { %> <span class="simple-seo-query"><%= topic.queryWords %></span><% } %></h1>
+            <p class="simple-seo-lead"><%= topic.post[0] %><% if (topic.post.length > 1) { %><b><%= topic.post[1] %></b><%= topic.post[2] %><% } %> <%= topic.choose %></p>
+            <% } %>
+          </div>
+          <% } %>
                     <section id="post-section" class="home-request scroll-mt-20" <% if (simple) { %>aria-label="<%= t('simple_publish') %>"<% } else { %>aria-labelledby="home-form-title"<% } %>>
                         <div class="composer-card">
 
@@ -310,6 +325,16 @@
                                         </button>
                                     </div>
                                 </div>
+
+                                <% const pageExamples = !draftPage && (autoPage ? autoPage.examples : topic ? topic.examples : null) || []; %>
+                                <% if (pageExamples.length) { %>
+                                <div class="page-examples">
+                                  <p class="page-examples-title"><%= t('page_examples_title') %></p>
+                                  <div class="page-examples-list">
+                                    <% pageExamples.forEach(function (example) { %><button type="button" class="page-example" data-example="<%= example %>"><%= example %></button><% }); %>
+                                  </div>
+                                </div>
+                                <% } %>
 
                             </div>
 
@@ -696,16 +721,8 @@
                         .replace('{city}', catalogCity ? (catalogCity['name_' + lang] || catalogCity.name_ru) : '')
                         .replace('{date}', nowDate);
                     %>
-                    <section class="simple-seo" aria-labelledby="simple-seo-title">
-                      <% if (autoPage) { %>
-                      <h1 id="simple-seo-title"><%= autoPage.h1 %></h1>
-                      <p class="simple-seo-lead"><%= t('seo_auto_lead') %></p>
-                      <% } else if (topic) { %>
-                      <%# Страница задачи: заголовок, фраза о группе с настоящим числом и статья — из админки. На английской
-                          версии в заголовке ещё и сам запрос латиницей (куда ведёт реклама по грузинским запросам). %>
-                      <h1 id="simple-seo-title"><%= topic.title %><% if (topic.accent) { %> <%= topic.accent %><% } %><% if (topic.queryWords) { %> <span class="simple-seo-query"><%= topic.queryWords %></span><% } %></h1>
-                      <p class="simple-seo-lead"><%= topic.post[0] %><% if (topic.post.length > 1) { %><b><%= topic.post[1] %></b><%= topic.post[2] %><% } %> <%= topic.choose %></p>
-                      <% } else { %>
+                    <section class="simple-seo" <% if (autoPage || topic) { %>aria-label="<%= t('seo_what_title') %>"<% } else { %>aria-labelledby="simple-seo-title"<% } %>>
+                      <% if (!autoPage && !topic) { %>
                       <h1 id="simple-seo-title"><%= t('home_hero_title') %> <%= t('home_hero_title_accent') %></h1>
                       <p class="simple-seo-lead"><%= t('home_hero_lead_short') %></p>
                       <% } %>
@@ -1193,6 +1210,20 @@
 
         if (composeInput) composeInput.addEventListener('focus', enterCompose);
         if (composeInput) composeInput.addEventListener('input', () => trackStep('lead_form_start'));
+
+        // Пример под полем ставит начало заявки, дальше человек дописывает сам. Свой текст не стирается: пример встаёт
+        // после него; только что поставленный пример меняется на другой.
+        let pageExampleText = '';
+        document.querySelectorAll('.page-example').forEach((button) => button.addEventListener('click', () => {
+            const current = composeInput.value.trim();
+            const start = button.dataset.example + ', ';
+            composeInput.value = !current || composeInput.value === pageExampleText ? start : current.replace(/[,\s]+$/, '') + ', ' + start;
+            pageExampleText = composeInput.value;
+            composeInput.dispatchEvent(new Event('input', { bubbles: true }));
+            composeInput.focus();
+            composeInput.setSelectionRange(composeInput.value.length, composeInput.value.length);
+            if (window.xtTrack) window.xtTrack('page_example_click');
+        }));
 
         // --- Мобильная форма: чипсы категорий + клавиатура vs нижнее меню ---
         (function () {

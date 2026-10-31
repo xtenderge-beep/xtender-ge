@@ -9,6 +9,7 @@ const { displayName } = require('../config/providerName');
 const { localizedPath } = require('../config/seo');
 const PLACEHOLDERS = require('../config/service-pages-copy');
 const ARTICLES = require('../config/service-pages-article');
+const EXAMPLES = require('../config/page-examples');
 
 const MIN_PROVIDERS = 3;
 // Адрес — запрос грузинскими словами в латинице, как у страниц задач. Услуга из админки получает его из
@@ -94,9 +95,11 @@ function view(page, lang, masters, cityPages, t) {
     seoTitle: h1 + ' | xtender.ge',
     seoDescription: t('seo_auto_description').replace('{h1}', h1).replace('{n}', own.length),
     placeholder: PLACEHOLDERS[key]?.[lang] || t('simple_placeholder'),
+    examples: EXAMPLES.service[key]?.[lang] || [],
     features: [...features].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 8),
     others: others.map((other) => ({ href: localizedPath(lang, '/s/' + other.slug), title: title(other, lang) })),
-    article: copy.article || [],
+    // {n} в статье — настоящее число исполнителей услуги, как в блоке «Исполнители в каталоге сейчас».
+    article: (copy.article || []).map((block) => (block.p ? { p: block.p.replace('{n}', own.length) } : block)),
     faq: copy.faq || [],
     join: copy.join || null,
   };

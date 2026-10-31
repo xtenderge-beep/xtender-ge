@@ -5,6 +5,8 @@
 // теряет метку клика при переадресации, поисковик получает языки, которых у страницы нет, меняется
 // общая главная или телефонная раскладка, от которой зависит прежняя полноэкранная форма.
 const assert = require('node:assert/strict');
+const EXAMPLES = require('../src/config/page-examples');
+const FAQ = require('../src/config/landing-faq');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
@@ -244,6 +246,11 @@ function startSite() {
       const [before, bold, after] = text.post.replace('{count}', count).split(/[\[\]]/);
       assert.ok(html.includes(`<p class="simple-seo-lead">${before}<b>${bold}</b>${after} ${text.choose}</p>`), `${where}: the sentence with the real number`);
       assert.ok(html.includes(`placeholder="${text.placeholder}"`), `${where}: the example fits the task`);
+      // Заголовок запроса над полем, свои примеры заявок под ним, свои вопросы на странице и в разметке (владелец 2026-10-31).
+      assert.ok(html.indexOf('<h1 id="simple-seo-title">') < html.indexOf('id="post-section"'), `${where}: the headline is above the form`);
+      for (const example of EXAMPLES.task[page.slug][lang]) assert.ok(html.includes(`data-example="${example}"`), `${where}: example ${example}`);
+      for (const item of FAQ[page.slug][lang]) assert.ok(html.includes(`<h3>${item.q}</h3>`) && html.includes(`"name":"${item.q}"`), `${where}: question ${item.q}`);
+      assert.ok(!html.includes(`"name":"${translate(lang)('faq_q5')}"`), `${where}: general questions are not in the markup`);
       assert.doesNotMatch(html, /class="home-hero-title"|class="home-usp|class="home-catalog-strip"|class="home-article"/, `${where}: nothing of the old layout`);
       // Статья страницы стоит на месте общих «Как это работает» и «Чем удобнее»: раздел «как работает» один.
       const headings = [...text.article.matchAll(/^## (.+)$/gm)].map(match => match[1]);
@@ -272,6 +279,7 @@ function startSite() {
       assert.ok(html.includes(`<title>${t('site_title_index')}</title>`), `${lang}: general tab title`);
       assert.ok(html.includes(`<h1 id="simple-seo-title">${t('home_hero_title')} ${t('home_hero_title_accent')}</h1>`) && html.includes(`<p class="simple-seo-lead">${t('home_hero_lead_short')}</p>`), `${lang}: general headline and lead`);
       assert.equal((html.match(/<h1[ >]/g) || []).length, 1, `${lang}: one h1`);
+      assert.ok(html.indexOf('id="post-section"') < html.indexOf('<h1 id="simple-seo-title">') && !html.includes('class="page-examples"'), `${lang}: the homepage keeps the field without a headline or examples`);
       assert.ok(html.includes(`placeholder="${t('simple_placeholder')}"`), `${lang}: general text in the form`);
       assert.doesNotMatch(html, /noindex/, `${lang}: the homepage is open to search`);
       assert.doesNotMatch(html, /home-usp|home-article"|"serviceType"|"BreadcrumbList"/, `${lang}: nothing of a task page on the general homepage`);
