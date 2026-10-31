@@ -23,9 +23,20 @@
 4. Сразу после — `telegram.notifyModerator(order)` с уже подставленным переводом.
 5. **Сбой/таймаут/нет ключа** → заявка и рассылка идут дальше с оригиналом. Перевод
    никогда не блокирует создание заказа. Перевод одного языка не роняет второй.
+6. **Догонка** (`orderTranslation.service`): через минуту после запуска и затем каждые 10 минут
+   открытые заявки (`pending_review`, `new`) без полного перевода переводятся заново, сначала
+   самые новые, до 20 за проход из 500 последних. Так подбираются заявки после сбоя или нерабочего ключа и
+   заявки, исправленные заказчиком (`orderRevision.resubmit` стирает перевод и сам не переводит).
+   Закрытые заявки не трогаем. В логах: `[order-translation] переведено N из M`.
 
 Перевод делается **один раз при создании заявки**, не при каждом открытии. 10 исполнителей
 открыли лид → вызов перевода был один, текст уже в базе.
+
+**Нерабочий ключ сайт не показывает** (случай 2026-10-31: `401 User not found` от OpenRouter; перевод,
+подбор на главной и карточка «Кратко» молча не работали). Проверка снаружи, без логов: POST на
+`/api/task-match` со свежим текстом `{text, lang, city}`. Ответ 200 с `services` значит, что ключ работает;
+204 так же быстро, как у слишком короткого текста, значит, что вызов не удался (суточный лимит подбора
+или сбой Redis выглядят так же).
 
 ## 2. Что видит исполнитель на `/order/<token>`
 
@@ -76,6 +87,7 @@
 | Сервис перевода | `src/services/translation.service.js` (`translateOrder`, `detectLang`) |
 | Схема | `schema.sql` — `orders.description_translations JSONB`, `orders.source_lang VARCHAR(2)` |
 | Сохранение | `order.service.saveTranslations(orderId, sourceLang, translations)` |
+| Догонка заявок без перевода | `src/services/orderTranslation.service.js`, запуск в `src/app.js`, тест `tests/order-translation-backfill.test.js` |
 | Врезка в создание заявки | `order.controller.create` — фоновый IIFE перед `notifyModerator` |
 | WhatsApp-заготовка | `order.controller.buildWhatsappText(order)` → в `show`/`showByOwnerToken` как `whatsappText` |
 | Вьюха | `src/views/order.ejs` — блок `label_request`, кнопки, скрипт копирования |

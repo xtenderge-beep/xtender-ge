@@ -162,6 +162,8 @@ runMigrations()
     });
     // Описания исполнителей без перевода (старые профили, сбои) — через минуту и раз в час.
     require('./services/descriptionTranslation.service').start();
+    // Открытые заявки без перевода (сбой OpenRouter, правка заказчиком) — через минуту и каждые 10 минут.
+    require('./services/orderTranslation.service').start();
     // Посещаемость: удаление записей старше 400 дней раз в сутки.
     require('./services/siteAnalytics.service').start();
   })
