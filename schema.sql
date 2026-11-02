@@ -948,6 +948,12 @@ CREATE TABLE IF NOT EXISTS consent_log_anchors (
     sent_to VARCHAR(30),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Независимая метка времени (RFC 3161) на отпечаток звена: служба DigiCert или FreeTSA подписывает его своим ключом,
+-- проверяется без нас командой openssl ts -verify. kind: daily — суточный отпечаток, export — при выгрузке архива.
+ALTER TABLE consent_log_anchors ADD COLUMN IF NOT EXISTS kind VARCHAR(20) NOT NULL DEFAULT 'daily';
+ALTER TABLE consent_log_anchors ADD COLUMN IF NOT EXISTS tsa_url TEXT;
+ALTER TABLE consent_log_anchors ADD COLUMN IF NOT EXISTS tsa_time TIMESTAMPTZ;
+ALTER TABLE consent_log_anchors ADD COLUMN IF NOT EXISTS tsa_response TEXT;
 -- Короткая ссылка «Stop» в SMS о заявке (leadStop.service): отказ без входа, в том числе для нового
 -- владельца номера («это не мой номер»). Код свой для пары «исполнитель и номер»: смена номера даёт новый.
 CREATE TABLE IF NOT EXISTS lead_stop_codes (

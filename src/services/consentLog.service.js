@@ -63,7 +63,7 @@ async function insertRow(values, client = pool) {
 function redactSms(text, { code = null } = {}) {
   let safe = String(text ?? '')
     .replace(/([?&]k=)[A-Za-z0-9_-]+/g, '$1[скрыто]')
-    .replace(/(\/(?:master|o|review|stop)\/)[A-Za-z0-9_-]+/g, '$1[скрыто]');
+    .replace(/(\/(?:master|o|order|review|stop)\/)[A-Za-z0-9_-]+/g, '$1[скрыто]');
   if (code) safe = safe.split(String(code)).join('[код]');
   return safe;
 }

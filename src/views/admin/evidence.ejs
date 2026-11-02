@@ -1,0 +1,75 @@
+<%- include('./_header', { active: 'consent' }) %>
+<%
+  const fmt = (value) => value ? new Date(new Date(value).getTime() + 4 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 16) : '—';
+  const EVENT = { EVIDENCE_EXPORT_REQUESTED: 'запрошена', EVIDENCE_EXPORTED: 'выгружено', EVIDENCE_EXPORT_DENIED: 'отклонено' };
+  const DENIED = { wrong_code: 'неверный код', request_expired: 'запрос устарел', superseded: 'был запрос новее', other_session: 'другая сессия', no_admin_phone: 'не задан ADMIN_PHONE', code_rate_limited: 'много кодов за час', code_not_sent: 'код не отправлен', build_failed: 'архив не собран', not_found: 'записей нет' };
+%>
+<a href="/admin/consent" class="text-emerald-700 underline">← Согласия</a>
+<h1 class="text-2xl font-black mt-4">Доказательства по номеру</h1>
+<p class="mt-2 text-stone-600">Архив по одному профилю или по номеру: регистрация, договоры в редакции на момент принятия, коды, согласия и отказы, сообщения, паузы, смены номера, проверка целостности. Профили с одним номером не объединяются. Скачивание — только после кода из SMS на телефон администратора; каждая выгрузка и каждая неудачная попытка записываются в журнал.</p>
+
+<% if (error) { %><p role="alert" class="mt-4 p-4 bg-red-50 text-red-800"><%= error %></p><% } %>
+
+<% if (pending) { %>
+<section class="mt-6 p-5 bg-white border border-stone-200 rounded-2xl">
+  <h2 class="text-lg font-bold">Код подтверждения отправлен</h2>
+  <p class="text-sm text-stone-600 mt-2">Запрос <span class="font-mono"><%= pending.requestId %></span>: <%= pending.subject.type === 'profile' ? 'профиль #' + pending.subject.id : 'номер ' + pending.subject.phone %>, цель — <%= purposes[pending.purpose].ru %>. Код действует 5 минут и только для этого запроса.</p>
+  <form method="POST" action="/admin/evidence/download" class="admin-filter mt-4">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="requestId" value="<%= pending.requestId %>">
+    <label>Код из SMS <input name="code" inputmode="numeric" autocomplete="one-time-code" required maxlength="8"></label>
+    <button>Скачать архив</button>
+  </form>
+</section>
+<% } %>
+
+<section class="mt-6 p-5 bg-white border border-stone-200 rounded-2xl">
+  <form method="GET" action="/admin/evidence" class="admin-filter">
+    <label>Номер в любом формате или #номер профиля <input name="q" value="<%= query %>" maxlength="40" placeholder="+995 5XX XX XX XX или #123" required></label>
+    <button>Найти</button>
+  </form>
+  <% if (found && found.error) { %><p class="mt-4 text-stone-500"><%= found.error === 'invalid' ? 'Нужен номер из 9 цифр или #номер профиля.' : 'Ничего не найдено.' %></p><% } %>
+  <% if (found && !found.error) { %>
+    <% (found.notes || []).forEach(note => { %><p class="mt-4 p-4 bg-amber-50 text-amber-900 text-sm"><%= note %></p><% }) %>
+    <% const candidates = [];
+       found.profiles.forEach(p => candidates.push({ key: 'profile:' + p.id, title: 'Профиль #' + p.id + (p.name ? ' «' + p.name + '»' : '') + (p.deletedAt ? ' (удалён ' + fmt(p.deletedAt) + ')' : ''), p }));
+       if (found.phone && (found.phoneOnly.records || found.phoneOnly.orders)) candidates.push({ key: 'phone:' + found.phone, title: 'Номер ' + found.phone + ': записи без связи с профилем', phoneOnly: found.phoneOnly }); %>
+    <% if (!candidates.length) { %><p class="mt-4 text-stone-500">По этому номеру записей нет.</p><% } %>
+    <% candidates.forEach(c => { %>
+    <div class="mt-4 border-t pt-4">
+      <h2 class="font-bold"><%= c.title %></h2>
+      <% if (c.p) { %>
+        <p class="text-sm text-stone-600">Записей журнала: <%= c.p.records %>. Номера профиля:</p>
+        <ul class="text-sm mt-1">
+        <% c.p.periods.forEach(period => { %><li><span class="font-mono"><%= period.phone %></span>: <%= fmt(period.from) %> — <%= period.to ? fmt(period.to) : 'сейчас' %>. <%= period.how %><%= period.recorded ? '' : ' (в журнале не записано)' %></li><% }) %>
+        </ul>
+      <% } else { %>
+        <p class="text-sm text-stone-600">Записей журнала: <%= c.phoneOnly.records %>, заявок заказчика: <%= c.phoneOnly.orders %>. Это записи, которые ни одному профилю доказуемо не принадлежат.</p>
+      <% } %>
+      <form method="POST" action="/admin/evidence/request" class="admin-filter mt-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="subject" value="<%= c.key %>">
+        <input type="hidden" name="q" value="<%= query %>">
+        <label>Цель <select name="purpose" required><option value="">—</option><% Object.entries(purposes).forEach(([key, purpose]) => { %><option value="<%= key %>"><%= purpose.ru %></option><% }) %></select></label>
+        <label>Причина <input name="reason" required minlength="10" maxlength="500" placeholder="Например: жалоба в Службу аудита №…"></label>
+        <button>Запросить код и выгрузить</button>
+      </form>
+    </div>
+    <% }) %>
+  <% } %>
+</section>
+
+<section class="mt-6 p-5 bg-white border border-stone-200 rounded-2xl">
+  <h2 class="text-lg font-bold">Журнал выгрузок</h2>
+  <% if (!exports.length) { %><p class="mt-2 text-stone-500">Выгрузок ещё не было.</p><% } %>
+  <% exports.forEach(item => { %>
+  <div class="mt-3 border-t pt-3 text-sm">
+    <b><%= fmt(item.time) %></b> · <%= EVENT[item.event] %><%= item.denied ? ': ' + (DENIED[item.denied] || item.denied) : '' %>
+    · <%= item.masterId ? 'профиль #' + item.masterId : item.phone %><%= item.requestId ? ' · запрос ' + item.requestId : '' %>
+    <% if (item.purpose && purposes[item.purpose]) { %><br><span class="text-stone-600"><%= purposes[item.purpose].ru %>. <%= item.reason || '' %></span><% } %>
+    <% if (item.sha256) { %><br><span class="font-mono text-xs">SHA-256 архива: <%= item.sha256 %></span><% } %>
+    <% if (item.tsa) { %><br><span class="text-xs">Метка времени на архив: <%= item.tsa.url %>, <%= fmt(item.tsa.time) %> · <a class="text-emerald-700 underline" href="/admin/evidence/receipt/<%= item.id %>">квитанция .tsr</a></span><% } %>
+  </div>
+  <% }) %>
+</section>
+<%- include('./_footer') %>
