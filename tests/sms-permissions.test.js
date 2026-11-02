@@ -113,13 +113,18 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
   assert.deepEqual([res.statusCode,res.data.found],[404,false]);
   assert.equal(first.id>0,true);
 
-  // 4. Пауза: две заявки по SMS, которые открыли другие, а он нет, — третья не уходит, приходит одна SMS о паузе.
+  // 4. Пауза: две заявки по SMS, которые открыли другие, а он нет, — третья не уходит; отдельной SMS о паузе нет.
   await pool.query('UPDATE masters SET is_subscribed=true WHERE id IN ($1,$2)',[giorgi.id,levan.id]);
   await pool.query("DELETE FROM dispatch_deliveries");
   const age=()=>pool.query("UPDATE dispatch_deliveries SET finished_at=$1",[new Date(Date.now()-3*60*60*1000)]);
   const a=await send(),b=await send();
   await age();
   for (const order of [a,b]) await pool.query("INSERT INTO order_views(order_id,master_id,event_type) VALUES($1,$2,'view')",[order.id,levan.id]);
+  // Заявки, ушедшие до включения паузы, не считаются: после выкладки никто не встаёт на паузу по старой истории.
+  const settings=require('../src/services/settings.service');
+  await settings.setSetting(pause.SINCE_KEY,new Date().toISOString());
+  assert.deepEqual(await pause.check(await row(giorgi.id)),{paused:false},'история до включения паузы не считается');
+  await settings.setSetting(pause.SINCE_KEY,'2020-01-01T00:00:00.000Z');
   const before=leadSms(giorgi).length;
   const c=await send();
   assert.equal(leadSms(giorgi).length,before,'третья заявка по SMS не ушла');

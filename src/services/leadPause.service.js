@@ -16,6 +16,19 @@ function isPaused(master) {
   return Boolean(master && master.lead_sms_paused_at && !master.telegram_id);
 }
 
+// Отсчёт с включения паузы: SMS о заявках, ушедшие раньше, не считаются. Иначе при первой рассылке после выкладки
+// на паузу сразу встали бы 32 из 70 исполнителей, получающих заявки только по SMS (по копии базы 2026-11-02), без
+// предупреждения. Время включения пишется при первой проверке; применить правило к истории — поставить раннюю дату.
+const SINCE_KEY = 'lead_pause_since';
+async function startedAt() {
+  const settings = require('./settings.service');
+  const value = await settings.getSetting(SINCE_KEY, null);
+  if (value && !Number.isNaN(new Date(value).getTime())) return new Date(value);
+  const now = new Date();
+  await settings.setSetting(SINCE_KEY, now.toISOString());
+  return now;
+}
+
 async function openedBy(orderIds, client) {
   const ph = orderIds.map((_, i) => `$${i + 1}`).join(', ');
   const [links, views] = await Promise.all([
@@ -36,7 +49,8 @@ async function check(master, client = pool) {
   if (master.telegram_id) return { paused: false };
   if (master.lead_sms_paused_at) return { paused: true, justPaused: false };
   const cutoff = new Date(Date.now() - OPEN_WINDOW_MS);
-  const since = master.lead_sms_resumed_at ? new Date(master.lead_sms_resumed_at) : new Date(0);
+  const resumed = master.lead_sms_resumed_at ? new Date(master.lead_sms_resumed_at).getTime() : 0;
+  const since = new Date(Math.max(resumed, (await startedAt()).getTime()));
   const recent = (await client.query(`SELECT order_id, finished_at FROM dispatch_deliveries
     WHERE master_id=$1 AND status='accepted' AND channel='sms' AND finished_at < $2 AND finished_at > $3
     ORDER BY finished_at DESC, id DESC LIMIT 10`, [master.id, cutoff, since])).rows;
@@ -66,4 +80,4 @@ async function resume(masterId, { meta = {} } = {}) {
   return result;
 }
 
-module.exports = { OPEN_WINDOW_MS, UNOPENED_LIMIT, isPaused, check, resume };
+module.exports = { OPEN_WINDOW_MS, UNOPENED_LIMIT, SINCE_KEY, isPaused, startedAt, check, resume };
