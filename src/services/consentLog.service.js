@@ -25,6 +25,7 @@ const VERIFIED_EVENT_BY_PURPOSE = {
   master_login: 'AUTH_SMS_OTP_VERIFIED',
   order: 'ORDER_SMS_OTP_VERIFIED',
   review: 'REVIEW_SMS_OTP_VERIFIED',
+  lead_resume: 'LEAD_RESUME_OTP_VERIFIED',
 };
 const VERIFIED_EVENT_TYPES = [...Object.values(VERIFIED_EVENT_BY_PURPOSE), 'CLIENT_CONSENT_OTP_VERIFIED'];
 
@@ -108,9 +109,17 @@ async function recordConsentVerified({ phone, purpose, submittedCode, masterId =
 }
 
 // Transactional audit: the business change and its evidence either both commit or both roll back.
-async function recordAction({ eventType, phone, masterId = null, orderId = null, metadata = {}, meta = {}, channel = 'web' }, client = pool) {
+// consentText / language / version — для событий согласия: точный показанный текст, его язык и версия.
+async function recordAction({ eventType, phone, masterId = null, orderId = null, metadata = {}, meta = {}, channel = 'web',
+  consentText = null, language = null, version = null }, client = pool) {
   return insertRow({ event_type: eventType, channel, phone_number: phone, master_id: masterId, order_id: orderId,
-    ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata }, client);
+    ip_address: meta.ip, user_agent: meta.userAgent, x_forwarded_for: meta.xForwardedFor, metadata,
+    consent_text_snapshot: consentText, consent_language: language, terms_version: version }, client);
+}
+
+// Версия текста разрешения: отпечаток самого текста, чтобы по записи было видно, какой именно текст показан.
+function textVersion(text) {
+  return 'sms-' + sha256(text).slice(0, 12);
 }
 
 // declared: what the person typed at acceptance time (e.g. declared_name). The profile row can
@@ -246,7 +255,8 @@ async function exportForPhone(rawPhone) {
 // Последние подтверждённые согласия — для landing-страницы /admin/consent.
 // Джойн по phone_number ↔ masters.phone (FK нет, см. schema.sql).
 async function listRecentConsents(limit = 100) {
-  const recentTypes = [...VERIFIED_EVENT_TYPES, 'MASTER_REGISTERED', 'ORDER_PUBLISHED'];
+  const recentTypes = [...VERIFIED_EVENT_TYPES, 'MASTER_REGISTERED', 'ORDER_PUBLISHED',
+    'LEAD_SMS_OPT_IN', 'LEAD_SMS_OPT_OUT', 'MARKETING_SMS_OPT_IN', 'MARKETING_SMS_OPT_OUT', 'LEAD_SMS_PAUSED', 'LEAD_SMS_RESUMED'];
   const ph = recentTypes.map((_, i) => `$${i + 1}`).join(', ');
   const { rows } = await pool.query(
     `SELECT l.id, l.event_type, l.phone_number, l.purpose, l.ip_address, l.user_agent,
@@ -274,6 +284,7 @@ async function exportForMaster(masterId) {
 
 module.exports = {
   recordAction,
+  textVersion,
   applyConsent,
   recordOtpSent,
   recordConsentVerified,

@@ -41,7 +41,7 @@ const views=async(orderId,masterId)=>(await pool.query('SELECT event_type FROM o
   assert.equal(sent.count,2);
 
   // В SMS уходит ссылка с личным ключом; в базе лежит только его хеш.
-  const keyOf=master=>sms.find(item=>item.phone===master.phone).text.match(/\/order\/lead-1\?k=([A-Za-z0-9_-]{22})$/)?.[1];
+  const keyOf=master=>sms.find(item=>item.phone===master.phone).text.match(/\/order\/lead-1\?k=([A-Za-z0-9_-]{22}) Stop: /)?.[1];
   const key=keyOf(first),otherKey=keyOf(second);
   assert.ok(key && otherKey && key!==otherKey);assert.ok(sms.every(item=>!item.text.includes('master=')));
   assert.ok(!JSON.stringify((await pool.query('SELECT * FROM lead_links')).rows).includes(key));

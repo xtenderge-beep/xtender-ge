@@ -173,7 +173,8 @@ async function getDistrictsByCity(cityId) {
 async function getMasterByToken(token) {
   const { rows } = await pool.query(
     `SELECT ${FIELDS}, is_active, balance_tetri, is_banned, banned_reason, created_at, master_token,
-            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id, is_subscribed, subscription_until, paid_mode
+            telegram_id, telegram_linked_at, missed_dispatch_count, promo_code_used, manager_id, is_subscribed, subscription_until, paid_mode,
+            marketing_sms, lead_sms_paused_at
      FROM masters WHERE master_token = $1`,
     [token]
   );

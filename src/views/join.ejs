@@ -175,6 +175,15 @@
                     <span><%= consent.privacyLabel %> <a href="<%= legalPrefix %>/privacy" target="_blank" rel="noopener" class="text-emerald-700 underline"><%= t('join_privacy_link') %></a></span>
                 </label>
                 <p id="privacyError" class="hidden text-xs text-red-700" role="alert"></p>
+                <%# Два независимых необязательных разрешения на SMS: заявки и предложения Xtender. Отметки сняты. %>
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-stone-200 text-sm cursor-pointer">
+                    <input type="checkbox" id="leadSmsCheckbox" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><b><%= consent.leadSms.title %></b><span class="block text-xs text-stone-600 mt-1"><%= consent.leadSms.text %></span><span class="block text-xs text-stone-500 mt-1"><%= consent.leadSms.hint %></span></span>
+                </label>
+                <label class="flex items-start gap-3 p-3 rounded-xl border border-stone-200 text-sm cursor-pointer">
+                    <input type="checkbox" id="marketingSmsCheckbox" class="mt-1 w-4 h-4 accent-emerald-600 shrink-0">
+                    <span><b><%= consent.marketingSms.title %></b><span class="block text-xs text-stone-600 mt-1"><%= consent.marketingSms.text %></span><span class="block text-xs text-stone-500 mt-1"><%= consent.marketingSms.hint %></span></span>
+                </label>
                 <p class="text-xs text-stone-500"><%= consent.confirmationHint %></p>
                 </div>
                 </div>
@@ -266,6 +275,8 @@
                 promoCode: document.getElementById('promoInput').value.trim(),
                 termsAccepted: document.getElementById('termsCheckbox').checked,
                 privacyAccepted: document.getElementById('privacyCheckbox').checked,
+                leadSmsAccepted: document.getElementById('leadSmsCheckbox').checked,
+                marketingSmsAccepted: document.getElementById('marketingSmsCheckbox').checked,
             };
         }
 
@@ -417,7 +428,8 @@
             const res = await fetch('/api/masters/otp/send', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted, consentLanguage, consentDigest }),
+                body: JSON.stringify({ phone: payload.phone, termsAccepted: payload.termsAccepted, privacyAccepted: payload.privacyAccepted,
+                    leadSmsAccepted: payload.leadSmsAccepted, marketingSmsAccepted: payload.marketingSmsAccepted, consentLanguage, consentDigest }),
             });
             const data = await res.json();
             if (!data.success) return showSignupError(data, T.js_err_send_code);

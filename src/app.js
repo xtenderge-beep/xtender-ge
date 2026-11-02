@@ -89,6 +89,11 @@ app.get('/master/:token', asyncHandler(masterController.statusPage));
 
 app.get('/review/:ownerToken', asyncHandler(reviewController.showInvite));
 
+// Ссылка «Stop» из SMS о заявке: отказ без входа (leadStop.service). Не /s/ — там страницы задач.
+const leadStopController = require('./controllers/leadStop.controller');
+app.get('/stop/:code', asyncHandler(leadStopController.show));
+app.post('/stop/:code', asyncHandler(leadStopController.stop));
+
 app.use('/api', apiRoutes);
 
 // API заявок для ИИ-ассистентов и его описание для моделей (docs/ai-agent-api.md).

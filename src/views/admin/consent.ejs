@@ -22,7 +22,12 @@
     LEAD_SMS_SENT:            { label: 'Лид-SMS',                 cls: 'bg-stone-100 text-stone-600 border-stone-200' },
     TX_SMS_SENT:              { label: 'SMS',                     cls: 'bg-stone-100 text-stone-600 border-stone-200' },
     LEAD_SMS_OPT_OUT:         { label: 'Отказ от заявок',         cls: 'bg-stone-100 text-stone-600 border-stone-200' },
-    LEAD_SMS_OPT_IN:          { label: 'Снова получает заявки',   cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    LEAD_SMS_OPT_IN:          { label: 'Согласие на заявки',      cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    MARKETING_SMS_OPT_IN:     { label: 'Согласие на предложения', cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+    MARKETING_SMS_OPT_OUT:    { label: 'Отказ от предложений',    cls: 'bg-stone-100 text-stone-600 border-stone-200' },
+    LEAD_SMS_PAUSED:          { label: 'Пауза SMS о заявках',     cls: 'bg-amber-100 text-amber-800 border-amber-200' },
+    LEAD_SMS_RESUMED:         { label: 'Пауза снята кодом',       cls: 'bg-sky-100 text-sky-800 border-sky-200' },
+    LEAD_RESUME_OTP_VERIFIED: { label: 'Подтверждение · снятие паузы', cls: 'bg-sky-100 text-sky-800 border-sky-200' },
   };
   function evtBadge(type, metadata) {
     const m = EVENT_META[type] || { label: type, cls: 'bg-stone-100 text-stone-600 border-stone-200' };
@@ -182,7 +187,8 @@
       <div class="text-xs font-bold text-stone-500 uppercase mb-2">Заявки только с согласием</div>
       <p class="text-sm text-stone-600">Когда включено, заявки по SMS и в Telegram получают только исполнители, у которых в журнале есть подтверждённое согласие: код на странице регистрации.</p>
       <ul class="text-sm text-stone-900 mt-2">
-        <li class="py-0.5">Подписаны на заявки: <b><%= leadGate.total %></b><% if (leadGate.telegram) { %>, из них с Telegram: <%= leadGate.telegram %> (заявка приходит в Telegram, SMS — если Telegram её не принял)<% } %>.</li>
+        <li class="py-0.5">Подписаны на заявки: <b><%= leadGate.total %></b><% if (leadGate.telegram) { %>, из них с Telegram: <%= leadGate.telegram %> (заявка приходит в Telegram, SMS — если Telegram её не принял)<% } %><% if (leadGate.paused) { %>; SMS на паузе после двух неоткрытых заявок: <%= leadGate.paused %><% } %>.</li>
+        <li class="py-0.5">Согласие на предложения Xtender: <b><%= leadGate.marketing || 0 %></b>.</li>
         <li class="py-0.5">С записью согласия: <b><%= leadGate.consented %></b><% if (leadGate.versions.length) { %>; версия показанного текста: <%= leadGate.versions.map(function (v) { return v.version + ' — ' + v.count; }).join(', ') %><% } %>.</li>
         <li class="py-0.5">Без записи согласия: <b><%= leadGate.missing.length %></b><% if (leadGate.reasons.length) { %>: <%= leadGate.reasons.map(function (r) { return r.label + ' — ' + r.count; }).join('; ') %><% } %><% if (leadGate.required && leadGate.missing.length) { %>. Им заявки сейчас не отправляются<% } %>.</li>
       </ul>
@@ -255,6 +261,6 @@
 
 
 
-<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED','LEAD_SMS_OPT_OUT','LEAD_SMS_OPT_IN'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
+<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED','LEAD_SMS_OPT_OUT','LEAD_SMS_OPT_IN','MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT','LEAD_SMS_PAUSED','LEAD_SMS_RESUMED'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
 
 <%- include('./_footer') %>

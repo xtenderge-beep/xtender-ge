@@ -13,30 +13,36 @@ const consentLog = require('./consentLog.service');
 const SOURCES = {
   order: 'страница заявки',
   cabinet: 'кабинет',
+  sms_stop: 'ссылка Stop из SMS',
 };
+const ACTORS = { provider: 'Исполнитель', phone_holder: 'Владелец номера' };
 
-async function change(masterId, on, { actor, source, orderId = null, meta = {}, allowBanned = false }) {
+// Включение исполнителем — это согласие: в журнал идёт показанный ему текст разрешения на заявки и его версия.
+async function change(masterId, on, { actor, source, orderId = null, meta = {}, allowBanned = false, language = null, reason = null }) {
   return pool.withTransaction(async (client) => {
     const master = (await client.query('SELECT id, phone, is_banned, is_subscribed FROM masters WHERE id=$1 FOR UPDATE', [masterId])).rows[0];
     if (!master || (master.is_banned && !allowBanned)) return null;
     if (master.is_subscribed === on) return { on, changed: false };
     await client.query('UPDATE masters SET is_subscribed=$1 WHERE id=$2', [on, masterId]);
+    const permission = on && actor === 'provider' && language ? require('./smsPermissions.service').permissionText('lead', language) : null;
     await consentLog.recordAction({ eventType: on ? 'LEAD_SMS_OPT_IN' : 'LEAD_SMS_OPT_OUT', phone: master.phone, masterId, orderId,
-      metadata: { actor, source }, meta }, client);
+      metadata: { actor, source, ...(reason ? { reason } : {}) }, meta,
+      consentText: permission?.text || null, language: permission ? language : null, version: permission?.version || null }, client);
     return { on, changed: true };
   });
 }
 
 // subscribed — true: снова получать заявки, false: больше не присылать. source — ключ SOURCES;
 // orderToken — заявка, со страницы которой нажали (в журнал пишется её номер, как его видит исполнитель).
-// Возвращает новое состояние; null — исполнителя нет или он заблокирован (у заблокированного заявок и так нет).
-async function set(masterId, subscribed, { source = 'cabinet', orderToken = null, orderId = null, meta = {} } = {}) {
-  const result = await change(masterId, subscribed === true, { actor: 'provider', source, orderId, meta });
+// language — язык страницы, где показан текст согласия (для включения). actor — provider или phone_holder
+// (ссылка Stop: кто нажал, неизвестно). Возвращает новое состояние; null — исполнителя нет или он заблокирован.
+async function set(masterId, subscribed, { source = 'cabinet', orderToken = null, orderId = null, meta = {}, language = null, actor = 'provider', reason = null } = {}) {
+  const result = await change(masterId, subscribed === true, { actor, source, orderId, meta, language, reason });
   if (!result) return null;
   if (result.changed) {
     const where = (SOURCES[source] || source) + (orderToken ? ' #' + String(orderToken).slice(0, 6).toUpperCase() : '');
     await audit.record(masterId, {
-      actor: 'Исполнитель',
+      actor: ACTORS[actor] || 'Исполнитель',
       action: result.on ? 'leads_on' : 'leads_off',
       body: (result.on ? 'Снова получает заявки' : 'Отписался от заявок') + ' (' + where + ')',
     });

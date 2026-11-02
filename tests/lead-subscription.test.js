@@ -41,7 +41,7 @@ const t=translate('ru');
   const first=await provider('Первый'),second=await provider('Второй');
   const order=await newOrder('subs-1','Перенести диван');
   assert.equal((await dispatch.sendNeeds(order.token,{needs:['movers']},null,'',{actor:'test'})).count,2);
-  const keyOf=(master,token)=>sms.filter(item=>item.phone===master.phone).map(item=>item.text.match(new RegExp('/order/'+token+'\\?k=([A-Za-z0-9_-]{22})$'))?.[1]).find(Boolean);
+  const keyOf=(master,token)=>sms.filter(item=>item.phone===master.phone).map(item=>item.text.match(new RegExp('/order/'+token+'\\?k=([A-Za-z0-9_-]{22}) Stop: '))?.[1]).find(Boolean);
   const key=keyOf(first,order.token);
   assert.ok(key);
 

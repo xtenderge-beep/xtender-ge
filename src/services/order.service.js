@@ -431,6 +431,8 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
     const paid=billing.isPaid(master), funded=!paid || (master.balance_tetri >= leadPrice && allowed.has(master.id));
     if((!funded && !options.withUnfunded) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
     if(consented && !consented(master)) continue;
+    // SMS о заявках на паузе (две неоткрытые подряд) — пока исполнитель не подтвердит номер кодом.
+    if(require('./leadPause.service').isPaused(master)) continue;
     if(inCity && !inCity(master)) continue;
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;
@@ -465,6 +467,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   });
   context.runId=run.id;
   const notifiedIds = [];
+  const pausedNow = [];
   // A row lock serializes routing changes against delivery and charging. Limit
   // concurrency so background SMS auditing can still obtain a pool connection.
   for (let offset = 0; offset < masters.length; offset += 4) {
@@ -496,6 +499,11 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       // Бесплатный период: основание не нужно, ниже запишется доставка с нулевой суммой.
       const billingConsent = paid ? await billing.permission(master.id, rates, client) : { basis: 'free_period', consent_log_id: null };
       if (!billingConsent || rates.leadPriceTetri !== leadPrice) return;
+      // Без Telegram заявка уйдёт по SMS: две предыдущие по SMS не открыты — ставим паузу вместо отправки.
+      if (!master.telegram_id) {
+        const pause = await require('./leadPause.service').check(master, client);
+        if (pause.paused) { skipReason='sms_paused'; if (pause.justPaused) pausedNow.push(master); return; }
+      }
       const amount = paid ? leadPrice : 0;
       // Личная ссылка: ключ открывает заявку и контакт без входа, но только в первом браузере (leadLink.service).
       const link = getBaseUrl() + '/order/' + order.token + '?k=' + await require('./leadLink.service').issue(order.id, master.id, client);
@@ -506,7 +514,9 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       if (!receipt?.ok && !receipt?.uncertain) {
         channel = 'sms';
         try {
-          receipt = await smsService.sendOrderNotification(master.phone, serviceMessage.sms('lead', { test: isTechnical ? '[TEST] ' : '', id: order.id, link }),
+          // Stop — отказ без входа при каждой отправке (ст. 12(3), (6) закона о персональных данных).
+          const stop = await require('./leadStop.service').linkFor(master, client);
+          receipt = await smsService.sendOrderNotification(master.phone, serviceMessage.sms('lead', { test: isTechnical ? '[TEST] ' : '', id: order.id, link, stop }),
             { kind: 'lead', masterId: master.id, orderId: order.id });
         } catch (err) { receipt = {ok:false,uncertain:err.deliveryUnknown !== false}; console.error('Failed to notify master ' + master.id + ':', err.message); }
       }
@@ -547,6 +557,11 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',reason=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id,skipReason]);
    }));
   }
+  // Одна SMS при постановке на паузу: что случилось и где снять (вход в кабинет, затем код на номер).
+  for (const master of pausedNow) {
+    await smsService.sendOrderNotification(master.phone, serviceMessage.sms('leadPaused', { link: getBaseUrl() + '/master' }), { masterId: master.id })
+      .catch(err => console.error('Pause SMS failed:', err.message));
+  }
   const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
   // Прежние отправки этой же группы (другой язык): кого они уже учли, тому «упущенный лид» второй раз не засчитываем.
   const { rows: earlier } = await pool.query('SELECT language FROM order_dispatches WHERE order_id = $1 AND category = $2 AND vehicle_size = $3 AND language <> $4', [order.id, category, vehicleSize || '', language || '']);
@@ -554,8 +569,9 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const { rows: broke } = await pool.query('SELECT * FROM masters WHERE ' + activeWhere + ' AND paid_mode = true AND balance_tetri < $1', [leadPrice]);
   for (const candidate of broke) {
     if (notifiedIds.includes(candidate.id)) continue;
-    // Напоминание о балансе идёт по тому же согласию, что и заявки.
+    // Напоминание о балансе идёт по тому же согласию, что и заявки, и тоже молчит на паузе.
     if (consented && !consented(candidate)) continue;
+    if (require('./leadPause.service').isPaused(candidate)) continue;
     if (!(await matching.openMatches(candidate,await getOrderByToken(order.token))).includes(category)) continue;
     if(!matching.matches(await matching.servicesFor(candidate),category,vehicleSize || '',order.target_categories,order.requirements)) continue;
     // Рассылка по языку не касается тех, кто на нём не говорит.

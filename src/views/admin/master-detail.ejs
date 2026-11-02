@@ -100,6 +100,14 @@
           <button type="submit" class="text-xs font-bold text-stone-500 hover:text-red-700 underline">Снять с рассылки</button>
         <% } %>
     </form>
+    <%# Пауза SMS о заявках (leadPause.service) и предложения Xtender (smsPermissions.service). Пауза снимается
+        только кодом на номер в кабинете исполнителя, предложения включает только он сам: кнопок здесь нет. %>
+    <p class="mt-2 text-xs text-stone-600">
+      <% if (master.lead_sms_paused_at && !master.telegram_id) { %>
+        <span class="font-bold text-amber-800">SMS о заявках на паузе</span> с <%= new Date(master.lead_sms_paused_at).toLocaleString('ru', { timeZone: 'Asia/Tbilisi' }) %>: две последние заявки по SMS не открыты. Снять может только сам исполнитель — кодом на номер в кабинете.
+      <% } %>
+      Предложения Xtender: <b><%= master.marketing_sms ? 'включены' : 'выключены' %></b>.
+    </p>
 
     <% if (error === 'invalid_amount') { %>
       <p class="mt-2 text-sm text-red-600 font-semibold">Некорректная сумма коррекции.</p>

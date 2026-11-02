@@ -38,15 +38,19 @@ const message = require('../src/config/service-message-copy');
     assert.ok(message('balanceLow',lang,{amount:'1.00',link}).includes(link));
   }
   // Every SMS template is printable ASCII with all placeholders filled.
-  const sample = {code:'1234',reference:' #7',link:'https://example.test/x',test:'[TEST] ',id:7,amount:'1.00'};
-  for (const key of ['code','orderCode','orderLink','lead','revision','reviewInvite','balanceLow','balanceMissed']) {
+  const sample = {code:'1234',reference:' #7',link:'https://example.test/x',test:'[TEST] ',id:7,amount:'1.00',stop:'https://example.test/stop/AbCdEf12'};
+  for (const key of ['code','orderCode','orderLink','lead','leadPaused','revision','reviewInvite','balanceLow','balanceMissed']) {
     const body = message.sms(key, sample);
     assert.match(body, /^[ -~]+$/, 'SMS "' + key + '" must stay Latin');
     assert.ok(!body.includes('{'), 'SMS "' + key + '" has an unfilled placeholder');
   }
   assert.equal(message.sms('code',{code:'1234'}),'Code: 1234','the login code is a bare code on purpose');
   // Providers call an order «zakazi»; «#», not «№», which would turn the SMS into UCS-2.
-  assert.equal(message.sms('lead',sample),'Xtender: [TEST] Zakazi (Order) #7: https://example.test/x');
+  assert.equal(message.sms('lead',sample),'Xtender: [TEST] Zakazi (Order) #7: https://example.test/x Stop: https://example.test/stop/AbCdEf12');
+  // With real link lengths (orders.token is at most 20 characters, the key 22, the stop code 8) the lead SMS,
+  // even for a test order with a large number, stays within one 160-character Latin SMS.
+  const real=message.sms('lead',{test:'[TEST] ',id:9999999,link:'https://xtender.ge/order/'+'a'.repeat(20)+'?k='+'b'.repeat(22),stop:'https://xtender.ge/stop/'+'c'.repeat(8)});
+  assert.ok(real.length<=160,'lead SMS is '+real.length+' characters');
   // A gateway that does not confirm acceptance must not become an unhandled error, keep a dead code
   // alive, or use up the person's hourly attempts.
   const brokenPhone = '+995500000199';

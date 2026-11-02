@@ -763,6 +763,14 @@ ALTER TABLE masters ADD COLUMN IF NOT EXISTS paid_mode BOOLEAN NOT NULL DEFAULT 
 -- «Кто вы?» при регистрации на /join (2026-10-17): worker / vehicle / store, подсказка модератору
 -- (src/config/providerKinds.js). Пустой массив — зарегистрировался раньше или не отметил.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_kinds JSONB NOT NULL DEFAULT '[]'::jsonb;
+-- Два независимых разрешения на SMS (2026-11-02): заявки — is_subscribed, предложения Xtender —
+-- marketing_sms (по умолчанию нет: только отдельной отметкой с показанным текстом, не входом по коду).
+-- lead_sms_paused_at — пауза SMS о заявках после двух неоткрытых подряд (leadPause.service), снимается
+-- только новым кодом на номер. Сами факты согласий и отказов — в sms_consent_logs.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS marketing_sms BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS marketing_sms_at TIMESTAMPTZ;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS lead_sms_paused_at TIMESTAMPTZ;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS lead_sms_resumed_at TIMESTAMPTZ;
 CREATE OR REPLACE VIEW business_orders AS SELECT * FROM orders WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_masters AS SELECT * FROM masters WHERE is_technical = false;
 CREATE OR REPLACE VIEW business_balance_transactions AS
@@ -920,6 +928,15 @@ CREATE TABLE IF NOT EXISTS lead_links (
     UNIQUE (order_id, master_id)
 );
 CREATE INDEX IF NOT EXISTS idx_lead_links_key ON lead_links(key_hash);
+-- Короткая ссылка «Stop» в SMS о заявке (leadStop.service): отказ без входа, в том числе для нового
+-- владельца номера («это не мой номер»). Код свой для пары «исполнитель и номер»: смена номера даёт новый.
+CREATE TABLE IF NOT EXISTS lead_stop_codes (
+    code VARCHAR(16) PRIMARY KEY,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    phone VARCHAR(20) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (master_id, phone)
+);
 
 -- Страницы под рекламу и поиск: одна задача заказчика — одна страница /s/<slug> (landingPage.service.js,
 -- /admin/landings). categories — группы рассылки, чьих получателей считает число на первом экране;

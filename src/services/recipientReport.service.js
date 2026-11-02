@@ -132,7 +132,7 @@ function after(from, to) {
 }
 
 const CHANNELS = { telegram: 'Telegram', sms: 'SMS' };
-const REASONS = { eligibility_changed: 'изменился допуск или баланс', need_closed: 'потребность закрыта', service_changed: 'услуги больше не подходят', language_changed: 'изменился язык', no_consent: 'нет записи согласия', already_received: 'уже уведомлён', prior_attempt_pending: 'есть незавершённая отправка', channel_rejected: 'канал отклонил отправку', result_unknown: 'результат неизвестен', before_send_error: 'ошибка до отправки' };
+const REASONS = { eligibility_changed: 'изменился допуск или баланс', need_closed: 'потребность закрыта', service_changed: 'услуги больше не подходят', language_changed: 'изменился язык', no_consent: 'нет записи согласия', sms_paused: 'SMS на паузе: не открыл две заявки', already_received: 'уже уведомлён', prior_attempt_pending: 'есть незавершённая отправка', channel_rejected: 'канал отклонил отправку', result_unknown: 'результат неизвестен', before_send_error: 'ошибка до отправки' };
 const DENIED = { unavailable: 'заявка или услуга уже закрыта', forbidden: 'нет доступа к этой заявке' };
 const channelName = code => CHANNELS[code] || code || '';
 const reasonText = code => REASONS[code] || code || '';

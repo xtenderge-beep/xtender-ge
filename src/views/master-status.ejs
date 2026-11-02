@@ -349,6 +349,10 @@
                     <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('lead_sub_title') %></h2>
                     <%- include('partials/lead-subscription', { endpoint: '/api/master/' + master.master_token + '/lead-subscription', subscribed: master.is_subscribed !== false, reload: true, hint: t('lead_sub_on_hint') }) %>
                 </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6">
+                    <h2 class="text-sm font-extrabold text-stone-900 uppercase tracking-wide mb-3"><%= t('mkt_title') %></h2>
+                    <%- include('partials/marketing-sms', { endpoint: '/api/master/' + master.master_token + '/marketing', subscribed: master.marketing_sms === true }) %>
+                </div>
                 <% } %>
 
                 <div id="supportCard" class="bg-white rounded-2xl shadow-sm border border-stone-200/80 p-5 sm:p-6 scroll-mt-32">

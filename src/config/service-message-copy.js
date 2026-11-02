@@ -52,7 +52,10 @@ const smsMessages = {
   orderCodeAutofill: '@{host} #{code}',
   // «Zakazi» — так исполнители называют заказ (решение владельца 2026-10-15); «#», не «№»: «№» нет в
   // латинском наборе SMS, с ним сообщение уходит как не-латинское и делится на части по 70 знаков.
-  lead: 'Xtender: {test}Zakazi (Order) #{id}: {link}',
+  // Stop — короткая ссылка отказа без входа (leadStop.service): вся SMS латиницей укладывается в 160 знаков.
+  lead: 'Xtender: {test}Zakazi (Order) #{id}: {link} Stop: {stop}',
+  // Одна SMS при паузе (leadPause.service): две последние заявки по SMS не открыты.
+  leadPaused: 'Xtender: order SMS paused, the last 2 were not opened. To resume, sign in: {link}',
   revision: 'Xtender: please update your request. Moderator feedback: {link}',
   reviewInvite: 'Xtender: order #{id} closed. Rate the provider: {link}',
   balanceLow: 'Xtender: balance low ({amount} GEL). Top up to keep getting orders: {link}',

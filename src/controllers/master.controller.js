@@ -263,6 +263,8 @@ async function register(req, res) {
     if (err.code === 'MASTER_ALREADY_REGISTERED') return existingProfileResponse(req, res);
     throw err;
   }
+  // Две необязательные отметки при регистрации: заявки по SMS и предложения Xtender (smsPermissions.service).
+  await require('../services/smsPermissions.service').applyRegistration(master.id, phone, verified, requestMeta(req));
   await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
   require('../services/descriptionTranslation.service').queue(master.id);
 
@@ -479,9 +481,41 @@ async function unlinkTelegram(req, res) {
 async function setLeadSubscription(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
   if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
-  const subscribed = await require('../services/leadSubscription.service').set(master.id, req.body.subscribed === true, { source: 'cabinet', meta: requestMeta(req) });
+  // Текст согласия в кабинете показан на языке исполнителя (statusPage): его же и пишем в журнал.
+  const subscribed = await require('../services/leadSubscription.service').set(master.id, req.body.subscribed === true,
+    { source: 'cabinet', meta: requestMeta(req), language: normalizeLang(master.language) });
   if (subscribed === null) return res.status(403).json({ success: false });
   return res.json({ success: true, subscribed });
+}
+
+// «Предложения Xtender» в кабинете: включение — только этой отметкой с показанным текстом (smsPermissions.service).
+async function setMarketing(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
+  const marketing = await require('../services/smsPermissions.service').setMarketing(master.id, req.body.subscribed === true,
+    { language: normalizeLang(master.language), source: 'cabinet', meta: requestMeta(req) });
+  if (marketing === null) return res.status(403).json({ success: false });
+  return res.json({ success: true, subscribed: marketing });
+}
+
+// Пауза SMS о заявках снимается только новым кодом на номер исполнителя (leadPause.service).
+const RESUME_OTP_PURPOSE = 'lead_resume';
+async function sendResumeCode(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
+  if (!master.lead_sms_paused_at) return res.status(409).json({ success: false });
+  const result = await otpService.sendCode(master.phone, RESUME_OTP_PURPOSE, null, { meta: requestMeta(req) });
+  if (!result.success) return res.status(result.reason === 'rate_limited' ? 429 : 500).json({ success: false, message: serviceMessage(result.reason === 'rate_limited' ? 'rateLimit' : 'sendFailed', req.lang) });
+  return res.json({ success: true });
+}
+async function verifyResumeCode(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
+  const code = typeof req.body.code === 'string' ? req.body.code.trim() : '';
+  const valid = code && await otpService.verifyCode(master.phone, code, RESUME_OTP_PURPOSE, { meta: requestMeta(req), masterId: master.id, language: req.lang });
+  if (!valid) return res.status(400).json({ success: false, message: clientStrings(normalizeLang(master.language)).pause_error });
+  const result = await require('../services/leadPause.service').resume(master.id, { meta: requestMeta(req) });
+  return res.json({ success: true, resumed: Boolean(result && result.resumed) });
 }
 
 async function submitTopupReceipt(req, res) {
@@ -541,6 +575,9 @@ module.exports = {
   loginVerify,
   unlinkTelegram,
   setLeadSubscription,
+  setMarketing,
+  sendResumeCode,
+  verifyResumeCode,
   sendSupportMessage,
   activatePromo,
   submitTopupReceipt,

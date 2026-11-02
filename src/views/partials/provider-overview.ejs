@@ -3,10 +3,11 @@
 const freePeriod = master.paid_mode !== true;
 // unsubscribed — исполнитель сам отписался от заявок (кнопка на странице заявки или в профиле), вернуться
 // может сам: кнопка «Снова получать заявки» прямо здесь (leadSubscription.service).
+// paused — SMS о заявках на паузе после двух неоткрытых подряд (leadPause.service); снять — кодом на номер.
 const receivingState = master.is_banned || (master.subscription_until && new Date(master.subscription_until) <= new Date())
-  ? 'disabled' : master.is_subscribed === false ? 'unsubscribed' : (typeof billingState !== 'undefined' && billingState.required) ? 'billing_pending' : !master.is_active ? 'pending' : !freePeriod && master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
+  ? 'disabled' : master.is_subscribed === false ? 'unsubscribed' : (master.lead_sms_paused_at && !master.telegram_id) ? 'paused' : (typeof billingState !== 'undefined' && billingState.required) ? 'billing_pending' : !master.is_active ? 'pending' : !freePeriod && master.balance_tetri < leadPriceTetri ? 'low' : 'ready';
 // В бесплатный период главное на экране — что всё бесплатно; баланс одной строкой, без кнопки.
-const showFree = freePeriod && !['disabled', 'unsubscribed'].includes(receivingState);
+const showFree = freePeriod && !['disabled', 'unsubscribed', 'paused'].includes(receivingState);
 %>
 <section class="provider-overview" data-account-state="<%= receivingState %>">
   <div class="provider-overview-top"><span class="provider-status <%= receivingState %>"><%= t('provider_' + receivingState) %></span><span class="provider-channel"><%= t('provider_channel') %>: <strong><%= master.telegram_id ? 'Telegram' : 'SMS' %></strong></span></div>
@@ -20,8 +21,49 @@ const showFree = freePeriod && !['disabled', 'unsubscribed'].includes(receivingS
   <p class="provider-state-hint"><%= t(receivingState === 'billing_pending' && !master.is_active ? 'provider_billing_review_hint' : 'provider_' + receivingState + '_hint') %></p>
   <% if (receivingState === 'unsubscribed') { %>
   <div class="provider-balance-row">
+    <%# Включить заявки снова — это согласие: текст разрешения стоит прямо перед кнопкой и уходит в журнал. %>
+    <p><%= t('lead_sub_on_consent_intro') %> <%= t('signup_lead_sms_title') %>. <%= t('signup_lead_sms') %></p>
     <button type="button" class="provider-primary" data-lead-sub-set="on" data-endpoint="/api/master/<%= master.master_token %>/lead-subscription" data-reload><%= t('lead_sub_on_btn') %></button>
   </div>
+  <% } else if (receivingState === 'paused') { %>
+  <div class="provider-balance-row" data-resume-box data-send="/api/master/<%= master.master_token %>/sms-resume/send" data-verify="/api/master/<%= master.master_token %>/sms-resume/verify">
+    <button type="button" class="provider-primary" data-resume-send><%= t('pause_send') %></button>
+    <div data-resume-code hidden>
+      <label class="block text-sm"><%= t('pause_code') %>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" data-resume-input class="mt-1 block w-32 rounded-lg border border-stone-300 px-3 py-2 text-stone-900">
+      </label>
+      <button type="button" class="provider-primary mt-2" data-resume-verify><%= t('pause_confirm') %></button>
+    </div>
+    <p data-resume-msg role="status" hidden></p>
+  </div>
+  <script>
+    (function () {
+      var box = document.querySelector('[data-resume-box]');
+      if (!box) return;
+      var msg = box.querySelector('[data-resume-msg]');
+      var SENT = <%- JSON.stringify(t('pause_sent').replace('{phone}', '••• ' + String(master.phone).slice(-3))) %>;
+      var ERR = <%- JSON.stringify(t('lead_sub_error')) %>;
+      function post(url, body) {
+        return fetch(url, { method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+          .then(function (r) { return r.json().catch(function () { return {}; }); });
+      }
+      function say(text) { msg.textContent = text; msg.hidden = false; }
+      box.querySelector('[data-resume-send]').addEventListener('click', function () {
+        post(box.getAttribute('data-send')).then(function (data) {
+          if (!data.success) return say(data.message || ERR);
+          box.querySelector('[data-resume-code]').hidden = false;
+          say(SENT);
+          box.querySelector('[data-resume-input]').focus();
+        });
+      });
+      box.querySelector('[data-resume-verify]').addEventListener('click', function () {
+        post(box.getAttribute('data-verify'), { code: box.querySelector('[data-resume-input]').value }).then(function (data) {
+          if (!data.success) return say(data.message || ERR);
+          location.reload();
+        });
+      });
+    })();
+  </script>
   <% } else if (showFree) { %>
   <p class="provider-free-balance"><%= t('provider_free_balance').replace('{amount}', (master.balance_tetri / 100).toFixed(2)) %></p>
   <% } else { %>
@@ -36,5 +78,5 @@ const showFree = freePeriod && !['disabled', 'unsubscribed'].includes(receivingS
     <% } %>
   </div>
   <% } %>
-  <div class="provider-overview-footer"><% if (!showFree && receivingState !== 'unsubscribed') { %><span><%= t('provider_lead_price') %>: <b><%= freePeriod ? t('provider_price_free') : (leadPriceTetri / 100).toFixed(2) + ' ₾' %></b></span><% } %><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
+  <div class="provider-overview-footer"><% if (!showFree && !['unsubscribed', 'paused'].includes(receivingState)) { %><span><%= t('provider_lead_price') %>: <b><%= freePeriod ? t('provider_price_free') : (leadPriceTetri / 100).toFixed(2) + ' ₾' %></b></span><% } %><a href="#profile" data-tab-jump="profile"><%= t('provider_telegram_action') %> →</a></div>
 </section>

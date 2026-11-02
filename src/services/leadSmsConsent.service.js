@@ -51,7 +51,7 @@ function reasonFor(master, registeredByCode, journalStart) {
 // показанного текста) и у кого её нет, с причиной. Начало журнала — его первая запись.
 async function summary() {
   const [masters, consents, registered, start] = await Promise.all([
-    pool.query(`SELECT id, name, phone, created_at, telegram_id FROM masters
+    pool.query(`SELECT id, name, phone, created_at, telegram_id, lead_sms_paused_at, marketing_sms FROM masters
       WHERE is_technical = false AND is_active = true AND is_subscribed = true AND is_banned = false ORDER BY id`),
     pool.query("SELECT phone_number, terms_version FROM sms_consent_logs WHERE event_type = 'CONSENT_SMS_OTP_VERIFIED' ORDER BY timestamp_utc, id"),
     // Фильтр master_id IS NOT NULL — в JS: pg-mem на этой таблице теряет строки при таком условии.
@@ -77,6 +77,8 @@ async function summary() {
     required: await isRequired(),
     total: masters.rows.length,
     telegram: masters.rows.filter((master) => master.telegram_id).length,
+    paused: masters.rows.filter((master) => master.lead_sms_paused_at && !master.telegram_id).length,
+    marketing: masters.rows.filter((master) => master.marketing_sms === true).length,
     consented: masters.rows.length - missing.length,
     versions: [...versions].map(([version, count]) => ({ version, count })).sort((a, b) => b.count - a.count),
     reasons: Object.entries(reasons).filter(([, count]) => count).map(([key, count]) => ({ key, label: REASONS[key], count })),

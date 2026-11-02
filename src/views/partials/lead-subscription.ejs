@@ -18,6 +18,8 @@
   </div>
   <div data-lead-sub-view="off"<%= subscribed ? ' hidden' : '' %>>
     <p class="lead-sub-done"><%= t('lead_sub_done') %></p>
+    <%# Снова получать заявки — это согласие: его текст перед кнопкой, сервер пишет этот же текст в журнал. %>
+    <p class="lead-sub-hint"><%= t('lead_sub_on_consent_intro') %> <%= t('signup_lead_sms_title') %>. <%= t('signup_lead_sms') %></p>
     <button type="button" data-lead-sub-set="on" class="lead-sub-primary"><%= t('lead_sub_on_btn') %></button>
   </div>
   <p data-lead-sub-msg class="lead-sub-msg" role="status" hidden></p>

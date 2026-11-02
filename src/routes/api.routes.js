@@ -63,6 +63,9 @@ router.post('/master/:token/contacts', asyncHandler(masterController.saveContact
 router.post('/master/:token/billing/accept', asyncHandler(masterController.acceptBilling));
 router.post('/master/:token/telegram/unlink', asyncHandler(masterController.unlinkTelegram));
 router.post('/master/:token/lead-subscription', asyncHandler(masterController.setLeadSubscription));
+router.post('/master/:token/marketing', asyncHandler(masterController.setMarketing));
+router.post('/master/:token/sms-resume/send', asyncHandler(masterController.sendResumeCode));
+router.post('/master/:token/sms-resume/verify', asyncHandler(masterController.verifyResumeCode));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
 router.post('/master/:token/topups', asyncHandler(require('../controllers/topup.controller').create));

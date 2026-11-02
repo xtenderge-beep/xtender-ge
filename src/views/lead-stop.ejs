@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>" class="h-full bg-stone-50">
+<head>
+  <%- include('partials/head', { title: t('stop_title'), noindex: true }) %>
+</head>
+<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+
+  <header class="bg-white/95 backdrop-blur-md border-b border-stone-200 shadow-sm">
+    <div class="max-w-xl mx-auto px-4">
+      <div class="flex items-center justify-between h-16">
+        <a href="/" class="flex items-center gap-2">
+          <%- include('partials/brand') %>
+        </a>
+        <%- include('partials/lang-switch') %>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto px-4 py-8">
+    <%# Ссылка «Stop» из SMS о заявке (leadStop.service): отказ без входа, в том числе «это не мой номер». %>
+    <div class="bg-white rounded-2xl shadow-xl border border-stone-200/80 p-6">
+      <h1 class="text-xl font-black tracking-tight text-stone-900"><%= t('stop_title') %></h1>
+      <% if (!found) { %>
+        <p class="mt-3 text-stone-700"><%= t('stop_unknown') %></p>
+      <% } else if (done) { %>
+        <p class="mt-3 text-stone-700" role="status"><%= t(done === 'not_mine' ? 'stop_not_mine_done' : 'stop_done') %></p>
+      <% } else { %>
+        <p class="mt-3 text-stone-700"><%= t('stop_text').replace('{phone}', phone) %></p>
+        <form method="POST" class="mt-5 flex flex-col gap-3">
+          <button type="submit" name="action" value="stop" class="w-full py-3 bg-stone-900 hover:bg-stone-800 text-white font-bold rounded-xl transition"><%= t('stop_btn') %></button>
+          <button type="submit" name="action" value="not_mine" class="w-full py-3 bg-white border border-stone-300 hover:bg-stone-50 text-stone-800 font-bold rounded-xl transition"><%= t('stop_not_mine') %></button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+</body>
+</html>

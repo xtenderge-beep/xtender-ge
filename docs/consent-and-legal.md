@@ -281,8 +281,21 @@ Analytics, с 2026-10-10 — пиксель Meta (рекламный). Оба н
 | `SMS_OTP_SENT` | факт отправки OTP-SMS (любой flow) | `NULL` |
 | `LEAD_SMS_SENT` | лид-уведомление исполнителю | `NULL` |
 | `TX_SMS_SENT` | прочие транзакционные (подтверждение регистрации, пинок «пополни», приглашение на отзыв) | `NULL` |
-| `LEAD_SMS_OPT_OUT` | исполнитель отказался от заявок (страница заявки, кабинет) или его снял администратор; в `metadata` — кто (`provider` / `admin`) и откуда | `NULL` |
-| `LEAD_SMS_OPT_IN` | снова получает заявки: сам или его вернул администратор | `NULL` |
+| `LEAD_SMS_OPT_OUT` | отказ от заявок: страница заявки, кабинет, ссылка Stop из SMS (`actor: phone_holder`, `reason: stop_link` / `not_my_number`) или администратор | `NULL` |
+| `LEAD_SMS_OPT_IN` | согласие на заявки: отметка при регистрации (`source: registration`, `consent_log_id`) или включение в кабинете и на странице заявки; администратор — без текста | текст разрешения; `terms_version` = `sms-<отпечаток текста>` |
+| `MARKETING_SMS_OPT_IN` / `MARKETING_SMS_OPT_OUT` | согласие на предложения Xtender и отказ от него (регистрация, кабинет, «Это не мой номер») | у `OPT_IN` — текст разрешения и его версия |
+| `LEAD_SMS_PAUSED` / `LEAD_SMS_RESUMED` | пауза SMS о заявках после двух неоткрытых подряд (`unopened_order_ids`) и её снятие кодом | `NULL` |
+| `LEAD_RESUME_OTP_VERIFIED` | код на номер для снятия паузы подтверждён | `NULL` |
+
+**Два разрешения на SMS (ветка `sms-consents-demo`, 2026-11-02, не выложено).** На `/join` к двум обязательным
+отметкам добавлены две необязательные, сняты по умолчанию: «Присылать мне заявки по SMS» (`masters.is_subscribed`)
+и «Присылать мне предложения Xtender» (`masters.marketing_sms`). Тексты — `provider-consent-copy.js`, в снимке согласия
+(`consent.service`) вместе с выбором (`snapshot.choices`). Предложения включаются только отметкой с показанным текстом:
+вход по коду их не возвращает (`smsPermissions.service`). В каждой SMS о заявке — ссылка `Stop: /stop/<код>`
+(`leadStop.service`, таблица `lead_stop_codes`): отказ без входа и «Это не мой номер». Пауза SMS о заявках
+(`leadPause.service`, `masters.lead_sms_paused_at`): две последние заявки по SMS старше двух часов не открыты им, но
+открыты кем-то из получателей; одна SMS о паузе; снять — только новым кодом в кабинете. Заявки в Telegram паузе не
+подвержены. Демо — `_demo-sms-consents.js` (локальный, в git не входит).
 
 `terms_version` проставляется на **всех** `*_OTP_VERIFIED`, `consent_text_snapshot` и
 `metadata` (структурно) — только на `CONSENT_SMS_OTP_VERIFIED`.
