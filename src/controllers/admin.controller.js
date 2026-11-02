@@ -414,7 +414,7 @@ async function setMasterPaidMode(req, res) {
 // Вернуть исполнителя в рассылку заявок или снять с неё по его просьбе (leadSubscription.service).
 async function setMasterLeadSubscription(req, res) {
   const id = parseInt(req.params.id, 10);
-  if (await require('../services/leadSubscription.service').setByAdmin(id, req.body.subscribed === '1') === null) return res.status(404).send('Мастер не найден');
+  if (await require('../services/leadSubscription.service').setByAdmin(id, req.body.subscribed === '1', { meta: requestMeta(req) }) === null) return res.status(404).send('Мастер не найден');
   res.redirect(`/admin/masters/${id}`);
 }
 
@@ -708,7 +708,14 @@ async function consentLog(req, res) {
   const phoneQuery = (req.query.phone || '').trim();
   const report = phoneQuery ? await consentLogService.exportForPhone(phoneQuery) : null;
   const recent = phoneQuery ? [] : await consentLogService.listRecentConsents(150);
-  res.render('admin/consent', { phoneQuery, report, recent });
+  const leadGate = phoneQuery ? null : await require('../services/leadSmsConsent.service').summary();
+  res.render('admin/consent', { phoneQuery, report, recent, leadGate });
+}
+
+// «Заявки только с согласием» (leadSmsConsent.service): выключенный переключатель ничего не меняет в рассылке.
+async function updateLeadGate(req, res) {
+  await require('../services/leadSmsConsent.service').setRequired(req.body.enabled === '1');
+  res.redirect('/admin/consent#lead-gate');
 }
 
 // Та же выгрузка, что отдаёт scripts/export-consent-log.js — скачивается файлом
@@ -977,6 +984,7 @@ module.exports = {
   rejectReview,
   consentLog,
   consentExport,
+  updateLeadGate,
   supportList,
   supportThread,
   supportReply,

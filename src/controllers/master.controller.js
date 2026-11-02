@@ -479,7 +479,7 @@ async function unlinkTelegram(req, res) {
 async function setLeadSubscription(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
   if (!master) return res.status(404).json({ success: false, message: serviceMessage('notFound', req.lang) });
-  const subscribed = await require('../services/leadSubscription.service').set(master.id, req.body.subscribed === true, { source: 'cabinet' });
+  const subscribed = await require('../services/leadSubscription.service').set(master.id, req.body.subscribed === true, { source: 'cabinet', meta: requestMeta(req) });
   if (subscribed === null) return res.status(403).json({ success: false });
   return res.json({ success: true, subscribed });
 }

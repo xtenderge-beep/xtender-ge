@@ -117,6 +117,7 @@ router.post('/reviews/:id/reject', verifyCsrf, asyncHandler(adminController.reje
 
 router.get('/consent', asyncHandler(adminController.consentLog));
 router.get('/consent/export', asyncHandler(adminController.consentExport));
+router.post('/consent/lead-gate', verifyCsrf, asyncHandler(adminController.updateLeadGate));
 
 router.get('/legal', asyncHandler(adminController.legalPage));
 router.post('/legal/terms', verifyCsrf, asyncHandler(adminController.updateLegalTerms));

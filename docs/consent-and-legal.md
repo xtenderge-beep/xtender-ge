@@ -281,6 +281,8 @@ Analytics, с 2026-10-10 — пиксель Meta (рекламный). Оба н
 | `SMS_OTP_SENT` | факт отправки OTP-SMS (любой flow) | `NULL` |
 | `LEAD_SMS_SENT` | лид-уведомление исполнителю | `NULL` |
 | `TX_SMS_SENT` | прочие транзакционные (подтверждение регистрации, пинок «пополни», приглашение на отзыв) | `NULL` |
+| `LEAD_SMS_OPT_OUT` | исполнитель отказался от заявок (страница заявки, кабинет) или его снял администратор; в `metadata` — кто (`provider` / `admin`) и откуда | `NULL` |
+| `LEAD_SMS_OPT_IN` | снова получает заявки: сам или его вернул администратор | `NULL` |
 
 `terms_version` проставляется на **всех** `*_OTP_VERIFIED`, `consent_text_snapshot` и
 `metadata` (структурно) — только на `CONSENT_SMS_OTP_VERIFIED`.
@@ -330,6 +332,13 @@ ref + orderId), чтобы шаг `verifyCode` (отдельный HTTP-запр
 - Кнопка **«Скачать JSON»** → `GET /admin/consent/export?phone=<номер>` — файл
   `sms-consent-<цифры>.json`, `Content-Disposition: attachment`.
 - Ссылка «Журнал согласий →» есть и в карточке специалиста (`/admin/masters/:id`).
+- **«Заявки только с согласием»** — блок над списком: сколько исполнителей подписаны на заявки и у кого нет
+  записи `CONSENT_SMS_OTP_VERIFIED` на номер (сверка по всем форматам номера), со списком. Переключатель
+  (`app_settings.lead_sms_requires_consent`, по умолчанию выключен): включённый оставляет в рассылке (SMS и
+  Telegram) и в напоминаниях о балансе только исполнителей с записью; в заранее подготовленном списке остальные
+  пропускаются с причиной «нет записи согласия». Код: `leadSmsConsent.service.js`, `order.service`
+  (`getDispatchRecipients`, `notifyMasters`). Отказ от заявок и возврат пишутся в журнал событиями
+  `LEAD_SMS_OPT_OUT` / `LEAD_SMS_OPT_IN` (`leadSubscription.service`) в одной транзакции с изменением.
 
 ### CLI (на сервере)
 

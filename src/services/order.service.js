@@ -415,6 +415,8 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
   const allowed = await billing.eligibleIds(rates);
   // Порядок по id: список получателей на экране и очерёдность отправки не зависят от того, как база хранит строки.
   const rows=(await pool.query('SELECT * FROM masters WHERE is_technical=$1 AND is_active=true AND is_subscribed=true AND is_banned=false ORDER BY id', [isTechnical])).rows;
+  // Включена проверка согласия: исполнителя без записи согласия нет ни в рассылке, ни на экране менеджера.
+  const consented=await require('./leadSmsConsent.service').gate();
   const closed=order ? await getClosedCategories(order.id) : [];
   const open=[...new Set([...(Array.isArray(order?.target_categories) ? order.target_categories : []),category])].filter(c=>!closed.includes(c));
   if(!open.includes(category)) return [];
@@ -428,6 +430,7 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
   for(const master of rows) {
     const paid=billing.isPaid(master), funded=!paid || (master.balance_tetri >= leadPrice && allowed.has(master.id));
     if((!funded && !options.withUnfunded) || (master.subscription_until && new Date(master.subscription_until)<=new Date()) || (language && !speaks(master,language))) continue;
+    if(consented && !consented(master)) continue;
     if(inCity && !inCity(master)) continue;
     const services=(await matching.servicesFor(master,pool,allServices.filter(s=>s.master_id === master.id))).filter(s=>active.has(s.service_type));
     if(!matching.matches(services,category,size,open,order?.requirements)) continue;
@@ -450,6 +453,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const lowBalanceNudgeTetri = leadPrice * LOW_BALANCE_NUDGE_LEADS;
   const received = await getChargedMasterIds(order.id);
   const unresolved=new Set((await pool.query("SELECT master_id FROM dispatch_deliveries WHERE order_id=$1 AND status='pending'",[order.id])).rows.map(d=>d.master_id));
+  // Список, подготовленный на экране менеджера, мимо отбора получателей: согласие проверяется и при отправке.
+  const consented = await require('./leadSmsConsent.service').gate();
   const candidates = await getDispatchRecipients(category, vehicleSize, leadPrice, isTechnical, language, order);
   let masters = candidates.filter(m=>!received.has(m.id) && !unresolved.has(m.id) && (!context.recipientIds || context.recipientIds.includes(m.id)));
   if(context.preparedRun) masters=(await pool.query('SELECT * FROM masters')).rows.filter(m=>context.recipientIds.includes(m.id));
@@ -473,6 +478,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       const paid = billing.isPaid(master);
       if (!live || !['pending_review','new'].includes(live.status) || !master.is_active || master.is_banned || !master.is_subscribed ||
           (master.subscription_until && new Date(master.subscription_until) <= new Date()) || (paid && master.balance_tetri < leadPrice)) return;
+      if (consented && !consented(master)) { skipReason='no_consent'; return; }
       const closed = await client.query('SELECT category FROM order_category_closures WHERE order_id=$1 AND category=$2', [order.id, category]);
       if (closed.rows.length) { skipReason='need_closed'; return; }
       const openMatches=await matching.openMatches(master,live,client);
@@ -548,6 +554,8 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   const { rows: broke } = await pool.query('SELECT * FROM masters WHERE ' + activeWhere + ' AND paid_mode = true AND balance_tetri < $1', [leadPrice]);
   for (const candidate of broke) {
     if (notifiedIds.includes(candidate.id)) continue;
+    // Напоминание о балансе идёт по тому же согласию, что и заявки.
+    if (consented && !consented(candidate)) continue;
     if (!(await matching.openMatches(candidate,await getOrderByToken(order.token))).includes(category)) continue;
     if(!matching.matches(await matching.servicesFor(candidate),category,vehicleSize || '',order.target_categories,order.requirements)) continue;
     // Рассылка по языку не касается тех, кто на нём не говорит.

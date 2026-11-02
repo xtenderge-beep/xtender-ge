@@ -21,6 +21,8 @@
     SMS_OTP_SENT:             { label: 'Код отправлен',           cls: 'bg-stone-100 text-stone-600 border-stone-200' },
     LEAD_SMS_SENT:            { label: 'Лид-SMS',                 cls: 'bg-stone-100 text-stone-600 border-stone-200' },
     TX_SMS_SENT:              { label: 'SMS',                     cls: 'bg-stone-100 text-stone-600 border-stone-200' },
+    LEAD_SMS_OPT_OUT:         { label: 'Отказ от заявок',         cls: 'bg-stone-100 text-stone-600 border-stone-200' },
+    LEAD_SMS_OPT_IN:          { label: 'Снова получает заявки',   cls: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
   };
   function evtBadge(type, metadata) {
     const m = EVENT_META[type] || { label: type, cls: 'bg-stone-100 text-stone-600 border-stone-200' };
@@ -175,6 +177,38 @@
 
 <% } else { %>
 
+  <% if (typeof leadGate !== 'undefined' && leadGate) { %>
+    <div id="lead-gate" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5" style="scroll-margin-top:110px">
+      <div class="text-xs font-bold text-stone-500 uppercase mb-2">Заявки только с согласием</div>
+      <p class="text-sm text-stone-600">Когда включено, заявки по SMS и в Telegram получают только исполнители, у которых в журнале есть подтверждённое согласие: код на странице регистрации.</p>
+      <ul class="text-sm text-stone-900 mt-2">
+        <li class="py-0.5">Подписаны на заявки: <b><%= leadGate.total %></b><% if (leadGate.telegram) { %>, из них с Telegram: <%= leadGate.telegram %> (заявка приходит в Telegram, SMS — если Telegram её не принял)<% } %>.</li>
+        <li class="py-0.5">С записью согласия: <b><%= leadGate.consented %></b><% if (leadGate.versions.length) { %>; версия показанного текста: <%= leadGate.versions.map(function (v) { return v.version + ' — ' + v.count; }).join(', ') %><% } %>.</li>
+        <li class="py-0.5">Без записи согласия: <b><%= leadGate.missing.length %></b><% if (leadGate.reasons.length) { %>: <%= leadGate.reasons.map(function (r) { return r.label + ' — ' + r.count; }).join('; ') %><% } %><% if (leadGate.required && leadGate.missing.length) { %>. Им заявки сейчас не отправляются<% } %>.</li>
+      </ul>
+      <% if (leadGate.journalStart) { %><p class="text-xs text-stone-500 mt-1">Журнал согласий ведётся с <%= fmt(leadGate.journalStart) %> (UTC).</p><% } %>
+      <form method="POST" action="/admin/consent/lead-gate" class="mt-3 flex flex-wrap items-center gap-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <input type="hidden" name="enabled" value="<%= leadGate.required ? '0' : '1' %>">
+        <span class="text-sm text-stone-700">Сейчас: <b class="<%= leadGate.required ? 'text-emerald-700' : 'text-stone-900' %>"><%= leadGate.required ? 'включено' : 'выключено' %></b></span>
+        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition"><%= leadGate.required ? 'Выключить' : 'Включить' %></button>
+      </form>
+      <% if (!leadGate.required && leadGate.missing.length) { %>
+        <p class="text-xs text-amber-700 mt-2">После включения эти исполнители перестанут получать заявки, пока не подтвердят согласие.</p>
+      <% } %>
+      <% if (leadGate.missing.length) { %>
+        <details class="mt-3">
+          <summary class="text-sm font-bold cursor-pointer text-stone-700">Без записи согласия: <%= leadGate.missing.length %></summary>
+          <ul class="mt-2 text-sm">
+            <% leadGate.missing.forEach(function (m) { %>
+              <li class="py-0.5"><a href="/admin/masters/<%= m.id %>" class="text-stone-800 hover:underline">#<%= m.id %> <%= m.name %></a> · <a href="/admin/consent?phone=<%= encodeURIComponent(m.phone) %>" class="font-mono text-emerald-700 hover:underline"><%= m.phone %></a> · с <%= fmt(m.created_at) %> · <%= m.reasonLabel %></li>
+            <% }); %>
+          </ul>
+        </details>
+      <% } %>
+    </div>
+  <% } %>
+
   <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <div class="text-xs font-bold text-stone-500 uppercase mb-3">Последние подтверждения и действия</div>
     <% if (!recent.length) { %>
@@ -221,6 +255,6 @@
 
 
 
-<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
+<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED','LEAD_SMS_OPT_OUT','LEAD_SMS_OPT_IN'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
 
 <%- include('./_footer') %>

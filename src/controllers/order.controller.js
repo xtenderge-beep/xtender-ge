@@ -1162,7 +1162,8 @@ async function setLeadSubscription(req, res) {
   if (!order) return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
   const actor = await leadActor(req, res, order);
   if (!actor || actor.master.is_banned) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
-  const subscribed = await require('../services/leadSubscription.service').set(actor.master.id, req.body.subscribed === true, { source: 'order', orderToken: order.token });
+  const subscribed = await require('../services/leadSubscription.service').set(actor.master.id, req.body.subscribed === true,
+    { source: 'order', orderToken: order.token, orderId: order.id, meta: requestMeta(req) });
   if (subscribed === null) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
   return res.json({ success: true, subscribed });
 }

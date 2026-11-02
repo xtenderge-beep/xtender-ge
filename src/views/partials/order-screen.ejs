@@ -65,7 +65,7 @@
 </style>
 <%
   const statusLabels={accepted:'Принято каналом',failed:'Ошибка',pending:'В обработке / неизвестно',skipped:'Пропущено'};
-  const reasonLabels={eligibility_changed:'изменился допуск или баланс',need_closed:'потребность закрыта',service_changed:'услуги больше не подходят',language_changed:'изменился язык',already_received:'уже уведомлён',prior_attempt_pending:'есть незавершённая отправка',channel_rejected:'канал отклонил отправку',result_unknown:'результат неизвестен — нужна проверка',before_send_error:'ошибка до отправки'};
+  const reasonLabels={eligibility_changed:'изменился допуск или баланс',need_closed:'потребность закрыта',service_changed:'услуги больше не подходят',language_changed:'изменился язык',no_consent:'нет записи согласия',already_received:'уже уведомлён',prior_attempt_pending:'есть незавершённая отправка',channel_rejected:'канал отклонил отправку',result_unknown:'результат неизвестен — нужна проверка',before_send_error:'ошибка до отправки'};
   const cityName=allCities.find(city=>city.id===(order.city_id||activeCities.find(c=>c.slug==='tbilisi')?.id))?.name_ru||'Тбилиси';
   const sentAny=runs.length>0, transportSent=needs.locked.categories.includes('transport');
   const vehicleFlag=order.requirements?.movers_need_vehicle===true;
