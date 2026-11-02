@@ -119,12 +119,6 @@ router.get('/consent', asyncHandler(adminController.consentLog));
 router.get('/consent/export', asyncHandler(adminController.consentExport));
 router.post('/consent/lead-gate', verifyCsrf, asyncHandler(adminController.updateLeadGate));
 router.post('/consent/verify-chain', verifyCsrf, asyncHandler(adminController.verifyConsentChain));
-// Архив доказательств по номеру или профилю: только администратор, повторный код из SMS, журнал выгрузок.
-const evidenceController = require('../controllers/evidence.controller');
-router.get('/evidence', asyncHandler(evidenceController.show));
-router.post('/evidence/request', verifyCsrf, asyncHandler(evidenceController.request));
-router.post('/evidence/download', verifyCsrf, asyncHandler(evidenceController.download));
-router.get('/evidence/receipt/:id', asyncHandler(evidenceController.receipt));
 
 router.get('/legal', asyncHandler(adminController.legalPage));
 router.post('/legal/terms', verifyCsrf, asyncHandler(adminController.updateLegalTerms));

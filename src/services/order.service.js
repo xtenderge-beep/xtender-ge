@@ -534,8 +534,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
             run_id: run.id, category, matched_categories: openMatches, service_snapshot: liveServices, amount_tetri: amount, balance_before_tetri: master.balance_tetri,
             balance_after_tetri: master.balance_tetri - amount, channel,
             provider_message_id: receipt.providerMessageId || null,
-            // Текст без секретов, как в записи об отправке: ключ ?k= в журнале не хранится.
-            provider_response: receipt.providerResponse || null, message_body: receipt.messageBody ? consentLog.redactSms(receipt.messageBody) : null,
+            provider_response: receipt.providerResponse || null, message_body: receipt.messageBody || null,
             acceptance_status: 'accepted', delivery_status: 'unknown',
           } }, client);
       }

@@ -4,9 +4,8 @@ const pool = require('../config/db');
 // Проверяемая целостность журнала согласий (sms_consent_logs). Триггеры запрещают менять и удалять записи, но
 // владелец базы может их снять. Поэтому каждая запись по порядку получает звено цепочки (consent_log_chain):
 // SHA-256 от отпечатка предыдущего звена и однозначного текста самой записи. Изменённая или удалённая запись
-// ломает все звенья после неё. Раз в сутки отпечаток последнего звена уходит в Telegram модератора и получает
-// независимую метку времени RFC 3161 (consent_log_anchors): копии вне базы, по которым видно, что журнал с того дня
-// не меняли. Метку подписывает внешняя служба, её проверяют без нас (openssl ts -verify).
+// ломает все звенья после неё. Раз в сутки отпечаток последнего звена уходит в Telegram модератора
+// (consent_log_anchors): копия вне базы, по которой видно, что журнал с того дня не меняли.
 // Цепочку ведёт фоновая задача, а не триггер на вставку: регистрации и рассылке не приходится ждать друг друга.
 const GENESIS = 'genesis';
 const SETTLE_MS = 60 * 1000; // записи моложе минуты ждут: их транзакция могла ещё не завершиться
@@ -80,40 +79,32 @@ async function verify() {
   return { ok: problems.length === 0, checked: links.length, anchors: anchors.length, unchained, head: prev, problems: problems.slice(0, 50) };
 }
 
-// Отпечаток: дописать цепочку, поставить на последнее звено независимую метку времени (RFC 3161, evidence/tsa.js),
-// отправить его в Telegram модератора и сохранить. kind: daily — раз в сутки, export — при выгрузке архива
-// доказательств (тогда сообщение в Telegram отправляет сама выгрузка, вместе с отпечатком архива).
-async function anchor({ kind = 'daily', settleMs } = {}) {
-  await extend(settleMs === undefined ? {} : { settleMs });
+// Отпечаток дня: дописать цепочку, отправить последнее звено в Telegram модератора и сохранить.
+async function anchor() {
+  await extend();
   const head = (await pool.query('SELECT seq, log_id, row_hash FROM consent_log_chain ORDER BY seq DESC LIMIT 1')).rows[0];
   if (!head) return null;
   const total = Number((await pool.query('SELECT COUNT(*)::int AS n FROM sms_consent_logs')).rows[0].n);
-  const stamp = await require('./evidence/tsa').stamp(head.row_hash).catch(() => null);
+  const day = new Date().toISOString().slice(0, 10);
+  const text = `Журнал согласий Xtender, отпечаток на ${day}: записей ${total}, звено ${head.seq} (запись #${head.log_id}).\n${head.row_hash}\n`
+    + 'Не удаляйте это сообщение: по нему можно доказать, что журнал с этого дня не меняли.';
   let sentTo = null;
-  if (kind === 'daily') {
-    const day = new Date().toISOString().slice(0, 10);
-    const text = `Журнал согласий Xtender, отпечаток на ${day}: записей ${total}, звено ${head.seq} (запись #${head.log_id}).\n${head.row_hash}\n`
-      + (stamp ? `Метка времени ${new URL(stamp.url).host}: ${stamp.genTime ? stamp.genTime.toISOString() : 'время не прочитано'}.\n` : 'Независимая метка времени не получена.\n')
-      + 'Не удаляйте это сообщение: по нему можно доказать, что журнал с этого дня не меняли.';
-    try {
-      const telegram = require('./telegram.service');
-      if (process.env.TELEGRAM_MODERATOR_CHAT_ID) { await telegram.sendSecurityAlert(text); sentTo = 'telegram'; }
-    } catch (error) {
-      console.error('[consent-chain] anchor message failed:', error.message);
-    }
+  try {
+    const telegram = require('./telegram.service');
+    if (process.env.TELEGRAM_MODERATOR_CHAT_ID) { await telegram.sendSecurityAlert(text); sentTo = 'telegram'; }
+  } catch (error) {
+    console.error('[consent-chain] anchor message failed:', error.message);
   }
-  const saved = (await pool.query(`INSERT INTO consent_log_anchors(chain_seq, log_id, chain_head, log_rows, sent_to, kind, tsa_url, tsa_time, tsa_response)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, created_at`,
-  [head.seq, head.log_id, head.row_hash, total, sentTo, kind, stamp?.url || null, stamp?.genTime || null, stamp?.response || null])).rows[0];
-  return { id: Number(saved.id), createdAt: saved.created_at, seq: Number(head.seq), logId: Number(head.log_id), head: head.row_hash, total, sentTo,
-    tsa: stamp ? { url: stamp.url, time: stamp.genTime } : null };
+  await pool.query('INSERT INTO consent_log_anchors(chain_seq, log_id, chain_head, log_rows, sent_to) VALUES($1,$2,$3,$4,$5)',
+    [head.seq, head.log_id, head.row_hash, total, sentTo]);
+  return { seq: Number(head.seq), logId: Number(head.log_id), head: head.row_hash, total, sentTo };
 }
 
 // Для страницы согласий: без пересчёта, только размер цепочки и последний отпечаток.
 async function status() {
   const [chain, anchor, logs] = await Promise.all([
     pool.query('SELECT COUNT(*)::int AS n FROM consent_log_chain'),
-    pool.query('SELECT chain_seq, chain_head, log_rows, sent_to, kind, tsa_url, tsa_time, created_at FROM consent_log_anchors ORDER BY id DESC LIMIT 1'),
+    pool.query('SELECT chain_seq, chain_head, log_rows, sent_to, created_at FROM consent_log_anchors ORDER BY id DESC LIMIT 1'),
     pool.query('SELECT COUNT(*)::int AS n FROM sms_consent_logs'),
   ]);
   return { chained: Number(chain.rows[0].n), logs: Number(logs.rows[0].n), lastAnchor: anchor.rows[0] || null };
@@ -122,7 +113,7 @@ async function status() {
 function start() {
   const grow = () => extend().catch((error) => console.error('[consent-chain] extend:', error.message));
   const daily = async () => {
-    const last = (await pool.query("SELECT created_at FROM consent_log_anchors WHERE kind = 'daily' ORDER BY id DESC LIMIT 1")).rows[0];
+    const last = (await pool.query('SELECT created_at FROM consent_log_anchors ORDER BY id DESC LIMIT 1')).rows[0];
     if (!last || Date.now() - new Date(last.created_at).getTime() >= ANCHOR_EVERY_MS) await anchor();
   };
   setTimeout(grow, 30 * 1000).unref();
@@ -131,4 +122,4 @@ function start() {
   setTimeout(() => daily().catch((error) => console.error('[consent-chain] anchor:', error.message)), 2 * 60 * 1000).unref();
 }
 
-module.exports = { canonical, link, extend, verify, anchor, status, start, GENESIS };
+module.exports = { canonical, extend, verify, anchor, status, start, GENESIS };

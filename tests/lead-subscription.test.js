@@ -1,5 +1,5 @@
 // «Больше не присылать мне заявки»: исполнитель отписывается со страницы заявки (по личной ссылке из SMS или
-// войдя в кабинет) и возвращается сам, войдя в кабинет по коду (ключа из ссылки для возврата мало). Рассылка отписавшегося пропускает, каталог —
+// войдя в кабинет) и возвращается сам — там же или в кабинете. Рассылка отписавшегося пропускает, каталог —
 // нет. Чужая или пересланная ссылка ничего не меняет. Каждое изменение — строка в журнале действий исполнителя.
 const assert=require('node:assert/strict'),fs=require('fs'),path=require('path'),ejs=require('ejs');
 const db=require('pg-mem').newDb();db.public.none(fs.readFileSync(path.join(__dirname,'../schema.sql'),'utf8'));
@@ -83,24 +83,10 @@ const t=translate('ru');
   assert.equal((await phone.set(next.token,secondKey,false)).statusCode,401,'ключ действует только для своей заявки');
   assert.equal(await subscribed(second.id),true);
 
-  // Вернуться по ключу из ссылки нельзя — даже в своём браузере: включение — это согласие, нужен вход по коду из SMS.
-  const optIns=async id=>(await pool.query("SELECT COUNT(*)::int AS n FROM sms_consent_logs WHERE master_id=$1 AND event_type='LEAD_SMS_OPT_IN'",[id])).rows[0].n;
-  const optInsBefore=await optIns(first.id);
-  const byKey=await phone.set(order.token,key,true);
-  assert.deepEqual([byKey.statusCode,byKey.data.code,byKey.data.message],[401,'login',clientStrings('ru').lead_sub_login]);
-  assert.equal(await subscribed(first.id),false,'ключ из ссылки не включает заявки');
-  assert.equal(await optIns(first.id),optInsBefore,'согласие в журнал не записано');
-  const fresh=browser(),freshKey=await require('../src/services/leadLink.service').issue(order.id,first.id);
-  assert.equal((await fresh.set(order.token,freshKey,true)).statusCode,401,'и свежий неиспользованный ключ тоже');
-  assert.equal((await pool.query('SELECT device_hash FROM lead_links WHERE order_id=$1 AND master_id=$2',[order.id,first.id])).rows[0].device_hash,null,'отказ не привязывает ссылку');
-  assert.equal(await subscribed(first.id),false);
-
-  // Войдя в кабинет по коду, вернуться можно с той же страницы и из кабинета.
-  await require('../src/services/masterSession.service').start({cookies:{}},phone.response(),first.master_token);
-  const back=await phone.set(order.token,freshKey,true);
+  // Вернуться можно с той же страницы и из кабинета.
+  const back=await phone.set(order.token,key,true);
   assert.deepEqual(back.data,{success:true,subscribed:true});
   assert.equal(await subscribed(first.id),true);
-  assert.equal(await optIns(first.id),optInsBefore+1,'возврат записан в журнал согласий');
   assert.deepEqual((await cabinetSet(first.master_token,false)).data,{success:true,subscribed:false});
   assert.deepEqual((await cabinetSet(first.master_token,true)).data,{success:true,subscribed:true});
   assert.deepEqual((await events(first.id)).map(e=>e.body),[

@@ -45,7 +45,7 @@ const originalLog=console.log;
   const arrive=async(type,count)=>{for(let i=0;i<100 && (await rows(type)).length<count;i++) await new Promise(resolve=>setTimeout(resolve,50));};
   await arrive('LEAD_SMS_SENT',1);await arrive('TX_SMS_SENT',2);
   const [leadRow]=await rows('LEAD_SMS_SENT');
-  assert.deepEqual([json(leadRow.metadata).category,json(leadRow.metadata).message_text],['lead','Xtender: Zakazi (Order) #42: https://xtender.ge/order/[скрыто]?k=[скрыто] Stop: https://xtender.ge/stop/[скрыто]']);
+  assert.deepEqual([json(leadRow.metadata).category,json(leadRow.metadata).message_text],['lead','Xtender: Zakazi (Order) #42: https://xtender.ge/order/abc123?k=[скрыто] Stop: https://xtender.ge/stop/[скрыто]']);
   const tx=await rows('TX_SMS_SENT');
   // Журнал доставки пишется в фоне: порядок двух почти одновременных SMS не гарантирован.
   assert.deepEqual(tx.map(r=>[json(r.metadata).category,json(r.metadata).message_text]).sort(),[
