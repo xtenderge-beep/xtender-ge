@@ -63,9 +63,9 @@
          class="border border-stone-300 rounded-xl px-3 py-2 text-sm outline-none focus:border-emerald-500 w-64">
   <button type="submit" class="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Найти</button>
   <% if (phoneQuery && report && !report.error) { %>
-    <a href="/admin/consent/export?phone=<%= encodeURIComponent(phoneQuery) %>"
+    <a href="/admin/evidence?q=<%= encodeURIComponent(phoneQuery) %>"
        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition">
-      Скачать пакет доказательств (JSON)
+      Архив доказательств по этому номеру
     </a>
   <% } %>
 </form>

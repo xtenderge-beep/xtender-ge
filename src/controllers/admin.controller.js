@@ -731,18 +731,11 @@ async function updateLeadGate(req, res) {
   res.redirect('/admin/consent#lead-gate');
 }
 
-// Та же выгрузка, что отдаёт scripts/export-consent-log.js — скачивается файлом
-// для официального ответа регулятору (PDPS) или SMS-оператору.
+// Прежняя выгрузка журнала файлом JSON отдавала записи как есть — с ключами ссылок из старых SMS и без кода
+// из SMS. Выгрузка теперь только через /admin/evidence (цель, причина, код, запись в журнал): старый адрес ведёт туда.
 async function consentExport(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
-  const phoneQuery = (req.query.phone || '').trim();
-  if (!phoneQuery) return res.status(400).send('phone query param required');
-
-  const report = await consentLogService.exportForPhone(phoneQuery);
-  const safe = phoneQuery.replace(/[^\d]/g, '') || 'unknown';
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="sms-consent-${safe}.json"`);
-  res.send(JSON.stringify(report, null, 2));
+  const phoneQuery = String(req.query.phone || '').trim().slice(0, 40);
+  res.redirect('/admin/evidence' + (phoneQuery ? '?q=' + encodeURIComponent(phoneQuery) : ''));
 }
 
 async function rejectReview(req, res) {

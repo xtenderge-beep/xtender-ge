@@ -129,6 +129,20 @@ const views=async(orderId,masterId)=>(await pool.query('SELECT event_type FROM o
   assert.equal((await phone.contact(order.token,again)).statusCode,200);
   assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM lead_links WHERE order_id=$1 AND master_id=$2',[order.id,first.id])).rows[0].n,1);
 
+  // Неиспользованной ссылкой можно воспользоваться 7 дней после отправки (в старых записях журнала ключ открыт).
+  // Привязанная к браузеру работает в нём и дальше.
+  const old=new Date(Date.now()-leadLink.FREE_KEY_TTL_MS-60000);
+  const stale=await leadLink.issue(order.id,second.id);
+  await pool.query('UPDATE lead_links SET created_at=$1 WHERE order_id=$2',[old,order.id]);
+  const late=browser(),latePage=await late.page(order.token,{k:stale});
+  assert.deepEqual([latePage.data.masterId,latePage.data.linkTaken],[null,false],'старая свободная ссылка — обычная ссылка на заявку');
+  assert.equal((await late.contact(order.token,stale)).statusCode,401);
+  assert.equal((await late.view(order.token,stale)).statusCode,401);
+  assert.equal((await linkRow(order.id,second.id)).device_hash,null,'просроченная ссылка не привязывается');
+  const lateSub=late.response();await controller.setLeadSubscription(late.request({params:{token:order.token},body:{key:stale,subscribed:false}}),lateSub);
+  assert.equal(lateSub.statusCode,401,'отписать исполнителя старой ссылкой нельзя');
+  assert.equal((await phone.contact(order.token,again)).statusCode,200,'привязанная к своему браузеру работает и после срока');
+
   // Удаление заявки убирает её ссылки.
   await require('../src/services/order.service').deleteOrder(elsewhere.token);
   assert.equal((await pool.query('SELECT COUNT(*)::int AS n FROM lead_links WHERE order_id=$1',[elsewhere.id])).rows[0].n,0);

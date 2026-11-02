@@ -6,14 +6,20 @@ const pool = require('../config/db');
 // браузере, где ссылкой воспользовались. В любом другом браузере она ведёт себя как обычная ссылка
 // на заявку: текст виден, контакт — после входа по коду из SMS. Кабинет и баланс ключ не открывает,
 // а контакт по-прежнему выдаётся только тому, с кого за эту заявку списано (orderContact.service).
-// В таблице ссылок лежат только хеши ключа и устройства. Сам текст отправленного SMS со ссылкой
-// хранится в журнале доказательств списания (LEAD_CHARGE_ACCEPTED, message_body) — как и раньше.
+// В таблице ссылок лежат только хеши ключа и устройства. Текст SMS в журнале доказательств списания
+// (LEAD_CHARGE_ACCEPTED, message_body) с 03.11.2026 пишется без ключа; в более ранних записях ключ есть.
+// Ссылкой, которой ещё не воспользовались, можно воспользоваться только 7 дней после отправки: в старых записях
+// журнала (до 03.11.2026) ключ лежит открытым текстом, а журнал менять нельзя. Исполнители открывают ссылку
+// почти всегда в первые двое суток (по рабочей базе: 99% за 50 часов). Привязанная к браузеру ссылка в этом
+// браузере работает и дальше; после срока — обычная ссылка на заявку, контакт после входа по коду.
+const FREE_KEY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEVICE_COOKIE = 'lead_device';
 const DEVICE_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const KEY = /^[A-Za-z0-9_-]{22}$/, DEVICE = /^[a-f0-9]{64}$/;
 const hash = value => createHash('sha256').update(value).digest('hex');
 const valid = key => typeof key === 'string' && KEY.test(key);
 const deviceOf = req => DEVICE.test(req.cookies?.[DEVICE_COOKIE] || '') ? req.cookies[DEVICE_COOKIE] : null;
+const expired = row => !row.device_hash && Date.now() - new Date(row.created_at).getTime() > FREE_KEY_TTL_MS;
 
 // Новый ключ для пары «заявка — исполнитель». Повторная отправка тому же исполнителю заменяет
 // прежний ключ и снимает привязку: старая ссылка перестаёт работать.
@@ -30,8 +36,8 @@ async function issue(orderId, masterId, client = pool) {
 //   free — ею ещё не пользовались; mine — привязана к этому браузеру; taken — к другому.
 async function look(req, order, key) {
   if (!order || !valid(key)) return null;
-  const row = (await pool.query('SELECT master_id, device_hash FROM lead_links WHERE order_id=$1 AND key_hash=$2', [order.id, hash(key)])).rows[0];
-  if (!row) return null;
+  const row = (await pool.query('SELECT master_id, device_hash, created_at FROM lead_links WHERE order_id=$1 AND key_hash=$2', [order.id, hash(key)])).rows[0];
+  if (!row || expired(row)) return null;
   const device = deviceOf(req);
   return { masterId: row.master_id, state: !row.device_hash ? 'free' : device && row.device_hash === hash(device) ? 'mine' : 'taken' };
 }
@@ -41,8 +47,8 @@ async function look(req, order, key) {
 async function claim(req, res, order, key) {
   if (!order || !valid(key)) return null;
   return pool.withTransaction(async client => {
-    const row = (await client.query('SELECT id, master_id, device_hash FROM lead_links WHERE order_id=$1 AND key_hash=$2 FOR UPDATE', [order.id, hash(key)])).rows[0];
-    if (!row) return null;
+    const row = (await client.query('SELECT id, master_id, device_hash, created_at FROM lead_links WHERE order_id=$1 AND key_hash=$2 FOR UPDATE', [order.id, hash(key)])).rows[0];
+    if (!row || expired(row)) return null;
     let device = deviceOf(req);
     if (row.device_hash) return device && row.device_hash === hash(device) ? row.master_id : null;
     if (!device) {
@@ -54,4 +60,4 @@ async function claim(req, res, order, key) {
   });
 }
 
-module.exports = { DEVICE_COOKIE, issue, look, claim };
+module.exports = { DEVICE_COOKIE, FREE_KEY_TTL_MS, issue, look, claim };

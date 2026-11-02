@@ -93,8 +93,13 @@ once. Only an order page path is accepted as a return target
 Owner decision 2026-10-06. The lead link sent by SMS or Telegram is now
 `/order/<token>?k=<key>` (`leadLink.service.js`, table `lead_links`). The key is
 22 random URL-safe characters, one per order and provider; the table keeps only
-SHA-256 hashes of the key and of the device cookie. The exact SMS text with the
-link is still kept in the charge evidence (`LEAD_CHARGE_ACCEPTED.message_body`).
+SHA-256 hashes of the key and of the device cookie. The SMS text in the charge
+evidence (`LEAD_CHARGE_ACCEPTED.message_body`) has been written without the key
+since 2026-11-03; older rows hold it in plain text and the journal cannot be
+changed. So a key that has not been used yet works for 7 days after sending
+(`FREE_KEY_TTL_MS`; on the production copy 99% of providers opened the link
+within 50 hours). After that it is a plain order link: the contact is shown
+after a code login. A key already bound to a browser keeps working there.
 
 - The key identifies the provider on the order page without a cabinet sign-in:
   the page shows the provider view, records the view and releases the contact.

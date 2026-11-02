@@ -368,8 +368,9 @@ ref + orderId), чтобы шаг `verifyCode` (отдельный HTTP-запр
 - **`?phone=<номер>`** (любой формат записи) — карточка Double Opt-In (дата, версии
   оферты/политики, IP, User-Agent, X-Forwarded-For, снимок текста, `otp_reference_id`,
   SHA-256 кода) + профиль(и) + полная таблица всех событий по номеру.
-- Кнопка **«Скачать JSON»** → `GET /admin/consent/export?phone=<номер>` — файл
-  `sms-consent-<цифры>.json`, `Content-Disposition: attachment`.
+- Кнопка **«Архив доказательств по этому номеру»** ведёт в `/admin/evidence` (цель, причина, код из SMS). Прежний
+  адрес `GET /admin/consent/export?phone=<номер>` с 03.11.2026 файл не отдаёт, а перенаправляет туда же: JSON шёл
+  без кода и с ключами ссылок из старых SMS.
 - Ссылка «Журнал согласий →» есть и в карточке специалиста (`/admin/masters/:id`).
 - **«Заявки только с согласием»** — блок над списком: сколько исполнителей подписаны на заявки и у кого нет
   записи `CONSENT_SMS_OTP_VERIFIED` на номер (сверка по всем форматам номера), со списком. Переключатель
@@ -422,7 +423,8 @@ node scripts/export-consent-log.js --master 42
 node scripts/export-consent-log.js +9955XXXXXXXX > consent.json
 ```
 
-Тот же JSON, что отдаёт `/admin/consent/export`.
+JSON с записями как есть, без скрытия: в старых записях о списании (до 03.11.2026) лежит ключ ссылки из SMS. Только
+для работы на сервере; наружу отдавать архив из `/admin/evidence`.
 
 ### Формат отчёта (`consentLog.service.exportForPhone`)
 
@@ -499,4 +501,4 @@ node scripts/export-consent-log.js +9955XXXXXXXX > consent.json
 Быстрый сквозной тест: `/api/masters/otp/send` → достать код из лога
 (`[SMS DEV MODE] … Code: NNNN`) → `/api/masters/otp/verify` с
 `{termsAccepted:true, privacyAccepted:true}` → `/api/masters/register` → войти в
-`/admin` и открыть `/admin/consent?phone=<номер>` или дёрнуть `/admin/consent/export`.
+`/admin` и открыть `/admin/consent?phone=<номер>` или собрать архив в `/admin/evidence`.
