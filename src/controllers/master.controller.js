@@ -285,13 +285,18 @@ async function register(req, res) {
   telegramService.notifyModeratorNewMaster(master).catch((err) => {
     console.error('Failed to notify moderator about new master:', err.message);
   });
-  smsService.sendOrderNotification(
-    phone,
-    clientStrings(req.lang).sms_registration_accepted.replace('{link}', link),
-    { masterId: master.id, purpose: OTP_PURPOSE, meta: requestMeta(req) }
-  ).catch((err) => {
+  try {
+    const stop = await require('../services/leadStop.service').linkFor(master);
+    smsService.sendOrderNotification(
+      phone,
+      clientStrings(req.lang).sms_registration_accepted.replace('{link}', link).replace('{stop}', stop),
+      { masterId: master.id, purpose: OTP_PURPOSE, meta: requestMeta(req) }
+    ).catch((err) => {
+      console.error('Failed to send registration confirmation SMS:', err.message);
+    });
+  } catch (err) {
     console.error('Failed to send registration confirmation SMS:', err.message);
-  });
+  }
 
   await masterSession.start(req, res, master.master_token);
   return res.json({ success: true, link, promoBonusGel, welcomeBonusGel: master.welcomeBonusTetri / 100 });
