@@ -1160,9 +1160,13 @@ async function setLeadSubscription(req, res) {
   masterSession.noStore(res);
   const order = await orderService.getOrderByToken(req.params.token);
   if (!order) return res.status(404).json({ success: false, message: serviceMessage('orderNotFound', req.lang) });
+  // Отказаться можно и по ссылке из SMS. Снова включить — это согласие: только войдя в кабинет по коду из SMS,
+  // ключ ссылки для этого не годится (его можно переслать, а в старых записях журнала он лежит открытым).
+  const on = req.body.subscribed === true;
+  if (on && !await masterSession.token(req)) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
   const actor = await leadActor(req, res, order);
-  if (!actor || actor.master.is_banned) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
-  const subscribed = await require('../services/leadSubscription.service').set(actor.master.id, req.body.subscribed === true,
+  if (!actor || actor.master.is_banned || (on && actor.access !== 'session')) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
+  const subscribed = await require('../services/leadSubscription.service').set(actor.master.id, on,
     { source: 'order', orderToken: order.token, orderId: order.id, meta: requestMeta(req), language: req.lang });
   if (subscribed === null) return res.status(401).json({ success: false, code: 'login', message: clientStrings(req.lang).lead_sub_login });
   return res.json({ success: true, subscribed });
