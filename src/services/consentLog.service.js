@@ -57,10 +57,21 @@ async function insertRow(values, client = pool) {
   return rows[0];
 }
 
+// Текст SMS для журнала: всё как отправлено, кроме секретов. Ключ личной ссылки заявки, ссылки кабинета, заказчика,
+// отзыва и Stop открывают чужие данные или действия — вместо них «[скрыто]». Код в SMS с кодом — «[код]» (сам код
+// хранится только хэшем). Номер заявки и адрес страницы заявки остаются: по ним видно, о чём было сообщение.
+function redactSms(text, { code = null } = {}) {
+  let safe = String(text ?? '')
+    .replace(/([?&]k=)[A-Za-z0-9_-]+/g, '$1[скрыто]')
+    .replace(/(\/(?:master|o|review|stop)\/)[A-Za-z0-9_-]+/g, '$1[скрыто]');
+  if (code) safe = safe.split(String(code)).join('[код]');
+  return safe;
+}
+
 // --- Точка 2: факт отправки OTP-SMS (вызывается из otp.service после отправки) ---
 // best-effort: потеря строки журнала отправки не должна ронять саму отправку кода.
 async function recordOtpSent({ phone, purpose, code, masterId = null, orderId = null,
-  providerMessageId = null, providerResponse = null, meta = {} }) {
+  providerMessageId = null, providerResponse = null, meta = {}, messageText = null }) {
   try {
     return await insertRow({
       event_type: 'SMS_OTP_SENT',
@@ -75,6 +86,8 @@ async function recordOtpSent({ phone, purpose, code, masterId = null, orderId = 
       provider: PROVIDER,
       provider_response: providerResponse,
       otp_code_hash: code ? hashOtp(code) : null,
+      message_body_hash: messageText ? sha256(messageText) : null,
+      metadata: messageText ? { category: 'code', message_text: redactSms(messageText, { code }) } : null,
     });
   } catch (err) {
     console.error('consentLog.recordOtpSent failed:', err.message);
@@ -135,7 +148,7 @@ async function applyConsent(grant, role, subjectId, phone, meta, client, declare
 
 // --- Точка 2: прочие транзакционные SMS (лид-уведомления, подтверждения, пинки) ---
 // Вызывается из sms.service на каждую отправку не-OTP SMS. best-effort.
-async function recordSmsDelivery({ phone, kind = 'transactional', body = null, purpose = null,
+async function recordSmsDelivery({ phone, kind = 'transactional', body = null, purpose = null, category = null,
   masterId = null, orderId = null, providerMessageId = null, providerResponse = null, meta = {}, status = 'accepted' }) {
   try {
     return await insertRow({
@@ -151,7 +164,9 @@ async function recordSmsDelivery({ phone, kind = 'transactional', body = null, p
       provider: PROVIDER,
       provider_response: providerResponse,
       message_body_hash: body ? sha256(body) : null,
-      metadata: { ...(meta.extra || {}), acceptance_status: status, delivery_status: 'unknown' },
+      // Категория и текст без секретов: по ним видно, что именно и зачем отправлено (заявка, баланс, служебное).
+      metadata: { ...(meta.extra || {}), category: category || (kind === 'lead' ? 'lead' : 'service'),
+        message_text: body ? redactSms(body) : null, acceptance_status: status, delivery_status: 'unknown' },
     });
   } catch (err) {
     console.error('consentLog.recordSmsDelivery failed:', err.message);
@@ -256,7 +271,8 @@ async function exportForPhone(rawPhone) {
 // Джойн по phone_number ↔ masters.phone (FK нет, см. schema.sql).
 async function listRecentConsents(limit = 100) {
   const recentTypes = [...VERIFIED_EVENT_TYPES, 'MASTER_REGISTERED', 'ORDER_PUBLISHED',
-    'LEAD_SMS_OPT_IN', 'LEAD_SMS_OPT_OUT', 'MARKETING_SMS_OPT_IN', 'MARKETING_SMS_OPT_OUT', 'LEAD_SMS_PAUSED', 'LEAD_SMS_RESUMED'];
+    'LEAD_SMS_OPT_IN', 'LEAD_SMS_OPT_OUT', 'MARKETING_SMS_OPT_IN', 'MARKETING_SMS_OPT_OUT', 'LEAD_SMS_PAUSED', 'LEAD_SMS_RESUMED',
+    'PHONE_CHANGED', 'PHONE_REPLACED'];
   const ph = recentTypes.map((_, i) => `$${i + 1}`).join(', ');
   const { rows } = await pool.query(
     `SELECT l.id, l.event_type, l.phone_number, l.purpose, l.ip_address, l.user_agent,
@@ -285,6 +301,7 @@ async function exportForMaster(masterId) {
 module.exports = {
   recordAction,
   textVersion,
+  redactSms,
   applyConsent,
   recordOtpSent,
   recordConsentVerified,

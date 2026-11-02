@@ -928,6 +928,26 @@ CREATE TABLE IF NOT EXISTS lead_links (
     UNIQUE (order_id, master_id)
 );
 CREATE INDEX IF NOT EXISTS idx_lead_links_key ON lead_links(key_hash);
+-- Проверяемая целостность журнала согласий (consentChain.service). Каждая запись sms_consent_logs по порядку
+-- получает отпечаток: SHA-256 от отпечатка предыдущей и содержимого самой записи. Изменённая или удалённая запись
+-- ломает цепочку. Раз в сутки отпечаток последнего звена уходит владельцу в Telegram (consent_log_anchors) —
+-- копия вне базы. Обе таблицы только для добавления (schema.postgres.sql).
+CREATE TABLE IF NOT EXISTS consent_log_chain (
+    seq BIGSERIAL PRIMARY KEY,
+    log_id BIGINT NOT NULL UNIQUE,
+    prev_hash VARCHAR(64) NOT NULL UNIQUE,
+    row_hash VARCHAR(64) NOT NULL,
+    chained_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS consent_log_anchors (
+    id SERIAL PRIMARY KEY,
+    chain_seq BIGINT NOT NULL,
+    log_id BIGINT NOT NULL,
+    chain_head VARCHAR(64) NOT NULL,
+    log_rows BIGINT NOT NULL,
+    sent_to VARCHAR(30),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 -- Короткая ссылка «Stop» в SMS о заявке (leadStop.service): отказ без входа, в том числе для нового
 -- владельца номера («это не мой номер»). Код свой для пары «исполнитель и номер»: смена номера даёт новый.
 CREATE TABLE IF NOT EXISTS lead_stop_codes (

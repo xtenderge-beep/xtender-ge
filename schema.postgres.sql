@@ -23,6 +23,30 @@ CREATE TRIGGER trg_sms_consent_logs_no_truncate
     BEFORE TRUNCATE ON sms_consent_logs
     FOR EACH STATEMENT EXECUTE PROCEDURE sms_consent_logs_block_mutation();
 
+-- Цепочка отпечатков журнала и суточные отпечатки (consentChain.service) — тоже только для добавления.
+CREATE OR REPLACE FUNCTION append_only_block_mutation() RETURNS trigger AS $$
+BEGIN
+    RAISE EXCEPTION '% is append-only: % is not allowed', TG_TABLE_NAME, TG_OP;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_consent_log_chain_append_only ON consent_log_chain;
+CREATE TRIGGER trg_consent_log_chain_append_only
+    BEFORE UPDATE OR DELETE ON consent_log_chain
+    FOR EACH ROW EXECUTE PROCEDURE append_only_block_mutation();
+DROP TRIGGER IF EXISTS trg_consent_log_chain_no_truncate ON consent_log_chain;
+CREATE TRIGGER trg_consent_log_chain_no_truncate
+    BEFORE TRUNCATE ON consent_log_chain
+    FOR EACH STATEMENT EXECUTE PROCEDURE append_only_block_mutation();
+DROP TRIGGER IF EXISTS trg_consent_log_anchors_append_only ON consent_log_anchors;
+CREATE TRIGGER trg_consent_log_anchors_append_only
+    BEFORE UPDATE OR DELETE ON consent_log_anchors
+    FOR EACH ROW EXECUTE PROCEDURE append_only_block_mutation();
+DROP TRIGGER IF EXISTS trg_consent_log_anchors_no_truncate ON consent_log_anchors;
+CREATE TRIGGER trg_consent_log_anchors_no_truncate
+    BEFORE TRUNCATE ON consent_log_anchors
+    FOR EACH STATEMENT EXECUTE PROCEDURE append_only_block_mutation();
+
 -- Persistent receipt review, independent of balance crediting (Telegram/admin).
 CREATE TABLE IF NOT EXISTS topup_receipts (
  id SERIAL PRIMARY KEY,

@@ -31,7 +31,8 @@
                 <a href="/" class="flex items-center gap-2 shrink-0">
                     <%- include('partials/brand') %>
                 </a>
-                <div class="flex items-center gap-2">
+                <%# gap-1 и px-2.5 у «Выйти»: на экране 320 px шапка с «Бесплатно», «Выйти» и языками была шире экрана на 4–6 px. %>
+                <div class="flex items-center gap-1">
                     <% if (master && master.paid_mode !== true) { %>
                         <%# Бесплатный период: в шапке «Бесплатно» вместо суммы, баланс виден в карточке и во вкладке. %>
                         <span class="text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg whitespace-nowrap"><i class="fa-solid fa-gift" aria-hidden="true"></i> <%= t('provider_free_badge') %></span>
@@ -42,7 +43,7 @@
                     <% } %>
                     <% if (master) { %>
                     <form method="POST" action="/master/logout" data-logout>
-                        <button type="submit" class="text-sm font-bold border border-stone-200 rounded-lg px-3 py-2"><%= t('master_logout') %></button>
+                        <button type="submit" class="text-sm font-bold border border-stone-200 rounded-lg px-2.5 py-2"><%= t('master_logout') %></button>
                     </form>
                     <% } %>
                     <%- include('partials/lang-switch', { masterLangHref: master ? ('/master/' + master.master_token + '/lang/') : null }) %>

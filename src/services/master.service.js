@@ -440,7 +440,8 @@ async function topUpBalance(phone, amountTetri) {
 // назначается размер кузова (при саморегистрации на /join он остаётся пустым — «размер
 // неизвестен»). Три размера кузова в характеристиках перевозки (cargo_*_cm) дают букву
 // по текущим порогам; без них действует буква vehicleSize, выбранная на глаз.
-async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds, spokenLanguages }) {
+// changedBy / meta — кто меняет профиль (сейчас номер меняет только администратор): для истории номера в журнале.
+async function updateMasterProfile(id, { name, phone, category, vehicleType, vehicleSize, priceText, description, serviceAttributes = {}, services, cityIds, spokenLanguages, changedBy = null, meta = {} }) {
   rejectPhoneInText(description, priceText);
   const config = require('../config/serviceTypes');
   const categories = require('./category.service');
@@ -496,7 +497,14 @@ async function updateMasterProfile(id, { name, phone, category, vehicleType, veh
     throw Object.assign(new Error('Выберите хотя бы один язык общения'), { code: 'INVALID_LANGUAGE' });
   }
   return pool.withTransaction(async client => {
-    const previous=(await client.query('SELECT description FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    const previous=(await client.query('SELECT description, phone FROM masters WHERE id=$1 FOR UPDATE', [id])).rows[0];
+    // История номера: две записи в журнале согласий, на новом и на старом номере, — поиск по любому найдёт обе.
+    // Согласие на старый номер к новому не переходит (проверка согласия перед рассылкой смотрит на номер).
+    if (previous && phone && String(previous.phone).replace(/\D/g, '').slice(-9) !== String(phone).replace(/\D/g, '').slice(-9)) {
+      const actor = changedBy || 'system';
+      await consentLog.recordAction({ eventType: 'PHONE_CHANGED', phone, masterId: id, metadata: { old_phone: previous.phone, actor }, meta }, client);
+      await consentLog.recordAction({ eventType: 'PHONE_REPLACED', phone: previous.phone, masterId: id, metadata: { new_phone: phone, actor }, meta }, client);
+    }
     const { rows } = await client.query(
       'UPDATE masters SET name=$1, phone=$2, category=$3, vehicle_type=$4, vehicle_size=$5, is_flatbed=$6, price_text=$7, description=$8 WHERE id=$9 RETURNING *',
       [name, phone, legacy.category, vehicleType || null, legacy.vehicle_size, legacy.is_flatbed, priceText || null, description || null, id]);

@@ -17,9 +17,13 @@ async function setRequired(enabled) {
   await settings.setSetting(KEY, enabled ? '1' : '0');
 }
 
+// Запись согласия: подтверждение кода на /join с текстом согласия или включение заявок самим исполнителем с
+// показанным текстом (кабинет, страница заявки). Фильтр по тексту — в JS: pg-mem на этой таблице теряет строки
+// при условии IS NOT NULL.
 async function consentedPhones(client = pool) {
-  const { rows } = await client.query("SELECT DISTINCT phone_number FROM sms_consent_logs WHERE event_type = 'CONSENT_SMS_OTP_VERIFIED'");
-  return new Set(rows.map((row) => row.phone_number));
+  const { rows } = await client.query(`SELECT event_type, phone_number, consent_text_snapshot FROM sms_consent_logs
+    WHERE event_type IN ('CONSENT_SMS_OTP_VERIFIED', 'LEAD_SMS_OPT_IN')`);
+  return new Set(rows.filter((row) => row.event_type === 'CONSENT_SMS_OTP_VERIFIED' || row.consent_text_snapshot).map((row) => row.phone_number));
 }
 
 // В журнале и в профиле один номер может быть записан по-разному: +995…, 995… или 9 цифр.
@@ -59,6 +63,8 @@ async function summary() {
     pool.query('SELECT MIN(timestamp_utc) AS at FROM sms_consent_logs'),
   ]);
   const versionByPhone = new Map(consents.rows.map((row) => [row.phone_number, row.terms_version || '—']));
+  // Согласие только из кабинета или со страницы заявки (без подтверждения кода на /join с этим номером).
+  for (const phone of await consentedPhones()) if (!versionByPhone.has(phone)) versionByPhone.set(phone, 'включено в кабинете');
   const registeredByCode = new Set(registered.rows.filter((row) => row.master_id !== null).map((row) => Number(row.master_id)));
   const journalStart = start.rows[0]?.at || null;
   const versions = new Map(), reasons = { phone_changed: 0, before_journal: 0, no_code: 0 }, missing = [];

@@ -64,4 +64,23 @@ function canSendMarketing(master) {
   return Boolean(master && master.marketing_sms === true && !master.is_banned);
 }
 
-module.exports = { permissionText, applyRegistration, setMarketing, canSendMarketing };
+// Есть ли у исполнителя согласие на SMS о заявках на нынешний номер. Прежняя единая отметка (до двух разрешений)
+// включала сообщения о заявках, поэтому она считается; новая регистрация — только с отмеченной «заявки по SMS»;
+// включение с показанным текстом (кабинет, страница заявки) — тоже. Включение администратором согласием не является.
+async function hasLeadConsent(masterId, client = pool) {
+  const master = (await client.query('SELECT phone FROM masters WHERE id=$1', [masterId])).rows[0];
+  if (!master) return false;
+  const variants = require('../config/phone').phoneVariants(master.phone);
+  if (!variants.length) return false;
+  const ph = variants.map((_, i) => `$${i + 1}`).join(', ');
+  const rows = (await client.query(`SELECT event_type, metadata, consent_text_snapshot FROM sms_consent_logs
+    WHERE event_type IN ('CONSENT_SMS_OTP_VERIFIED', 'LEAD_SMS_OPT_IN') AND phone_number IN (${ph})`, variants)).rows;
+  return rows.some((row) => {
+    if (row.event_type === 'LEAD_SMS_OPT_IN') return Boolean(row.consent_text_snapshot);
+    const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+    const choices = metadata?.snapshot?.choices;
+    return !choices || choices.lead_sms === true;
+  });
+}
+
+module.exports = { permissionText, applyRegistration, setMarketing, canSendMarketing, hasLeadConsent };

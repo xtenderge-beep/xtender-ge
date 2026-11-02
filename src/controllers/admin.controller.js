@@ -293,6 +293,7 @@ async function updateMaster(req, res) {
 
   try {
     await masterService.updateMasterProfile(id, {
+      changedBy: 'admin', meta: requestMeta(req),
       name,
       phone: toE164(phoneRaw),
       category,
@@ -414,8 +415,9 @@ async function setMasterPaidMode(req, res) {
 // Вернуть исполнителя в рассылку заявок или снять с неё по его просьбе (leadSubscription.service).
 async function setMasterLeadSubscription(req, res) {
   const id = parseInt(req.params.id, 10);
-  if (await require('../services/leadSubscription.service').setByAdmin(id, req.body.subscribed === '1', { meta: requestMeta(req) }) === null) return res.status(404).send('Мастер не найден');
-  res.redirect(`/admin/masters/${id}`);
+  const result = await require('../services/leadSubscription.service').setByAdmin(id, req.body.subscribed === '1', { meta: requestMeta(req) });
+  if (result === null) return res.status(404).send('Мастер не найден');
+  res.redirect(`/admin/masters/${id}` + (result === 'no_consent' ? '?error=no_lead_consent' : ''));
 }
 
 async function unbanMaster(req, res) {
@@ -709,7 +711,18 @@ async function consentLog(req, res) {
   const report = phoneQuery ? await consentLogService.exportForPhone(phoneQuery) : null;
   const recent = phoneQuery ? [] : await consentLogService.listRecentConsents(150);
   const leadGate = phoneQuery ? null : await require('../services/leadSmsConsent.service').summary();
-  res.render('admin/consent', { phoneQuery, report, recent, leadGate });
+  const chain = phoneQuery ? null : await require('../services/consentChain.service').status();
+  const chainCheck = req.query.chain ? { ok: req.query.chain === 'ok', checked: Number(req.query.checked) || 0, problems: Number(req.query.problems) || 0, unchained: Number(req.query.unchained) || 0 } : null;
+  res.render('admin/consent', { phoneQuery, report, recent, leadGate, chain, chainCheck });
+}
+
+// «Проверить сейчас»: пересчитать цепочку отпечатков журнала (consentChain.service). Только чтение.
+async function verifyConsentChain(req, res) {
+  const service = require('../services/consentChain.service');
+  await service.extend();
+  const result = await service.verify();
+  if (!result.ok) console.error('[consent-chain] verify problems:', JSON.stringify(result.problems.slice(0, 10)));
+  res.redirect(`/admin/consent?chain=${result.ok ? 'ok' : 'broken'}&checked=${result.checked}&problems=${result.problems.length}&unchained=${result.unchained}#journal-chain`);
 }
 
 // «Заявки только с согласием» (leadSmsConsent.service): выключенный переключатель ничего не меняет в рассылке.
@@ -985,6 +998,7 @@ module.exports = {
   consentLog,
   consentExport,
   updateLeadGate,
+  verifyConsentChain,
   supportList,
   supportThread,
   supportReply,

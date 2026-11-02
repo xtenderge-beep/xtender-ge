@@ -28,6 +28,8 @@
     LEAD_SMS_PAUSED:          { label: 'Пауза SMS о заявках',     cls: 'bg-amber-100 text-amber-800 border-amber-200' },
     LEAD_SMS_RESUMED:         { label: 'Пауза снята кодом',       cls: 'bg-sky-100 text-sky-800 border-sky-200' },
     LEAD_RESUME_OTP_VERIFIED: { label: 'Подтверждение · снятие паузы', cls: 'bg-sky-100 text-sky-800 border-sky-200' },
+    PHONE_CHANGED:            { label: 'Номер установлен',        cls: 'bg-amber-100 text-amber-800 border-amber-200' },
+    PHONE_REPLACED:           { label: 'Номер заменён другим',    cls: 'bg-amber-100 text-amber-800 border-amber-200' },
   };
   function evtBadge(type, metadata) {
     const m = EVENT_META[type] || { label: type, cls: 'bg-stone-100 text-stone-600 border-stone-200' };
@@ -215,6 +217,21 @@
     </div>
   <% } %>
 
+  <% if (typeof chain !== 'undefined' && chain) { %>
+    <div id="journal-chain" class="mt-4 bg-white rounded-2xl border border-stone-200 p-5" style="scroll-margin-top:110px">
+      <div class="text-xs font-bold text-stone-500 uppercase mb-2">Целостность журнала</div>
+      <p class="text-sm text-stone-600">Каждая запись журнала получает отпечаток, зависящий от предыдущей: изменённая или удалённая запись ломает цепочку. Раз в сутки отпечаток уходит в Telegram модератора — это копия вне базы.</p>
+      <p class="text-sm text-stone-900 mt-2">В цепочке: <b><%= chain.chained %></b> из <%= chain.logs %> записей<% if (chain.lastAnchor) { %>; последний отпечаток <%= fmt(chain.lastAnchor.created_at) %> (UTC)<%= chain.lastAnchor.sent_to ? ', отправлен в Telegram' : ', в Telegram не отправлен' %><% } else { %>; отпечатков ещё не было<% } %>.</p>
+      <% if (typeof chainCheck !== 'undefined' && chainCheck) { %>
+        <p class="text-sm mt-2 font-bold <%= chainCheck.ok ? 'text-emerald-700' : 'text-red-600' %>"><%= chainCheck.ok ? 'Проверено: цепочка цела, звеньев ' + chainCheck.checked + '.' : 'Цепочка нарушена: проблем ' + chainCheck.problems + ' из ' + chainCheck.checked + ' звеньев. Подробности — в журнале сервера.' %><% if (chainCheck.unchained) { %> Ещё не в цепочке: <%= chainCheck.unchained %>.<% } %></p>
+      <% } %>
+      <form method="POST" action="/admin/consent/verify-chain" class="mt-3">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" class="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Проверить сейчас</button>
+      </form>
+    </div>
+  <% } %>
+
   <div class="mt-4 bg-white rounded-2xl border border-stone-200 p-5">
     <div class="text-xs font-bold text-stone-500 uppercase mb-3">Последние подтверждения и действия</div>
     <% if (!recent.length) { %>
@@ -261,6 +278,6 @@
 
 
 
-<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED','LEAD_SMS_OPT_OUT','LEAD_SMS_OPT_IN','MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT','LEAD_SMS_PAUSED','LEAD_SMS_RESUMED'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
+<% if (report && report.events) { %><details class="mt-6 p-4 border rounded-xl"><summary class="font-bold cursor-pointer">Полные тексты согласий и история действий</summary><% report.events.filter(e => e.consent_text_snapshot || ['ORDER_CLOSED','CONTACT_SHARING_WITHDRAWN','ORDER_PUBLISHED','MASTER_REGISTERED','LEAD_SMS_OPT_OUT','LEAD_SMS_OPT_IN','MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT','LEAD_SMS_PAUSED','LEAD_SMS_RESUMED','PHONE_CHANGED','PHONE_REPLACED'].includes(e.event_type)).forEach(e => { %><div class="mt-4"><h3 class="font-bold"><%= e.event_type %> · <%= fmt(e.timestamp_utc) %></h3><p class="whitespace-pre-wrap"><%= e.consent_text_snapshot || '' %></p><pre class="text-xs whitespace-pre-wrap break-all"><%= JSON.stringify(e.metadata, null, 2) %></pre></div><% }) %></details><% } %>
 
 <%- include('./_footer') %>

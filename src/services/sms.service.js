@@ -61,6 +61,7 @@ function acceptedResponse(data) {
 //   { purpose }           — otp purpose, если применимо
 //   { masterId, orderId } — связи для журнала
 //   { meta }              — { ip, userAgent, xForwardedFor } из requestMeta(req)
+//   { category }          — для журнала: lead, balance, review, service (по умолчанию: lead для kind lead, иначе service)
 //   { log: false }        — не писать строку доставки здесь (OTP-отправки логирует otp.service)
 async function send(phone, text, context = {}) {
   const e164 = toE164(phone);
@@ -103,7 +104,7 @@ async function send(phone, text, context = {}) {
     console.error(`[SMS GATEWAY] to=${normalizePhone(phone)} failed: ${err.message}`);
     if (context.log !== false) {
       consentLog.recordSmsDelivery({
-        phone: e164, kind: context.kind, purpose: context.purpose || null, body: text,
+        phone: e164, kind: context.kind, purpose: context.purpose || null, body: text, category: context.category || null,
         masterId: context.masterId || null, orderId: context.orderId || null,
         providerMessageId, providerResponse, meta: context.meta || {}, status: 'failed',
       }).catch(() => {});
@@ -114,7 +115,7 @@ async function send(phone, text, context = {}) {
   if (context.log !== false) {
     // best-effort — журнал доставки не должен ронять отправку SMS
     consentLog.recordSmsDelivery({
-      phone: e164, kind: context.kind, purpose: context.purpose || null, body: text,
+      phone: e164, kind: context.kind, purpose: context.purpose || null, body: text, category: context.category || null,
       masterId: context.masterId || null, orderId: context.orderId || null,
       providerMessageId, providerResponse, meta: context.meta || {},
     }).catch(() => {});

@@ -96,6 +96,8 @@ async function sendCode(phone, purpose = 'order', orderId = null, context = {}) 
       providerMessageId,
       providerResponse: result && result.providerResponse,
       meta: context.meta || {},
+      // Текст SMS с кодом, сам код в журнале заменён на «[код]» (consentLog.redactSms).
+      messageText: (result && result.messageBody) || null,
     })
     .catch(() => {});
 

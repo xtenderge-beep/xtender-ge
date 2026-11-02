@@ -125,7 +125,7 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
   assert.equal(leadSms(giorgi).length,before,'третья заявка по SMS не ушла');
   assert.ok((await row(giorgi.id)).lead_sms_paused_at,'пауза поставлена');
   assert.deepEqual((await pool.query('SELECT status, reason FROM dispatch_deliveries WHERE order_id=$1 AND master_id=$2',[c.id,giorgi.id])).rows[0],{status:'skipped',reason:'sms_paused'});
-  assert.equal(sms.filter(s=>s.phone===giorgi.phone && s.text.startsWith('Xtender: order SMS paused')).length,1);
+  assert.equal(sms.filter(s=>s.phone===giorgi.phone && s.kind!=='lead' && s.kind!=='otp').length,0,'отдельной SMS о паузе нет');
   assert.deepEqual(json((await journal(giorgi.id,['LEAD_SMS_PAUSED'])).at(-1).metadata).unopened_order_ids,[b.id,a.id].map(Number));
   assert.equal((await row(levan.id)).lead_sms_paused_at,null,'открывший заявки не на паузе');
   assert.equal((await row(nino.id)).lead_sms_paused_at,null,'заявки в Telegram паузе не подвержены');

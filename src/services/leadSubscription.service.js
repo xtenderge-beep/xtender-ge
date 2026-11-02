@@ -50,8 +50,12 @@ async function set(masterId, subscribed, { source = 'cabinet', orderToken = null
   return result.on;
 }
 
-// Администратор возвращает исполнителя в рассылку или снимает с неё (по его просьбе по телефону).
+// Администратор возвращает исполнителя в рассылку или снимает с неё (по его просьбе по телефону). Вернуть можно
+// только того, у кого есть согласие на заявки на этот номер; иначе 'no_consent': включить может лишь он сам.
 async function setByAdmin(masterId, subscribed, { meta = {} } = {}) {
+  if (subscribed === true && !await require('./smsPermissions.service').hasLeadConsent(masterId)) {
+    return (await pool.query('SELECT 1 FROM masters WHERE id=$1', [masterId])).rows.length ? 'no_consent' : null;
+  }
   const result = await change(masterId, subscribed === true, { actor: 'admin', source: 'admin', meta, allowBanned: true });
   if (!result) return null;
   if (result.changed) {

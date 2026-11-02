@@ -171,6 +171,8 @@ runMigrations()
     require('./services/orderTranslation.service').start();
     // Посещаемость: удаление записей старше 400 дней раз в сутки.
     require('./services/siteAnalytics.service').start();
+    // Цепочка отпечатков журнала согласий — каждые 5 минут; отпечаток дня в Telegram модератора — раз в сутки.
+    require('./services/consentChain.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

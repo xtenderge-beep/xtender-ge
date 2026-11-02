@@ -33,7 +33,7 @@ async function nudgeLowBalance(master, telegramService, reason) {
       // Telegram carries the provider's language; the SMS body stays Latin (see service-message-copy.js).
       await telegramService.sendToChat(master.telegram_id, serviceMessage(messageKey, master.language, { amount: gel, link }));
     } else {
-      await smsService.sendOrderNotification(master.phone, serviceMessage.sms(messageKey, { amount: gel, link }), { masterId: master.id });
+      await smsService.sendOrderNotification(master.phone, serviceMessage.sms(messageKey, { amount: gel, link }), { masterId: master.id, category: 'balance' });
     }
   } catch (err) {
     console.error(`Failed to nudge master ${master.id} about low balance:`, err.message);
@@ -467,7 +467,6 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
   });
   context.runId=run.id;
   const notifiedIds = [];
-  const pausedNow = [];
   // A row lock serializes routing changes against delivery and charging. Limit
   // concurrency so background SMS auditing can still obtain a pool connection.
   for (let offset = 0; offset < masters.length; offset += 4) {
@@ -502,7 +501,7 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
       // Без Telegram заявка уйдёт по SMS: две предыдущие по SMS не открыты — ставим паузу вместо отправки.
       if (!master.telegram_id) {
         const pause = await require('./leadPause.service').check(master, client);
-        if (pause.paused) { skipReason='sms_paused'; if (pause.justPaused) pausedNow.push(master); return; }
+        if (pause.paused) { skipReason='sms_paused'; return; }
       }
       const amount = paid ? leadPrice : 0;
       // Личная ссылка: ключ открывает заявку и контакт без входа, но только в первом браузере (leadLink.service).
@@ -556,11 +555,6 @@ async function notifyMasters(order, category, vehicleSize, confirmedPrice = null
     }
     if (outcome === 'skipped') await pool.query("UPDATE dispatch_deliveries SET status='skipped',reason=$3,finished_at=NOW() WHERE run_id=$1 AND master_id=$2", [run.id,candidate.id,skipReason]);
    }));
-  }
-  // Одна SMS при постановке на паузу: что случилось и где снять (вход в кабинет, затем код на номер).
-  for (const master of pausedNow) {
-    await smsService.sendOrderNotification(master.phone, serviceMessage.sms('leadPaused', { link: getBaseUrl() + '/master' }), { masterId: master.id })
-      .catch(err => console.error('Pause SMS failed:', err.message));
   }
   const { activeWhere, catParams, catClause } = dispatchFilter(category, vehicleSize, isTechnical);
   // Прежние отправки этой же группы (другой язык): кого они уже учли, тому «упущенный лид» второй раз не засчитываем.

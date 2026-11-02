@@ -109,6 +109,9 @@
       Предложения Xtender: <b><%= master.marketing_sms ? 'включены' : 'выключены' %></b>.
     </p>
 
+    <% if (error === 'no_lead_consent') { %>
+      <p class="mt-2 text-sm text-red-600 font-semibold">Вернуть в рассылку нельзя: исполнитель не давал согласия на заявки по SMS на этот номер. Включить их может только он сам — в кабинете или на странице заявки, с текстом согласия.</p>
+    <% } %>
     <% if (error === 'invalid_amount') { %>
       <p class="mt-2 text-sm text-red-600 font-semibold">Некорректная сумма коррекции.</p>
     <% } else if (error === 'invalid_fields') { %>

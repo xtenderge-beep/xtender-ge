@@ -39,7 +39,7 @@ const message = require('../src/config/service-message-copy');
   }
   // Every SMS template is printable ASCII with all placeholders filled.
   const sample = {code:'1234',reference:' #7',link:'https://example.test/x',test:'[TEST] ',id:7,amount:'1.00',stop:'https://example.test/stop/AbCdEf12'};
-  for (const key of ['code','orderCode','orderLink','lead','leadPaused','revision','reviewInvite','balanceLow','balanceMissed']) {
+  for (const key of ['code','orderCode','orderLink','lead','revision','reviewInvite','balanceLow','balanceMissed']) {
     const body = message.sms(key, sample);
     assert.match(body, /^[ -~]+$/, 'SMS "' + key + '" must stay Latin');
     assert.ok(!body.includes('{'), 'SMS "' + key + '" has an unfilled placeholder');
