@@ -102,6 +102,13 @@ async function registerMaster({
       await client.query('UPDATE masters SET signup_kinds = $1::jsonb WHERE id = $2', [JSON.stringify(signupKinds), master.id]);
       master.signup_kinds = signupKinds;
     }
+    // Отметка «заявки по SMS» ставится вместе с профилем: без неё профиль не попадает в рассылку, даже если
+    // запись согласий после регистрации (smsPermissions.applyRegistration) сорвётся. Без выбора — прежняя единая отметка.
+    const choices = consentGrant?.snapshot?.choices;
+    if (choices) {
+      await client.query('UPDATE masters SET is_subscribed = $1 WHERE id = $2', [choices.lead_sms === true, master.id]);
+      master.is_subscribed = choices.lead_sms === true;
+    }
     if (cityIds !== null) {
       const available = await client.query('SELECT id FROM cities');
       const valid = new Set(available.rows.map(c => c.id));

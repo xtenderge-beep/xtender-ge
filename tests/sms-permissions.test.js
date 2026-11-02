@@ -15,7 +15,8 @@ stub('../src/services/sms.service',{
   sendOtp:async(phone,code)=>{sms.push({phone,text:'Code: '+code,kind:'otp'});return {ok:true,providerMessageId:'otp'};},
 });
 stub('../src/services/translation.service',{translateOrder:async()=>null,detectLang:()=> 'ru'});
-stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async()=>false,notifyModerator:async()=>{},notifyModeratorNewMaster:async()=>{}});
+const telegramLeads=[];
+stub('../src/services/telegram.service',{updateMessage:async()=>{},sendToChat:async()=>{},sendLeadToMaster:async(master)=>{telegramLeads.push(master.id);return false;},notifyModerator:async()=>{},notifyModeratorNewMaster:async()=>{}});
 const masters=require('../src/services/master.service'),dispatch=require('../src/services/dispatch.service');
 const consent=require('../src/services/consent.service'),otp=require('../src/services/otp.service');
 const permissions=require('../src/services/smsPermissions.service'),pause=require('../src/services/leadPause.service');
@@ -57,6 +58,7 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
     assert.equal(await otp.verifyCode(phone,await redis.get('otp:master:'+phone),'master',{challengeId:sent.challengeId,strict:true}),true);
     const grant=await otp.getConsentGrant(phone,'master',sent.challengeId);
     const master=await masters.registerMaster({createOnly:true,name,phone,serviceType:null,consentGrant:grant,cityIds:[1],cityId:1,spokenLanguages:['ru']});
+    assert.equal((await row(master.id)).is_subscribed,choices.leadSmsAccepted===true,'отметка заявок ставится вместе с профилем');
     await permissions.applyRegistration(master.id,phone,grant,{ip:'198.51.100.7'});
     return row(master.id);
   }
@@ -89,6 +91,20 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
   assert.deepEqual((await journal(offersOnly.id,['MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT'])).map(r=>r.event_type),['MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT','MARKETING_SMS_OPT_IN']);
   assert.equal(permissions.canSendMarketing(await row(offersOnly.id)),true);assert.equal(permissions.canSendMarketing(await row(leadsOnly.id)),false);
 
+  // 2а. Новый исполнитель без отметки «заявки» после модерации и с подключённым Telegram не получает заявок ни по SMS,
+  // ни в Telegram — при выключенном общем переключателе проверки согласий.
+  assert.equal(await require('../src/services/leadSmsConsent.service').isRequired(),false);
+  for (const m of [leadsOnly,offersOnly,nothing]) {
+    await masters.updateMasterProfile(m.id,{name:m.name,phone:m.phone,services:[{type:'movers',attributes:{crew_size:2}}],cityIds:[1],spokenLanguages:['ru']});
+    await masters.approveMaster(m.id);
+  }
+  await pool.query('UPDATE masters SET telegram_id=5552 WHERE id=$1',[nothing.id]);
+  const unticked=await send();
+  assert.equal(sms.filter(s=>s.kind==='lead' && [offersOnly.phone,nothing.phone].includes(s.phone)).length,0,'без отметки SMS о заявке нет');
+  assert.equal(telegramLeads.includes(nothing.id),false,'без отметки заявки в Telegram нет');
+  assert.equal(sms.some(s=>s.kind==='lead' && s.phone===leadsOnly.phone),true,'с отметкой заявка пришла');
+  assert.equal((await pool.query('SELECT count(*)::int AS n FROM dispatch_deliveries WHERE order_id=$1 AND master_id IN ($2,$3)',[unticked.id,offersOnly.id,nothing.id])).rows[0].n,0);
+
   // 3. Ссылка Stop в каждой SMS о заявке: отказ без входа; «Это не мой номер» выключает и предложения.
   const giorgi=await provider('Гиорги'),levan=await provider('Леван'),nino=await provider('Нино',{telegram:5551});
   await pool.query('UPDATE masters SET is_active=false WHERE id IN ($1,$2,$3)',[leadsOnly.id,offersOnly.id,nothing.id]);
@@ -103,6 +119,9 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
   assert.equal((await row(giorgi.id)).is_subscribed,false);
   const stopRow=(await journal(giorgi.id,['LEAD_SMS_OPT_OUT'])).at(-1);
   assert.deepEqual([json(stopRow.metadata).actor,json(stopRow.metadata).source,json(stopRow.metadata).reason],['phone_holder','sms_stop','stop_link']);
+  const stoppedCount=leadSms(giorgi).length;
+  await send();
+  assert.equal(leadSms(giorgi).length,stoppedCount,'после Stop заявки не приходят');
   await pool.query('UPDATE masters SET marketing_sms=true WHERE id=$1',[levan.id]);
   const levanCode=leadSms(levan)[0].text.match(/\/stop\/([A-Za-z0-9_-]+)$/)[1];
   res=response();await stopPage.stop(request({params:{code:levanCode},body:{action:'not_mine'}}),res);
@@ -115,6 +134,8 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
 
   // 4. Пауза: две заявки по SMS, которые открыли другие, а он нет, — третья не уходит; отдельной SMS о паузе нет.
   await pool.query('UPDATE masters SET is_subscribed=true WHERE id IN ($1,$2)',[giorgi.id,levan.id]);
+  // Раньше у Гиорги было согласие на предложения, потом он его отозвал: снятие паузы не должно его вернуть.
+  for (const on of [true,false]) { res=response();await cabinet.setMarketing(request({params:{token:giorgi.master_token},body:{subscribed:on}}),res); }
   await pool.query("DELETE FROM dispatch_deliveries");
   const age=()=>pool.query("UPDATE dispatch_deliveries SET finished_at=$1",[new Date(Date.now()-3*60*60*1000)]);
   const a=await send(),b=await send();
@@ -148,6 +169,8 @@ const leadSms=(master)=>sms.filter(s=>s.kind==='lead' && s.phone===master.phone)
   const after=await row(giorgi.id);
   assert.deepEqual([after.lead_sms_paused_at,Boolean(after.lead_sms_resumed_at)],[null,true]);
   assert.deepEqual((await journal(giorgi.id,['LEAD_RESUME_OTP_VERIFIED','LEAD_SMS_RESUMED'])).map(r=>r.event_type),['LEAD_RESUME_OTP_VERIFIED','LEAD_SMS_RESUMED']);
+  assert.equal(after.marketing_sms,false,'снятие паузы не возвращает согласие на предложения');
+  assert.equal((await journal(giorgi.id,['MARKETING_SMS_OPT_IN','MARKETING_SMS_OPT_OUT'])).at(-1).event_type,'MARKETING_SMS_OPT_OUT');
   // Отсчёт начинается заново: старые неоткрытые заявки больше не считаются.
   await send();
   assert.equal(leadSms(giorgi).length,before+1);
