@@ -136,12 +136,14 @@
                 supportMessages.forEach(function (sm, i) { if (sm.sender === 'master') lastMine = i; });
                 var pendingSupport = supportMessages.slice(lastMine + 1).filter(function (sm) { return sm.sender === 'moderator'; });
             %>
-            <% if (pendingSupport.length) { %>
-                <div id="supportPending" class="p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 space-y-3">
+            <%# Блок есть всегда: если поддержка напишет, пока кабинет открыт, вопрос появится здесь сам (опрос раз в 20 секунд). %>
+                <div id="supportPending" <%= pendingSupport.length ? '' : 'hidden' %> data-pending-ids="<%= pendingSupport.map(function (sm) { return sm.id; }).join(',') %>" class="p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 space-y-3">
                     <p class="flex items-center gap-2 text-sm font-extrabold text-emerald-900"><i class="fa-solid fa-headset text-emerald-600"></i><%= t('master_support_pending_title') %></p>
+                    <div id="supportPendingList" class="space-y-3">
                     <% pendingSupport.forEach(function (sm) { %>
                         <p class="text-sm leading-relaxed text-stone-800 whitespace-pre-wrap break-words bg-white rounded-xl p-3 border border-emerald-100"><%= sm.body %></p>
                     <% }); %>
+                    </div>
                     <form id="supportPendingForm" class="flex flex-col gap-2">
                         <textarea id="supportPendingInput" rows="3" maxlength="2000" placeholder="<%= t('master_support_pending_placeholder') %>"
                                   class="w-full text-sm outline-none text-stone-800 resize-none placeholder:text-stone-400 bg-white border border-emerald-200 rounded-xl p-3 focus:border-emerald-500"></textarea>
@@ -149,7 +151,6 @@
                         <p id="supportPendingMsg" class="hidden text-xs font-bold"></p>
                     </form>
                 </div>
-            <% } %>
             <% var unreadSupport = pendingSupport.some(function (sm) { return !sm.seen_at; }) || supportMessages.some(function (sm) { return sm.sender === 'moderator' && !sm.seen_at; }); %>
 
             <%- include('partials/provider-overview') %>
@@ -568,7 +569,8 @@
             };
             // Ссылка из SMS рассылки ведёт на /master#support. Вопрос без ответа и так первым на экране;
             // иначе — открыть переписку с поддержкой.
-            if (location.hash === '#support' && !document.getElementById('supportPending')) openSupport();
+            var pendingBox = document.getElementById('supportPending');
+            if (location.hash === '#support' && (!pendingBox || pendingBox.hidden)) openSupport();
             else activate(location.hash === '#support' ? 'leads' : (location.hash.slice(1) || 'leads'));
             window.addEventListener('pageshow', function (event) { if (event.persisted) location.reload(); });
             document.querySelectorAll('[data-logout]').forEach(function (form) {
@@ -649,6 +651,34 @@
             if (<%= unreadSupport ? 'true' : 'false' %>) {
                 fetch('/api/master/' + SUPPORT_TOKEN + '/support/seen', { method: 'POST' }).catch(function () {});
             }
+            // Новое сообщение поддержки, пока кабинет открыт: опрос раз в 20 секунд, когда вкладка на экране.
+            var pendingCard = document.getElementById('supportPending');
+            var pendingList = document.getElementById('supportPendingList');
+            var checkPending = function () {
+                if (document.visibilityState !== 'visible' || !pendingCard) return;
+                fetch('/api/master/' + SUPPORT_TOKEN + '/support/pending', { credentials: 'same-origin', cache: 'no-store' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d || !d.success) return;
+                        var ids = d.messages.map(function (m) { return m.id; }).join(',');
+                        if (ids === pendingCard.getAttribute('data-pending-ids')) return;
+                        pendingCard.setAttribute('data-pending-ids', ids);
+                        pendingList.innerHTML = '';
+                        d.messages.forEach(function (m) {
+                            var p = document.createElement('p');
+                            p.className = 'text-sm leading-relaxed text-stone-800 whitespace-pre-wrap break-words bg-white rounded-xl p-3 border border-emerald-100';
+                            p.textContent = m.body;
+                            pendingList.appendChild(p);
+                        });
+                        pendingCard.hidden = !d.messages.length;
+                        if (d.messages.length) {
+                            fetch('/api/master/' + SUPPORT_TOKEN + '/support/seen', { method: 'POST' }).catch(function () {});
+                            if (pendingCard.getBoundingClientRect().top < 0) pendingCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                    }).catch(function () {});
+            };
+            setInterval(checkPending, 20000);
+            document.addEventListener('visibilitychange', checkPending);
             var pendingForm = document.getElementById('supportPendingForm');
             if (pendingForm) {
                 var pInput2 = document.getElementById('supportPendingInput');

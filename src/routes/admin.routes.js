@@ -40,6 +40,17 @@ router.get('/live.json', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(await require('../services/liveVisitors.service').list());
 }));
+// «Написать» из «Сейчас на сайте»: сообщение исполнителю в кабинет (и SMS по галочке) — рассылка на одного.
+router.post('/live/message', verifyCsrf, asyncHandler(async (req, res) => {
+  try {
+    const campaign = await require('../services/outreach.service').sendOne({
+      masterId: req.body.masterId, body: req.body.body, withSms: req.body.sms === 'on' });
+    res.json({ success: true, campaignId: campaign.id });
+  } catch (error) {
+    if (!error.status) throw error;
+    res.status(error.status).json({ success: false, message: error.message });
+  }
+}));
 const outreach = require('../controllers/outreach.controller');
 router.get('/outreach', asyncHandler(outreach.index));
 router.get('/outreach/new', asyncHandler(outreach.form));

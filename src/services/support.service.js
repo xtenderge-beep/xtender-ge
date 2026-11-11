@@ -101,7 +101,16 @@ async function markSeen(masterId) {
   return rowCount;
 }
 
+// Сообщения модератора после последнего сообщения исполнителя — вопрос без ответа, который кабинет показывает первым.
+async function pendingForMaster(masterId) {
+  const messages = await listForMaster(masterId, 30);
+  let lastMine = -1;
+  messages.forEach((m, i) => { if (m.sender === 'master') lastMine = i; });
+  return messages.slice(lastMine + 1).filter(m => m.sender === 'moderator').map(m => ({ id: m.id, body: m.body }));
+}
+
 module.exports = {
+  pendingForMaster,
   markSeen,
   addMessage,
   setTgMessageId,

@@ -89,7 +89,8 @@ const rejects = async (fn, pattern) => { await assert.rejects(fn, err => pattern
   };
   let html = await render(11, 'ka');
   // Вопрос без ответа — первым на экране, с полем ответа; показ сразу отмечает «Открыл».
-  assert.ok(html.includes('id="supportPending"') && html.includes(translate('ka')('master_support_pending_title')));
+  const shown = h => /id="supportPending"\s+data-pending-ids/.test(h);
+  assert.ok(shown(html) && html.includes(translate('ka')('master_support_pending_title')));
   assert.ok(html.indexOf('id="supportPending"') < html.indexOf('data-tab-btn='), 'вопрос выше вкладок');
   assert.ok(html.includes('გამარჯობა! შესწორებული კითხვა.') && html.includes('id="supportPendingForm"'));
   assert.ok(html.includes("fetch('/api/master/' + SUPPORT_TOKEN + '/support/seen'") && html.includes('if (true)'));
@@ -97,7 +98,7 @@ const rejects = async (fn, pattern) => { await assert.rejects(fn, err => pattern
   await cabinet.markSupportSeen({ params: { token: 'tok-11' } }, res);
   assert.deepEqual(res.data, { success: true, marked: 1 });
   html = await render(11, 'ka');
-  assert.ok(html.includes('id="supportPending"') && html.includes('if (false)'), 'открыл, но не ответил: вопрос остаётся, повторной отметки нет');
+  assert.ok(shown(html) && html.includes('if (false)'), 'открыл, но не ответил: вопрос остаётся, повторной отметки нет');
   await cabinet.markSupportSeen({ params: { token: 'nope' } }, res);
   assert.equal(res.statusCode, 404);
 
@@ -107,7 +108,31 @@ const rejects = async (fn, pattern) => { await assert.rejects(fn, err => pattern
   assert.deepEqual([view.stats.seen, view.stats.replied], [1, 1]);
   assert.equal(row(11).reply, null);
   assert.equal(view.rows.find(r => r.master_id === 12).reply.body, 'У меня Ford Transit, закрытый кузов.');
-  assert.ok(!(await render(12, 'ru')).includes('id="supportPending"'), 'после ответа вопрос сверху убран');
+  const after = await render(12, 'ru');
+  assert.ok(after.includes('id="supportPending" hidden') && !shown(after), 'после ответа вопрос сверху скрыт');
+  assert.ok(after.includes("'/support/pending'"), 'открытый кабинет сам проверяет новые вопросы');
+
+  // Опрос кабинета: вопрос без ответа — список; после ответа — пусто.
+  const pendingRes = { set() { return this; }, status(c) { this.statusCode = c; return this; }, json(d) { this.data = d; return this; } };
+  await cabinet.supportPending({ params: { token: 'tok-11' } }, pendingRes);
+  assert.deepEqual(pendingRes.data.messages.map(m => m.body), ['გამარჯობა! შესწორებული კითხვა.']);
+  await cabinet.supportPending({ params: { token: 'tok-12' } }, pendingRes);
+  assert.deepEqual(pendingRes.data.messages, []);
+
+  // «Написать» из «Сейчас на сайте»: рассылка на одного, без SMS по умолчанию; с галочкой — с SMS.
+  sms.length = 0; telegram.length = 0;
+  const quick = await outreach.sendOne({ masterId: 13, body: 'Hello from live' });
+  let one = await outreach.get(quick.id);
+  assert.match(quick.title, /^Вручную: #13 · Мастер 13 · /);
+  assert.deepEqual([one.rows[0].status, one.rows[0].sms_status, sms.length], ['sent', 'off', 0]);
+  await cabinet.supportPending({ params: { token: 'tok-13' } }, pendingRes);
+  assert.deepEqual(pendingRes.data.messages.map(m => m.body), ['Hello from live']);
+  const withSms = await outreach.sendOne({ masterId: 13, body: 'Второе', withSms: true });
+  one = await outreach.get(withSms.id);
+  assert.deepEqual([one.rows[0].sms_status, sms.length, sms[0].context.category], ['accepted', 1, 'outreach']);
+  await rejects(() => outreach.sendOne({ masterId: 14, body: 'x' }), /заблокирован/);
+  await rejects(() => outreach.sendOne({ masterId: 13, body: '  ' }), /от 1 до 2000/);
+  assert.ok((await ejs.renderFile(path.join(__dirname, '../src/views/admin/outreach-detail.ejs'), { csrfToken: 'x', navCounts: {}, ...(await outreach.get(quick.id)), filter: 'all', error: null, notice: null })).includes('без SMS'));
 
   // Экраны админки рендерятся: список, новая, рассылка со всеми фильтрами.
   const admin = (file, data) => ejs.renderFile(path.join(__dirname, '../src/views/admin/' + file), { csrfToken: 'x', navCounts: {}, ...data });

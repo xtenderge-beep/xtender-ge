@@ -1020,6 +1020,8 @@ CREATE TABLE IF NOT EXISTS outreach_messages (
     UNIQUE (campaign_id, master_id)
 );
 CREATE INDEX IF NOT EXISTS idx_outreach_messages_campaign ON outreach_messages(campaign_id);
+-- Сообщение из «Сейчас на сайте» человеку, который и так на сайте, — без SMS (outreach.service.sendOne).
+ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS with_sms BOOLEAN NOT NULL DEFAULT true;
 
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;

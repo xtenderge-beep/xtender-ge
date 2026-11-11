@@ -155,14 +155,17 @@ async function deliver(campaign, row) {
   const message = await supportService.addMessage({ masterId: master.id, sender: 'moderator', body: row.body });
   await pool.query("UPDATE outreach_messages SET status = 'sent', support_message_id = $1, sent_at = $2 WHERE id = $3",
     [message.id, message.created_at, row.id]);
-  let smsStatus = 'failed';
+  // Без SMS — сообщение из «Сейчас на сайте» человеку, который и так открыл сайт (with_sms = false).
+  let smsStatus = campaign.with_sms === false ? 'off' : 'failed';
   let smsError = null;
-  try {
-    await smsService.sendOrderNotification(master.phone, campaign.sms_text,
-      { masterId: master.id, category: 'outreach', meta: { extra: { campaign_id: campaign.id } } });
-    smsStatus = 'accepted';
-  } catch (err) {
-    smsError = String(err.message || err).slice(0, 300);
+  if (smsStatus !== 'off') {
+    try {
+      await smsService.sendOrderNotification(master.phone, campaign.sms_text,
+        { masterId: master.id, category: 'outreach', meta: { extra: { campaign_id: campaign.id } } });
+      smsStatus = 'accepted';
+    } catch (err) {
+      smsError = String(err.message || err).slice(0, 300);
+    }
   }
   let telegramSent = false;
   if (master.telegram_id) {
@@ -198,4 +201,25 @@ async function start(campaignId) {
   };
 }
 
-module.exports = { parseRecipients, create, list, get, updateBody, setSkipped, updateSms, sendTest, start, checkSms };
+// Сообщение одному исполнителю из «Сейчас на сайте»: рассылка на одного получателя, отправляется сразу. SMS — по галочке.
+// Отметки «Открыл» и «Ответил» — как у любой рассылки, в «Рассылках».
+const DEFAULT_SMS = 'Xtender: you have a message from support. Log in and reply: https://xtender.ge/master#support';
+async function sendOne({ masterId, body, withSms = false }) {
+  const id = Number(masterId);
+  const text = String(body || '').trim();
+  if (!text || text.length > 2000) throw fail('Сообщение: от 1 до 2000 знаков.');
+  const master = (await pool.query('SELECT id, name, is_banned FROM masters WHERE id = $1', [id])).rows[0];
+  if (!master || master.is_banned) throw fail('Нет такого исполнителя или он заблокирован.', 404);
+  const when = new Date().toLocaleString('ru', { timeZone: 'Asia/Tbilisi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const campaign = await pool.withTransaction(async client => {
+    const row = (await client.query('INSERT INTO outreach_campaigns(title, sms_text, with_sms) VALUES($1, $2, $3) RETURNING *',
+      [`Вручную: #${master.id} · ${master.name} · ${when}`.slice(0, 200), DEFAULT_SMS, Boolean(withSms)])).rows[0];
+    await client.query('INSERT INTO outreach_messages(campaign_id, master_id, body) VALUES($1, $2, $3)', [row.id, master.id, text]);
+    return row;
+  });
+  const run = await start(campaign.id);
+  await run.done;
+  return campaign;
+}
+
+module.exports = { parseRecipients, create, list, get, updateBody, setSkipped, updateSms, sendTest, start, checkSms, sendOne, DEFAULT_SMS };

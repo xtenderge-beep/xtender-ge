@@ -407,6 +407,14 @@ async function sendSupportMessage(req, res) {
   return res.json({ success: true });
 }
 
+// Открытый кабинет раз в 20 секунд спрашивает, нет ли нового вопроса поддержки (появится первым на экране без перезагрузки).
+async function supportPending(req, res) {
+  res.set('Cache-Control', 'no-store');
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false });
+  return res.json({ success: true, messages: await supportService.pendingForMaster(master.id) });
+}
+
 // Кабинет показал блок поддержки — сообщения модератора отмечаются увиденными («Открыл» в /admin/outreach).
 async function markSupportSeen(req, res) {
   const master = await masterService.getMasterByToken(req.params.token);
@@ -592,6 +600,7 @@ module.exports = {
   verifyResumeCode,
   sendSupportMessage,
   markSupportSeen,
+  supportPending,
   activatePromo,
   submitTopupReceipt,
   catalogOtpSend,

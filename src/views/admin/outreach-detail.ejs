@@ -93,7 +93,7 @@
                     <% if (r.status === 'failed') { %><span class="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">не отправлено</span><% } %>
                     <% if (r.sent_at) { %>
                         <span class="px-2 py-0.5 rounded-full bg-stone-100 text-stone-700">Кабинет ✓ <%= when(r.sent_at) %></span>
-                        <span class="px-2 py-0.5 rounded-full <%= r.sms_status === 'accepted' ? 'bg-stone-100 text-stone-700' : 'bg-red-50 text-red-700 border border-red-200' %>">SMS <%= r.sms_status === 'accepted' ? '✓ принято' : r.sms_status === 'failed' ? '✗ ошибка' : '…' %></span>
+                        <% if (r.sms_status === 'off') { %><span class="px-2 py-0.5 rounded-full bg-stone-50 text-stone-400">без SMS</span><% } else { %><span class="px-2 py-0.5 rounded-full <%= r.sms_status === 'accepted' ? 'bg-stone-100 text-stone-700' : 'bg-red-50 text-red-700 border border-red-200' %>">SMS <%= r.sms_status === 'accepted' ? '✓ принято' : r.sms_status === 'failed' ? '✗ ошибка' : '…' %></span><% } %>
                         <% if (r.telegram_id) { %><span class="px-2 py-0.5 rounded-full <%= r.telegram_sent ? 'bg-sky-50 text-sky-700' : 'bg-red-50 text-red-700' %>">Telegram <%= r.telegram_sent ? '✓' : '✗' %></span><% } %>
                         <span class="px-2 py-0.5 rounded-full <%= r.seen_at ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-stone-50 text-stone-400' %>"><%= r.seen_at ? 'Открыл ' + when(r.seen_at) : 'Не открыл' %></span>
                         <span class="px-2 py-0.5 rounded-full <%= r.reply ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-stone-50 text-stone-400' %>"><%= r.reply ? 'Ответил ' + when(r.reply.created_at) : 'Нет ответа' %></span>

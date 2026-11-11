@@ -7,6 +7,22 @@
 <p class="text-sm text-stone-500 mb-4">Кто открыл xtender.ge в последние полторы минуты и на какой странице. По имени видно только тех, кто сам вошёл в этом браузере: исполнителя в кабинете, менеджера, заказчика со своей заявкой. Остальные — гости. Истории не хранится: закрыл вкладку — пропал из списка.</p>
 
 <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4" data-live-counts></div>
+
+<form data-live-compose hidden class="bg-white rounded-2xl border-2 border-emerald-400 p-4 mb-4 space-y-2">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <input type="hidden" name="masterId">
+    <div class="flex items-center justify-between gap-2">
+        <span class="text-sm font-extrabold text-stone-900">Сообщение для <span data-compose-who></span></span>
+        <button type="button" data-compose-close class="text-xs font-bold text-stone-500 hover:text-stone-900">Закрыть</button>
+    </div>
+    <textarea name="body" rows="4" maxlength="2000" required placeholder="Текст появится у исполнителя первым на экране кабинета, с полем для ответа."
+              class="w-full text-sm text-stone-800 bg-stone-50 border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 focus:bg-white"></textarea>
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+        <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="sms" class="w-4 h-4"> Также SMS-уведомление</label>
+        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold rounded-xl">Отправить</button>
+    </div>
+    <p data-compose-msg hidden class="text-xs font-bold"></p>
+</form>
 <div class="space-y-2" data-live-list></div>
 
 <script>
@@ -42,7 +58,8 @@
             return '<div class="bg-white rounded-2xl border border-stone-200 p-3.5">' +
                 '<div class="flex items-center justify-between flex-wrap gap-2">' +
                     '<span class="flex items-center gap-2 min-w-0 flex-wrap"><span class="text-[11px] font-bold rounded-full border px-2 py-0.5 ' + badge + '">' + KIND[p.who.kind] + '</span><span class="font-extrabold text-stone-900 break-words">' + who(p) + '</span></span>' +
-                    '<span class="text-[11px] font-bold text-stone-400">на сайте ' + ago(p.first, data.now) + '</span>' +
+                    '<span class="flex items-center gap-2"><span class="text-[11px] font-bold text-stone-400">на сайте ' + ago(p.first, data.now) + '</span>' +
+                    (p.who.kind === 'provider' ? '<button type="button" data-write="' + p.who.id + '" data-write-name="#' + p.who.id + ' · ' + esc(p.who.name) + '" class="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-lg">Написать</button>' : '') + '</span>' +
                 '</div>' +
                 '<p class="text-sm text-stone-800 mt-1.5 break-words"><span class="font-bold">' + esc(p.label) + '</span>' + (p.detail ? ' · <span class="font-mono text-xs">' + esc(p.detail) + '</span>' : '') + ' <span class="text-xs text-stone-400">— ' + ago(p.since, data.now) + ' на странице</span></p>' +
                 '<p class="text-[11px] text-stone-400 mt-1">' + [esc(p.source), DEVICE[p.device] || esc(p.device), esc(p.browser), LANG[p.pageLang] || esc(p.pageLang), p.views > 1 ? p.views + ' стр.' : ''].filter(Boolean).join(' · ') + '</p>' +
@@ -55,6 +72,38 @@
         if (btn) btn.addEventListener('click', function () { showStaff = !showStaff; render(last); });
         document.querySelector('[data-live-updated]').textContent = new Date(data.now).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     }
+    var compose = document.querySelector('[data-live-compose]');
+    var composeMsg = compose.querySelector('[data-compose-msg]');
+    document.querySelector('[data-live-list]').addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-write]');
+        if (!btn) return;
+        compose.hidden = false;
+        compose.masterId.value = btn.getAttribute('data-write');
+        compose.querySelector('[data-compose-who]').textContent = btn.getAttribute('data-write-name');
+        composeMsg.hidden = true;
+        compose.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        compose.body.focus();
+    });
+    compose.querySelector('[data-compose-close]').addEventListener('click', function () { compose.hidden = true; });
+    compose.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var submit = compose.querySelector('button[type=submit]');
+        submit.disabled = true;
+        fetch('/admin/live/message', { method: 'POST', credentials: 'same-origin', body: new URLSearchParams(new FormData(compose)) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                submit.disabled = false;
+                composeMsg.hidden = false;
+                if (d.success) {
+                    composeMsg.className = 'text-xs font-bold text-emerald-700';
+                    composeMsg.innerHTML = 'Отправлено. Исполнитель увидит сообщение в кабинете в течение 20 секунд. <a class="underline" href="/admin/outreach/' + d.campaignId + '">Открыл ли и что ответил →</a>';
+                    compose.body.value = '';
+                } else {
+                    composeMsg.className = 'text-xs font-bold text-red-600';
+                    composeMsg.textContent = d.message || 'Не отправилось.';
+                }
+            }).catch(function () { submit.disabled = false; composeMsg.hidden = false; composeMsg.className = 'text-xs font-bold text-red-600'; composeMsg.textContent = 'Не отправилось — проверьте связь.'; });
+    });
     var last = initial;
     render(last);
     setInterval(function () {

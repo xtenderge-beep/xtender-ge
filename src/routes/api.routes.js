@@ -80,6 +80,7 @@ router.post('/master/:token/sms-resume/send', asyncHandler(masterController.send
 router.post('/master/:token/sms-resume/verify', asyncHandler(masterController.verifyResumeCode));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
 router.post('/master/:token/support/seen', asyncHandler(masterController.markSupportSeen));
+router.get('/master/:token/support/pending', asyncHandler(masterController.supportPending));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
 router.post('/master/:token/topups', asyncHandler(require('../controllers/topup.controller').create));
 router.post('/master/:token/topup-receipt', upload.single('receipt'), asyncHandler(masterController.submitTopupReceipt));
