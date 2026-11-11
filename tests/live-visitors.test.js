@@ -69,5 +69,6 @@ const req = (cookies = {}, ua = UA) => ({ cookies, headers: { 'user-agent': ua }
   const html = await ejs.renderFile(path.join(__dirname, '../src/views/admin/live.ejs'), { csrfToken: 'x', navCounts: {}, live: await live.list() });
   assert.ok(html.includes('Сейчас на сайте') && html.includes("fetch('/admin/live.json'"));
   assert.ok(html.includes('data-write="') && html.includes("fetch('/admin/live/message'") && html.includes('name="_csrf" value="x"'), 'кнопка «Написать» и окно сообщения');
+  assert.ok(html.includes("fetch('/admin/live/thread/'") && html.includes('data-compose-thread') && html.includes('не прочитано'), 'переписка в окне сообщения');
   console.log('PASS: live visitors — provider, client, guest, staff identified; order tokens shown as numbers and not stored; leave/continue; expiry; bots skipped; screen rendered.');
 })().catch(e => { console.error(e); process.exitCode = 1; }).finally(() => redis.disconnect());

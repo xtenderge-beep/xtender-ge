@@ -40,6 +40,13 @@ router.get('/live.json', asyncHandler(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(await require('../services/liveVisitors.service').list());
 }));
+// Переписка с исполнителем для окна сообщения в «Сейчас на сайте» (обновляется каждые 10 секунд, пока окно открыто).
+router.get('/live/thread/:masterId', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const id = parseInt(req.params.masterId, 10);
+  if (!id) return res.status(404).json({ success: false });
+  res.json({ success: true, messages: await require('../services/support.service').listForMaster(id, 50) });
+}));
 // «Написать» из «Сейчас на сайте»: сообщение исполнителю в кабинет (и SMS по галочке) — рассылка на одного.
 router.post('/live/message', verifyCsrf, asyncHandler(async (req, res) => {
   try {

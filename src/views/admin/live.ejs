@@ -13,8 +13,12 @@
     <input type="hidden" name="masterId">
     <div class="flex items-center justify-between gap-2">
         <span class="text-sm font-extrabold text-stone-900">Сообщение для <span data-compose-who></span></span>
-        <button type="button" data-compose-close class="text-xs font-bold text-stone-500 hover:text-stone-900">Закрыть</button>
+        <span class="flex items-center gap-3">
+            <a data-compose-full href="#" class="text-xs font-bold text-emerald-700 hover:underline">вся переписка →</a>
+            <button type="button" data-compose-close class="text-xs font-bold text-stone-500 hover:text-stone-900">Закрыть</button>
+        </span>
     </div>
+    <div data-compose-thread class="max-h-80 overflow-y-auto space-y-2 bg-stone-50 border border-stone-200 rounded-xl p-3"></div>
     <textarea name="body" rows="4" maxlength="2000" required placeholder="Текст появится у исполнителя первым на экране кабинета, с полем для ответа."
               class="w-full text-sm text-stone-800 bg-stone-50 border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 focus:bg-white"></textarea>
     <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -74,16 +78,44 @@
     }
     var compose = document.querySelector('[data-live-compose]');
     var composeMsg = compose.querySelector('[data-compose-msg]');
+    var thread = compose.querySelector('[data-compose-thread]');
+    var threadKey = '';
+    var when = function (iso) { return new Date(iso).toLocaleString('ru', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+    // Переписка с исполнителем в окне сообщения: ваши — справа (прочитано или нет), его — слева. Обновляется каждые 10 секунд.
+    function loadThread() {
+        var id = compose.masterId.value;
+        if (compose.hidden || !id) return;
+        fetch('/admin/live/thread/' + encodeURIComponent(id), { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { return r.ok && !r.redirected ? r.json() : null; })
+            .then(function (d) {
+                if (!d || String(id) !== compose.masterId.value) return;
+                var key = d.messages.map(function (m) { return m.id + (m.seen_at ? 's' : ''); }).join(',');
+                if (key === threadKey) return;
+                threadKey = key;
+                thread.innerHTML = d.messages.length ? d.messages.map(function (m) {
+                    var mine = m.sender === 'moderator';
+                    return '<div class="flex ' + (mine ? 'justify-end' : 'justify-start') + '"><div class="max-w-[80%] rounded-2xl px-3 py-2 ' + (mine ? 'bg-emerald-600 text-white' : 'bg-white border border-stone-200 text-stone-800') + '">' +
+                        '<div class="text-[10px] font-bold uppercase tracking-wide ' + (mine ? 'text-emerald-100' : 'text-stone-400') + '">' + (mine ? 'Вы' : 'Исполнитель') + ' · ' + when(m.created_at) +
+                        (mine ? (m.seen_at ? ' · прочитано' : ' · не прочитано') : '') + '</div>' +
+                        '<p class="text-sm leading-snug whitespace-pre-wrap break-words">' + esc(m.body) + '</p></div></div>';
+                }).join('') : '<p class="text-sm text-stone-400">Переписки пока нет.</p>';
+                thread.scrollTop = thread.scrollHeight;
+            }).catch(function () {});
+    }
     document.querySelector('[data-live-list]').addEventListener('click', function (e) {
         var btn = e.target.closest('[data-write]');
         if (!btn) return;
         compose.hidden = false;
+        if (compose.masterId.value !== btn.getAttribute('data-write')) { threadKey = ''; thread.innerHTML = '<p class="text-sm text-stone-400">Загружаю переписку…</p>'; }
         compose.masterId.value = btn.getAttribute('data-write');
         compose.querySelector('[data-compose-who]').textContent = btn.getAttribute('data-write-name');
+        compose.querySelector('[data-compose-full]').href = '/admin/support/' + btn.getAttribute('data-write');
         composeMsg.hidden = true;
+        loadThread();
         compose.scrollIntoView({ behavior: 'smooth', block: 'start' });
         compose.body.focus();
     });
+    setInterval(loadThread, 10000);
     compose.querySelector('[data-compose-close]').addEventListener('click', function () { compose.hidden = true; });
     compose.addEventListener('submit', function (e) {
         e.preventDefault();
@@ -98,6 +130,7 @@
                     composeMsg.className = 'text-xs font-bold text-emerald-700';
                     composeMsg.innerHTML = 'Отправлено. Исполнитель увидит сообщение в кабинете в течение 20 секунд. <a class="underline" href="/admin/outreach/' + d.campaignId + '">Открыл ли и что ответил →</a>';
                     compose.body.value = '';
+                    loadThread();
                 } else {
                     composeMsg.className = 'text-xs font-bold text-red-600';
                     composeMsg.textContent = d.message || 'Не отправилось.';
