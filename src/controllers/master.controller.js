@@ -407,6 +407,13 @@ async function sendSupportMessage(req, res) {
   return res.json({ success: true });
 }
 
+// Кабинет показал блок поддержки — сообщения модератора отмечаются увиденными («Открыл» в /admin/outreach).
+async function markSupportSeen(req, res) {
+  const master = await masterService.getMasterByToken(req.params.token);
+  if (!master) return res.status(404).json({ success: false });
+  return res.json({ success: true, marked: await supportService.markSeen(master.id) });
+}
+
 // Revoke only this device, including copies of its old cookie.
 async function logout(req, res) {
   masterSession.noStore(res);
@@ -584,6 +591,7 @@ module.exports = {
   sendResumeCode,
   verifyResumeCode,
   sendSupportMessage,
+  markSupportSeen,
   activatePromo,
   submitTopupReceipt,
   catalogOtpSend,

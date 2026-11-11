@@ -1,0 +1,32 @@
+<%- include('./_header', { active: 'outreach' }) %>
+
+<div class="flex items-center justify-between flex-wrap gap-3 mb-1">
+    <h1 class="text-2xl font-black text-stone-900">Рассылки исполнителям</h1>
+    <a href="/admin/outreach/new" class="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Новая рассылка</a>
+</div>
+<p class="text-sm text-stone-500 mb-5">Сообщение приходит исполнителю в чат поддержки в кабинете, а SMS и Telegram сообщают, что оно пришло. Ответы — в «Поддержке», как обычные вопросы.</p>
+
+<% if (!campaigns.length) { %>
+    <p class="text-sm text-stone-500">Рассылок пока нет.</p>
+<% } %>
+
+<div class="space-y-2">
+    <% campaigns.forEach(function (c) { const s = c.stats; %>
+        <a href="/admin/outreach/<%= c.id %>" class="block bg-white rounded-2xl border border-stone-200 p-4 hover:shadow-md transition">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="font-extrabold text-stone-900"><%= c.title %></span>
+                <% if (c.sent_at) { %>
+                    <span class="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">отправлена <%= new Date(c.sent_at).toLocaleString('ru') %></span>
+                <% } else { %>
+                    <span class="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">черновик</span>
+                <% } %>
+            </div>
+            <p class="text-sm text-stone-600 mt-1.5">
+                Получателей: <b><%= s.total %></b>
+                <% if (c.sent_at) { %> · ушло: <b><%= s.sent %></b> · SMS принято шлюзом: <b><%= s.smsAccepted %></b> · открыли: <b><%= s.seen %></b> · ответили: <b><%= s.replied %></b><% } %>
+            </p>
+        </a>
+    <% }); %>
+</div>
+
+<%- include('./_footer') %>

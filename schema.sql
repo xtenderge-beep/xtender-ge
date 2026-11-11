@@ -993,6 +993,34 @@ CREATE TABLE IF NOT EXISTS traffic_sources (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Рассылки исполнителям (/admin/outreach, docs/provider-outreach.md). Рассылка — черновик со своим текстом каждому
+-- получателю; «Отправить» кладёт текст в чат поддержки кабинета, шлёт SMS-уведомление (и Telegram, если привязан) и
+-- пишет итог в строку получателя. «Открыл» — seen_at сообщения поддержки: исполнитель увидел блок поддержки в кабинете.
+-- «Ответил» — его первое сообщение в поддержке после отправки (считается при показе).
+ALTER TABLE support_messages ADD COLUMN IF NOT EXISTS seen_at TIMESTAMPTZ;
+CREATE TABLE IF NOT EXISTS outreach_campaigns (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    sms_text VARCHAR(160) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sent_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS outreach_messages (
+    id SERIAL PRIMARY KEY,
+    campaign_id INTEGER NOT NULL REFERENCES outreach_campaigns(id) ON DELETE CASCADE,
+    master_id INTEGER NOT NULL REFERENCES masters(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    status VARCHAR(10) NOT NULL DEFAULT 'draft',
+    support_message_id INTEGER REFERENCES support_messages(id) ON DELETE SET NULL,
+    sms_status VARCHAR(10),
+    sms_error TEXT,
+    telegram_sent BOOLEAN NOT NULL DEFAULT false,
+    sent_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (campaign_id, master_id)
+);
+CREATE INDEX IF NOT EXISTS idx_outreach_messages_campaign ON outreach_messages(campaign_id);
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

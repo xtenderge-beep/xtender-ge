@@ -130,6 +130,28 @@
                 </div>
             <% } %>
 
+            <%# Вопрос поддержки без ответа — первым на экране, с полем ответа, пока исполнитель не ответит (рассылки, /admin/outreach). %>
+            <%
+                var lastMine = -1;
+                supportMessages.forEach(function (sm, i) { if (sm.sender === 'master') lastMine = i; });
+                var pendingSupport = supportMessages.slice(lastMine + 1).filter(function (sm) { return sm.sender === 'moderator'; });
+            %>
+            <% if (pendingSupport.length) { %>
+                <div id="supportPending" class="p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-400 space-y-3">
+                    <p class="flex items-center gap-2 text-sm font-extrabold text-emerald-900"><i class="fa-solid fa-headset text-emerald-600"></i><%= t('master_support_pending_title') %></p>
+                    <% pendingSupport.forEach(function (sm) { %>
+                        <p class="text-sm leading-relaxed text-stone-800 whitespace-pre-wrap break-words bg-white rounded-xl p-3 border border-emerald-100"><%= sm.body %></p>
+                    <% }); %>
+                    <form id="supportPendingForm" class="flex flex-col gap-2">
+                        <textarea id="supportPendingInput" rows="3" maxlength="2000" placeholder="<%= t('master_support_pending_placeholder') %>"
+                                  class="w-full text-sm outline-none text-stone-800 resize-none placeholder:text-stone-400 bg-white border border-emerald-200 rounded-xl p-3 focus:border-emerald-500"></textarea>
+                        <button type="submit" id="supportPendingSubmit" class="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-bold transition"><%= t('master_support_send') %></button>
+                        <p id="supportPendingMsg" class="hidden text-xs font-bold"></p>
+                    </form>
+                </div>
+            <% } %>
+            <% var unreadSupport = pendingSupport.some(function (sm) { return !sm.seen_at; }) || supportMessages.some(function (sm) { return sm.sender === 'moderator' && !sm.seen_at; }); %>
+
             <%- include('partials/provider-overview') %>
             <%# With only gift balance the rates are confirmed before a top-up, in the balance tab (topup-panel). %>
             <%# В бесплатный период «Тарифы подтверждены» не показываем: тарифы сейчас ни на что не влияют. %>
@@ -501,7 +523,13 @@
                     body: JSON.stringify({ phone: phone, code: code, next: new URLSearchParams(location.search).get('next') || '' }),
                 }).then(function (r) { return r.json(); })
                   .then(function (d) {
-                      if (d.success && d.link) { window.location = d.link; return; }
+                      // Пришёл по ссылке из SMS рассылки (/master#support) — после входа сразу переписка с поддержкой.
+                      // Тот же адрес с той же меткой браузер не перезагружает — тогда reload.
+                      if (d.success && d.link) {
+                          var target = d.link + (location.hash === '#support' && d.link.indexOf('#') < 0 ? '#support' : '');
+                          if (target === location.pathname + location.search + location.hash) location.reload(); else window.location = target;
+                          return;
+                      }
                       codeBtn.disabled = false;
                       msg(d.message || T.wrong_code, true);
                   }).catch(function () { codeBtn.disabled = false; msg(T.wrong_code, true); });
@@ -533,7 +561,15 @@
                 });
             });
 
-            activate(location.hash.slice(1) || 'leads');
+            var openSupport = function () {
+                activate('profile');
+                var card = document.getElementById('supportCard');
+                if (card) setTimeout(function () { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 50);
+            };
+            // Ссылка из SMS рассылки ведёт на /master#support. Вопрос без ответа и так первым на экране;
+            // иначе — открыть переписку с поддержкой.
+            if (location.hash === '#support' && !document.getElementById('supportPending')) openSupport();
+            else activate(location.hash === '#support' ? 'leads' : (location.hash.slice(1) || 'leads'));
             window.addEventListener('pageshow', function (event) { if (event.persisted) location.reload(); });
             document.querySelectorAll('[data-logout]').forEach(function (form) {
                 form.addEventListener('submit', function () {
@@ -596,12 +632,53 @@
                     var input = document.getElementById('supportInput');
                     if (input) setTimeout(function () { input.focus(); }, 350);
                 });
-                // прячем кнопку, когда блок поддержки и так на экране
+                // прячем кнопку, когда блок поддержки или вопрос поддержки сверху и так на экране
                 if ('IntersectionObserver' in window) {
-                    new IntersectionObserver(function (entries) {
-                        supportFab.classList.toggle('hidden', entries[0].isIntersecting);
-                    }).observe(supportCard);
+                    var visibleBlocks = {};
+                    var fabObserver = new IntersectionObserver(function (entries) {
+                        entries.forEach(function (entry) { visibleBlocks[entry.target.id] = entry.isIntersecting; });
+                        supportFab.classList.toggle('hidden', Object.keys(visibleBlocks).some(function (k) { return visibleBlocks[k]; }));
+                    });
+                    fabObserver.observe(supportCard);
+                    var pendingCard = document.getElementById('supportPending');
+                    if (pendingCard) fabObserver.observe(pendingCard);
                 }
+            }
+            // Вопрос поддержки стоит первым на экране — он показан, отметка «Открыл» в рассылках админки ставится сразу.
+            var SUPPORT_TOKEN = <%- JSON.stringify(master.master_token) %>;
+            if (<%= unreadSupport ? 'true' : 'false' %>) {
+                fetch('/api/master/' + SUPPORT_TOKEN + '/support/seen', { method: 'POST' }).catch(function () {});
+            }
+            var pendingForm = document.getElementById('supportPendingForm');
+            if (pendingForm) {
+                var pInput2 = document.getElementById('supportPendingInput');
+                var pBtn2 = document.getElementById('supportPendingSubmit');
+                var pMsg2 = document.getElementById('supportPendingMsg');
+                pendingForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var body = pInput2.value.trim();
+                    if (!body) return;
+                    pBtn2.disabled = true;
+                    fetch('/api/master/' + SUPPORT_TOKEN + '/support', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: body }),
+                    }).then(function (r) { return r.json(); }).then(function (d) {
+                        pMsg2.classList.remove('hidden');
+                        if (d.success) {
+                            pMsg2.className = 'text-xs font-bold text-emerald-700';
+                            pMsg2.textContent = <%- JSON.stringify(t('master_support_pending_thanks')) %>;
+                            setTimeout(function () { location.reload(); }, 1500);
+                        } else {
+                            pBtn2.disabled = false;
+                            pMsg2.className = 'text-xs font-bold text-red-600';
+                            pMsg2.textContent = d.message || <%- JSON.stringify(t('js_support_error')) %>;
+                        }
+                    }).catch(function () {
+                        pBtn2.disabled = false;
+                        pMsg2.classList.remove('hidden');
+                        pMsg2.className = 'text-xs font-bold text-red-600';
+                        pMsg2.textContent = <%- JSON.stringify(t('js_support_error')) %>;
+                    });
+                });
             }
 
             var filters = document.querySelectorAll('[data-lead-filter]');

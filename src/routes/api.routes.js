@@ -18,6 +18,18 @@ router.post('/v', (req, res) => {
     ip: req.headers['cf-connecting-ip'] || req.ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 400),
     host: req.hostname, country: req.headers['cf-ipcountry'],
   }).catch(err => console.error('[site-analytics]', err.message));
+  require('../services/liveVisitors.service').touch(req, b, { view: true }).catch(err => console.error('[live]', err.message));
+});
+// «Сейчас на сайте» (/admin/live): вкладка на экране — сигнал раз в 30 секунд; закрыли — «ушёл». Всегда 204.
+router.post('/v/live', (req, res) => {
+  res.status(204).end();
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  require('../services/liveVisitors.service').touch(req, b).catch(err => console.error('[live]', err.message));
+});
+router.post('/v/leave', (req, res) => {
+  res.status(204).end();
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  require('../services/liveVisitors.service').leave(b).catch(err => console.error('[live]', err.message));
 });
 
 // Подбор исполнителей по смыслу задачи на главной (taskMatch.service.rank): разбор задачи, кандидаты из
@@ -67,6 +79,7 @@ router.post('/master/:token/marketing', asyncHandler(masterController.setMarketi
 router.post('/master/:token/sms-resume/send', asyncHandler(masterController.sendResumeCode));
 router.post('/master/:token/sms-resume/verify', asyncHandler(masterController.verifyResumeCode));
 router.post('/master/:token/support', asyncHandler(masterController.sendSupportMessage));
+router.post('/master/:token/support/seen', asyncHandler(masterController.markSupportSeen));
 router.post('/master/:token/promo', asyncHandler(masterController.activatePromo));
 router.post('/master/:token/topups', asyncHandler(require('../controllers/topup.controller').create));
 router.post('/master/:token/topup-receipt', upload.single('receipt'), asyncHandler(masterController.submitTopupReceipt));

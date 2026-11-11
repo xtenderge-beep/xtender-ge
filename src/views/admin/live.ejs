@@ -1,0 +1,67 @@
+<%- include('./_header', { active: 'live' }) %>
+
+<div class="flex items-center justify-between flex-wrap gap-2 mb-1">
+    <h1 class="text-2xl font-black text-stone-900">Сейчас на сайте</h1>
+    <span class="flex items-center gap-2 text-xs font-bold text-stone-500"><span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>обновляется каждые 10 секунд · <span data-live-updated></span></span>
+</div>
+<p class="text-sm text-stone-500 mb-4">Кто открыл xtender.ge в последние полторы минуты и на какой странице. По имени видно только тех, кто сам вошёл в этом браузере: исполнителя в кабинете, менеджера, заказчика со своей заявкой. Остальные — гости. Истории не хранится: закрыл вкладку — пропал из списка.</p>
+
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4" data-live-counts></div>
+<div class="space-y-2" data-live-list></div>
+
+<script>
+(function () {
+    var KIND = { provider: 'Исполнитель', client: 'Заказчик', manager: 'Менеджер', guest: 'Гость', staff: 'Сотрудник' };
+    var DEVICE = { mobile: 'телефон', tablet: 'планшет', desktop: 'компьютер' };
+    var LANG = { ka: 'ქართ.', ru: 'рус.', en: 'eng.' };
+    var initial = <%- JSON.stringify(live) %>;
+    var showStaff = false;
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+    var ago = function (ms, now) {
+        var s = Math.max(0, Math.round((now - ms) / 1000));
+        if (s < 60) return s + ' с';
+        var m = Math.round(s / 60);
+        return m < 60 ? m + ' мин' : Math.floor(m / 60) + ' ч ' + (m % 60) + ' мин';
+    };
+    function who(p) {
+        var w = p.who;
+        if (w.kind === 'provider') return '<a href="/admin/masters/' + w.id + '" class="hover:underline">#' + w.id + ' · ' + esc(w.name) + '</a>' + (w.active ? '' : ' <span class="text-xs font-semibold text-amber-700">на модерации</span>');
+        if (w.kind === 'manager') return '<a href="/admin/managers/' + w.id + '" class="hover:underline">' + esc(w.name) + '</a>';
+        if (w.kind === 'client') return (w.orderLink ? '<a href="' + esc(w.orderLink) + '" class="hover:underline">заявка #' + w.orderId + '</a>' : 'заявка #' + w.orderId) + (w.orders > 1 ? ' <span class="text-xs text-stone-400">и ещё ' + (w.orders - 1) + '</span>' : '');
+        if (w.kind === 'staff') return esc(w.name);
+        return '<span class="text-stone-500">без входа</span>';
+    }
+    function render(data) {
+        var people = data.people.filter(function (p) { return showStaff || p.who.kind !== 'staff'; });
+        var c = data.counts;
+        document.querySelector('[data-live-counts]').innerHTML = [['Всего', c.total], ['Исполнители', c.provider], ['Заказчики', c.client], ['Менеджеры', c.manager], ['Гости', c.guest]].map(function (t, i) {
+            return '<div class="bg-white rounded-2xl border border-stone-200 p-3' + (i === 0 ? ' col-span-2 sm:col-span-1' : '') + '"><div class="text-[11px] font-bold text-stone-400 uppercase tracking-wide">' + t[0] + '</div><div class="text-xl font-black text-stone-900 mt-0.5">' + t[1] + '</div></div>';
+        }).join('');
+        var list = people.map(function (p) {
+            var badge = p.who.kind === 'provider' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : p.who.kind === 'client' ? 'bg-sky-50 text-sky-700 border-sky-200' : p.who.kind === 'manager' ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-stone-100 text-stone-600 border-stone-200';
+            return '<div class="bg-white rounded-2xl border border-stone-200 p-3.5">' +
+                '<div class="flex items-center justify-between flex-wrap gap-2">' +
+                    '<span class="flex items-center gap-2 min-w-0 flex-wrap"><span class="text-[11px] font-bold rounded-full border px-2 py-0.5 ' + badge + '">' + KIND[p.who.kind] + '</span><span class="font-extrabold text-stone-900 break-words">' + who(p) + '</span></span>' +
+                    '<span class="text-[11px] font-bold text-stone-400">на сайте ' + ago(p.first, data.now) + '</span>' +
+                '</div>' +
+                '<p class="text-sm text-stone-800 mt-1.5 break-words"><span class="font-bold">' + esc(p.label) + '</span>' + (p.detail ? ' · <span class="font-mono text-xs">' + esc(p.detail) + '</span>' : '') + ' <span class="text-xs text-stone-400">— ' + ago(p.since, data.now) + ' на странице</span></p>' +
+                '<p class="text-[11px] text-stone-400 mt-1">' + [esc(p.source), DEVICE[p.device] || esc(p.device), esc(p.browser), LANG[p.pageLang] || esc(p.pageLang), p.views > 1 ? p.views + ' стр.' : ''].filter(Boolean).join(' · ') + '</p>' +
+            '</div>';
+        }).join('');
+        var staffCount = c.staff;
+        document.querySelector('[data-live-list]').innerHTML = (list || '<p class="text-sm text-stone-500">Сейчас на сайте никого нет.</p>') +
+            (staffCount ? '<button type="button" data-live-staff class="text-xs font-bold text-stone-500 hover:text-stone-900 mt-1">' + (showStaff ? 'Скрыть сотрудников' : 'Показать сотрудников (' + staffCount + ')') + '</button>' : '');
+        var btn = document.querySelector('[data-live-staff]');
+        if (btn) btn.addEventListener('click', function () { showStaff = !showStaff; render(last); });
+        document.querySelector('[data-live-updated]').textContent = new Date(data.now).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    var last = initial;
+    render(last);
+    setInterval(function () {
+        fetch('/admin/live.json', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.ok && !r.redirected ? r.json() : null; })
+            .then(function (d) { if (d) { last = d; render(d); } }).catch(function () {});
+    }, 10000);
+})();
+</script>
+
+<%- include('./_footer') %>

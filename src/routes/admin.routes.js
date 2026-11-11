@@ -31,6 +31,25 @@ const cityController = require('../controllers/city.controller');
 router.get('/cities', asyncHandler(cityController.index));
 router.post('/cities', verifyCsrf, asyncHandler(cityController.create));
 router.post('/cities/:id/status', verifyCsrf, asyncHandler(cityController.setStatus));
+// «Сейчас на сайте»: кто открыт на xtender.ge и на какой странице (liveVisitors.service).
+router.get('/live', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.render('admin/live', { live: await require('../services/liveVisitors.service').list() });
+}));
+router.get('/live.json', asyncHandler(async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await require('../services/liveVisitors.service').list());
+}));
+const outreach = require('../controllers/outreach.controller');
+router.get('/outreach', asyncHandler(outreach.index));
+router.get('/outreach/new', asyncHandler(outreach.form));
+router.post('/outreach', verifyCsrf, asyncHandler(outreach.create));
+router.get('/outreach/:id', asyncHandler(outreach.show));
+router.post('/outreach/:id/sms', verifyCsrf, asyncHandler(outreach.updateSms));
+router.post('/outreach/:id/test', verifyCsrf, asyncHandler(outreach.sendTest));
+router.post('/outreach/:id/send', verifyCsrf, asyncHandler(outreach.send));
+router.post('/outreach/:id/items/:itemId', verifyCsrf, asyncHandler(outreach.updateBody));
+router.post('/outreach/:id/items/:itemId/skip', verifyCsrf, asyncHandler(outreach.skip));
 const categories = require('../controllers/category.controller');
 router.get('/categories', asyncHandler(categories.index));
 router.get('/categories/new', asyncHandler(categories.form));

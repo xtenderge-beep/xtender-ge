@@ -1,0 +1,32 @@
+<%- include('./_header', { active: 'outreach' }) %>
+
+<a href="/admin/outreach" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; все рассылки</a>
+<h1 class="text-2xl font-black text-stone-900 mt-2 mb-1">Новая рассылка</h1>
+<p class="text-sm text-stone-500 mb-5">Сохраняется черновиком: ничего не уходит, пока на странице рассылки не нажата «Отправить».</p>
+
+<% if (error) { %>
+    <p class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm font-bold text-red-700"><%= error %></p>
+<% } %>
+
+<form method="POST" action="/admin/outreach" class="bg-white rounded-2xl border border-stone-200 p-4 sm:p-5 space-y-4">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="block">
+        <span class="text-sm font-bold text-stone-800">Название (видно только в админке)</span>
+        <input name="title" required maxlength="200" value="<%= input.title %>" placeholder="Например: уточняем описания, ноябрь"
+               class="mt-1 w-full text-sm bg-stone-50 border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 focus:bg-white">
+    </label>
+    <label class="block">
+        <span class="text-sm font-bold text-stone-800">SMS-уведомление — одно на всех, латиницей, до 160 знаков</span>
+        <textarea name="smsText" required rows="3" maxlength="160"
+                  class="mt-1 w-full text-sm font-mono break-all resize-none bg-stone-50 border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 focus:bg-white"><%= input.smsText %></textarea>
+    </label>
+    <label class="block">
+        <span class="text-sm font-bold text-stone-800">Получатели и тексты</span>
+        <span class="block text-[11px] text-stone-400 mb-1">Каждый блок: строка «#номер исполнителя», под ней текст сообщения. Блоки разделяются строкой «---».</span>
+        <textarea name="recipients" required rows="16" placeholder="#112&#10;Здравствуйте! …&#10;---&#10;#73&#10;Здравствуйте! …"
+                  class="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl p-3 outline-none focus:border-emerald-500 focus:bg-white"><%= input.recipients %></textarea>
+    </label>
+    <button type="submit" class="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold rounded-xl transition">Сохранить черновик</button>
+</form>
+
+<%- include('./_footer') %>

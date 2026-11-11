@@ -18,8 +18,8 @@ async function setTgMessageId(id, tgMessageId) {
 // Последние сообщения треда, по возрастанию — для показа в кабинете.
 async function listForMaster(masterId, limit = 30) {
   const { rows } = await pool.query(
-    `SELECT id, sender, body, created_at FROM (
-       SELECT id, sender, body, created_at FROM support_messages
+    `SELECT id, sender, body, created_at, seen_at FROM (
+       SELECT id, sender, body, created_at, seen_at FROM support_messages
        WHERE master_id = $1 ORDER BY created_at DESC LIMIT $2
      ) t ORDER BY created_at ASC`,
     [masterId, limit]
@@ -91,7 +91,18 @@ async function forwardQuestion(master, body) {
   return row;
 }
 
+// Исполнитель увидел блок поддержки в кабинете — сообщения модератора, которые он ещё не видел, отмечаются
+// прочитанными. По этой отметке экран рассылок показывает «Открыл» (outreach.service).
+async function markSeen(masterId) {
+  const { rowCount } = await pool.query(
+    `UPDATE support_messages SET seen_at = NOW() WHERE master_id = $1 AND sender = 'moderator' AND seen_at IS NULL`,
+    [masterId]
+  );
+  return rowCount;
+}
+
 module.exports = {
+  markSeen,
   addMessage,
   setTgMessageId,
   listForMaster,
