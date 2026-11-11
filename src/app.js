@@ -71,6 +71,8 @@ app.get('/health', (req, res) => {
 app.get('/lang/:code', require('./controllers/language.controller').change);
 
 app.use('/', require('./routes/crmPublic.routes'));
+// Анкеты от SMS-бота владельца: API /api/outreach/* и страница /c/<token> (docs/outreach-bot-drafts.md).
+app.use('/', require('./routes/outreachDraft.routes'));
 app.use('/', publicRoutes);
 app.use('/:locale(ru|en)', publicRoutes);
 
@@ -125,6 +127,9 @@ app.use((err, req, res, next) => {
   if (err && err.type === 'entity.parse.failed' && req.path === '/mcp') {
     return res.status(400).json({ jsonrpc: '2.0', error: { code: -32700, message: 'Parse error: the request body is not valid JSON.' }, id: null });
   }
+  if (err && err.type === 'entity.parse.failed' && req.path.startsWith('/api/outreach/')) {
+    return res.status(400).json({ error: 'invalid_request', message: 'The request body is not valid JSON.' });
+  }
   if (err && err.type === 'entity.parse.failed' && req.path.startsWith('/v1/')) {
     return res.status(400).json({ success: false, error: 'invalid_request', message: 'The request body is not valid JSON.' });
   }
@@ -173,6 +178,8 @@ runMigrations()
     require('./services/siteAnalytics.service').start();
     // Цепочка отпечатков журнала согласий — каждые 5 минут; отпечаток дня в Telegram модератора — раз в сутки.
     require('./services/consentChain.service').start();
+    // Неподтверждённые за 14 дней анкеты от бота стираются — через минуту и раз в час.
+    require('./services/providerDraft.service').start();
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

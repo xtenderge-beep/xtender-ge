@@ -61,6 +61,10 @@ router.post('/live/message', verifyCsrf, asyncHandler(async (req, res) => {
 const outreach = require('../controllers/outreach.controller');
 router.get('/outreach', asyncHandler(outreach.index));
 router.get('/outreach/new', asyncHandler(outreach.form));
+// Анкеты от SMS-бота владельца (docs/outreach-bot-drafts.md) — до /outreach/:id.
+const draftAdmin = require('../controllers/providerDraftAdmin.controller');
+router.get('/outreach/drafts', asyncHandler(draftAdmin.index));
+router.post('/outreach/drafts/key', verifyCsrf, asyncHandler(draftAdmin.issueKey));
 router.post('/outreach', verifyCsrf, asyncHandler(outreach.create));
 router.get('/outreach/:id', asyncHandler(outreach.show));
 router.post('/outreach/:id/sms', verifyCsrf, asyncHandler(outreach.updateSms));

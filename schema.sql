@@ -1023,6 +1023,47 @@ CREATE INDEX IF NOT EXISTS idx_outreach_messages_campaign ON outreach_messages(c
 -- Сообщение из «Сейчас на сайте» человеку, который и так на сайте, — без SMS (outreach.service.sendOne).
 ALTER TABLE outreach_campaigns ADD COLUMN IF NOT EXISTS with_sms BOOLEAN NOT NULL DEFAULT true;
 
+-- Черновики анкет исполнителей от SMS-бота владельца (docs/outreach-bot-drafts.md, providerDraft.service.js).
+-- Бот создаёт черновик по API /api/outreach/*, сам шлёт исполнителю короткую ссылку /c/<token>; исполнитель
+-- проверяет анкету, ставит галочки и подтверждает кодом из SMS сайта — дальше обычная регистрация и модерация.
+-- Один номер — одна строка. data — поля анкеты до подтверждения; после подтверждения, отказа или истечения
+-- срока стирается (остаются номер, статус и даты, чтобы бот не написал повторно). status: draft | confirmed |
+-- declined | expired | opted_out. is_test — проба бота: не в счётчиках, профиль после подтверждения тестовый.
+CREATE TABLE IF NOT EXISTS provider_drafts (
+    id SERIAL PRIMARY KEY,
+    public_id VARCHAR(16) NOT NULL UNIQUE,
+    token VARCHAR(16) NOT NULL UNIQUE,
+    phone VARCHAR(20) NOT NULL UNIQUE,
+    status VARCHAR(12) NOT NULL DEFAULT 'draft',
+    data JSONB NOT NULL DEFAULT '{}',
+    lang VARCHAR(2) NOT NULL DEFAULT 'ka',
+    source VARCHAR(80) NOT NULL DEFAULT '',
+    external_id VARCHAR(80),
+    is_test BOOLEAN NOT NULL DEFAULT false,
+    master_id INTEGER REFERENCES masters(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    opened_at TIMESTAMPTZ,
+    confirmed_at TIMESTAMPTZ,
+    closed_at TIMESTAMPTZ,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_provider_drafts_updated ON provider_drafts(updated_at);
+-- Номера, которым бот больше не пишет: ответил «нет / STOP» (source=bot) или нажал «Не интересно» на странице
+-- анкеты (source=page). Только номер и причина — без анкеты.
+CREATE TABLE IF NOT EXISTS outreach_optouts (
+    phone VARCHAR(20) PRIMARY KEY,
+    reason VARCHAR(200) NOT NULL DEFAULT '',
+    source VARCHAR(10) NOT NULL DEFAULT 'bot',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- free_until — обещанный в анкете бесплатный период (60 дней от подтверждения); пока только дата для админки,
+-- платный режим по-прежнему включает администратор (paid_mode). signup_source — откуда пришёл профиль
+-- (источник бота). signup_hint — что бот предложил модератору: услуги, другие направления, районы.
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS free_until TIMESTAMPTZ;
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_source VARCHAR(80);
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_hint JSONB NOT NULL DEFAULT '{}';
+
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS requirements JSONB NOT NULL DEFAULT '{}';

@@ -31,6 +31,7 @@ const EVENTS = {
   MARKETING_SMS_OPT_OUT: ['Отказ от предложений Xtender', 'უარი Xtender-ის შეთავაზებებზე', ['consents', 'optouts']],
   PROVIDER_BILLING_ACCEPTED: ['Приняты платные условия', 'მიღებულია ფასიანი პირობები', ['documents', 'consents']],
   CONTACT_SHARING_WITHDRAWN: ['Заказчик запретил передавать контакт', 'დამკვეთმა აკრძალა კონტაქტის გადაცემა', ['consents', 'orders']],
+  OUTREACH_OPT_OUT: ['Просил больше не писать (анкета от бота)', 'სთხოვა, აღარ მივწეროთ (ბოტის ანკეტა)', ['optouts']],
   LEAD_SMS_PAUSED: ['SMS о заявках на паузе', 'SMS განაცხადების შესახებ შეჩერდა', ['optouts']],
   LEAD_SMS_RESUMED: ['Пауза снята', 'პაუზა მოიხსნა', ['optouts']],
   TX_SMS_SENT: ['Служебная SMS', 'სერვისული SMS', ['sms']],
