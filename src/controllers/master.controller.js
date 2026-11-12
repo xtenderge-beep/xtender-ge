@@ -263,7 +263,10 @@ async function register(req, res) {
     if (err.code === 'MASTER_ALREADY_REGISTERED') return existingProfileResponse(req, res);
     throw err;
   }
-  await afterRegistration(master, phone, verified, req.body.challengeId, req);
+  // Две необязательные отметки при регистрации: заявки по SMS и предложения Xtender (smsPermissions.service).
+  await require('../services/smsPermissions.service').applyRegistration(master.id, phone, verified, requestMeta(req));
+  await otpService.clearConsentGrant(phone, OTP_PURPOSE, req.body.challengeId);
+  require('../services/descriptionTranslation.service').queue(master.id);
 
   // Промокод: welcome-бонус на баланс. Ошибка/невалидный код не ломает регистрацию.
   let promoBonusGel = 0;
@@ -277,20 +280,6 @@ async function register(req, res) {
     }
   }
 
-  const link = await announceRegistration(master, phone, req, res, req.lang);
-  return res.json({ success: true, link, promoBonusGel, welcomeBonusGel: master.welcomeBonusTetri / 100 });
-}
-
-// Общие шаги после создания профиля — для /join и для анкеты от бота (/c/<token>, outreachDraft.routes):
-// две отметки SMS в журнал (smsPermissions.service), грант кода гасится, описание уходит на перевод.
-async function afterRegistration(master, phone, grant, challengeId, req) {
-  await require('../services/smsPermissions.service').applyRegistration(master.id, phone, grant, requestMeta(req));
-  await otpService.clearConsentGrant(phone, OTP_PURPOSE, challengeId);
-  require('../services/descriptionTranslation.service').queue(master.id);
-}
-
-// Модератору в Telegram, исполнителю SMS со ссылкой на кабинет и «Stop», вход в кабинет на этом устройстве.
-async function announceRegistration(master, phone, req, res, lang) {
   const link = `${getBaseUrl()}/master/${master.master_token}`;
 
   telegramService.notifyModeratorNewMaster(master).catch((err) => {
@@ -300,7 +289,7 @@ async function announceRegistration(master, phone, req, res, lang) {
     const stop = await require('../services/leadStop.service').linkFor(master);
     smsService.sendOrderNotification(
       phone,
-      clientStrings(lang).sms_registration_accepted.replace('{link}', link).replace('{stop}', stop),
+      clientStrings(req.lang).sms_registration_accepted.replace('{link}', link).replace('{stop}', stop),
       { masterId: master.id, purpose: OTP_PURPOSE, meta: requestMeta(req) }
     ).catch((err) => {
       console.error('Failed to send registration confirmation SMS:', err.message);
@@ -310,7 +299,7 @@ async function announceRegistration(master, phone, req, res, lang) {
   }
 
   await masterSession.start(req, res, master.master_token);
-  return link;
+  return res.json({ success: true, link, promoBonusGel, welcomeBonusGel: master.welcomeBonusTetri / 100 });
 }
 
 // Cabinet access requires a revocable device session established by SMS verification.
@@ -599,8 +588,6 @@ module.exports = {
   sendOtp,
   verifyOtp,
   register,
-  afterRegistration,
-  announceRegistration,
   statusPage,
   switchLanguage,
   logout,

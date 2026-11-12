@@ -243,12 +243,6 @@ async function notifyModeratorNewMaster(master) {
   ];
   const kinds = require('../config/providerKinds').labelsRu(master);
   if (kinds.length) lines.push(`🏷 При регистрации выбрал: ${kinds.join(', ')}`);
-  // Анкета от бота владельца: что бот предложил (providerDraft.service.complete). Услуги назначает модератор.
-  const signupHint = require('../config/signupHint');
-  if (signupHint.of(master)) {
-    const names = await signupHint.namesRu().catch(() => ({}));
-    signupHint.linesRu(master, names).forEach(line => lines.push(`🤖 ${line}`));
-  }
   if (master.vehicle_type) lines.push(`🚙 ${master.vehicle_type}${master.vehicle_size ? ' (' + master.vehicle_size + ')' : ''}`);
   if (master.description) lines.push(`📝 ${master.description}`);
   lines.push(master.referral_manager_name ? `🔗 По ссылке: ${master.referral_manager_name}` : '🔗 Без реферальной ссылки (органика)');

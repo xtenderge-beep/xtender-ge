@@ -250,7 +250,6 @@ async function masterDetail(req, res) {
     maxVanVehicles: MAX_VAN_VEHICLES,
     languageNames: require('../config/spokenLanguages').ruNames,
     signupKinds: require('../config/providerKinds').labelsRu(master),
-    signupHint: require('../config/signupHint').linesRu(master, await require('../config/signupHint').namesRu()),
     autoDisplayName: require('../config/providerName').displayName(master.name),
     publicName: require('../config/providerName').resolve(master),
     messengersSaved: req.query.saved === 'messengers',
