@@ -161,6 +161,8 @@ const DRAFT = {
     assert.deepEqual([row.status, row.master_id, drafts.json(row.data, null)], ['confirmed', master.id, {}]);
     st = await botCall('GET', '/api/outreach/status?phone=995597749378');
     assert.equal(st.data.status, 'confirmed'); assert.ok(st.data.confirmed_at && st.data.free_until);
+    assert.deepEqual([st.data.lead_sms, st.data.telegram], [true, false]);
+    assert.deepEqual([(await botCall('GET', '/api/outreach/status?phone=%2B995500000999')).data.lead_sms], [null]);
     assert.equal((await call('GET', '/c/' + token)).data.includes('/master'), true, 'по ссылке — «уже подтверждена»');
     assert.equal((await pageCall(`/c/${token}/code`, form)).status, 409);
     await pool.query('UPDATE masters SET is_active = true WHERE id = $1', [master.id]);
@@ -168,7 +170,7 @@ const DRAFT = {
     assert.equal((await botCall('GET', '/api/outreach/status?phone=%2B995597749378')).data.status, 'active');
     const since = new Date(Date.now() - 3600000).toISOString();
     const changes = await botCall('GET', '/api/outreach/changes?since=' + encodeURIComponent(since));
-    assert.deepEqual(changes.data.map(c => [c.phone, c.status]), [['+995597749378', 'active']]);
+    assert.deepEqual(changes.data.map(c => [c.phone, c.status, c.lead_sms]), [['+995597749378', 'active', true]]);
     assert.equal((await botCall('GET', '/api/outreach/changes?since=вчера')).status, 400);
     assert.equal((await botCall('POST', '/api/outreach/drafts', DRAFT)).data.error, 'already_registered');
 
@@ -212,6 +214,19 @@ const DRAFT = {
     assert.equal(doneP.data.leadSms, false);
     const probeMaster = (await pool.query("SELECT is_technical, is_subscribed FROM masters WHERE phone = '+995566666666'")).rows[0];
     assert.deepEqual([probeMaster.is_technical, probeMaster.is_subscribed], [true, false]);
+    assert.equal((await botCall('GET', '/api/outreach/status?phone=%2B995566666666')).data.lead_sms, false, 'бот видит, что SMS о заявках не включены');
+
+    // Шесть направлений: один раз; уже существующее название не дублируется; удалённое не возвращается.
+    const seed = require('../src/services/outreachServicesSeed');
+    await pool.query("INSERT INTO service_categories (slug, name_ka, name_ru, name_en) VALUES ('svc_old_electric', 'ე', 'электрика', 'E')");
+    const firstSeed = await seed.run();
+    assert.equal(firstSeed.created.length, 5);
+    const added = (await pool.query('SELECT slug, name_ru, is_active, fields FROM service_categories WHERE slug = ANY($1)', [firstSeed.created])).rows;
+    assert.ok(added.every(row => row.is_active && /^svc_[a-f0-9]{12}$/.test(row.slug)));
+    assert.ok((await botCall('GET', '/api/outreach/services')).data.some(s => s.name.ru === 'Котлы и отопление' && s.name.ka === 'ქვაბები და გათბობა'));
+    await pool.query('DELETE FROM service_categories WHERE slug = $1', [firstSeed.created[0]]);
+    assert.deepEqual(await seed.run(), { created: [], skipped: true });
+    assert.equal((await pool.query("SELECT count(*)::int AS n FROM service_categories WHERE lower(name_ru) = 'электрика'")).rows[0].n, 1);
 
     // Админка: счётчики без проб.
     const admin = await drafts.adminRows({});

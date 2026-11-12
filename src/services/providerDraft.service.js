@@ -179,7 +179,8 @@ async function findMaster(phone, client = pool) {
   const variants = phoneVariants(phone);
   if (!variants.length) return null;
   const ph = variants.map((_, i) => `$${i + 1}`).join(', ');
-  const rows = (await client.query(`SELECT id, phone, is_active, is_banned, banned_reason, free_until, created_at FROM masters WHERE phone IN (${ph}) ORDER BY id`, variants)).rows;
+  const rows = (await client.query(`SELECT id, phone, is_active, is_banned, banned_reason, free_until, created_at, is_subscribed, lead_sms_paused_at, telegram_id
+    FROM masters WHERE phone IN (${ph}) ORDER BY id`, variants)).rows;
   return rows[0] || null;
 }
 
@@ -229,6 +230,10 @@ async function status(phone, client = pool) {
     free_until: master ? iso(master.free_until) : null,
     // Отдельной публичной страницы исполнителя на сайте нет: профиль виден в каталоге.
     profile_url: null,
+    // Придут ли заявки: SMS о заявках включены (галочка при подтверждении или позже в кабинете) и не на паузе;
+    // telegram — привязан Telegram, туда заявки приходят и без SMS. Бот напоминает тем, у кого оба false.
+    lead_sms: master ? master.is_subscribed === true && !master.lead_sms_paused_at : null,
+    telegram: master ? Boolean(master.telegram_id) : null,
     ...(value === 'rejected' ? { reason: master.banned_reason || '' } : {}),
     ...(value === 'expired' ? { expired_at: iso(draft.closed_at || draft.expires_at) } : {}),
   };
@@ -344,7 +349,8 @@ async function changes(since) {
   for (const row of events) touch(row.phone, row.created_at);
   const out = [];
   for (const [phone, at] of [...phones].sort((a, b) => a[1] - b[1]).slice(0, 1000)) {
-    out.push({ phone, status: (await status(phone)).status, changed_at: at.toISOString() });
+    const current = await status(phone);
+    out.push({ phone, status: current.status, lead_sms: current.lead_sms, telegram: current.telegram, changed_at: at.toISOString() });
   }
   return out;
 }

@@ -180,6 +180,8 @@ runMigrations()
     require('./services/consentChain.service').start();
     // Неподтверждённые за 14 дней анкеты от бота стираются — через минуту и раз в час.
     require('./services/providerDraft.service').start();
+    // Шесть направлений для анкет от бота — один раз (отметка в app_settings).
+    require('./services/outreachServicesSeed').run().catch((err) => console.error('[services] seed failed:', err.message));
   })
   .catch((err) => {
     console.error('Failed to run database migrations:', err);

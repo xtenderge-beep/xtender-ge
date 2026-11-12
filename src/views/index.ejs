@@ -68,7 +68,8 @@
           name: 'Tbilisi',
           address: { '@type': 'PostalAddress', addressLocality: 'Tbilisi', addressCountry: 'GE' },
         },
-        makesOffer: catalogGroups.map((g) => ({
+        // Только услуги, в которых есть исполнители в каталоге: та же проверка, что у кнопок фильтра ниже.
+        makesOffer: catalogGroups.filter((g) => masters.some((m) => m.service_type === g.key || (m.services || []).some((s) => s.service_type === g.key))).map((g) => ({
           '@type': 'Offer',
           itemOffered: { '@type': 'Service', name: g.label, areaServed: 'Tbilisi' },
         })),
