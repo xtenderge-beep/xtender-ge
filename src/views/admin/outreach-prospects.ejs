@@ -1,0 +1,53 @@
+<%- include('./_header', { active: 'outreach' }) %>
+<% const svcName = code => { const s = services.find(x => x.code === code); return s ? s.name.ru : code; }; %>
+
+<a href="/admin/outreach" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; рассылки</a>
+<h1 class="text-2xl font-black text-stone-900 mt-2 mb-1">Компании для обзвона</h1>
+<p class="text-sm text-stone-500 mb-5">Компании из поиска, которым вы звоните сами. Здесь их видит только администратор: на сайте их нет, сайт им ничего не отправляет. Согласились по телефону — в карточке создайте ссылку на анкету и отправьте её со своего телефона; компания проверит анкету, сама поставит галочки и подтвердит кодом из SMS. Описание — docs/outreach-prospects.md.</p>
+
+<div class="flex flex-wrap gap-2 mb-5">
+    <a href="/admin/outreach/prospects" class="px-3 py-1.5 rounded-full text-xs font-bold border <%= !filter.stage ? 'bg-stone-900 text-white border-stone-900' : 'bg-white border-stone-200 text-stone-700' %>">Все · <%= total %></a>
+    <% stages.filter(s => counts[s]).forEach(s => { %>
+    <a href="/admin/outreach/prospects?stage=<%= s %>" class="px-3 py-1.5 rounded-full text-xs font-bold border <%= filter.stage === s ? 'bg-stone-900 text-white border-stone-900' : 'bg-white border-stone-200 text-stone-700' %>"><%= labels[s] %> · <%= counts[s] %></a>
+    <% }); %>
+</div>
+
+<form method="GET" action="/admin/outreach/prospects" class="flex flex-wrap items-end gap-2 mb-4">
+    <% if (filter.stage) { %><input type="hidden" name="stage" value="<%= filter.stage %>"><% } %>
+    <label class="text-sm"><span class="block text-xs font-bold text-stone-500">Услуга</span>
+        <select name="service" class="border border-stone-200 rounded-xl px-3 py-2 bg-white">
+            <option value="">все</option>
+            <% services.forEach(s => { %><option value="<%= s.code %>" <%= filter.service === s.code ? 'selected' : '' %>><%= s.name.ru %></option><% }); %>
+        </select>
+    </label>
+    <label class="text-sm"><span class="block text-xs font-bold text-stone-500">Поиск</span>
+        <input name="q" value="<%= filter.q %>" placeholder="название, номер, сайт" class="border border-stone-200 rounded-xl px-3 py-2 bg-white">
+    </label>
+    <button class="px-4 py-2 bg-stone-900 text-white text-sm font-bold rounded-xl">Показать</button>
+</form>
+
+<% if (!rows.length) { %>
+    <p class="text-sm text-stone-500 mb-6"><%= total ? 'По этому отбору никого.' : 'Список пуст. Компании загружаются через API: POST /api/outreach/prospects (ключ — «Анкеты от бота»).' %></p>
+<% } else { %>
+<div class="overflow-x-auto bg-white rounded-2xl border border-stone-200 mb-6">
+    <table class="w-full text-sm">
+        <thead class="text-left text-xs text-stone-500 border-b border-stone-200">
+            <tr><th class="p-2">Компания</th><th class="p-2">Телефон</th><th class="p-2">Услуги</th><th class="p-2">Статус</th><th class="p-2">Последний звонок</th></tr>
+        </thead>
+        <tbody>
+        <% rows.forEach(r => { const last = r.calls[r.calls.length - 1]; %>
+            <tr class="border-b border-stone-100 align-top hover:bg-stone-50">
+                <td class="p-2"><a class="font-bold text-stone-900 underline" href="/admin/outreach/prospects/<%= r.id %>"><%= r.name %></a>
+                    <% if (r.website) { %><span class="block text-xs text-stone-400 break-all"><%= r.website.replace(/^https:\/\//, '') %></span><% } %></td>
+                <td class="p-2 font-mono whitespace-nowrap"><%= r.phone || '—' %></td>
+                <td class="p-2 text-xs"><%= r.services.map(svcName).concat(r.other_services).join(', ') || '—' %></td>
+                <td class="p-2 text-xs font-bold"><%= labels[r.stage] || r.stage %></td>
+                <td class="p-2 text-xs text-stone-500"><%= last ? new Date(last.at).toLocaleString('ru', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + (last.note ? ' · ' + last.note : '') : '—' %></td>
+            </tr>
+        <% }); %>
+        </tbody>
+    </table>
+</div>
+<% } %>
+
+<%- include('./_footer') %>

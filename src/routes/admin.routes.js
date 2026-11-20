@@ -65,6 +65,14 @@ router.get('/outreach/new', asyncHandler(outreach.form));
 const draftAdmin = require('../controllers/providerDraftAdmin.controller');
 router.get('/outreach/drafts', asyncHandler(draftAdmin.index));
 router.post('/outreach/drafts/key', verifyCsrf, asyncHandler(draftAdmin.issueKey));
+// Компании для обзвона (docs/outreach-prospects.md) — тоже до /outreach/:id.
+const prospectAdmin = require('../controllers/prospectAdmin.controller');
+router.get('/outreach/prospects', asyncHandler(prospectAdmin.index));
+router.get('/outreach/prospects/:id(\\d+)', asyncHandler(prospectAdmin.show));
+router.post('/outreach/prospects/:id(\\d+)/call', verifyCsrf, asyncHandler(prospectAdmin.call));
+router.post('/outreach/prospects/:id(\\d+)/note', verifyCsrf, asyncHandler(prospectAdmin.note));
+router.post('/outreach/prospects/:id(\\d+)/link', verifyCsrf, asyncHandler(prospectAdmin.link));
+router.post('/outreach/prospects/:id(\\d+)/delete', verifyCsrf, asyncHandler(prospectAdmin.remove));
 router.post('/outreach', verifyCsrf, asyncHandler(outreach.create));
 router.get('/outreach/:id', asyncHandler(outreach.show));
 router.post('/outreach/:id/sms', verifyCsrf, asyncHandler(outreach.updateSms));

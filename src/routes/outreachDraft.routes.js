@@ -61,6 +61,12 @@ api.post('/optout', wrap(async (req, res) => {
   res.json(await drafts.optOut(phone, { reason: req.body.reason || '', source: 'bot', meta: requestMeta(req) }));
 }));
 
+// Компании для обзвона (docs/outreach-prospects.md): владелец загружает список, звонит сам из админки.
+api.post('/prospects', wrap(async (req, res) => {
+  const list = Array.isArray(req.body) ? req.body : req.body?.prospects;
+  res.json(await require('../services/prospect.service').importMany(list, { source: req.body?.source || '' }));
+}));
+
 api.use((req, res) => res.status(404).json({ error: 'not_found', message: 'Unknown endpoint. See docs: GET /api/outreach/services, POST /api/outreach/drafts …' }));
 
 api.use((err, req, res, next) => {

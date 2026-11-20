@@ -317,8 +317,10 @@ async function optOut(phone, { reason = '', source = 'bot', meta = {} } = {}) {
       await client.query(`UPDATE provider_drafts SET status = $2, data = '{}'::jsonb, closed_at = NOW(), updated_at = NOW() WHERE id = $1`,
         [draft.id, source === 'page' ? 'declined' : 'opted_out']);
     }
-    await require('./consentLog.service').recordAction({ eventType: 'OUTREACH_OPT_OUT', phone, metadata: { actor: source === 'page' ? 'provider' : 'bot', source, reason, draft_id: draft?.public_id || null },
-      meta, channel: source === 'page' ? 'web' : 'api' }, client);
+    // source: bot — отказ в переписке с ботом, page — «Не интересно» на странице, admin — «просил не звонить» владельцу.
+    const actor = { page: 'provider', admin: 'admin' }[source] || 'bot';
+    await require('./consentLog.service').recordAction({ eventType: 'OUTREACH_OPT_OUT', phone, metadata: { actor, source, reason, draft_id: draft?.public_id || null },
+      meta, channel: { page: 'web', admin: 'phone' }[source] || 'api' }, client);
     return status(phone, client);
   });
 }

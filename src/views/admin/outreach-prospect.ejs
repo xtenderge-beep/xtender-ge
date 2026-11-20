@@ -1,0 +1,96 @@
+<%- include('./_header', { active: 'outreach' }) %>
+<% const fmt = d => d ? new Date(d).toLocaleString('ru', { timeZone: 'Asia/Tbilisi', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'; %>
+<% const digits = (p.phone || '').replace(/\D/g, ''); %>
+
+<a href="/admin/outreach/prospects" class="text-sm font-bold text-stone-500 hover:text-stone-900">&larr; компании для обзвона</a>
+<h1 class="text-2xl font-black text-stone-900 mt-2"><%= p.name %></h1>
+<p class="text-sm font-bold text-stone-500 mb-4"><%= labels[p.stage] || p.stage %><% if (p.agreed_at) { %> · согласился <%= fmt(p.agreed_at) %><% } %></p>
+
+<% if (flash.error) { %><p class="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-800"><%= flash.error %></p><% } %>
+<% if (flash.notice) { %><p class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800"><%= flash.notice %></p><% } %>
+
+<div class="grid md:grid-cols-2 gap-4 mb-4">
+    <section class="bg-white rounded-2xl border border-stone-200 p-4 text-sm space-y-2">
+        <h2 class="font-extrabold text-stone-900">Контакты</h2>
+        <p><span class="text-stone-500">Телефон:</span> <% if (p.phone) { %><a class="font-mono font-bold underline" href="tel:<%= p.phone %>"><%= p.phone %></a><% } else { %>— <span class="text-xs text-amber-700">нет грузинского номера: ссылку не создать</span><% } %></p>
+        <% if (p.phones_extra) { %><p><span class="text-stone-500">Ещё номера:</span> <span class="font-mono"><%= p.phones_extra %></span></p><% } %>
+        <% if (p.website) { %><p><span class="text-stone-500">Сайт:</span> <a class="underline break-all" href="<%= p.website %>" target="_blank" rel="noopener noreferrer"><%= p.website %></a></p><% } %>
+        <% if (p.email) { %><p><span class="text-stone-500">Почта:</span> <%= p.email %></p><% } %>
+        <% if (p.found_where) { %><p><span class="text-stone-500">Где нашли:</span> <%= p.found_where %></p><% } %>
+        <% if (p.source) { %><p class="text-xs text-stone-400">Источник: <%= p.source %></p><% } %>
+    </section>
+    <section class="bg-white rounded-2xl border border-stone-200 p-4 text-sm space-y-2">
+        <h2 class="font-extrabold text-stone-900">Что делают</h2>
+        <p><span class="text-stone-500">Услуги на сайте:</span> <%= p.services.join(', ') || '—' %></p>
+        <p><span class="text-stone-500">Другое:</span> <%= p.other_services.join(', ') || '—' %></p>
+        <% if (p.title) { %><p class="text-stone-700"><%= p.title %></p><% } %>
+        <% if (p.description) { %><p class="text-stone-600"><%= p.description %></p><% } %>
+    </section>
+</div>
+
+<section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
+    <h2 class="font-extrabold text-stone-900 mb-2">Ссылка на анкету</h2>
+    <% if (p.stage === 'registered') { %>
+        <p class="text-sm text-emerald-800">Компания подтвердила анкету и стала исполнителем. Дальше — обычная модерация в «Исполнителях».</p>
+    <% } else if (p.confirmUrl) { %>
+        <p class="text-sm text-stone-600">Действует до <%= fmt(p.expiresAt) %>. Отправьте со своего телефона:</p>
+        <p class="mt-2 p-3 rounded-xl bg-stone-100 font-mono text-sm break-all select-all"><%= p.confirmUrl %></p>
+        <% ['ka', 'ru'].forEach(l => { %>
+        <div class="mt-3">
+            <p class="text-xs font-bold text-stone-500"><%= l === 'ka' ? 'Текст по-грузински' : 'Текст по-русски' %></p>
+            <p class="p-3 rounded-xl bg-stone-50 border border-stone-200 text-sm whitespace-pre-line select-all"><%= message[l] %></p>
+            <div class="flex flex-wrap gap-2 mt-2">
+                <a class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold" target="_blank" rel="noopener noreferrer" href="https://wa.me/<%= digits %>?text=<%= encodeURIComponent(message[l]) %>">WhatsApp</a>
+                <a class="px-3 py-2 rounded-xl bg-stone-900 text-white text-sm font-bold" href="sms:+<%= digits %>?body=<%= encodeURIComponent(message[l]) %>">SMS с телефона</a>
+            </div>
+        </div>
+        <% }); %>
+    <% } else if (['refused', 'do_not_call', 'rejected'].includes(p.stage)) { %>
+        <p class="text-sm text-stone-600">Ссылку не создать: компания отказалась или в списке отказа.</p>
+    <% } else { %>
+        <form method="POST" action="/admin/outreach/prospects/<%= p.id %>/link" class="space-y-3">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+            <label class="text-sm flex items-start gap-2"><input type="checkbox" name="agreed" value="yes" required class="mt-1"> Компания согласилась по телефону, чтобы мы подготовили ей анкету на xtender.ge и прислали ссылку</label>
+            <label class="text-sm"><span class="text-stone-500">Язык страницы анкеты:</span>
+                <select name="lang" class="border border-stone-200 rounded-xl px-2 py-1 bg-white"><option value="ka">ქართული</option><option value="ru">Русский</option><option value="en">English</option></select>
+            </label>
+            <div><button class="px-4 py-2 bg-emerald-600 text-white text-sm font-bold rounded-xl" <%= p.phone ? '' : 'disabled' %>>Создать ссылку на анкету</button></div>
+            <p class="text-xs text-stone-500">Сайт ничего не отправит сам. Галочки (условия, SMS о заявках) компания ставит сама на странице и подтверждает кодом — это её согласие в журнале. Ссылка живёт 14 дней.</p>
+        </form>
+    <% } %>
+</section>
+
+<section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
+    <h2 class="font-extrabold text-stone-900 mb-2">Итог звонка</h2>
+    <form method="POST" action="/admin/outreach/prospects/<%= p.id %>/call" class="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <select name="result" class="border border-stone-200 rounded-xl px-3 py-2 bg-white text-sm">
+            <% ['no_answer', 'callback', 'declined', 'do_not_call', 'note'].forEach(r => { %><option value="<%= r %>"><%= results[r] %></option><% }); %>
+        </select>
+        <input name="note" maxlength="1000" placeholder="заметка: кто ответил, когда перезвонить" class="flex-1 min-w-[220px] border border-stone-200 rounded-xl px-3 py-2 text-sm">
+        <button class="px-4 py-2 bg-stone-900 text-white text-sm font-bold rounded-xl">Записать</button>
+    </form>
+    <p class="text-xs text-stone-500 mt-2">«Просил не звонить» вносит номер в общий список отказа: ни анкета, ни бот ему больше не напишут.</p>
+    <% if (p.calls.length) { %>
+    <ul class="mt-3 text-sm divide-y divide-stone-100">
+        <% p.calls.slice().reverse().forEach(c => { %><li class="py-1.5"><span class="text-xs text-stone-400"><%= fmt(c.at) %></span> · <b><%= results[c.result] || c.result %></b><%= c.note ? ' — ' + c.note : '' %></li><% }); %>
+    </ul>
+    <% } %>
+</section>
+
+<section class="bg-white rounded-2xl border border-stone-200 p-4 mb-4">
+    <h2 class="font-extrabold text-stone-900 mb-2">Заметка</h2>
+    <form method="POST" action="/admin/outreach/prospects/<%= p.id %>/note" class="flex flex-wrap gap-2">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <textarea name="note" maxlength="1000" rows="2" class="flex-1 min-w-[260px] border border-stone-200 rounded-xl px-3 py-2 text-sm"><%= p.note %></textarea>
+        <button class="px-4 py-2 bg-white border border-stone-300 text-sm font-bold rounded-xl self-end">Сохранить</button>
+    </form>
+</section>
+
+<form method="POST" action="/admin/outreach/prospects/<%= p.id %>/delete" class="flex items-center gap-3 text-sm mb-8">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="flex items-center gap-2 text-stone-500"><input type="checkbox" name="confirm" value="yes" required> удалить карточку (например, по просьбе компании)</label>
+    <button class="px-3 py-1.5 bg-white border border-red-300 text-red-700 font-bold rounded-xl">Удалить</button>
+</form>
+
+<%- include('./_footer') %>

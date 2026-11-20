@@ -1057,6 +1057,31 @@ CREATE TABLE IF NOT EXISTS outreach_optouts (
     source VARCHAR(10) NOT NULL DEFAULT 'bot',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Компании для обзвона (docs/outreach-prospects.md): публичные контакты компаний из поиска, которым владелец
+-- звонит сам. Только в админке: на сайте не показываются, сайт им ничего не отправляет. После «да» по телефону из
+-- карточки создаётся обычный черновик анкеты (provider_drafts) и ссылка /c/<token>; согласие на SMS исполнитель даёт
+-- сам галочками и кодом на этой странице. calls — журнал звонков владельца [{at, result, note}].
+CREATE TABLE IF NOT EXISTS outreach_prospects (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    phone VARCHAR(20) UNIQUE,
+    phones_extra VARCHAR(200) NOT NULL DEFAULT '',
+    website VARCHAR(300) UNIQUE,
+    email VARCHAR(200) NOT NULL DEFAULT '',
+    title VARCHAR(300) NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    services JSONB NOT NULL DEFAULT '[]',
+    other_services JSONB NOT NULL DEFAULT '[]',
+    found_where VARCHAR(500) NOT NULL DEFAULT '',
+    note VARCHAR(1000) NOT NULL DEFAULT '',
+    source VARCHAR(80) NOT NULL DEFAULT '',
+    status VARCHAR(16) NOT NULL DEFAULT 'new',
+    calls JSONB NOT NULL DEFAULT '[]',
+    draft_public_id VARCHAR(16),
+    agreed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 -- free_until — обещанный в анкете бесплатный период (60 дней от подтверждения); пока только дата для админки,
 -- платный режим по-прежнему включает администратор (paid_mode). signup_source — откуда пришёл профиль
 -- (источник бота). signup_hint — что бот предложил модератору: услуги, другие направления, районы.
