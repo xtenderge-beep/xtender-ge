@@ -67,7 +67,16 @@ function serviceHref(code, lang) {
 }
 
 // Данные для шаблона. Описание — то, что компания написала (или подтвердила); если пусто — собираем из услуг.
-function model({ name, description = '', services = [], other_services = [], districts = [], lang = 'ka', reviews = [], slug = null, preview = false }) {
+const MONTHS = {
+  ka: ['იანვრის', 'თებერვლის', 'მარტის', 'აპრილის', 'მაისის', 'ივნისის', 'ივლისის', 'აგვისტოს', 'სექტემბრის', 'ოქტომბრის', 'ნოემბრის', 'დეკემბრის'],
+  ru: ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+};
+const monthYear = (date, lang) => { const d = new Date(date); return Number.isNaN(d.getTime()) ? null : `${MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`; };
+const SPOKEN = require('./../config/spokenLanguages').options;
+
+function model({ name, description = '', services = [], other_services = [], districts = [], lang = 'ka', reviews = [], slug = null, preview = false,
+  since = null, languages = [], priceText = '' }) {
   lang = LANGS.includes(lang) ? lang : 'ka';
   const copy = COPY[lang];
   const items = services.filter(code => copy.services[code]).map(code => ({ code, title: copy.services[code][0], text: copy.services[code][1], href: serviceHref(code, lang) }));
@@ -76,11 +85,17 @@ function model({ name, description = '', services = [], other_services = [], dis
   const ratings = reviews.map(r => Number(r.rating)).filter(Boolean);
   const avg = ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 10) / 10 : null;
   const label = items.map(i => i.title).slice(0, 2).join(', ');
+  const dist = [5, 4, 3, 2, 1].map(star => ({ star, n: ratings.filter(r => r === star).length }));
+  const crumbs = [{ name: copy.home, href: localizedPath(lang, '/') }];
+  if (items[0]) crumbs.push({ name: `${items[0].title} — ${copy.area}`, href: items[0].href });
+  crumbs.push({ name, href: slug ? localizedPath(lang, '/company/' + slug) : null });
   return {
     lang, copy, name, slug, preview, intro, items, extras: other_services.slice(0, 12), districts: districts.slice(0, 20),
     indexable: !preview && isIndexable(description, reviews.length),
-    title: `${name}${label ? ' — ' + label : ''} ${copy.titleSuffix}`,
-    metaDescription: (intro || label).slice(0, 155),
+    title: copy.seoTitle(name, label),
+    metaDescription: copy.seoDescription(name, label.toLowerCase(), avg ? copy.ratingLine(avg, ratings.length) : '').slice(0, 160),
+    since: since ? monthYear(since, lang) : null, languages: languages.filter(code => SPOKEN[code]).map(code => SPOKEN[code]),
+    priceText: String(priceText || '').trim(), dist, crumbs,
     ctaHref: serviceHref(main, lang),
     reviews: reviews.map(r => ({ rating: Number(r.rating), comment: r.comment || '', date: r.created_at })), avg,
   };
@@ -109,7 +124,8 @@ async function bySlug(slug, lang) {
   const translations = json(m.description_translations, {});
   const reviews = (await pool.query('SELECT rating, comment, created_at FROM master_reviews WHERE master_id = $1 AND is_approved = true ORDER BY created_at DESC LIMIT 50', [m.id])).rows;
   return model({ name: require('../config/providerName').resolve(m) || m.name, description: translations[lang] || m.description, services,
-    other_services: hint.other_services || [], districts: hint.districts || [], lang, reviews, slug });
+    other_services: hint.other_services || [], districts: hint.districts || [], lang, reviews, slug,
+    since: m.created_at, languages: json(m.spoken_languages, []), priceText: m.price_text });
 }
 
 // В карту сайта — только страницы, прошедшие порог качества.

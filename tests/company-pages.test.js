@@ -76,7 +76,12 @@ const render = (locals) => ejs.renderFile(path.join(__dirname, '../src/views/com
   assert.ok(html.includes('"@type":"MovingCompany"') && html.includes('"ratingValue":5'));
   assert.ok(html.includes('Отлично!') && !html.includes('спам'));
   assert.ok(!html.includes('noindex'), 'есть одобренный отзыв — страница открыта поиску');
-  assert.ok(html.includes('<title>AG — Грузчики, Перевозка на машине в Тбилиси — xtender.ge</title>'), html.match(/<title>.*<\/title>/)[0]);
+  assert.ok(html.includes('<title>AG: Грузчики, Перевозка на машине в Тбилиси — отзывы, цены | xtender.ge</title>'), html.match(/<title>.*<\/title>/)[0]);
+  assert.ok(html.includes('"@type":"BreadcrumbList"') && html.includes('aria-label="breadcrumb"'), 'хлебные крошки и их разметка');
+  assert.ok(/На xtender\.ge с \S+ \d{4}/.test(html), 'на xtender с месяца года');
+  assert.ok(html.includes('Номер подтверждён кодом из SMS') && html.includes('Проверено модератором'));
+  assert.deepEqual(pub.dist.map(d => d.n), [1, 0, 0, 0, 0], 'разбивка по звёздам');
+  assert.ok(pub.metaDescription.includes('Оценка 5 (1)'), pub.metaDescription);
 
   // Порог качества: без отзывов и с коротким описанием — noindex и не в карте сайта; длинное своё описание — открыта.
   await pool.query('UPDATE master_reviews SET is_approved = false WHERE master_id = $1', [m.id]);

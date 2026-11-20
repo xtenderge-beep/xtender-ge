@@ -39,7 +39,7 @@
             <% if (typeof company !== 'undefined' && company && company.name) { %>
             <section class="mt-4">
                 <p class="text-sm font-black text-stone-900 mb-2"><i class="fa-regular fa-eye" aria-hidden="true"></i> <%= company.copy.draftBanner %></p>
-                <%- include('partials/company-card', { c: company, headingTag: 'h2' }) %>
+                <%- include('partials/company-card', { c: company, headingTag: 'h2', compact: true }) %>
             </section>
             <% } %>
 
