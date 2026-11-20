@@ -423,6 +423,7 @@ async function complete(draft, grant, { meta = {}, copy } = {}) {
     await client.query(`UPDATE provider_drafts SET status = 'confirmed', master_id = $2, confirmed_at = $3, data = '{}'::jsonb, updated_at = $3 WHERE id = $1`,
       [draft.id, master.id, confirmedAt]);
   });
+  if (data.slug) master.public_slug = await require('./companyPage.service').claimSlug(master.id, data.slug);
   Object.assign(master, { signup_hint: hint, signup_source: source, free_until: freeUntil, is_technical: master.is_technical || draft.is_test === true });
   return master;
 }

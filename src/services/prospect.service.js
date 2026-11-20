@@ -78,6 +78,7 @@ async function importMany(list, { source = '' } = {}) {
       result.created++;
     }
   }
+  await require('./companyPage.service').ensureProspectPages();
   return result;
 }
 
@@ -100,6 +101,7 @@ function shape(row) {
 
 async function list({ stage = '', service = '', q = '' } = {}) {
   await drafts.expireOld();
+  await require('./companyPage.service').ensureProspectPages();
   const rows = (await pool.query('SELECT * FROM outreach_prospects ORDER BY id')).rows.map(shape);
   const out = [];
   for (const row of rows) out.push({ ...row, ...(await live(row)) });
@@ -160,6 +162,10 @@ async function createLink(id, { lang = 'ka', confirmedByOwner = false } = {}, me
     description: description.slice(0, 2000), city: city ? city.id : undefined, lang: ['ka', 'ru', 'en'].includes(lang) ? lang : 'ka',
     source: 'owner_call', external_id: `prospect_${p.id}`, provider_agreed: true,
   });
+  if (p.slug) {
+    const d = (await pool.query('SELECT id, data FROM provider_drafts WHERE public_id = $1', [result.draft.public_id])).rows[0];
+    await pool.query('UPDATE provider_drafts SET data = $2::jsonb WHERE id = $1', [d.id, JSON.stringify({ ...json(d.data, {}), slug: p.slug })]);
+  }
   await pool.withTransaction(async (client) => {
     await client.query(`UPDATE outreach_prospects SET status = 'agreed', agreed_at = COALESCE(agreed_at, NOW()), draft_public_id = $2, calls = $3::jsonb, updated_at = NOW() WHERE id = $1`,
       [id, result.draft.public_id, pushCall(row, { result: 'agreed', note: result.created ? 'ссылка создана' : 'ссылка повторно' })]);

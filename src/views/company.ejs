@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="<%= c.lang %>" class="h-full bg-stone-50">
+<head>
+    <%- include('partials/head', { title: c.title, metaDescription: c.metaDescription, noindex: !c.indexable }) %>
+    <% if (c.indexable) { %>
+    <link rel="canonical" href="<%= seo.canonical %>">
+    <% Object.entries(seo.alternates).forEach(([l, href]) => { %><link rel="alternate" hreflang="<%= l %>" href="<%= href %>">
+    <% }); %><link rel="alternate" hreflang="x-default" href="<%= seo.xDefault %>">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="<%= c.title %>">
+    <meta property="og:description" content="<%= c.metaDescription %>">
+    <meta property="og:url" content="<%= seo.canonical %>">
+    <script type="application/ld+json"><%- JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': c.items.some(i => ['movers', 'van'].includes(i.code)) ? 'MovingCompany' : 'LocalBusiness',
+      name: c.name, description: c.metaDescription, url: seo.canonical,
+      areaServed: { '@type': 'City', name: c.copy.area },
+      makesOffer: c.items.map(i => ({ '@type': 'Offer', itemOffered: { '@type': 'Service', name: i.title, description: i.text } })),
+      ...(c.avg ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: c.avg, reviewCount: c.reviews.length } } : {}),
+    }).replace(/</g, '\\u003c') %></script>
+    <% } %>
+</head>
+<%# Мини-страница компании (docs/company-pages.md). Предпросмотр — noindex, без canonical и разметки. %>
+<body class="font-sans text-stone-800 bg-stone-50 min-h-screen antialiased">
+    <header class="bg-white/95 border-b border-stone-200 shadow-sm">
+        <div class="max-w-xl mx-auto px-4 flex items-center justify-between h-14">
+            <a href="<%= c.lang === 'ka' ? '/' : '/' + c.lang %>" class="flex items-center gap-2"><%- include('partials/brand') %></a>
+            <nav class="flex gap-1 text-sm font-bold" aria-label="Language">
+                <% [['ka','ქარ'],['ru','Рус'],['en','Eng']].forEach(([code, label]) => { %>
+                <a href="<%= langHref(code) %>" class="px-2 py-1 rounded-lg <%= code === c.lang ? 'bg-emerald-50 text-emerald-700' : 'text-stone-500' %>" <%- code === c.lang ? 'aria-current="true"' : '' %>><%= label %></a>
+                <% }); %>
+            </nav>
+        </div>
+    </header>
+    <main class="max-w-xl mx-auto px-4 py-6">
+        <% if (c.preview) { %><p class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900"><%= c.copy.previewBanner %></p><% } %>
+        <%- include('partials/company-card', { c, headingTag: 'h1' }) %>
+    </main>
+</body>
+</html>

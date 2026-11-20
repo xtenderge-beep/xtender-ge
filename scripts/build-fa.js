@@ -21,7 +21,7 @@ const OUT = path.join(__dirname, '..', 'public', 'fa');
 const ICONS = {
   solid: [
     'address-book', 'arrow-down', 'arrow-left', 'arrow-right', 'bolt', 'briefcase', 'building-columns',
-    'check', 'chevron-down', 'circle-check', 'circle-info', 'clock', 'eye', 'gift',
+    'check', 'chevron-down', 'location-dot', 'circle-check', 'circle-info', 'clock', 'eye', 'gift',
     'headset', 'helmet-safety', 'key', 'list-check', 'lock', 'mobile-screen',
     'paper-plane', 'paperclip', 'pen', 'phone', 'right-to-bracket', 'screwdriver-wrench', 'shield-halved',
     'square-plus', 'star', 'tag', 'trash-can', 'triangle-exclamation',

@@ -28,7 +28,8 @@ const STATIC_PAGES = ['/', '/join', '/terms', '/privacy', '/guides/request'];
 function sitemapXml(pages = []) {
   const entries = [
     ...STATIC_PAGES.map(suffix => ({ suffix, languages: PUBLIC_LOCALES })),
-    ...pages.map(page => ({ suffix: '/s/' + page.slug, languages: PUBLIC_LOCALES.filter(lang => page.languages.includes(lang)) })),
+    // page.path — готовый адрес (страницы компаний /company/<slug>); иначе страница задачи /s/<slug>.
+    ...pages.map(page => ({ suffix: page.path || '/s/' + page.slug, languages: PUBLIC_LOCALES.filter(lang => page.languages.includes(lang)) })),
   ];
   const urls = [];
   for (const { suffix, languages } of entries) {

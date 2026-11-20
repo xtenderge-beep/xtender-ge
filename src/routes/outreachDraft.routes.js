@@ -139,6 +139,12 @@ router.get('/c/:token', wrap(async (req, res) => {
     cities: (await drafts.cities()).map(c => ({ id: c.id, name: c[nameKey] || c.name_ru })),
     languageOptions: require('../config/spokenLanguages').options,
     consent: await require('../services/consent.service').bundle('provider', lang),
+    // Блок «так будет выглядеть ваша страница» (docs/company-pages.md) — из данных анкеты.
+    company: (() => {
+      const d = drafts.json(draft.data, {});
+      return require('../services/companyPage.service').model({ name: d.name || '', description: d.description, services: d.services || [],
+        other_services: d.other_services || [], lang, preview: true });
+    })(),
   });
 }));
 

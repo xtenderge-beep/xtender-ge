@@ -1082,12 +1082,22 @@ CREATE TABLE IF NOT EXISTS outreach_prospects (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Мини-страница компании (docs/company-pages.md): slug — будущий адрес /company/<slug>, preview_token — закрытая
+-- ссылка на предпросмотр /company/preview/<token> (не индексируется), пока компания не подтвердила анкету.
+ALTER TABLE outreach_prospects ADD COLUMN IF NOT EXISTS slug VARCHAR(80);
+ALTER TABLE outreach_prospects ADD COLUMN IF NOT EXISTS preview_token VARCHAR(24);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_outreach_prospects_slug ON outreach_prospects(slug);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_outreach_prospects_preview ON outreach_prospects(preview_token);
 -- free_until — обещанный в анкете бесплатный период (60 дней от подтверждения); пока только дата для админки,
 -- платный режим по-прежнему включает администратор (paid_mode). signup_source — откуда пришёл профиль
 -- (источник бота). signup_hint — что бот предложил модератору: услуги, другие направления, районы.
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS free_until TIMESTAMPTZ;
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_source VARCHAR(80);
 ALTER TABLE masters ADD COLUMN IF NOT EXISTS signup_hint JSONB NOT NULL DEFAULT '{}';
+-- Публичная мини-страница исполнителя /company/<public_slug> (docs/company-pages.md). Есть только у тех, кто пришёл
+-- из «Компаний для обзвона» и подтвердил анкету; показывается, когда профиль активен (прошёл модерацию).
+ALTER TABLE masters ADD COLUMN IF NOT EXISTS public_slug VARCHAR(80);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_masters_public_slug ON masters(public_slug);
 
 -- Multiple provider services and immutable dispatch context.
 ALTER TABLE master_services ADD COLUMN IF NOT EXISTS requires_own_transport BOOLEAN NOT NULL DEFAULT false;

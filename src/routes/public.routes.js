@@ -332,6 +332,24 @@ router.get('/s/:slug', asyncHandler(async (req, res, next) => {
   await renderHome(req, res, locale, page, { simple: true });
 }));
 
+// Мини-страница компании (docs/company-pages.md). Предпросмотр по закрытой ссылке — до подтверждения, не индексируется;
+// публичная — у исполнителя, подтвердившего анкету и прошедшего модерацию. Язык — префикс адреса (/ru, /en), как везде.
+const companyPages = require('../services/companyPage.service');
+router.get('/company/preview/:token', asyncHandler(async (req, res, next) => {
+  const lang = normalizeLang(req.params.locale || req.query.lang);
+  const c = await companyPages.byPreviewToken(req.params.token, lang);
+  if (!c) return next();
+  res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow', 'Referrer-Policy': 'no-referrer' });
+  res.render('company', { c, seo: null, langHref: code => `/company/preview/${req.params.token}?lang=${code}` });
+}));
+router.get('/company/:slug', asyncHandler(async (req, res, next) => {
+  const lang = normalizeLang(req.params.locale);
+  const c = await companyPages.bySlug(req.params.slug, lang);
+  if (!c) return next();
+  const seo = buildSeo(lang, '/company/' + c.slug);
+  res.render('company', { c, seo, langHref: code => seo.alternates[code] });
+}));
+
 // Карта сайта собирается на лету: постоянные страницы, включённые страницы задач и открытые поиску страницы
 // «услуга + город» (они есть на всех трёх языках). Сбой подсчёта страниц услуг карту не роняет.
 router.get('/sitemap.xml', asyncHandler(async (req, res, next) => {
@@ -342,7 +360,13 @@ router.get('/sitemap.xml', asyncHandler(async (req, res, next) => {
   } catch (error) {
     console.error('Service pages unavailable:', error.message);
   }
-  res.type('application/xml').send(sitemapXml([...(await publishedLandings()), ...services]));
+  let companies = [];
+  try {
+    companies = (await companyPages.published()).map(slug => ({ path: '/company/' + slug, languages: ['ka', 'ru', 'en'] }));
+  } catch (error) {
+    console.error('Company pages unavailable:', error.message);
+  }
+  res.type('application/xml').send(sitemapXml([...(await publishedLandings()), ...services, ...companies]));
 }));
 
 // Персональная ссылка менеджера для заказчика. Ставим куку с токеном приглашения,
