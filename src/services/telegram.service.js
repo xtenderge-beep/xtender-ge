@@ -161,6 +161,8 @@ async function notifyModerator(order) {
 
   const base = getBaseUrl();
   const cityName = await getOrderCityName(order);
+  // Заявка со страницы компании: какую компанию выбрал клиент.
+  const preferred = order.preferred_master_id ? (await require('../config/db').query('SELECT * FROM masters WHERE id = $1', [order.preferred_master_id])).rows[0] : null;
   const text = [
     order.is_technical ? '🧪 ТЕСТ — только техническим исполнителям' : '🆕 Новая заявка на модерацию',
     '',
@@ -172,6 +174,7 @@ async function notifyModerator(order) {
     `🔗 ${base}/order/${order.token}`,
     ...(order.source === require('../config/agentApi').SOURCE ? ['🤖 Через ИИ-ассистента (API): номер подтверждён кодом, согласие передал ассистент'] : []),
     ...(order.source === require('../config/agentApi').DRAFT_SOURCE ? ['🤖 Текст подготовил ИИ-ассистент (ссылка), заказчик проверил его на сайте'] : []),
+    ...(preferred ? [`🏢 Клиент выбрал компанию на её странице: ${require('../config/providerName').resolve(preferred) || preferred.name} (#${preferred.id}) — в списке рассылки она первая`] : []),
     '',
     'Откройте карточку кнопкой ниже, отметьте потребности и выберите получателей. Уже уведомлённые повторно не платят.',
   ].join('\n');

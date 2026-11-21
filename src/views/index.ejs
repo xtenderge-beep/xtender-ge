@@ -1379,7 +1379,7 @@
                     // token — повторный код по уже созданной заявке, второй черновик не создаётся.
                     // entry — откуда человек пришёл на сайт (public/js/visit.js): источник заявки для админки.
                     // draft — форма открыта по ссылке-черновику от ИИ-ассистента (/draft): такой источник у заявки.
-                    body: JSON.stringify({ phone, description, token: pendingOrderToken, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null, draft: <%- JSON.stringify(Boolean(draftPage)) %> || undefined }),
+                    body: JSON.stringify({ phone, description, token: pendingOrderToken, termsAccepted: true, privacyAccepted: true, consentLanguage, consentDigest, entry: window.xtEntry ? window.xtEntry() : null, company: (new URLSearchParams(location.search).get('company') || undefined), draft: <%- JSON.stringify(Boolean(draftPage)) %> || undefined }),
                 });
                 const data = await res.json();
                 if (data.success) {

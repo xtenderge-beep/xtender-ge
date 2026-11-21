@@ -755,6 +755,9 @@ CREATE TABLE IF NOT EXISTS technical_client_phones (
 -- значения, что в site_visits.source. Пустая строка — прямой заход; NULL — не записано (заявки до
 -- 2026-10-12 и оформленные менеджером). Раздел «Источники» в админке, trafficSource.service.js.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS source VARCHAR(80);
+-- Заявка с кнопки на странице компании (/company/<slug>, docs/company-pages.md): какую компанию выбрал клиент.
+-- Модератор видит её в сообщении о заявке, в списке рассылки она стоит первой. NULL — заявка не со страницы компании.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS preferred_master_id INTEGER;
 -- Платный режим исполнителя (2026-10-16). По умолчанию false — бесплатный период: заявки и показ номера
 -- в каталоге не списывают баланс и не требуют подтверждённых тарифов и денег на балансе. Администратор
 -- включает платный режим каждому отдельно в карточке исполнителя (providerBilling.isPaid). Колонка

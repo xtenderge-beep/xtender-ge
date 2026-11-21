@@ -42,6 +42,11 @@ async function send(req, res) {
   // Форма, открытая по ссылке-черновику от ИИ-ассистента (/draft), присылает draft: источник — ассистент.
   const source = req.body.draft === true ? DRAFT_SOURCE : entry ? (parseSource(entry.r, entry.us, req.hostname) || '') : null;
 
+  // Заявка с кнопки на странице компании (?company=<slug>): запоминаем компанию, если её страница публична.
+  const companySlug = typeof req.body.company === 'string' ? req.body.company : '';
+  const companyPages = require('../services/companyPage.service');
+  const preferredMasterId = companyPages.SLUG_RE.test(companySlug) && companySlug.length <= 60 ? await companyPages.masterIdBySlug(companySlug) : null;
+
   // Форма просит код повторно по своей заявке (token) — черновик остаётся тот же.
   let order = await orderService.reusePendingOrder(req.body.token, phone, description);
   if (!order) {
@@ -51,6 +56,7 @@ async function send(req, res) {
       districtName: districtName || '',
       managerId,
       source,
+      preferredMasterId,
     });
     if (inviteToken) {
       managerService.linkInviteToOrder(inviteToken, order.id).catch(() => {});

@@ -18,6 +18,7 @@
         ...(c.languages.length ? { knowsLanguage: c.languages } : {}),
         makesOffer: c.items.map(i => ({ '@type': 'Offer', itemOffered: { '@type': 'Service', name: i.title, description: i.text } })),
         ...(c.avg ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: c.avg, reviewCount: c.reviews.length, bestRating: 5 } } : {}) },
+      { '@type': 'FAQPage', mainEntity: c.faq.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
     ] }).replace(/</g, '\\u003c') %></script>
     <% } %>
 </head>

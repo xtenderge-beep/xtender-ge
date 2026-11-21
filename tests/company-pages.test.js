@@ -2,7 +2,8 @@
 // адрес из домена сайта, без повторов; предпросмотр — noindex, без canonical; ссылка на анкету кладёт адрес в черновик;
 // после подтверждения адрес переходит исполнителю (если свободен); публичная страница — только у активного,
 // не тестового, не заблокированного; три языка с hreflang и разметкой; одобренные отзывы и средняя оценка;
-// страница в карте сайта; номер компании на странице не показывается.
+// страница в карте сайта; номер компании на странице не показывается; один язык на странице (районы, доп. услуги,
+// описание); короткий ответ сверху, вопросы-ответы с разметкой, похожие компании; кнопка заявки помечена компанией.
 const assert = require('node:assert/strict'), fs = require('fs'), path = require('path');
 const db = require('pg-mem').newDb(); db.public.none(fs.readFileSync(path.join(__dirname, '../schema.sql'), 'utf8'));
 const { Pool } = db.adapters.createPg(), pool = new Pool();
@@ -43,6 +44,15 @@ const render = (locals) => ejs.renderFile(path.join(__dirname, '../src/views/com
     assert.ok(!html.includes('599962596') && !html.includes('599 96'), 'номера нет');
     assert.ok(html.includes(m.copy.previewBanner) && html.includes(m.copy.cta));
   }
+  // Один язык: грузинское описание с сайта — только на грузинской странице; доп. услуги — на языке страницы.
+  const ka = await pages.byPreviewToken(a.preview_token, 'ka'), ru = await pages.byPreviewToken(a.preview_token, 'ru');
+  assert.equal(ka.intro, 'ავეჯის გადაზიდვა თბილისში და მთელ საქართველოში.');
+  assert.ok(!/[\u10A0-\u10FF]/.test(ru.intro), 'на русской странице нет грузинского описания: ' + ru.intro);
+  assert.deepEqual(ka.extras, ['შეფუთვა', 'პიანინო და სეიფი']); assert.deepEqual(ru.extras, ['упаковка', 'пианино и сейфы']);
+  assert.ok(ka.summary.startsWith('avejisgadazidva.ge — ') && ka.faq.length === 5);
+  assert.ok(!ka.ctaHref.includes('?company='), 'предпросмотр: компания ещё не принимает заявки');
+  assert.equal(pages.model({ name: 'X', services: ['junk'], other_services: ['вывоз пианино'], lang: 'en' }).extras.length, 0, 'незнакомое слово другим алфавитом не показываем');
+  assert.equal(pages.isIndexable('s'.repeat(130), 0), true, 'длина описания считается по знакам');
   assert.equal(await pages.byPreviewToken('wrong'), null);
   assert.equal(await pages.byPreviewToken('a'.repeat(20)), null);
 
@@ -68,7 +78,11 @@ const render = (locals) => ejs.renderFile(path.join(__dirname, '../src/views/com
   const pub = await pages.bySlug('avejisgadazidva', 'ru');
   assert.equal(pub.preview, false); assert.equal(pub.reviews.length, 1); assert.equal(pub.avg, 5);
   assert.equal(pub.intro, 'Перевозим мебель аккуратно.'); assert.deepEqual(pub.items.map(i => i.code), ['movers', 'van']);
-  assert.equal(pub.ctaHref, '/ru/s/mushebi-tbilisi');
+  assert.equal(pub.ctaHref, '/ru/s/mushebi-tbilisi?company=avejisgadazidva', 'заявка с кнопки помечена компанией');
+  const pubKa = await pages.bySlug('avejisgadazidva', 'ka');
+  assert.ok(!/[\u0400-\u04FF]/.test(pubKa.intro + pubKa.extras.join() + pubKa.languages.join()), 'на грузинской странице нет русского: ' + pubKa.intro);
+  await pool.query('UPDATE masters SET description_translations = $2 WHERE id = $1', [m.id, JSON.stringify({ ka: 'ავეჯს ფრთხილად ვზიდავთ.' })]);
+  assert.equal((await pages.bySlug('avejisgadazidva', 'ka')).intro, 'ავეჯს ფრთხილად ვზიდავთ.', 'перевод описания на язык страницы');
   const seo = buildSeo('ru', '/company/avejisgadazidva');
   const html = await render({ c: pub, seo, langHref: code => seo.alternates[code] });
   assert.ok(html.includes('rel="canonical" href="https://xtender.ge/ru/company/avejisgadazidva"'));
@@ -82,6 +96,9 @@ const render = (locals) => ejs.renderFile(path.join(__dirname, '../src/views/com
   assert.ok(html.includes('Номер подтверждён кодом из SMS') && html.includes('Проверено модератором'));
   assert.deepEqual(pub.dist.map(d => d.n), [1, 0, 0, 0, 0], 'разбивка по звёздам');
   assert.ok(pub.metaDescription.includes('Оценка 5 (1)'), pub.metaDescription);
+  assert.ok(pub.summary.includes('AG — ') && pub.summary.includes('Оценка 5 из 5'), pub.summary);
+  assert.ok(html.includes('"@type":"FAQPage"') && html.includes('Сколько стоят услуги AG?'), 'вопросы-ответы и их разметка');
+  assert.ok(html.includes('data-summary'), 'короткий ответ под названием');
 
   // Порог качества: без отзывов и с коротким описанием — noindex и не в карте сайта; длинное своё описание — открыта.
   await pool.query('UPDATE master_reviews SET is_approved = false WHERE master_id = $1', [m.id]);
@@ -94,6 +111,17 @@ const render = (locals) => ejs.renderFile(path.join(__dirname, '../src/views/com
   const rich = await pages.bySlug('avejisgadazidva', 'ru');
   assert.equal(rich.indexable, true); assert.deepEqual(rich.districts, ['Сабуртало', 'Ваке']);
   assert.ok((await render({ c: rich, seo, langHref: code => seo.alternates[code] })).includes('Сабуртало, Ваке'));
+  assert.deepEqual((await pages.bySlug('avejisgadazidva', 'ka')).districts, ['საბურთალო', 'ვაკე'], 'районы на языке страницы');
+
+  // Похожие компании: только опубликованные (порог качества) с общей услугой.
+  const other = (await pool.query("INSERT INTO masters (name, phone, is_active, category, description, public_slug) VALUES ('Movers Two', '+995599000777', true, 'movers', $1, 'movers-two') RETURNING id", ['Перевозки и грузчики по всему Тбилиси, работаем без выходных, своя машина и бригада из четырёх человек, разборка мебели и упаковка.'])).rows[0];
+  await pool.query("INSERT INTO master_services (master_id, service_type) VALUES ($1, 'movers')", [other.id]);
+  const thinOne = (await pool.query("INSERT INTO masters (name, phone, is_active, category, description, public_slug) VALUES ('Thin', '+995599000778', true, 'movers', 'коротко', 'thin') RETURNING id")).rows[0];
+  await pool.query("INSERT INTO master_services (master_id, service_type) VALUES ($1, 'movers')", [thinOne.id]);
+  const withSimilar = await pages.bySlug('avejisgadazidva', 'ru');
+  assert.deepEqual(withSimilar.similar.map(x => x.href), ['/ru/company/movers-two']);
+  assert.ok((await render({ c: withSimilar, seo, langHref: code => seo.alternates[code] })).includes('href="/ru/company/movers-two"'));
+  await pool.query('UPDATE masters SET public_slug = NULL WHERE id IN ($1, $2)', [other.id, thinOne.id]);
 
   // Тестовый или заблокированный — страницы нет.
   await pool.query('UPDATE masters SET is_technical = true WHERE id = $1', [m.id]);

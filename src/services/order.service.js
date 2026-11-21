@@ -41,13 +41,14 @@ async function nudgeLowBalance(master, telegramService, reason) {
 }
 
 // source — откуда заказчик пришёл на сайт (см. orders.source в schema.sql); null — не записано.
-async function createPendingOrder({ phone, description, districtName, managerId = null, source = null }) {
+// preferredMasterId — компания, со страницы которой оставлена заявка (orders.preferred_master_id).
+async function createPendingOrder({ phone, description, districtName, managerId = null, source = null, preferredMasterId = null }) {
   const token = generateShortId();
   const ownerToken = generateShortId();
   const { rows } = await pool.query(
-    `INSERT INTO orders (phone, description, district_name, token, owner_token, target_categories, status, manager_id, source)
-     VALUES ($1, $2, $3, $4, $5, '{}', 'unverified', $6, $7) RETURNING *`,
-    [phone, description, districtName, token, ownerToken, managerId, source]
+    `INSERT INTO orders (phone, description, district_name, token, owner_token, target_categories, status, manager_id, source, preferred_master_id)
+     VALUES ($1, $2, $3, $4, $5, '{}', 'unverified', $6, $7, $8) RETURNING *`,
+    [phone, description, districtName, token, ownerToken, managerId, source, preferredMasterId]
   );
   return rows[0];
 }
@@ -439,6 +440,9 @@ async function getDispatchRecipients(category, vehicleSize, leadPrice, isTechnic
     if(!definition.is_builtin && catalog.validate(definition,services.find(s=>s.service_type === definition.slug)?.attributes).errors.length) continue;
     result.push({...master,services,matched_categories:open.filter(c=>matching.matches(services,c,c==='transport' ? needSizes : '',open,order?.requirements)),...(options.withUnfunded ? {funded,billing_ok:!paid || allowed.has(master.id)} : {})});
   }
+  // Клиент выбрал компанию на её странице — она первая в списке и в очереди отправки (отбор тот же, что у всех).
+  const preferred=order?.preferred_master_id;
+  if(preferred) result.sort((a,b)=>(b.id===preferred)-(a.id===preferred));
   return result;
 }
 

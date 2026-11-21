@@ -16,7 +16,8 @@
                 <% if (c.avg) { %><p class="text-sm"><span class="font-black text-stone-900"><%= c.avg %></span> <span class="text-amber-500" aria-hidden="true"><%= '★'.repeat(Math.round(c.avg)) %></span> <a href="#reviews" class="text-emerald-700 font-bold"><%= k.reviewsCount(c.reviews.length) %></a></p><% } %>
             </div>
         </div>
-        <% if (c.items.length) { %><p class="text-sm font-bold text-emerald-700 mt-3"><%= c.items.map(i => i.title).join(' · ') %></p><% } %>
+        <%# Короткий ответ: кто, что, где, цена, оценка — одной фразой (её берут в сниппет и цитируют ИИ-ассистенты). %>
+        <p class="text-sm text-stone-700 mt-3" data-summary><%= c.summary %></p>
         <ul class="mt-3 space-y-1.5 text-sm text-stone-600">
             <li><i class="fa-solid fa-location-dot w-4 text-stone-400" aria-hidden="true"></i> <%= k.area %><%= c.districts && c.districts.length ? ': ' + c.districts.join(', ') : '' %></li>
             <% if (c.since) { %><li><i class="fa-solid fa-clock w-4 text-stone-400" aria-hidden="true"></i> <%= k.since(c.since) %></li><% } %>
@@ -30,7 +31,8 @@
             <li class="text-emerald-800"><i class="fa-solid fa-shield-halved w-4" aria-hidden="true"></i> <%= k.badgeModerated %></li>
         </ul>
         <% } %>
-        <a href="<%= c.ctaHref %>" class="mt-4 flex justify-center px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm"><%= k.cta %></a>
+        <%# На телефоне на странице компании кнопка закреплена внизу экрана (company.ejs) — здесь вторая не нужна. %>
+        <a href="<%= c.ctaHref %>" class="mt-4 <%= one ? 'flex' : 'hidden md:flex' %> justify-center px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm"><%= k.cta %></a>
         <p class="text-xs text-stone-500 mt-2"><%= k.ctaNote %></p>
     </aside>
 
@@ -84,11 +86,29 @@
             <% } %>
         </section>
 
+        <% if (c.faq && c.faq.length) { %>
+        <section class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
+            <h3 class="text-base font-black text-stone-900 mb-2"><%= k.faqTitle %></h3>
+            <div class="divide-y divide-stone-100"><% c.faq.forEach(f => { %>
+                <details class="py-2 group"><summary class="cursor-pointer text-sm font-bold text-stone-800 list-none flex justify-between gap-2"><%= f.q %><i class="fa-solid fa-chevron-down text-stone-400 text-xs mt-1 group-open:rotate-180" aria-hidden="true"></i></summary><p class="text-sm text-stone-600 mt-1"><%= f.a %></p></details>
+            <% }); %></div>
+        </section>
+        <% } %>
+
         <section class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
             <h3 class="text-base font-black text-stone-900 mb-3"><%= k.howTitle %></h3>
             <ol class="grid gap-3 sm:grid-cols-3"><% k.how.forEach((step, n) => { %>
                 <li class="rounded-xl bg-stone-50 p-3 text-sm text-stone-700"><span class="block text-emerald-700 font-black text-lg"><%= n + 1 %></span><%= step %></li>
             <% }); %></ol>
         </section>
+
+        <% if (c.similar && c.similar.length) { %>
+        <section class="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
+            <h3 class="text-base font-black text-stone-900 mb-3"><%= k.similarTitle %></h3>
+            <div class="grid gap-3 sm:grid-cols-2"><% c.similar.forEach(s => { %>
+                <a href="<%= s.href %>" class="block rounded-xl border border-stone-200 hover:border-emerald-400 p-3"><p class="font-bold text-stone-900"><%= s.name %></p><p class="text-xs text-stone-500 mt-1"><%= s.services %></p></a>
+            <% }); %></div>
+        </section>
+        <% } %>
     </div>
 </div>
